@@ -1,0 +1,15 @@
+.vscode
+/build
+/output
+*.lp
+*.mps.gz
+*.dot
+*.pdf
+*.eps
+*.svg
+*.index
+*.patches
+*.links
+
+/doc/html
+/doc/latex

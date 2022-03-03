@@ -1,0 +1,6 @@
+[submodule "melon"]
+	path = melon
+	url = https://github.com/fhamonic/melon
+[submodule "mippp"]
+	path = mippp
+	url = https://github.com/fhamonic/mippp

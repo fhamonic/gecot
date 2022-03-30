@@ -3,7 +3,7 @@
 
 #include <concepts>
 
-#include "melon.hpp"
+#include "melon/all.hpp"
 
 #include "concepts/detail/range_of.hpp"
 #include "concepts/instance_case.hpp"

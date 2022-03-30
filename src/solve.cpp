@@ -7,6 +7,7 @@ namespace br = boost::range;
 #include <boost/program_options.hpp>
 namespace bpo = boost::program_options;
 
+#define BOOST_LOG_DYN_LINK 1
 #include <boost/log/core.hpp>
 #include <boost/log/expressions.hpp>
 #include <boost/log/trivial.hpp>

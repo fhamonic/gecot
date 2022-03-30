@@ -12,77 +12,76 @@ project(
 # ################### Options ####################
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CONAN_DISABLE_CHECK_COMPILER ON)
 
-option(WARNINGS "" OFF)
-option(HARDCORE_WARNINGS "" OFF)
-option(COMPILE_FOR_NATIVE "" OFF)
-option(COMPILE_WITH_LTO "" OFF)
-option(WITH_GUROBI "" OFF)
-
-set(WARNINGS_LIST "-Wall;-Wextra;")
-set(HARDCORE_WARNINGS_LIST
-    "-Wall;-Wextra;-Wshadow;-Wpedantic;-Wnon-virtual-dtor;-Wold-style-cast;-Wcast-align;-Wunused;-Woverloaded-virtual;-Wpedantic;-Wconversion;-Wsign-conversion;-Wmisleading-indentation;-Wduplicated-cond;-Wduplicated-branches;-Wlogical-op;-Wnull-dereference;-Wuseless-cast;-Wdouble-promotion;-Wformat=2;-Wlifetime"
-)
+option(WARNINGS "Enable warnings" OFF)
+option(OPTIMIZE_FOR_NATIVE "Build with -march=native" OFF)
 
 # ################### Modules ####################
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
-include(CMakeBuildTypeUtils)
+include(GNUInstallDirs)
+include(CompilerWarnings)
+include(CompilerOptimizations)
+include(Conan)
+run_conan()
+
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}" ${CMAKE_MODULE_PATH})
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/dependencies/melon" ${CMAKE_MODULE_PATH})
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/dependencies/mippp" ${CMAKE_MODULE_PATH})
+
+add_subdirectory(dependencies/melon)
+add_subdirectory(dependencies/mippp)
 
 # ################### Packages ####################
-include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-conan_basic_setup(TARGETS)
+find_package(fast-cpp-csv-parser REQUIRED)
+find_package(nlohmann_json REQUIRED)
+find_package(phmap REQUIRED)
+find_package(TBB REQUIRED)
+find_package(Boost REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(range-v3 REQUIRED)
 
-find_package(LEMON REQUIRED)
 find_package(COIN REQUIRED)
-if(${WITH_GUROBI} STREQUAL "ON")
-    find_package(GUROBI REQUIRED)
-endif()
-
+find_package(GUROBI REQUIRED)
 
 # ################### LIB target ####################
 add_library(landscape_opt INTERFACE)
 target_include_directories(landscape_opt INTERFACE src/landscape_opt)
 
-target_link_libraries(landscape_opt INTERFACE CONAN_PKG::fast-cpp-csv-parser)
-target_link_libraries(landscape_opt INTERFACE CONAN_PKG::nlohmann_json)
-target_link_libraries(landscape_opt INTERFACE CONAN_PKG::parallel-hashmap)
-target_link_libraries(landscape_opt INTERFACE CONAN_PKG::tbb)
-target_link_libraries(landscape_opt INTERFACE CONAN_PKG::boost)
-target_link_libraries(landscape_opt INTERFACE CONAN_PKG::eigen)
-target_link_libraries(landscape_opt INTERFACE CONAN_PKG::range-v3)
+target_link_libraries(landscape_opt INTERFACE fast-cpp-csv-parser::fast-cpp-csv-parser)
+target_link_libraries(landscape_opt INTERFACE nlohmann_json::nlohmann_json)
+target_link_libraries(landscape_opt INTERFACE phmap::phmap)
+target_link_libraries(landscape_opt INTERFACE TBB::tbb)
+target_link_libraries(landscape_opt INTERFACE Boost::boost)
+target_link_libraries(landscape_opt INTERFACE Eigen3::Eigen3)
+target_link_libraries(landscape_opt INTERFACE range-v3::range-v3)
 
-target_include_directories(landscape_opt INTERFACE ${COIN_INCLUDE_DIR})
-target_link_libraries(landscape_opt INTERFACE ${COIN_LIBRARIES})
+target_link_libraries(landscape_opt INTERFACE melon)
+target_link_libraries(landscape_opt INTERFACE mippp)
 
-if(${WITH_GUROBI} STREQUAL "ON")
-    target_include_directories(landscape_opt INTERFACE ${GUROBI_INCLUDE_DIR})
-    target_link_libraries(landscape_opt INTERFACE ${GUROBI_LIBRARIES})
-endif()
+# target_include_directories(landscape_opt INTERFACE ${COIN_INCLUDE_DIR})
+# target_link_libraries(landscape_opt INTERFACE ${COIN_LIBRARIES})
+
+# if(${WITH_GUROBI} STREQUAL "ON")
+#     target_include_directories(landscape_opt INTERFACE ${GUROBI_INCLUDE_DIR})
+#     target_link_libraries(landscape_opt INTERFACE ${GUROBI_LIBRARIES})
+# endif()
 
 
-# ################## TEST target ####################
-# enable_testing()
+# # ################## TEST target ####################
+# # enable_testing()
 
-# add_executable(test_test test/test.cpp)
-# target_include_directories(test_test PUBLIC include)
-# target_link_libraries(test_test CONAN_PKG::gtest)
-# target_link_libraries(test_test landscape_opt)
+# # add_executable(test_test test/test.cpp)
+# # target_include_directories(test_test PUBLIC include)
+# # target_link_libraries(test_test CONAN_PKG::gtest)
+# # target_link_libraries(test_test landscape_opt)
 
-# include(GoogleTest)
-# gtest_discover_tests(test_test)
+# # include(GoogleTest)
+# # gtest_discover_tests(test_test)
 
-# ################## EXEC target ####################
+# # ################## EXEC target ####################
 
 add_executable(solve src/solve.cpp)
-target_include_directories(solve PUBLIC include melon/single-header mippp/single-header)
+target_include_directories(solve PUBLIC include)
 target_link_libraries(solve PUBLIC landscape_opt)
 
-target_compile_options_if_exists(solve PRIVATE ${WARNINGS}
-                                 ${WARNINGS_LIST})
-target_compile_options_if_exists(solve PRIVATE ${HARDCORE_WARNINGS}
-                                 ${HARDCORE_WARNINGS_LIST})
-target_compile_options_if_exists(solve PRIVATE ${COMPILE_FOR_NATIVE}
-                                 -march=native)
-target_compile_options_if_exists(solve PRIVATE ${COMPILE_WITH_LTO}
-                                 -flto)
+

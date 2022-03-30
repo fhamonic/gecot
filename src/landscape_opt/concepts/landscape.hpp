@@ -3,7 +3,7 @@
 
 #include <concepts>
 
-#include "melon.hpp"
+#include "melon/all.hpp"
 
 namespace fhamonic {
 namespace landscape_opt {

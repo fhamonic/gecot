@@ -26,5 +26,8 @@ doc:
 	doxywizard $$PWD/docs/Doxyfile
 	xdg-open docs/html/index.html
 
+init-submodules:
+	git submodule update --init --recursive
+	
 update-submodules:
 	git submodule update --recursive --remote

@@ -17,10 +17,9 @@ concept MultiInstance = requires(T mi, typename T::Option o, typename T::Solutio
     { mi.options() } -> detail::range_of<typename T::Option>;
     { mi.option_cost(o) } -> std::same_as<double>;
     { mi.cases() } -> std::ranges::range;
-    { *std::ranges::begin(mi.options()) } -> InstanceCase;
+    { *std::ranges::begin(mi.cases()) } -> InstanceCase;
     { mi.option_cost(o) } -> std::same_as<double>;
     { mi.create_solution() } -> std::same_as<typename T::Solution>;
-    { s[o] } -> std::same_as<double&>;
 };
 
 }  // namespace concepts

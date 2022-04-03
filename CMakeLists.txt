@@ -36,7 +36,7 @@ find_package(fast-cpp-csv-parser REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(phmap REQUIRED)
 find_package(TBB REQUIRED)
-find_package(Boost REQUIRED)
+find_package(Boost REQUIRED COMPONENTS program_options)
 find_package(Eigen3 REQUIRED)
 find_package(range-v3 REQUIRED)
 
@@ -47,11 +47,8 @@ find_package(GUROBI REQUIRED)
 add_library(landscape_opt INTERFACE)
 target_include_directories(landscape_opt INTERFACE src/landscape_opt)
 
-target_link_libraries(landscape_opt INTERFACE fast-cpp-csv-parser::fast-cpp-csv-parser)
-target_link_libraries(landscape_opt INTERFACE nlohmann_json::nlohmann_json)
-target_link_libraries(landscape_opt INTERFACE phmap::phmap)
 target_link_libraries(landscape_opt INTERFACE TBB::tbb)
-target_link_libraries(landscape_opt INTERFACE Boost::boost)
+target_link_libraries(landscape_opt INTERFACE Boost::Boost)
 target_link_libraries(landscape_opt INTERFACE Eigen3::Eigen3)
 target_link_libraries(landscape_opt INTERFACE range-v3::range-v3)
 
@@ -80,8 +77,11 @@ target_link_libraries(landscape_opt INTERFACE mippp)
 
 # # ################## EXEC target ####################
 
-add_executable(solve src/solve.cpp)
-target_include_directories(solve PUBLIC include)
-target_link_libraries(solve PUBLIC landscape_opt)
+add_executable(lscp_solve src/solve.cpp)
+target_include_directories(lscp_solve PUBLIC src include)
+target_link_libraries(lscp_solve PUBLIC landscape_opt)
+target_link_libraries(lscp_solve PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser)
+target_link_libraries(lscp_solve PUBLIC nlohmann_json::nlohmann_json)
+target_link_libraries(lscp_solve PUBLIC phmap::phmap)
 
 

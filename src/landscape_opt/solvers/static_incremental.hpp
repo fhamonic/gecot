@@ -1,5 +1,5 @@
-#ifndef LANDSCAPE_OPT_SOLVERS_INCREMENTAL_LOCAL_HPP
-#define LANDSCAPE_OPT_SOLVERS_INCREMENTAL_LOCAL_HPP
+#ifndef LANDSCAPE_OPT_SOLVERS_STATIC_INCREMENTAL_HPP
+#define LANDSCAPE_OPT_SOLVERS_STATIC_INCREMENTAL_HPP
 
 #include <execution>
 
@@ -10,15 +10,13 @@
 #include "helper.hpp"
 #include "indices/eca.hpp"
 #include "utils/chrono.hpp"
-#include "utils/random_chooser.hpp"
 
 namespace fhamonic {
 namespace landscape_opt {
 namespace solvers {
 
-struct IncrementalLocal {
-    int seed = 314159265;
-    int log_level = 0;
+struct StaticIncremental {
+    bool verbose = false;
     bool parallel = false;
 
     int time_ms = 0;
@@ -36,7 +34,7 @@ struct IncrementalLocal {
         const auto arcOptions = detail::computeOptionsForArcs(instance);
 
         const double base_eca = eca(instance.landscape);
-        if(log_level > 1) {
+        if(verbose) {
             std::cout << "base ECA: " << base_eca << std::endl;
         }
 
@@ -45,8 +43,10 @@ struct IncrementalLocal {
 
         auto compute = [&instance, &nodeOptions, &arcOptions,
                         base_eca](Option option) {
-            typename Landscape::QualityMap qm = instance.landscape.quality_map();
-            typename Landscape::ProbabilityMap pm = instance.landscape.probability_map();
+            typename Landscape::QualityMap qm =
+                instance.landscape.quality_map();
+            typename Landscape::ProbabilityMap pm =
+                instance.landscape.probability_map();
 
             for(auto && [u, quality_gain] : nodeOptions[option])
                 qm[u] += quality_gain;
@@ -80,9 +80,11 @@ struct IncrementalLocal {
             if(purchaised + price > budget) continue;
             purchaised += price;
             solution[option] = 1.0;
-            if(log_level > 1)
+            if(verbose) {
                 std::cout << "add option: " << option
-                          << "\t purchaised: " << purchaised << std::endl;
+                          << "\n\t costing: " << price
+                          << "\n\t total cost: " << purchaised << std::endl;
+            }
         }
 
         time_ms = chrono.timeMs();
@@ -95,4 +97,4 @@ struct IncrementalLocal {
 }  // namespace landscape_opt
 }  // namespace fhamonic
 
-#endif  // LANDSCAPE_OPT_SOLVERS_INCREMENTAL_LOCAL_HPP
+#endif  // LANDSCAPE_OPT_SOLVERS_STATIC_INCREMENTAL_HPP

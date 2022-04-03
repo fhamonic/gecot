@@ -1,9 +1,9 @@
-#ifndef BPO_UTILS_HPP
-#define BPO_UTILS_HPP
+#ifndef PO_UTILS_HPP
+#define PO_UTILS_HPP
 
 #include <boost/program_options.hpp>
 
-namespace BPOUtils {
+namespace po_utils {
 void conflicting_options(const boost::program_options::variables_map & vm,
                          const std::string & opt1, const std::string & opt2) {
     if(vm.count(opt1) && !vm[opt1].defaulted() && vm.count(opt2) &&
@@ -21,6 +21,6 @@ std::pair<std::string, std::string> split_equality_str(
                           str.substr(split_index + 1, -1));
 }
 
-}  // namespace BPOUtils
+}  // namespace po_utils
 
-#endif  // BPO_UTILS
+#endif  // PO_UTILS

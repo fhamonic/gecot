@@ -1,6 +1,7 @@
 #ifndef LANDSCAPE_OPT_INDICES_ECA_HPP
 #define LANDSCAPE_OPT_INDICES_ECA_HPP
 
+#include <cmath>
 #include <concepts>
 
 #include "melon/all.hpp"

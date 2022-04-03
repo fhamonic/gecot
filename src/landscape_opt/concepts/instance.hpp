@@ -19,7 +19,6 @@ concept Instance = InstanceCase<T> &&
     { i.options() } -> detail::range_of<typename T::Option>;
     { i.option_cost(o) } -> std::same_as<double>;
     { i.create_solution() } -> std::same_as<typename T::Solution>;
-    { s[o] } -> std::same_as<double &>;
 };
 
 }  // namespace concepts

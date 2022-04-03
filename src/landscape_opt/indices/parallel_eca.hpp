@@ -1,6 +1,7 @@
 #ifndef LANDSCAPE_OPT_INDICES_PARALLEL_ECA_HPP
 #define LANDSCAPE_OPT_INDICES_PARALLEL_ECA_HPP
 
+#include <cmath>
 #include <concepts>
 
 #include <tbb/blocked_range.h>

@@ -31,7 +31,6 @@ macro(run_conan)
         eigen/3.4.0
         range-v3/0.11.0
         gtest/cci.20210126
-        nlohmann_json/3.10.5
         GENERATORS
         cmake_find_package
         )

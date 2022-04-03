@@ -1,5 +1,5 @@
-#ifndef LANDSCAPE_OPT_SOLVERS_DECREMENTAL_LOCAL_HPP
-#define LANDSCAPE_OPT_SOLVERS_DECREMENTAL_LOCAL_HPP
+#ifndef LANDSCAPE_OPT_SOLVERS_STATIC_DECREMENTAL_HPP
+#define LANDSCAPE_OPT_SOLVERS_STATIC_DECREMENTAL_HPP
 
 #include <execution>
 
@@ -10,15 +10,13 @@
 #include "helper.hpp"
 #include "indices/eca.hpp"
 #include "utils/chrono.hpp"
-#include "utils/random_chooser.hpp"
 
 namespace fhamonic {
 namespace landscape_opt {
 namespace solvers {
 
-struct DecrementalLocal {
-    int seed = 314159265;
-    int log_level = 0;
+struct StaticDecremental {
+    bool verbose = false;
     bool parallel = false;
 
     int time_ms = 0;
@@ -51,8 +49,9 @@ struct DecrementalLocal {
 
         const double enhanced_eca =
             eca(instance.landscape.graph(), enhanced_qm, enhanced_pm);
-        if(log_level > 1) {
-            std::cout << "enhanced ECA: " << enhanced_eca << std::endl;
+        if(verbose) {
+            std::cout << "ECA with all improvments: " << enhanced_eca
+                      << std::endl;
         }
 
         std::vector<Option> options(instance.options());
@@ -95,7 +94,7 @@ struct DecrementalLocal {
 
         auto zipped_view_dec = ranges::view::zip(options_ratios, options);
         ranges::sort(zipped_view_dec, [](std::pair<double, Option> & e1,
-                                     std::pair<double, Option> & e2) {
+                                         std::pair<double, Option> & e2) {
             return e1.first < e2.first;
         });
 
@@ -107,9 +106,11 @@ struct DecrementalLocal {
             purchaised -= price;
             solution[option] = 0.0;
             free_options.emplace_back(option);
-            if(log_level > 1)
+            if(verbose) {
                 std::cout << "remove option: " << option
-                          << "\t purchaised: " << purchaised << std::endl;
+                          << "\n\t costing: " << price
+                          << "\n\t total cost: " << purchaised << std::endl;
+            }
         }
 
         typename Landscape::QualityMap current_qm = quality_map;
@@ -123,7 +124,8 @@ struct DecrementalLocal {
                 current_pm[a] = std::max(current_pm[a], enhanced_prob);
         }
 
-        const double current_eca = eca(instance.landscape.graph(), current_qm, current_pm);
+        const double current_eca =
+            eca(instance.landscape.graph(), current_qm, current_pm);
 
         auto compute_inc = [&](Option option) {
             typename Landscape::QualityMap qm = current_qm;
@@ -153,7 +155,7 @@ struct DecrementalLocal {
 
         auto zipped_view_inc = ranges::view::zip(options_ratios, free_options);
         ranges::sort(zipped_view_inc, [](std::pair<double, Option> & e1,
-                                     std::pair<double, Option> & e2) {
+                                         std::pair<double, Option> & e2) {
             return e1.first > e2.first;
         });
 
@@ -162,9 +164,11 @@ struct DecrementalLocal {
             if(purchaised + price > budget) continue;
             purchaised += price;
             solution[option] = 1.0;
-            if(log_level > 1)
+            if(verbose) {
                 std::cout << "add option: " << option
-                          << "\t purchaised: " << purchaised << std::endl;
+                          << "\n\t costing: " << price
+                          << "\n\t total cost: " << purchaised << std::endl;
+            }
         }
 
         time_ms = chrono.timeMs();
@@ -177,4 +181,4 @@ struct DecrementalLocal {
 }  // namespace landscape_opt
 }  // namespace fhamonic
 
-#endif  // LANDSCAPE_OPT_SOLVERS_DECREMENTAL_LOCAL_HPP
+#endif  // LANDSCAPE_OPT_SOLVERS_STATIC_DECREMENTAL_HPP

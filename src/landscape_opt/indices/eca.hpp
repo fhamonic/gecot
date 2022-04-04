@@ -22,7 +22,7 @@ double eca(const GR & graph, const QM & quality_map,
     double eca_sum = 0.0;
     for(auto && s : graph.vertices()) {
         double sum = 0.0;
-        dijkstra.reset(s);
+        dijkstra.reset();
         dijkstra.add_source(s);
         for(const auto & [u, prob] : dijkstra) {
             sum += quality_map[u] * prob;

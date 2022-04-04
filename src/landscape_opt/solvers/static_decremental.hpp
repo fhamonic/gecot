@@ -20,8 +20,6 @@ struct StaticDecremental {
     bool verbose = false;
     bool parallel = false;
 
-    int time_ms = 0;
-
     template <concepts::Instance I>
     typename I::Solution solve(const I & instance, const double budget) const {
         using Landscape = typename I::Landscape;
@@ -32,6 +30,7 @@ struct StaticDecremental {
 
         Chrono chrono;
         Solution solution = instance.create_solution();
+        int time_ms = 0;
 
         const auto nodeOptions = detail::computeOptionsForNodes(instance);
         const auto arcOptions = detail::computeOptionsForArcs(instance);
@@ -96,8 +95,9 @@ struct StaticDecremental {
                            options_ratios.begin(), compute_dec);
 
         auto zipped_view_dec = ranges::view::zip(options_ratios, options);
-        ranges::sort(zipped_view_dec,
-                     [](auto && e1, auto && e2) { return e1.first < e2.first; });
+        ranges::sort(zipped_view_dec, [](auto && e1, auto && e2) {
+            return e1.first < e2.first;
+        });
 
         std::vector<Option> free_options;
 
@@ -148,15 +148,16 @@ struct StaticDecremental {
         options_ratios.resize(free_options.size());
 
         if(parallel)
-            std::transform(std::execution::par_unseq, free_options.begin(), free_options.end(),
-                                   options_ratios.begin(), compute_inc);
+            std::transform(std::execution::par_unseq, free_options.begin(),
+                           free_options.end(), options_ratios.begin(),
+                           compute_inc);
         else
-            std::transform(std::execution::seq, free_options.begin(), free_options.end(),
-                                   options_ratios.begin(), compute_inc);
+            std::transform(std::execution::seq, free_options.begin(),
+                           free_options.end(), options_ratios.begin(),
+                           compute_inc);
 
         auto zipped_view_inc = ranges::view::zip(options_ratios, free_options);
-        ranges::sort(zipped_view_inc, [](auto && e1,
-                                         auto && e2) {
+        ranges::sort(zipped_view_inc, [](auto && e1, auto && e2) {
             return e1.first > e2.first;
         });
 

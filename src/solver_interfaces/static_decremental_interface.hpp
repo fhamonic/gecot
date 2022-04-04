@@ -18,6 +18,8 @@ private:
     landscape_opt::solvers::StaticDecremental solver;
 
 public:
+    StaticDecrementalInterface() = default;
+
     void parse(const std::vector<std::string> & args) {
         boost::program_options::options_description desc("Allowed options");
         desc.add_options()("help,h", "Display this help message")(
@@ -45,7 +47,10 @@ public:
         return solver.solve(instance, B);
     };
 
-    const std::string name() const { return "static_decremental"; }
+    std::string name() const { return "static_decremental"; }
+    std::string description() const { return ""; }
+    std::string params_lists() const { return ""; }
+    std::string string() const { return "static_decremental"; }
 };
 
 }  // namespace fhamonic

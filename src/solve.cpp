@@ -42,23 +42,12 @@ void init_logging() {
                                      logging::trivial::warning);
 }
 
-std::optional<std::unique_ptr<AbstractSolver> &> find_solver(
-    std::vector<std::unique_ptr<AbstractSolver>> & solvers,
-    const std::string & name) {
-    for(auto & solver : solvers) {
-        if(solver->name() == name)
-            return std::optional<std::unique_ptr<AbstractSolver> &>(solver);
-    }
-    return std::nullopt;
-}
-
 static bool process_command_line(
-    int argc, const char * argv[], std::unique_ptr<AbstractSolver> & solver,
+    int argc, const char * argv[], std::shared_ptr<AbstractSolver> & solver,
     std::filesystem::path & instances_description_json_file, double & budget,
     bool & output_in_file, std::filesystem::path & output_csv_file) {
-    std::vector<std::unique_ptr<AbstractSolver>> solver_interfaces{
-        // std::make_unique<StaticDecrementalInterface>()
-    };
+    std::vector<std::shared_ptr<AbstractSolver>> solver_interfaces{
+        std::make_unique<StaticDecrementalInterface>()};
 
     std::string solver_name;
     std::vector<std::string> solver_params;
@@ -80,8 +69,8 @@ static bool process_command_line(
 
         po::positional_options_description p;
         p.add("algorithm", 1);
-        p.add("instance", 2);
-        p.add("budget", 3);
+        p.add("instance", 1);
+        p.add("budget", 1);
         p.add("params", -1);
         po::variables_map vm;
         po::store(po::basic_command_line_parser(argc, argv)
@@ -107,16 +96,36 @@ Usage:
             std::cout << R"(LSCP 0.1
 
 Available algorithms:
-)" << std::endl;
-            // for(auto & s : solvers) std::cout << "\t" << s->name() <<
-            // std::endl;
+)";
+            for(auto & s : solver_interfaces)
+                std::cout << "  " << s->name() << '\n';
+            std::cout << std::endl;
             return false;
         }
 
-        auto solver_interface = find_solver(solver_interfaces, solver_name);
-        // if(vm.count("list-params") && solver_interface)
+        if(vm.count("algorithm")) {
+            solver_name = vm["algorithm"].as<std::string>();
+            for(auto & s : solver_interfaces) {
+                if(solver->name() == solver_name) {
+                    solver = std::move(s);
+                    break;
+                }
+            }
+        }
+
+        if(vm.count("list-params")) {
+              std::cout << R"(LSCP 0.1
+
+Algorithms options:
+)";
+            for(auto & s : solver_interfaces)
+                std::cout << "  " << s->description() << '\n';
+            std::cout << std::endl;
+            return false;          
+        }
 
         po::notify(vm);
+        // if(vm.count("list-params") && solver_interface) po::notify(vm);
         // if(it == solvers.end())
         // solver = make_solver(solver_name);
         // if(vm.count("list-params")) {
@@ -153,7 +162,7 @@ int main(int argc, const char * argv[]) {
     (void)argc;
     (void)argv;
 
-    std::unique_ptr<AbstractSolver> solver;
+    std::shared_ptr<AbstractSolver> solver;
     std::filesystem::path instances_description_json;
     double budget;
     bool output_in_file;

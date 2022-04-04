@@ -10,10 +10,12 @@ namespace fhamonic {
 
 class AbstractSolver {
 public:
-    virtual void parse(std::vector<std::string> args) = 0;
+    virtual void parse(const std::vector<std::string> & args) = 0;
     virtual typename Instance::Solution solve(const Instance & instance,
                                               const double B) const = 0;
-    virtual const std::string name() const = 0;
+    virtual std::string name() const = 0;
+    virtual std::string description() const = 0;
+    virtual std::string params_lists() const = 0;
     virtual std::string string() const = 0;
 };
 

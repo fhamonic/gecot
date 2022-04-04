@@ -20,7 +20,7 @@ double eca(const GR & graph, const QM & quality_map,
         dijkstra(graph, probability_map);
 
     double eca_sum = 0.0;
-    for(auto && s : graph.nodes()) {
+    for(auto && s : graph.vertices()) {
         double sum = 0.0;
         dijkstra.reset(s);
         dijkstra.add_source(s);

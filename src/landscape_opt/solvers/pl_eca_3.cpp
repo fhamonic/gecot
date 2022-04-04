@@ -58,9 +58,9 @@ private:
 
 public:
     XVar(const ContractionResult & cr)
-        : VarType(lemon::countArcs(cr.landscape.getNetwork())), _cr(cr) {}
+        : VarType(lemon::countArcs(cr.landscape().getNetwork())), _cr(cr) {}
     int id(StaticLandscape::Arc a) const {
-        const int id = _cr.landscape.getNetwork().id(a);
+        const int id = _cr.landscape().getNetwork().id(a);
         assert(id >= 0 && id < _number);
         return _offset + id;
     }
@@ -212,7 +212,7 @@ void fill_solver(OSI_Builder & solver_builder,
     auto M_x_const = [&](MutableLandscape::Node t, StaticLandscape::Arc a) {
         const ContractionResult & cr = *(*pdatas.contracted_instances)[t];
         const StaticLandscape::Graph & contracted_graph =
-            cr.landscape.getNetwork();
+            cr.landscape().getNetwork();
         return (*pdatas.M_Maps_Map[t])[contracted_graph.source(a)];
     };
     auto M_f_const = [&](MutableLandscape::Node t) {

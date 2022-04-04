@@ -17,7 +17,7 @@ namespace landscape_opt {
 template <typename GR, typename QM, typename PM>
 double parallel_eca(const GR & graph, const QM & quality_map,
            const PM & probability_map) {
-    auto nodes_range = graph.nodes();
+    auto nodes_range = graph.vertices();
 
     double eca_sum = tbb::parallel_reduce(
         tbb::blocked_range(nodes_range.begin(), nodes_range.end()), 0.0,

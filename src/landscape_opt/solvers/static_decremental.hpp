@@ -4,6 +4,7 @@
 #include <execution>
 
 #include <range/v3/algorithm/sort.hpp>
+#include <range/v3/range/conversion.hpp>
 #include <range/v3/view/zip.hpp>
 
 #include "concepts/instance.hpp"
@@ -35,8 +36,8 @@ struct StaticDecremental {
         const auto nodeOptions = detail::computeOptionsForNodes(instance);
         const auto arcOptions = detail::computeOptionsForArcs(instance);
 
-        QualityMap quality_map = instance.landscape.quality_map();
-        ProbabilityMap probability_map = instance.landscape.probability_map();
+        QualityMap quality_map = instance.landscape().quality_map();
+        ProbabilityMap probability_map = instance.landscape().probability_map();
 
         QualityMap enhanced_qm = quality_map;
         ProbabilityMap enhanced_pm = probability_map;
@@ -48,13 +49,14 @@ struct StaticDecremental {
         }
 
         const double enhanced_eca =
-            eca(instance.landscape.graph(), enhanced_qm, enhanced_pm);
+            eca(instance.landscape().graph(), enhanced_qm, enhanced_pm);
         if(verbose) {
             std::cout << "ECA with all improvments: " << enhanced_eca
                       << std::endl;
         }
 
-        std::vector<Option> options(instance.options());
+        std::vector<Option> options =
+            ranges::to<std::vector>(instance.options());
         std::vector<double> options_ratios(options.size());
 
         double purchaised = 0.0;
@@ -71,14 +73,15 @@ struct StaticDecremental {
                 enhanced_qm[u] -= quality_gain;
             for(auto && [a, enhanced_prob] : arcOptions[option]) {
                 enhanced_pm[a] = probability_map[a];
-                for(auto && [enhanced_prob, i] : instance.arc_options_map(a)) {
+                for(auto && [enhanced_prob, i] :
+                    instance.arc_options_map()[a]) {
                     if(option == i) continue;
                     enhanced_pm[a] = std::max(enhanced_pm[a], enhanced_prob);
                 }
             }
 
             const double decreased_eca =
-                eca(instance.landscape.graph(), qm, pm);
+                eca(instance.landscape().graph(), qm, pm);
             const double ratio =
                 (enhanced_eca - decreased_eca) / instance.option_cost(option);
 
@@ -86,17 +89,15 @@ struct StaticDecremental {
         };
 
         if(parallel)
-            std::ranges::transform(std::execution::par_unseq, options,
-                                   options_ratios.begin(), compute_dec);
+            std::transform(std::execution::par_unseq, options.begin(),
+                           options.end(), options_ratios.begin(), compute_dec);
         else
-            std::ranges::transform(std::execution::seq, options,
-                                   options_ratios.begin(), compute_dec);
+            std::transform(std::execution::seq, options.begin(), options.end(),
+                           options_ratios.begin(), compute_dec);
 
         auto zipped_view_dec = ranges::view::zip(options_ratios, options);
-        ranges::sort(zipped_view_dec, [](std::pair<double, Option> & e1,
-                                         std::pair<double, Option> & e2) {
-            return e1.first < e2.first;
-        });
+        ranges::sort(zipped_view_dec,
+                     [](auto && e1, auto && e2) { return e1.first < e2.first; });
 
         std::vector<Option> free_options;
 
@@ -125,7 +126,7 @@ struct StaticDecremental {
         }
 
         const double current_eca =
-            eca(instance.landscape.graph(), current_qm, current_pm);
+            eca(instance.landscape().graph(), current_qm, current_pm);
 
         auto compute_inc = [&](Option option) {
             typename Landscape::QualityMap qm = current_qm;
@@ -137,7 +138,7 @@ struct StaticDecremental {
                 pm[a] = std::max(pm[a], enhanced_prob);
 
             const double increased_eca =
-                eca(instance.landscape.graph(), qm, pm);
+                eca(instance.landscape().graph(), qm, pm);
             const double ratio =
                 (increased_eca - current_eca) / instance.option_cost(option);
 
@@ -147,15 +148,15 @@ struct StaticDecremental {
         options_ratios.resize(free_options.size());
 
         if(parallel)
-            std::ranges::transform(std::execution::par_unseq, free_options,
+            std::transform(std::execution::par_unseq, free_options.begin(), free_options.end(),
                                    options_ratios.begin(), compute_inc);
         else
-            std::ranges::transform(std::execution::seq, free_options,
+            std::transform(std::execution::seq, free_options.begin(), free_options.end(),
                                    options_ratios.begin(), compute_inc);
 
         auto zipped_view_inc = ranges::view::zip(options_ratios, free_options);
-        ranges::sort(zipped_view_inc, [](std::pair<double, Option> & e1,
-                                         std::pair<double, Option> & e2) {
+        ranges::sort(zipped_view_inc, [](auto && e1,
+                                         auto && e2) {
             return e1.first > e2.first;
         });
 

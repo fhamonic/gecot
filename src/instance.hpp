@@ -10,11 +10,13 @@
 
 #include <parallel_hashmap/phmap.h>
 
-#include "landscape.hpp"
+#include "static_landscape.hpp"
+
+namespace fhamonic {
 
 class Instance {
 public:
-    using Landscape = int;
+    using Landscape = StaticLandscape;
     using Option = int;
     using Solution = std::vector<double>;
 
@@ -25,8 +27,8 @@ private:
     std::vector<std::string> _options_names;
     phmap::node_hash_map<std::string, Option> _option_name_to_id_map;
 
-    std::vector<std::vector<std::pair<Option, double>>> _node_options_map;
-    std::vector<std::vector<std::pair<Option, double>>> _arc_options_map;
+    std::vector<std::vector<std::pair<double, Option>>> _node_options_map;
+    std::vector<std::vector<std::pair<double, Option>>> _arc_options_map;
 
 public:
     Instance() = default;
@@ -38,10 +40,9 @@ public:
     double option_cost(Option o) const { return _options_costs[o]; }
     Solution create_solution() const { return Solution(nb_options(), 0.0); }
 
-    std::vector<double> node_options_map() { return std::vector<double>(); }
-    std::vector<double> arc_options_map() const {
-        return std::vector<double>();
-    }
+    auto landscape() const { return _landscape; }
+    auto node_options_map() const { return _node_options_map; }
+    auto arc_options_map() const { return _arc_options_map; }
 
     std::size_t nb_options() const { return _options_costs.size(); }
 
@@ -64,5 +65,7 @@ public:
         _options_costs[i] = cost;
     }
 };
+
+}  // namespace fhamonic
 
 #endif  // INSTANCE_HPP

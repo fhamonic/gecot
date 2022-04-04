@@ -13,16 +13,17 @@
 
 namespace fhamonic {
 
-class Landscape {
+class StaticLandscape {
 public:
-    using Option = int;
-    using Solution = std::vector<double>;
+    using Graph = melon::static_digraph;
+    using QualityMap = std::vector<double>;
+    using ProbabilityMap = std::vector<double>;
 
 private:
-    melon::static_digraph _graph;
+    Graph _graph;
 
-    std::vector<double> _node_quality_map;
-    std::vector<double> _arc_probability_map;
+    QualityMap _node_quality_map;
+    ProbabilityMap _arc_probability_map;
 
     std::vector<std::string> _node_names;
     phmap::node_hash_map<std::string, unsigned int> _node_name_to_id_map;
@@ -30,7 +31,7 @@ private:
     phmap::node_hash_map<std::string, unsigned int> _arc_name_to_id_map;
 
 public:
-    Landscape() = default;
+    StaticLandscape() = default;
 
     auto & graph() const { return _graph; }
     auto & quality_map() const { return _node_quality_map; };

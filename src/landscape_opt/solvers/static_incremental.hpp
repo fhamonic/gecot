@@ -44,9 +44,9 @@ struct StaticIncremental {
         auto compute = [&instance, &nodeOptions, &arcOptions,
                         base_eca](Option option) {
             typename Landscape::QualityMap qm =
-                instance.landscape.quality_map();
+                instance.landscape().quality_map();
             typename Landscape::ProbabilityMap pm =
-                instance.landscape.probability_map();
+                instance.landscape().probability_map();
 
             for(auto && [u, quality_gain] : nodeOptions[option])
                 qm[u] += quality_gain;
@@ -54,7 +54,7 @@ struct StaticIncremental {
                 pm[a] = std::max(pm[a], enhanced_prob);
 
             const double increased_eca =
-                eca(instance.landscape.graph(), qm, pm);
+                eca(instance.landscape().graph(), qm, pm);
             const double ratio =
                 (increased_eca - base_eca) / instance.option_cost(option);
 

@@ -14,9 +14,10 @@
 namespace fhamonic {
 
 class StaticDecrementalInterface : public AbstractSolver {
-public:
+private:
     landscape_opt::solvers::StaticDecremental solver;
 
+public:
     void parse(const std::vector<std::string> & args) {
         boost::program_options::options_description desc("Allowed options");
         desc.add_options()("help,h", "Display this help message")(
@@ -41,7 +42,7 @@ public:
 
     typename Instance::Solution solve(const Instance & instance,
                                       const double B) const {
-        solver.solve(instance, B);
+        return solver.solve(instance, B);
     };
 
     const std::string name() const { return "static_decremental"; }

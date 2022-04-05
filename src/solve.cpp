@@ -31,6 +31,10 @@ namespace logging = boost::log;
 // #include "landscape_opt/solvers/randomized_rounding.hpp"
 
 #include "po_utils.hpp"
+
+#include "instance.hpp"
+#include "parse_instance.hpp"
+
 #include "solver_interfaces/abstract_solver.hpp"
 #include "solver_interfaces/static_decremental_interface.hpp"
 using namespace fhamonic;
@@ -43,7 +47,8 @@ void init_logging() {
 }
 
 static bool process_command_line(
-    int argc, const char * argv[], std::shared_ptr<AbstractSolver> & solver,
+    const std::vector<std::string> & args,
+    std::shared_ptr<AbstractSolver> & solver,
     std::filesystem::path & instances_description_json_file, double & budget,
     bool & output_in_file, std::filesystem::path & output_csv_file) {
     std::vector<std::shared_ptr<AbstractSolver>> solver_interfaces{
@@ -69,7 +74,6 @@ static bool process_command_line(
     };
 
     std::string solver_name;
-    std::vector<std::string> solver_params;
 
     try {
         po::options_description desc("Allowed options");
@@ -90,9 +94,8 @@ static bool process_command_line(
         p.add("algorithm", 1);
         p.add("instance", 1);
         p.add("budget", 1);
-        p.add("params", -1);
         po::variables_map vm;
-        po::store(po::basic_command_line_parser(argc, argv)
+        po::store(po::basic_command_line_parser(args)
                       .options(desc)
                       .positional(p)
                       .allow_unregistered()
@@ -143,7 +146,7 @@ static bool process_command_line(
         }
 
         po::notify(vm);
-        solver->parse(solver_params);
+        solver->parse(args);
         output_in_file = vm.count("output");
     } catch(std::exception & e) {
         std::cerr << "Error: " << e.what() << "\n";
@@ -162,22 +165,17 @@ int main(int argc, const char * argv[]) {
     bool output_in_file;
     std::filesystem::path output_csv;
 
+    std::vector<std::string> args(argv + 1, argv + argc);
     bool valid_command =
-        process_command_line(argc, argv, solver, instances_description_json,
-                             budget, output_in_file, output_csv);
+        process_command_line(args, solver, instances_description_json, budget,
+                             output_in_file, output_csv);
     if(!valid_command) return EXIT_FAILURE;
     init_logging();
 
-    std::cout << "algorithm: " << solver->name() << std::endl;
-    std::cout << "instance: " << instances_description_json << std::endl;
-    std::cout << "budget: " << budget << std::endl;
+    Instance instance = parse_instance(instances_description_json);
 
-    // Instance2 instance = parse_instance2(instances_description_json);
-
-    // Helper::assert_well_formed(instance.landscape, instance.plan);
-
-    // Solution solution = solver.solve(instance.landscape, instance.plan,
-    // instance.budget);
+    Instance::Solution solution =
+        solver->solve(instance, budget);
 
     // Helper::printSolution(instance.landscape, instance.plan, name, solver,
     // instance.budget, solution);

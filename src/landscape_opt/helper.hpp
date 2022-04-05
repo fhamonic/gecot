@@ -37,6 +37,12 @@ computeOptionsForArcs(const I & instance) noexcept {
     return arcOptionsMap;
 }
 
+// template <concepts::Instance I>
+// typename Instance::Option compute_best_option(instance, taken_options ou solutionc)
+
+// typename Instance::Option compute_worst_option(instance, taken_options)
+
+
 }  // namespace detail
 }  // namespace landscape_opt
 }  // namespace fhamonic

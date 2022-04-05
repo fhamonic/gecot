@@ -49,6 +49,25 @@ static bool process_command_line(
     std::vector<std::shared_ptr<AbstractSolver>> solver_interfaces{
         std::make_unique<StaticDecrementalInterface>()};
 
+    auto print_soft_name = []() { std::cout << "LSCP 0.1\n\n"; };
+    auto print_usage = []() {
+        std::cout << R"(Usage:
+  lcsp_solve --help
+  lcsp_solve --list-algorithms
+  lcsp_solve <algorithm> --list-params
+  lcsp_solve <algorithm> <instance> <budget> [<params> ...]
+
+)";
+    };
+
+    auto print_available_algorithms = [&solver_interfaces]() {
+        std::cout << "Available algorithms:\n";
+        for(auto & s : solver_interfaces)
+            std::cout << "  " << s->name() << '\n';
+        std::cout << std::endl;
+        return false;
+    };
+
     std::string solver_name;
     std::vector<std::string> solver_params;
 
@@ -79,78 +98,53 @@ static bool process_command_line(
                       .allow_unregistered()
                       .run(),
                   vm);
+
         if(vm.count("help")) {
-            std::cout << R"(LSCP 0.1
+            print_soft_name();
+            print_usage();
 
-Usage:
-  lcsp_solve --help
-  lcsp_solve --list-algorithms
-  lcsp_solve <algorithm> --list-params
-  lcsp_solve <algorithm> <instance> <budget> [<params> ...]
-
-)" << desc << std::endl;
+            std::cout << desc << std::endl;
             return false;
         }
 
         if(vm.count("list-algorithms")) {
-            std::cout << R"(LSCP 0.1
-
-Available algorithms:
-)";
-            for(auto & s : solver_interfaces)
-                std::cout << "  " << s->name() << '\n';
-            std::cout << std::endl;
+            print_soft_name();
+            print_available_algorithms();
             return false;
         }
 
         if(vm.count("algorithm")) {
             solver_name = vm["algorithm"].as<std::string>();
+            bool found = false;
             for(auto & s : solver_interfaces) {
-                if(solver->name() == solver_name) {
+                if(s->name() == solver_name) {
                     solver = std::move(s);
+                    found = true;
                     break;
                 }
+            }
+            if(!found) {
+                std::cout << "Error: the argument ('" << solver_name
+                          << "') for option '--algorithm' is invalid\n\n";
+                print_available_algorithms();
+                return false;
             }
         }
 
         if(vm.count("list-params")) {
-              std::cout << R"(LSCP 0.1
-
-Algorithms options:
-)";
-            for(auto & s : solver_interfaces)
-                std::cout << "  " << s->description() << '\n';
+            if(!vm.count("algorithm")) {
+                throw std::logic_error(std::string(
+                    "Option '--list-params' requires option '--algorithm'."));
+            }
+            print_soft_name();
+            std::cout << solver->description();
             std::cout << std::endl;
-            return false;          
+            return false;
         }
 
         po::notify(vm);
-        // if(vm.count("list-params") && solver_interface) po::notify(vm);
-        // if(it == solvers.end())
-        // solver = make_solver(solver_name);
-        // if(vm.count("list-params")) {
-        //     std::cout << "Available options for " << solver_name << ":"
-        //               << std::endl;
-        //     for(auto & param : solver->getParams())
-        //         std::cout << "\t" << param.first << std::endl;
-        //     return false;
-        // }
-        // for(auto param : solver_params) {
-        //     auto [param_name, param_value] =
-        //         po_utils::split_equality_str(param);
-        //     bool param_exists =
-        //         solver->setParam(param_name, param_value.data());
-        //     if(!param_exists)
-        //         throw std::invalid_argument(
-        //             "'" + param + "' is not a valid parameter for " +
-        //             solver_name + ", see --list-params.");
-        //     if(param_value.empty())
-        //         throw std::invalid_argument("Invalid value for parameter '" +
-        //                                     param_name + "' of " +
-        //                                     solver_name);
-        //     solver->setParam(param_name, param_value.data());
-        // }
-        // output_in_file = vm.count("output");
+        solver->parse(solver_params);
+        output_in_file = vm.count("output");
     } catch(std::exception & e) {
         std::cerr << "Error: " << e.what() << "\n";
         return false;
@@ -173,6 +167,10 @@ int main(int argc, const char * argv[]) {
                              budget, output_in_file, output_csv);
     if(!valid_command) return EXIT_FAILURE;
     init_logging();
+
+    std::cout << "algorithm: " << solver->name() << std::endl;
+    std::cout << "instance: " << instances_description_json << std::endl;
+    std::cout << "budget: " << budget << std::endl;
 
     // Instance2 instance = parse_instance2(instances_description_json);
 

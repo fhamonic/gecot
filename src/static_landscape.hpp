@@ -56,6 +56,21 @@ public:
     auto & graph() const { return _graph; }
     auto & quality_map() const { return _node_quality_map; };
     auto & probability_map() const { return _arc_probability_map; };
+
+    bool contains_vertex(const std::string & name) const {
+        return _name_to_vertex_map.contains(name);
+    }
+    bool contains_arc(const std::string & name) const {
+        return _name_to_arc_map.contains(name);
+    }
+    Graph::vertex vertex_from_name(const std::string & name) const {
+        assert(contains_vertex(name));
+        return _name_to_vertex_map.at(name);
+    }
+    Graph::arc arc_from_name(const std::string & name) const {
+        assert(contains_arc(name));
+        return _name_to_arc_map.at(name);
+    }
 };
 
 }  // namespace fhamonic

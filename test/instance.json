@@ -12,7 +12,7 @@
             "file": "./nodes.csv",
             "columns": {
                 "id": "id",
-                "_quality": "area"
+                "quality": "area"
             }
         },
         "arcs": {

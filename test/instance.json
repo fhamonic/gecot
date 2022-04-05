@@ -1,6 +1,6 @@
 {
     "options": {
-        "file": "./options.csv",
+        "file": "options.csv",
         "columns": {
             "option_id": "id",
             "cost": "cost"
@@ -9,14 +9,14 @@
     "case": {
         "name": "",
         "nodes": {
-            "file": "./nodes.csv",
+            "file": "nodes.csv",
             "columns": {
                 "id": "id",
-                "quality": "area"
+                "quality": "quality"
             }
         },
         "arcs": {
-            "file": "./arcs.csv",
+            "file": "arcs.csv",
             "columns": {
                 "id": "id",
                 "from": "from",
@@ -24,20 +24,15 @@
                 "probability": "arc_probability"
             }
         },
-        "node_restoration_options": {
-            "file": "./file.csv",
-            "columns": {
-                "option_id": "",
-                "node_id": "",
-                "quality_gain": ""
-            }
+        "node_options": {
+            "file": "node_options.csv"
         },
-        "arc_restoration_options": {
-            "file": "./file.csv",
+        "arc_options": {
+            "file": "arc_options.csv",
             "columns": {
-                "option_id": "",
-                "arc_id": "",
-                "restored_probability": ""
+                "option_id": "id",
+                "arc_id": "arc",
+                "restored_probability": "prob"
             }
         }
     }

@@ -31,6 +31,7 @@ public:
                 .options(desc)
                 .run(),
             vm);
+        po::notify(vm);
 
         solver.verbose = vm.count("verbose") > 0;
         solver.parallel = vm.count("parallel") > 0;

@@ -95,12 +95,12 @@ static bool process_command_line(
         p.add("instance", 1);
         p.add("budget", 1);
         po::variables_map vm;
-        po::store(po::basic_command_line_parser(args)
-                      .options(desc)
-                      .positional(p)
-                      .allow_unregistered()
-                      .run(),
-                  vm);
+        po::parsed_options parsed = po::basic_command_line_parser(args)
+                                        .options(desc)
+                                        .positional(p)
+                                        .allow_unregistered()
+                                        .run();
+        po::store(parsed, vm);
 
         if(vm.count("help")) {
             print_soft_name();
@@ -146,7 +146,10 @@ static bool process_command_line(
         }
 
         po::notify(vm);
-        solver->parse(args);
+        std::vector<std::string> opts =
+            po::collect_unrecognized(parsed.options, po::exclude_positional);
+
+        solver->parse(opts);
         output_in_file = vm.count("output");
     } catch(std::exception & e) {
         std::cerr << "Error: " << e.what() << "\n";
@@ -174,8 +177,7 @@ int main(int argc, const char * argv[]) {
 
     Instance instance = parse_instance(instances_description_json);
 
-    Instance::Solution solution =
-        solver->solve(instance, budget);
+    Instance::Solution solution = solver->solve(instance, budget);
 
     // Helper::printSolution(instance.landscape, instance.plan, name, solver,
     // instance.budget, solution);

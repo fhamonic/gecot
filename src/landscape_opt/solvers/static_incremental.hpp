@@ -4,6 +4,7 @@
 #include <execution>
 
 #include <range/v3/algorithm/sort.hpp>
+#include <range/v3/range/conversion.hpp>
 #include <range/v3/view/zip.hpp>
 
 #include "concepts/instance.hpp"
@@ -19,26 +20,26 @@ struct StaticIncremental {
     bool verbose = false;
     bool parallel = false;
 
-    int time_ms = 0;
-
     template <concepts::Instance I>
     typename I::Solution solve(const I & instance, const double budget) const {
         using Landscape = typename I::Landscape;
         using Option = typename I::Option;
         using Solution = typename I::Solution;
 
+        int time_ms = 0;
         Chrono chrono;
         Solution solution = instance.create_solution();
 
         const auto nodeOptions = detail::computeOptionsForNodes(instance);
         const auto arcOptions = detail::computeOptionsForArcs(instance);
 
-        const double base_eca = eca(instance.landscape);
+        const double base_eca = eca(instance.landscape());
         if(verbose) {
             std::cout << "base ECA: " << base_eca << std::endl;
         }
 
-        std::vector<Option> options(instance.options());
+        std::vector<Option> options =
+            ranges::to<std::vector>(instance.options());
         std::vector<double> options_ratios(options.size());
 
         auto compute = [&instance, &nodeOptions, &arcOptions,
@@ -62,15 +63,14 @@ struct StaticIncremental {
         };
 
         if(parallel)
-            std::ranges::transform(std::execution::par_unseq, options,
-                                   options_ratios.begin(), compute);
+            std::transform(std::execution::par_unseq, options.begin(),
+                           options.end(), options_ratios.begin(), compute);
         else
-            std::ranges::transform(std::execution::seq, options,
-                                   options_ratios.begin(), compute);
+            std::transform(std::execution::seq, options.begin(), options.end(),
+                           options_ratios.begin(), compute);
 
         auto zipped_view = ranges::view::zip(options_ratios, options);
-        ranges::sort(zipped_view, [](std::pair<double, Option> & e1,
-                                     std::pair<double, Option> & e2) {
+        ranges::sort(zipped_view, [](auto && e1, auto && e2) {
             return e1.first > e2.first;
         });
 

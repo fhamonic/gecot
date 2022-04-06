@@ -2,48 +2,54 @@
 #define LSCP_STATIC_INCREMENTAL_INTERFACE_HPP
 
 #include <execution>
+#include <sstream>
 
 #include <boost/program_options.hpp>
 
-#include "landscape_opt/concepts/instance.hpp"
 #include "landscape_opt/solvers/static_incremental.hpp"
 
+#include "instance.hpp"
 #include "solver_interfaces/abstract_solver.hpp"
 
 namespace fhamonic {
 
-template <landscape_opt::concepts::Instance I>
-class StaticInrementalInterface : public AbstractSolver {
-public:
+class StaticIncrementalInterface : public AbstractSolver {
+private:
     landscape_opt::solvers::StaticIncremental solver;
+    boost::program_options::options_description desc;
+
+public:
+    StaticIncrementalInterface() : desc(name() + " options") {
+        desc.add_options()("verbose,v", "Timeout in seconds")(
+            "parallel,p", "Use multithreaded version");
+    }
 
     void parse(const std::vector<std::string> & args) {
-        boost::program_options::options_description desc("Allowed options");
-        desc.add_options()("help,h", "Display this help message")(
-            "verbose,v", "Timeout in seconds")("parallel,p",
-                                               "Use multithreaded version");
-
         boost::program_options::variables_map vm;
         boost::program_options::store(
             boost::program_options::command_line_parser(args)
                 .options(desc)
                 .run(),
             vm);
-
-        if(vm.count("help")) {
-            std::cout << desc << "\n";
-            return;
-        }
+        po::notify(vm);
 
         solver.verbose = vm.count("verbose") > 0;
         solver.parallel = vm.count("parallel") > 0;
     }
 
-    Solution solve(const I & instance, const double B) const {
-        solver.solve(instance, B);
+    typename Instance::Solution solve(const Instance & instance,
+                                      const double B) const {
+        return solver.solve(instance, B);
     };
 
-    const std::string name() const { return "static_incremental"; }
+    std::string name() const { return "static_incremental"; }
+    std::string description() const {
+        std::ostringstream s;
+        s << desc;
+        return s.str();
+    }
+    std::string params_lists() const { return ""; }
+    std::string string() const { return "static_incremental"; }
 };
 
 }  // namespace fhamonic

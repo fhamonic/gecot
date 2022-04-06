@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <optional>
@@ -37,6 +38,7 @@ namespace logging = boost::log;
 
 #include "solver_interfaces/abstract_solver.hpp"
 #include "solver_interfaces/static_decremental_interface.hpp"
+#include "solver_interfaces/static_incremental_interface.hpp"
 using namespace fhamonic;
 
 // #include "landscape_opt/parsers/parse_instance.hpp"
@@ -52,6 +54,7 @@ static bool process_command_line(
     std::filesystem::path & instances_description_json_file, double & budget,
     bool & output_in_file, std::filesystem::path & output_csv_file) {
     std::vector<std::shared_ptr<AbstractSolver>> solver_interfaces{
+        std::make_unique<StaticIncrementalInterface>(),
         std::make_unique<StaticDecrementalInterface>()};
 
     auto print_soft_name = []() { std::cout << "LSCP 0.1\n\n"; };
@@ -67,8 +70,16 @@ static bool process_command_line(
 
     auto print_available_algorithms = [&solver_interfaces]() {
         std::cout << "Available algorithms:\n";
+        const std::size_t algorithm_name_max_length = std::ranges::max(
+            std::ranges::views::transform(solver_interfaces, [&](auto && s) {
+                return s->name().size();
+            }));
         for(auto & s : solver_interfaces)
-            std::cout << "  " << s->name() << '\n';
+            std::cout << "  " << s->name()
+                      << std::string(
+                             algorithm_name_max_length + 1 - s->name().size(),
+                             ' ')
+                      << '\n';
         std::cout << std::endl;
         return false;
     };
@@ -179,8 +190,19 @@ int main(int argc, const char * argv[]) {
 
     Instance::Solution solution = solver->solve(instance, budget);
 
-    // Helper::printSolution(instance.landscape, instance.plan, name, solver,
-    // instance.budget, solution);
+    std::cout << "Solution:" << std::endl;
+    const std::size_t option_name_max_length = std::ranges::max(
+        std::ranges::views::transform(instance.options(), [&](auto && o) {
+            return instance.option_name(o).size();
+        }));
+    for(auto && o : instance.options()) {
+        std::cout << "  " << instance.option_name(o)
+                  << std::string(option_name_max_length + 1 -
+                                     instance.option_name(o).size(),
+                                 ' ')
+                  << solution[o] << "\n";
+    }
+    std::cout << std::endl;
 
     return EXIT_SUCCESS;
 }

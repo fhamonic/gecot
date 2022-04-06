@@ -1,7 +1,8 @@
 #ifndef LANDSCAPE_OPT_SOLVERS_STATIC_INCREMENTAL_HPP
 #define LANDSCAPE_OPT_SOLVERS_STATIC_INCREMENTAL_HPP
 
-#include <execution>
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
 
 #include <range/v3/algorithm/sort.hpp>
 #include <range/v3/range/conversion.hpp>
@@ -23,6 +24,8 @@ struct StaticIncremental {
     template <concepts::Instance I>
     typename I::Solution solve(const I & instance, const double budget) const {
         using Landscape = typename I::Landscape;
+        using QualityMap = typename Landscape::QualityMap;
+        using ProbabilityMap = typename Landscape::ProbabilityMap;
         using Option = typename I::Option;
         using Solution = typename I::Solution;
 
@@ -36,6 +39,7 @@ struct StaticIncremental {
         const double base_eca = eca(instance.landscape());
         if(verbose) {
             std::cout << "base ECA: " << base_eca << std::endl;
+            std::cout << "total cost: 0" << std::endl;
         }
 
         std::vector<Option> options =
@@ -45,13 +49,15 @@ struct StaticIncremental {
         auto compute_delta_eca_inc =
             [&instance, &nodeOptions, &arcOptions, base_eca, &options_ratios](
                 const tbb::blocked_range<Option> & options_block) {
-                for(Option option = options_block.begin();
-                    option < options_block.end(); ++option) {
-                    typename Landscape::QualityMap qm =
-                        instance.landscape().quality_map();
-                    typename Landscape::ProbabilityMap pm =
-                        instance.landscape().probability_map();
+                const QualityMap & original_qm =
+                    instance.landscape().quality_map();
+                const ProbabilityMap & original_pm =
+                    instance.landscape().probability_map();
 
+                QualityMap qm = original_qm;
+                ProbabilityMap pm = original_pm;
+
+                for(Option option = options_block.begin();;) {
                     for(auto && [u, quality_gain] : nodeOptions[option])
                         qm[u] += quality_gain;
                     for(auto && [a, enhanced_prob] : arcOptions[option])
@@ -61,18 +67,25 @@ struct StaticIncremental {
                         eca(instance.landscape().graph(), qm, pm);
 
                     options_ratios[option] = (increased_eca - base_eca) /
-                                        instance.option_cost(option);
+                                             instance.option_cost(option);
+
+                    if(++option == options_block.end()) break;
+
+                    for(auto && [u, quality_gain] : nodeOptions[option])
+                        qm[u] = original_qm[u];
+                    for(auto && [a, enhanced_prob] : arcOptions[option])
+                        pm[a] = original_pm[a];
                 }
             };
 
         if(parallel) {
             auto options_range = instance.options();
-            tbb::parallel_for(tbb::blocked_range<Option>(
-                                  0, instance.options().size()),
-                              compute_delta_eca_inc);
+            tbb::parallel_for(
+                tbb::blocked_range<Option>(0, instance.options().size()),
+                compute_delta_eca_inc);
         } else {
-            compute_delta_eca_inc(tbb::blocked_range<Option>(
-                0, instance.options().size()));
+            compute_delta_eca_inc(
+                tbb::blocked_range<Option>(0, instance.options().size()));
         }
 
         auto zipped_view = ranges::view::zip(options_ratios, options);

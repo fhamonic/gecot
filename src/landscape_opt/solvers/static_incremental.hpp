@@ -42,32 +42,38 @@ struct StaticIncremental {
             ranges::to<std::vector>(instance.options());
         std::vector<double> options_ratios(options.size());
 
-        auto compute = [&instance, &nodeOptions, &arcOptions,
-                        base_eca](Option option) {
-            typename Landscape::QualityMap qm =
-                instance.landscape().quality_map();
-            typename Landscape::ProbabilityMap pm =
-                instance.landscape().probability_map();
+        auto compute_delta_eca_inc =
+            [&instance, &nodeOptions, &arcOptions, base_eca, &options_ratios](
+                const tbb::blocked_range<Option> & options_block) {
+                for(Option option = options_block.begin();
+                    option < options_block.end(); ++option) {
+                    typename Landscape::QualityMap qm =
+                        instance.landscape().quality_map();
+                    typename Landscape::ProbabilityMap pm =
+                        instance.landscape().probability_map();
 
-            for(auto && [u, quality_gain] : nodeOptions[option])
-                qm[u] += quality_gain;
-            for(auto && [a, enhanced_prob] : arcOptions[option])
-                pm[a] = std::max(pm[a], enhanced_prob);
+                    for(auto && [u, quality_gain] : nodeOptions[option])
+                        qm[u] += quality_gain;
+                    for(auto && [a, enhanced_prob] : arcOptions[option])
+                        pm[a] = std::max(pm[a], enhanced_prob);
 
-            const double increased_eca =
-                eca(instance.landscape().graph(), qm, pm);
-            const double ratio =
-                (increased_eca - base_eca) / instance.option_cost(option);
+                    const double increased_eca =
+                        eca(instance.landscape().graph(), qm, pm);
 
-            return ratio;
-        };
+                    options_ratios[option] = (increased_eca - base_eca) /
+                                        instance.option_cost(option);
+                }
+            };
 
-        if(parallel)
-            std::transform(std::execution::par_unseq, options.begin(),
-                           options.end(), options_ratios.begin(), compute);
-        else
-            std::transform(std::execution::seq, options.begin(), options.end(),
-                           options_ratios.begin(), compute);
+        if(parallel) {
+            auto options_range = instance.options();
+            tbb::parallel_for(tbb::blocked_range<Option>(
+                                  0, instance.options().size()),
+                              compute_delta_eca_inc);
+        } else {
+            compute_delta_eca_inc(tbb::blocked_range<Option>(
+                0, instance.options().size()));
+        }
 
         auto zipped_view = ranges::view::zip(options_ratios, options);
         ranges::sort(zipped_view, [](auto && e1, auto && e2) {

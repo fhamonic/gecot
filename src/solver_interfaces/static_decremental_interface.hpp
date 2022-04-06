@@ -1,7 +1,6 @@
 #ifndef LSCP_STATIC_DECREMENTAL_INTERFACE_HPP
 #define LSCP_STATIC_DECREMENTAL_INTERFACE_HPP
 
-#include <execution>
 #include <sstream>
 
 #include <boost/program_options.hpp>

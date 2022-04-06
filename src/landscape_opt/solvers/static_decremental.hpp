@@ -65,48 +65,48 @@ struct StaticDecremental {
             solution[option] = 1.0;
         }
 
-        // auto compute_delta_eca_dec =
-        //     [&](const tbb::blocked_range<std::vector<Option>::iterator> &
-        //             options_block) {
-        //         QualityMap qm = enhanced_qm;
-        //         ProbabilityMap pm = enhanced_pm;
+        auto compute_delta_eca_dec =
+            [&](const tbb::blocked_range<decltype(options.begin())> &
+                    options_block) {
+                QualityMap qm = enhanced_qm;
+                ProbabilityMap pm = enhanced_pm;
 
-        //         for(auto it = options_block.begin();;) {
-        //             Option option = *it;
-        //             for(auto && [u, quality_gain] : nodeOptions[option])
-        //                 qm[u] -= quality_gain;
-        //             for(auto && [a, enhanced_prob] : arcOptions[option]) {
-        //                 pm[a] = probability_map[a];
-        //                 for(auto && [enhanced_prob, i] :
-        //                     instance.arc_options_map()[a]) {
-        //                     if(option == i) continue;
-        //                     pm[a] = std::max(pm[a], enhanced_prob);
-        //                 }
-        //             }
+                for(auto it = options_block.begin();;) {
+                    Option option = *it;
+                    for(auto && [u, quality_gain] : nodeOptions[option])
+                        qm[u] -= quality_gain;
+                    for(auto && [a, enhanced_prob] : arcOptions[option]) {
+                        pm[a] = probability_map[a];
+                        for(auto && [enhanced_prob, i] :
+                            instance.arc_options_map()[a]) {
+                            if(option == i) continue;
+                            pm[a] = std::max(pm[a], enhanced_prob);
+                        }
+                    }
 
-        //             const double increased_eca =
-        //                 eca(instance.landscape().graph(), qm, pm);
+                    const double decreased_eca =
+                        eca(instance.landscape().graph(), qm, pm);
 
-        //             options_ratios[option] = (enhanced_eca - decreased_eca) /
-        //                                      instance.option_cost(option);
+                    options_ratios[option] = (enhanced_eca - decreased_eca) /
+                                             instance.option_cost(option);
 
-        //             if(++it == options_block.end()) break;
+                    if(++it == options_block.end()) break;
 
-        //             for(auto && [u, quality_gain] : nodeOptions[option])
-        //                 qm[u] = enhanced_qm[u];
-        //             for(auto && [a, enhanced_prob] : arcOptions[option])
-        //                 pm[a] = enhanced_pm[a];
-        //         }
-        //     };
+                    for(auto && [u, quality_gain] : nodeOptions[option])
+                        qm[u] = enhanced_qm[u];
+                    for(auto && [a, enhanced_prob] : arcOptions[option])
+                        pm[a] = enhanced_pm[a];
+                }
+            };
 
-        // if(parallel) {
-        //     tbb::parallel_for(
-        //         tbb::blocked_range(options.begin(), options.end()),
-        //         compute_delta_eca_dec);
-        // } else {
-        //     compute_delta_eca_dec(
-        //         tbb::blocked_range(options.begin(), options.end()));
-        // }
+        if(parallel) {
+            tbb::parallel_for(
+                tbb::blocked_range(options.begin(), options.end()),
+                compute_delta_eca_dec);
+        } else {
+            compute_delta_eca_dec(
+                tbb::blocked_range(options.begin(), options.end()));
+        }
 
         auto zipped_view_dec = ranges::view::zip(options_ratios, options);
         ranges::sort(zipped_view_dec, [](auto && e1, auto && e2) {
@@ -142,45 +142,44 @@ struct StaticDecremental {
         const double current_eca =
             eca(instance.landscape().graph(), current_qm, current_pm);
 
-        // auto compute_delta_eca_inc =
-        //     [&](const tbb::blocked_range<std::vector<Option>::const_iterator> &
-        //             options_block) {
-                // QualityMap qm = current_qm;
-                // ProbabilityMap pm = current_pm;
+        auto compute_delta_eca_inc =
+            [&](const tbb::blocked_range<decltype(free_options.begin())> &
+                    options_block) {
+                QualityMap qm = current_qm;
+                ProbabilityMap pm = current_pm;
 
-                // for(auto it = options_block.begin();;) {
-                //     Option option = *it;
-                //     for(auto && [u, quality_gain] : nodeOptions[option])
-                //         qm[u] += quality_gain;
-                //     for(auto && [a, enhanced_prob] : arcOptions[option])
-                //         pm[a] = std::max(pm[a], enhanced_prob);
+                for(auto it = options_block.begin();;) {
+                    Option option = *it;
+                    for(auto && [u, quality_gain] : nodeOptions[option])
+                        qm[u] += quality_gain;
+                    for(auto && [a, enhanced_prob] : arcOptions[option])
+                        pm[a] = std::max(pm[a], enhanced_prob);
 
-                //     const double increased_eca =
-                //         eca(instance.landscape().graph(), qm, pm);
+                    const double increased_eca =
+                        eca(instance.landscape().graph(), qm, pm);
 
-                //     options_ratios[option] = (increased_eca - current_eca) /
-                //                              instance.option_cost(option);
+                    options_ratios[option] = (increased_eca - current_eca) /
+                                             instance.option_cost(option);
 
-                //     if(++it == options_block.end()) break;
+                    if(++it == options_block.end()) break;
 
-                //     for(auto && [u, quality_gain] : nodeOptions[option])
-                //         qm[u] = current_qm[u];
-                //     for(auto && [a, enhanced_prob] : arcOptions[option])
-                //         pm[a] = current_pm[a];
-                // }
-        //         }
-        //     ;
+                    for(auto && [u, quality_gain] : nodeOptions[option])
+                        qm[u] = current_qm[u];
+                    for(auto && [a, enhanced_prob] : arcOptions[option])
+                        pm[a] = current_pm[a];
+                }
+            };
 
-        // options_ratios.resize(free_options.size());
+        options_ratios.resize(free_options.size());
 
-        // if(parallel) {
-        //     tbb::parallel_for(
-        //         tbb::blocked_range(free_options.begin(), free_options.end()),
-        //         compute_delta_eca_inc);
-        // } else {
-        //     compute_delta_eca_inc(
-        //         tbb::blocked_range(free_options.begin(), free_options.end()));
-        // }
+        if(parallel) {
+            tbb::parallel_for(
+                tbb::blocked_range(free_options.begin(), free_options.end()),
+                compute_delta_eca_inc);
+        } else {
+            compute_delta_eca_inc(
+                tbb::blocked_range(free_options.begin(), free_options.end()));
+        }
 
         auto zipped_view_inc = ranges::view::zip(options_ratios, free_options);
         ranges::sort(zipped_view_inc, [](auto && e1, auto && e2) {

@@ -40,9 +40,9 @@ public:
     double option_cost(Option o) const { return _options_costs[o]; }
     Solution create_solution() const { return Solution(nb_options(), 0.0); }
 
-    auto landscape() const noexcept { return _landscape; }
-    auto node_options_map() const noexcept { return _node_options_map; }
-    auto arc_options_map() const noexcept { return _arc_options_map; }
+    auto & landscape() const noexcept { return _landscape; }
+    auto & node_options_map() const noexcept { return _node_options_map; }
+    auto & arc_options_map() const noexcept { return _arc_options_map; }
 
     std::size_t nb_options() const noexcept { return _options_costs.size(); }
 
@@ -66,6 +66,24 @@ public:
     }
     const std::string & option_name(Option i) const noexcept {
         return _options_names[i];
+    }
+    Option option_from_name(std::string identifier) const noexcept {
+        assert(contains_option(identifier));
+        return _option_name_to_id_map.at(identifier);
+    }
+
+    void set_landscape(StaticLandscape && l) noexcept {
+        _landscape = std::move(l);
+    }
+    void set_node_options(
+        std::vector<std::vector<std::pair<double, Instance::Option>>> &&
+            node_options) noexcept {
+        _node_options_map = std::move(node_options);
+    }
+    void set_arc_options(
+        std::vector<std::vector<std::pair<double, Instance::Option>>> &&
+            arc_options) noexcept {
+        _arc_options_map = std::move(arc_options);
     }
 };
 

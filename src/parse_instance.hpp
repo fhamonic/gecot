@@ -60,7 +60,7 @@ void assert_json_properties(
 
 template <typename C, typename T, typename... Columns>
 void configure_csv_reader(C & csv, T json_object,
-                          Columns&&... default_column_names) {
+                          Columns &&... default_column_names) {
     auto get_column_name = [&](const std::string & c) -> std::string {
         if(json_object.contains("columns")) {
             auto columns_json = json_object["columns"];
@@ -119,8 +119,7 @@ StaticLandscape parse_landscape(T json_object,
     if(nodes_csv_path.is_relative())
         nodes_csv_path = (parent_path / nodes_csv_path);
     io::CSVReader<2> nodes_csv(nodes_csv_path);
-    detail::configure_csv_reader(nodes_csv, nodes_json, "id",
-                                 "quality");
+    detail::configure_csv_reader(nodes_csv, nodes_json, "id", "quality");
 
     std::string node_id;
     double node_quality;
@@ -157,6 +156,56 @@ StaticLandscape parse_landscape(T json_object,
     return StaticLandscape(graph, node_quality_map, arc_probability_map,
                            node_names, name_to_vertex_map, arc_names,
                            name_to_arc_map);
+}
+
+template <typename T, typename I>
+std::vector<std::vector<std::pair<double, Instance::Option>>>
+parse_node_options(T json_object, std::filesystem::path parent_path,
+                   const I & instance, const StaticLandscape & landscape) {
+    std::vector<std::vector<std::pair<double, Instance::Option>>> node_options(
+        landscape.graph().nb_vertices());
+
+    auto node_options_json = json_object["node_options"];
+    std::filesystem::path node_options_csv_path = node_options_json["file"];
+    if(node_options_csv_path.is_relative())
+        node_options_csv_path = (parent_path / node_options_csv_path);
+    io::CSVReader<3> node_options_csv(node_options_csv_path);
+    detail::configure_csv_reader(node_options_csv, node_options_json,
+                                 "option_id", "node_id", "quality_gain");
+
+    std::string option_id, node_id;
+    double quality_gain;
+    while(node_options_csv.read_row(option_id, node_id, quality_gain)) {
+        node_options[landscape.vertex_from_name(node_id)].emplace_back(
+            quality_gain, instance.option_from_name(option_id));
+    }
+
+    return node_options;
+}
+
+template <typename T, typename I>
+std::vector<std::vector<std::pair<double, Instance::Option>>> parse_arc_options(
+    T json_object, std::filesystem::path parent_path, const I & instance,
+    const StaticLandscape & landscape) {
+    std::vector<std::vector<std::pair<double, Instance::Option>>> arc_options(
+        landscape.graph().nb_arcs());
+
+    auto arc_options_json = json_object["arc_options"];
+    std::filesystem::path arc_options_csv_path = arc_options_json["file"];
+    if(arc_options_csv_path.is_relative())
+        arc_options_csv_path = (parent_path / arc_options_csv_path);
+    io::CSVReader<3> arc_options_csv(arc_options_csv_path);
+    detail::configure_csv_reader(arc_options_csv, arc_options_json, "option_id",
+                                 "arc_id", "improved_probability");
+
+    std::string option_id, arc_id;
+    double improved_probability;
+    while(arc_options_csv.read_row(option_id, arc_id, improved_probability)) {
+        arc_options[landscape.arc_from_name(arc_id)].emplace_back(
+            improved_probability, instance.option_from_name(option_id));
+    }
+
+    return arc_options;
 }
 
 // Instance parse_multi_instance(std::filesystem::path instance_path) {
@@ -255,7 +304,20 @@ Instance parse_instance(std::filesystem::path instance_path) {
     parse_options(options_json, instance_path.parent_path(), instance);
 
     auto case_json = instance_json["case"];
-    StaticLandscape l = parse_landscape(case_json, instance_path.parent_path());
+    detail::assert_json_properties(
+        case_json, {{"nodes", nlohmann::detail::value_t::object},
+                    {"arcs", nlohmann::detail::value_t::object},
+                    {"node_options", nlohmann::detail::value_t::object},
+                    {"arc_options", nlohmann::detail::value_t::object}});
+    instance.set_landscape(
+        parse_landscape(case_json, instance_path.parent_path()));
+
+    instance.set_node_options(
+        parse_node_options(case_json, instance_path.parent_path(), instance,
+                           instance.landscape()));
+    instance.set_arc_options(parse_arc_options(case_json,
+                                               instance_path.parent_path(),
+                                               instance, instance.landscape()));
 
     return instance;
 }

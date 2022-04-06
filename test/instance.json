@@ -32,7 +32,7 @@
             "columns": {
                 "option_id": "id",
                 "arc_id": "arc",
-                "restored_probability": "prob"
+                "improved_probability": "prob"
             }
         }
     }

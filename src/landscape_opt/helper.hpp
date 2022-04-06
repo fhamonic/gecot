@@ -16,11 +16,12 @@ std::vector<
 computeOptionsForNodes(const I & instance) noexcept {
     std::vector<
         std::vector<std::pair<typename I::Landscape::Graph::vertex, double>>>
-        nodeOptionsMap;
-    nodeOptionsMap.reserve(instance.options().size());
-    for(auto && u : instance.landscape().graph().vertices())
-        for(auto && [quality_gain, option] : instance.node_options_map()[u])
+        nodeOptionsMap(instance.options().size());
+    for(auto && u : instance.landscape().graph().vertices()) {
+        for(auto && [quality_gain, option] : instance.node_options_map()[u]) {
             nodeOptionsMap[option].emplace_back(u, quality_gain);
+        }
+    }
     return nodeOptionsMap;
 }
 
@@ -29,8 +30,7 @@ std::vector<std::vector<std::pair<typename I::Landscape::Graph::arc, double>>>
 computeOptionsForArcs(const I & instance) noexcept {
     std::vector<
         std::vector<std::pair<typename I::Landscape::Graph::arc, double>>>
-        arcOptionsMap;
-    arcOptionsMap.reserve(instance.options().size());
+        arcOptionsMap(instance.options().size());
     for(auto && a : instance.landscape().graph().arcs())
         for(auto && [enhanced_prob, option] : instance.arc_options_map()[a])
             arcOptionsMap[option].emplace_back(a, enhanced_prob);
@@ -38,10 +38,10 @@ computeOptionsForArcs(const I & instance) noexcept {
 }
 
 // template <concepts::Instance I>
-// typename Instance::Option compute_best_option(instance, taken_options ou solutionc)
+// typename Instance::Option compute_best_option(instance, taken_options ou
+// solutionc)
 
 // typename Instance::Option compute_worst_option(instance, taken_options)
-
 
 }  // namespace detail
 }  // namespace landscape_opt

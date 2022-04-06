@@ -37,6 +37,9 @@ public:
     StaticLandscape(const StaticLandscape &) = default;
     StaticLandscape(StaticLandscape &&) = default;
 
+    StaticLandscape & operator=(const StaticLandscape &) = default;
+    StaticLandscape & operator=(StaticLandscape &&) = default;
+
     StaticLandscape(
         const Graph & g, const QualityMap & qm, const ProbabilityMap & pm,
         const std::vector<std::string> & node_names,

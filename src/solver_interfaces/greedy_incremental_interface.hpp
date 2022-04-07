@@ -1,24 +1,24 @@
-#ifndef LSCP_STATIC_INCREMENTAL_INTERFACE_HPP
-#define LSCP_STATIC_INCREMENTAL_INTERFACE_HPP
+#ifndef LSCP_GREEDY_INCREMENTAL_INTERFACE_HPP
+#define LSCP_GREEDY_INCREMENTAL_INTERFACE_HPP
 
 #include <sstream>
 
 #include <boost/program_options.hpp>
 
-#include "landscape_opt/solvers/static_incremental.hpp"
+#include "landscape_opt/solvers/greedy_incremental.hpp"
 
 #include "instance.hpp"
 #include "solver_interfaces/abstract_solver.hpp"
 
 namespace fhamonic {
 
-class StaticIncrementalInterface : public AbstractSolver {
+class GreedyIncrementalInterface : public AbstractSolver {
 private:
-    landscape_opt::solvers::StaticIncremental solver;
+    landscape_opt::solvers::GreedyIncremental solver;
     boost::program_options::options_description desc;
 
 public:
-    StaticIncrementalInterface() : desc(name() + " options") {
+    GreedyIncrementalInterface() : desc(name() + " options") {
         desc.add_options()("verbose,v", "Timeout in seconds")(
             "parallel,p", "Use multithreaded version");
     }
@@ -41,16 +41,16 @@ public:
         return solver.solve(instance, B);
     };
 
-    std::string name() const { return "static_incremental"; }
+    std::string name() const { return "greedy_incremental"; }
     std::string description() const { return ""; }
     std::string options_description() const {
         std::ostringstream s;
         s << desc;
         return s.str();
     }
-    std::string string() const { return "static_incremental"; }
+    std::string string() const { return "greedy_incremental"; }
 };
 
 }  // namespace fhamonic
 
-#endif  // LSCP_STATIC_INCREMENTAL_INTERFACE_HPP
+#endif  // LSCP_GREEDY_INCREMENTAL_INTERFACE_HPP

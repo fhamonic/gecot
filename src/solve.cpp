@@ -76,10 +76,11 @@ static bool process_command_line(
             }));
         for(auto & s : solver_interfaces)
             std::cout << "  " << s->name()
-                      << std::string(
-                             algorithm_name_max_length + 1 - s->name().size(),
-                             ' ')
-                      << '\n';
+                      << std::string(std::max(algorithm_name_max_length,
+                                              std::size_t(25)) +
+                                         1 - s->name().size(),
+                                     ' ')
+                      << s->description() << '\n';
         std::cout << std::endl;
         return false;
     };
@@ -151,7 +152,7 @@ static bool process_command_line(
                     "Option '--list-params' requires option '--algorithm'."));
             }
             print_soft_name();
-            std::cout << solver->description();
+            std::cout << solver->options_description();
             std::cout << std::endl;
             return false;
         }

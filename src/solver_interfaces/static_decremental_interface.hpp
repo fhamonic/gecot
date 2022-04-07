@@ -42,12 +42,12 @@ public:
     };
 
     std::string name() const { return "static_decremental"; }
-    std::string description() const {
+    std::string description() const { return ""; }
+    std::string options_description() const {
         std::ostringstream s;
         s << desc;
         return s.str();
     }
-    std::string params_lists() const { return ""; }
     std::string string() const { return "static_decremental"; }
 };
 

@@ -49,7 +49,7 @@ struct GreedyIncremental {
         ProbabilityMap current_pm = instance.landscape().probability_map();
 
         auto compute_delta_eca_inc =
-            [&instance, &nodeOptions, &arcOptions, base_eca, &options_ratios](
+            [&](
                 const tbb::blocked_range<decltype(options.begin())> &
                     options_block,
                 std::pair<double, Option> init) {
@@ -85,12 +85,12 @@ struct GreedyIncremental {
             std::pair<Option, double> best_option_p;
             if(parallel) {
                 best_option_p = tbb::parallel_reduce(
-                    tbb::blocked_range(options.begin(), options.end()), 0.0,
+                    tbb::blocked_range(options.begin(), options.end()), std::pair<double, Option>(-1.0, -1),
                     compute_delta_eca_inc, [](auto && p1, auto && p2) {
                         return p1.first > p2.first ? p1 : p2;
                     });
             } else {
-                best_option_p = compute_delta_eca_inc();
+                best_option_p = compute_delta_eca_inc(tbb::blocked_range(options.begin(), options.end()), std::pair<double, Option>(-1.0, -1));
             }
         }
 

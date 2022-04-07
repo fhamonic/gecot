@@ -24,7 +24,7 @@ namespace logging = boost::log;
 #include "landscape_opt/solvers/random_solution.hpp"
 #include "landscape_opt/solvers/static_decremental.hpp"
 #include "landscape_opt/solvers/static_incremental.hpp"
-// #include "landscape_opt/solvers/incremental_greedy.hpp"
+#include "landscape_opt/solvers/greedy_incremental.hpp"
 // #include "landscape_opt/solvers/decremental_greedy.hpp"
 // #include "landscape_opt/solvers/mip_xue.hpp"
 // #include "landscape_opt/solvers/mip_eca.hpp"
@@ -39,6 +39,7 @@ namespace logging = boost::log;
 #include "solver_interfaces/abstract_solver.hpp"
 #include "solver_interfaces/static_decremental_interface.hpp"
 #include "solver_interfaces/static_incremental_interface.hpp"
+#include "solver_interfaces/greedy_incremental_interface.hpp"
 using namespace fhamonic;
 
 // #include "landscape_opt/parsers/parse_instance.hpp"
@@ -55,7 +56,8 @@ static bool process_command_line(
     bool & output_in_file, std::filesystem::path & output_csv_file) {
     std::vector<std::shared_ptr<AbstractSolver>> solver_interfaces{
         std::make_unique<StaticIncrementalInterface>(),
-        std::make_unique<StaticDecrementalInterface>()};
+        std::make_unique<StaticDecrementalInterface>(),
+        std::make_unique<GreedyIncrementalInterface>()};
 
     auto print_soft_name = []() { std::cout << "LSCP 0.1\n\n"; };
     auto print_usage = []() {

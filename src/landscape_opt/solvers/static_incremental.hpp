@@ -46,9 +46,16 @@ struct StaticIncremental {
             ranges::to<std::vector>(instance.options());
         std::vector<double> options_ratios(options.size());
 
+        options.erase(
+            std::remove_if(
+                options.begin(), options.end(),
+                [&](Option i) { return instance.option_cost(i) > budget; }),
+            options.end());
+
         auto compute_delta_eca_inc =
             [&instance, &nodeOptions, &arcOptions, base_eca, &options_ratios](
-                const tbb::blocked_range<Option> & options_block) {
+                const tbb::blocked_range<decltype(options.begin())> &
+                    options_block) {
                 const QualityMap & original_qm =
                     instance.landscape().quality_map();
                 const ProbabilityMap & original_pm =
@@ -57,7 +64,8 @@ struct StaticIncremental {
                 QualityMap qm = original_qm;
                 ProbabilityMap pm = original_pm;
 
-                for(Option option = options_block.begin();;) {
+                for(auto it = options_block.begin();;) {
+                    Option option = *it;
                     for(auto && [u, quality_gain] : nodeOptions[option])
                         qm[u] += quality_gain;
                     for(auto && [a, enhanced_prob] : arcOptions[option])
@@ -69,7 +77,7 @@ struct StaticIncremental {
                     options_ratios[option] = (increased_eca - base_eca) /
                                              instance.option_cost(option);
 
-                    if(++option == options_block.end()) break;
+                    if(++it == options_block.end()) break;
 
                     for(auto && [u, quality_gain] : nodeOptions[option])
                         qm[u] = original_qm[u];
@@ -81,11 +89,11 @@ struct StaticIncremental {
         if(parallel) {
             auto options_range = instance.options();
             tbb::parallel_for(
-                tbb::blocked_range<Option>(0, instance.options().size()),
+                tbb::blocked_range(options.begin(), options.end()),
                 compute_delta_eca_inc);
         } else {
             compute_delta_eca_inc(
-                tbb::blocked_range<Option>(0, instance.options().size()));
+                tbb::blocked_range(options.begin(), options.end()));
         }
 
         auto zipped_view = ranges::view::zip(options_ratios, options);

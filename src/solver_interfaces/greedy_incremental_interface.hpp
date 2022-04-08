@@ -19,7 +19,7 @@ private:
 
 public:
     GreedyIncrementalInterface() : desc(name() + " options") {
-        desc.add_options()("verbose,v", "Timeout in seconds")(
+        desc.add_options()("verbose,v", "Log the algorithm steps")(
             "parallel,p", "Use multithreaded version");
     }
 

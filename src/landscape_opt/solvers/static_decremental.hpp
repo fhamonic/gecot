@@ -20,6 +20,7 @@ namespace solvers {
 struct StaticDecremental {
     bool verbose = false;
     bool parallel = false;
+    bool only_dec = false;
 
     template <concepts::Instance I>
     typename I::Solution solve(const I & instance, const double budget) const {
@@ -29,19 +30,31 @@ struct StaticDecremental {
         using Option = typename I::Option;
         using Solution = typename I::Solution;
 
+        int time_ms = 0;
         Chrono chrono;
         Solution solution = instance.create_solution();
-        int time_ms = 0;
+        double purchaised = 0.0;
+
+        std::vector<Option> options;
+        std::vector<double> options_ratios(instance.options().size());
+
+        for(auto && option : instance.options()) {
+            const double price = instance.option_cost(option);
+            purchaised += price;
+            solution[option] = 1.0;
+            options.emplace_back(option);
+        }
 
         const auto nodeOptions = detail::computeOptionsForNodes(instance);
         const auto arcOptions = detail::computeOptionsForArcs(instance);
 
-        QualityMap quality_map = instance.landscape().quality_map();
-        ProbabilityMap probability_map = instance.landscape().probability_map();
+        const QualityMap & original_qm = instance.landscape().quality_map();
+        const ProbabilityMap & original_pm =
+            instance.landscape().probability_map();
 
-        QualityMap enhanced_qm = quality_map;
-        ProbabilityMap enhanced_pm = probability_map;
-        for(auto && option : instance.options()) {
+        QualityMap enhanced_qm = original_qm;
+        ProbabilityMap enhanced_pm = original_pm;
+        for(auto && option : options) {
             for(auto && [u, quality_gain] : nodeOptions[option])
                 enhanced_qm[u] += quality_gain;
             for(auto && [a, enhanced_prob] : arcOptions[option])
@@ -51,19 +64,10 @@ struct StaticDecremental {
         const double enhanced_eca =
             eca(instance.landscape().graph(), enhanced_qm, enhanced_pm);
         if(verbose) {
-            std::cout << "ECA with all improvments: " << enhanced_eca
+            std::cout << "ECA with all possible improvments: " << enhanced_eca
                       << std::endl;
         }
 
-        std::vector<Option> options =
-            ranges::to<std::vector>(instance.options());
-        std::vector<double> options_ratios(options.size());
-
-        double purchaised = 0.0;
-        for(auto && option : instance.options()) {
-            purchaised += instance.option_cost(option);
-            solution[option] = 1.0;
-        }
 
         auto compute_delta_eca_dec =
             [&](const tbb::blocked_range<decltype(options.begin())> &
@@ -76,7 +80,7 @@ struct StaticDecremental {
                     for(auto && [u, quality_gain] : nodeOptions[option])
                         qm[u] -= quality_gain;
                     for(auto && [a, enhanced_prob] : arcOptions[option]) {
-                        pm[a] = probability_map[a];
+                        pm[a] = original_pm[a];
                         for(auto && [enhanced_prob, i] :
                             instance.arc_options_map()[a]) {
                             if(option == i) continue;
@@ -128,76 +132,86 @@ struct StaticDecremental {
             }
         }
 
-        typename Landscape::QualityMap current_qm = quality_map;
-        typename Landscape::ProbabilityMap current_pm = probability_map;
+        free_options.erase(
+            std::remove_if(free_options.begin(), free_options.end(),
+                           [&](Option i) {
+                               return purchaised + instance.option_cost(i) >
+                                      budget;
+                           }),
+            free_options.end());
 
-        for(Option option : options) {
-            if(solution[option] == 0.0) continue;
-            for(auto && [u, quality_gain] : nodeOptions[option])
-                current_qm[u] += quality_gain;
-            for(auto && [a, enhanced_prob] : arcOptions[option])
-                current_pm[a] = std::max(current_pm[a], enhanced_prob);
-        }
+        if(!only_dec && !free_options.empty()) {
+            typename Landscape::QualityMap current_qm = original_qm;
+            typename Landscape::ProbabilityMap current_pm = original_pm;
 
-        const double current_eca =
-            eca(instance.landscape().graph(), current_qm, current_pm);
+            for(Option option : options) {
+                if(solution[option] == 0.0) continue;
+                for(auto && [u, quality_gain] : nodeOptions[option])
+                    current_qm[u] += quality_gain;
+                for(auto && [a, enhanced_prob] : arcOptions[option])
+                    current_pm[a] = std::max(current_pm[a], enhanced_prob);
+            }
 
-        auto compute_delta_eca_inc =
-            [&](const tbb::blocked_range<decltype(free_options.begin())> &
-                    options_block) {
-                QualityMap qm = current_qm;
-                ProbabilityMap pm = current_pm;
+            const double current_eca =
+                eca(instance.landscape().graph(), current_qm, current_pm);
 
-                for(auto it = options_block.begin();;) {
-                    Option option = *it;
-                    for(auto && [u, quality_gain] : nodeOptions[option])
-                        qm[u] += quality_gain;
-                    for(auto && [a, enhanced_prob] : arcOptions[option])
-                        pm[a] = std::max(pm[a], enhanced_prob);
+            auto compute_delta_eca_inc =
+                [&](const tbb::blocked_range<decltype(free_options.begin())> &
+                        options_block) {
+                    QualityMap qm = current_qm;
+                    ProbabilityMap pm = current_pm;
 
-                    const double increased_eca =
-                        eca(instance.landscape().graph(), qm, pm);
+                    for(auto it = options_block.begin();;) {
+                        Option option = *it;
+                        for(auto && [u, quality_gain] : nodeOptions[option])
+                            qm[u] += quality_gain;
+                        for(auto && [a, enhanced_prob] : arcOptions[option])
+                            pm[a] = std::max(pm[a], enhanced_prob);
 
-                    options_ratios[option] = (increased_eca - current_eca) /
-                                             instance.option_cost(option);
+                        const double increased_eca =
+                            eca(instance.landscape().graph(), qm, pm);
 
-                    if(++it == options_block.end()) break;
+                        options_ratios[option] = (increased_eca - current_eca) /
+                                                 instance.option_cost(option);
 
-                    for(auto && [u, quality_gain] : nodeOptions[option])
-                        qm[u] = current_qm[u];
-                    for(auto && [a, enhanced_prob] : arcOptions[option])
-                        pm[a] = current_pm[a];
+                        if(++it == options_block.end()) break;
+
+                        for(auto && [u, quality_gain] : nodeOptions[option])
+                            qm[u] = current_qm[u];
+                        for(auto && [a, enhanced_prob] : arcOptions[option])
+                            pm[a] = current_pm[a];
+                    }
+                };
+
+            options_ratios.resize(free_options.size());
+
+            if(parallel) {
+                tbb::parallel_for(tbb::blocked_range(free_options.begin(),
+                                                     free_options.end()),
+                                  compute_delta_eca_inc);
+            } else {
+                compute_delta_eca_inc(tbb::blocked_range(free_options.begin(),
+                                                         free_options.end()));
+            }
+
+            auto zipped_view_inc =
+                ranges::view::zip(options_ratios, free_options);
+            ranges::sort(zipped_view_inc, [](auto && e1, auto && e2) {
+                return e1.first > e2.first;
+            });
+
+            for(Option option : free_options) {
+                const double price = instance.option_cost(option);
+                if(purchaised + price > budget) continue;
+                purchaised += price;
+                solution[option] = 1.0;
+                if(verbose) {
+                    std::cout << "add option: " << option
+                              << "\n\t costing: " << price
+                              << "\n\t total cost: " << purchaised << std::endl;
                 }
-            };
-
-        options_ratios.resize(free_options.size());
-
-        if(parallel) {
-            tbb::parallel_for(
-                tbb::blocked_range(free_options.begin(), free_options.end()),
-                compute_delta_eca_inc);
-        } else {
-            compute_delta_eca_inc(
-                tbb::blocked_range(free_options.begin(), free_options.end()));
-        }
-
-        auto zipped_view_inc = ranges::view::zip(options_ratios, free_options);
-        ranges::sort(zipped_view_inc, [](auto && e1, auto && e2) {
-            return e1.first > e2.first;
-        });
-
-        for(Option option : free_options) {
-            const double price = instance.option_cost(option);
-            if(purchaised + price > budget) continue;
-            purchaised += price;
-            solution[option] = 1.0;
-            if(verbose) {
-                std::cout << "add option: " << option
-                          << "\n\t costing: " << price
-                          << "\n\t total cost: " << purchaised << std::endl;
             }
         }
-
         time_ms = chrono.timeMs();
 
         return solution;

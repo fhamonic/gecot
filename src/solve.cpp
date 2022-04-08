@@ -3,46 +3,29 @@
 #include <iostream>
 #include <optional>
 
-#include <boost/range/algorithm.hpp>
-namespace br = boost::range;
-
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
-namespace postyle = boost::program_options::command_line_style;
 
 #include <boost/log/core.hpp>
 #include <boost/log/expressions.hpp>
 #include <boost/log/trivial.hpp>
 namespace logging = boost::log;
 
-// #include "landscape_opt/concepts/instance.hpp"
-// #include "landscape_opt/concepts/landscape.hpp"
-
-// #include "landscape_opt/indices/eca.hpp"
-// #include "landscape_opt/indices/parallel_eca.hpp"
-
-#include "landscape_opt/solvers/greedy_incremental.hpp"
-#include "landscape_opt/solvers/random_solution.hpp"
-#include "landscape_opt/solvers/static_decremental.hpp"
-#include "landscape_opt/solvers/static_incremental.hpp"
-// #include "landscape_opt/solvers/decremental_greedy.hpp"
 // #include "landscape_opt/solvers/mip_xue.hpp"
 // #include "landscape_opt/solvers/mip_eca.hpp"
 // #include "landscape_opt/solvers/mip_eca_preprocessed.hpp"
 // #include "landscape_opt/solvers/randomized_rounding.hpp"
 
-#include "po_utils.hpp"
-
 #include "instance.hpp"
 #include "parse_instance.hpp"
 
 #include "solver_interfaces/abstract_solver.hpp"
+#include "solver_interfaces/greedy_decremental_interface.hpp"
 #include "solver_interfaces/greedy_incremental_interface.hpp"
 #include "solver_interfaces/static_decremental_interface.hpp"
 #include "solver_interfaces/static_incremental_interface.hpp"
-using namespace fhamonic;
 
-// #include "landscape_opt/parsers/parse_instance.hpp"
+using namespace fhamonic;
 
 void init_logging() {
     logging::core::get()->set_filter(logging::trivial::severity >=
@@ -77,7 +60,8 @@ static bool process_command_line(
     std::vector<std::shared_ptr<AbstractSolver>> solver_interfaces{
         std::make_unique<StaticIncrementalInterface>(),
         std::make_unique<StaticDecrementalInterface>(),
-        std::make_unique<GreedyIncrementalInterface>()};
+        std::make_unique<GreedyIncrementalInterface>(),
+        std::make_unique<GreedyDecrementalInterface>()};
 
     auto print_soft_name = []() { std::cout << "LSCP 0.1\n\n"; };
     auto print_usage = []() {

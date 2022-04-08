@@ -42,7 +42,10 @@ public:
     };
 
     std::string name() const { return "static_decremental"; }
-    std::string description() const { return ""; }
+    std::string description() const {
+        return "From the improved landscape, remove the options with the worst "
+               "gain/cost ratio.";
+    }
     std::string options_description() const {
         std::ostringstream s;
         s << desc;

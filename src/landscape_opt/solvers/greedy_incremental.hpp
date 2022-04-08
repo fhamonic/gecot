@@ -36,7 +36,7 @@ struct GreedyIncremental {
         const auto nodeOptions = detail::computeOptionsForNodes(instance);
         const auto arcOptions = detail::computeOptionsForArcs(instance);
 
-        const double prec_eca = eca(instance.landscape());
+        double prec_eca = eca(instance.landscape());
         if(verbose) {
             std::cout << "base ECA: " << prec_eca << std::endl;
             std::cout << "total cost: 0" << std::endl;
@@ -49,8 +49,7 @@ struct GreedyIncremental {
         ProbabilityMap current_pm = instance.landscape().probability_map();
 
         auto compute_delta_eca_inc =
-            [&](
-                const tbb::blocked_range<decltype(options.begin())> &
+            [&](const tbb::blocked_range<decltype(options.begin())> &
                     options_block,
                 std::pair<double, Option> init) {
                 QualityMap qm = current_qm;
@@ -66,8 +65,10 @@ struct GreedyIncremental {
                     const double increased_eca =
                         eca(instance.landscape().graph(), qm, pm);
 
-                    if(init.first < increased_eca)
-                        init = std::make_pair(increased_eca, option);
+                    const double ratio = (increased_eca - prec_eca) /
+                                         instance.option_cost(option);
+
+                    if(init.first < ratio) init = std::make_pair(ratio, option);
 
                     if(++it == options_block.end()) break;
 
@@ -81,16 +82,40 @@ struct GreedyIncremental {
             };
 
         double purchaised = 0.0;
-        while(options.size() > 0) {
+        for(;;) {
+            options.erase(
+                std::remove_if(options.begin(), options.end(),
+                               [&](Option i) {
+                                   return purchaised + instance.option_cost(i) >
+                                          budget;
+                               }),
+                options.end());
+
+            if(options.empty()) break;
+
             std::pair<Option, double> best_option_p;
             if(parallel) {
                 best_option_p = tbb::parallel_reduce(
-                    tbb::blocked_range(options.begin(), options.end()), std::pair<double, Option>(-1.0, -1),
-                    compute_delta_eca_inc, [](auto && p1, auto && p2) {
+                    tbb::blocked_range(options.begin(), options.end()),
+                    std::pair<double, Option>(-1.0, -1), compute_delta_eca_inc,
+                    [](auto && p1, auto && p2) {
                         return p1.first > p2.first ? p1 : p2;
                     });
             } else {
-                best_option_p = compute_delta_eca_inc(tbb::blocked_range(options.begin(), options.end()), std::pair<double, Option>(-1.0, -1));
+                best_option_p = compute_delta_eca_inc(
+                    tbb::blocked_range(options.begin(), options.end()),
+                    std::pair<double, Option>(-1.0, -1));
+            }
+
+            const double price = instance.option_cost(best_option_p.first);
+            purchaised += price;
+            solution[best_option_p.first] = 1.0;
+            prec_eca += best_option_p.second * price;
+
+            if(verbose) {
+                std::cout << "add option: " << best_option_p.first
+                          << "\n\t costing: " << price
+                          << "\n\t total cost: " << purchaised << std::endl;
             }
         }
 

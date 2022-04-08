@@ -42,7 +42,10 @@ public:
     };
 
     std::string name() const { return "greedy_decremental"; }
-    std::string description() const { return ""; }
+    std::string description() const {
+        return "From the base landscape, iteratively remove the option with "
+               "the worst gain/cost ratio.";
+    }
     std::string options_description() const {
         std::ostringstream s;
         s << desc;

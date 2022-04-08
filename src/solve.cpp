@@ -21,10 +21,10 @@ namespace logging = boost::log;
 // #include "landscape_opt/indices/eca.hpp"
 // #include "landscape_opt/indices/parallel_eca.hpp"
 
+#include "landscape_opt/solvers/greedy_incremental.hpp"
 #include "landscape_opt/solvers/random_solution.hpp"
 #include "landscape_opt/solvers/static_decremental.hpp"
 #include "landscape_opt/solvers/static_incremental.hpp"
-#include "landscape_opt/solvers/greedy_incremental.hpp"
 // #include "landscape_opt/solvers/decremental_greedy.hpp"
 // #include "landscape_opt/solvers/mip_xue.hpp"
 // #include "landscape_opt/solvers/mip_eca.hpp"
@@ -37,9 +37,9 @@ namespace logging = boost::log;
 #include "parse_instance.hpp"
 
 #include "solver_interfaces/abstract_solver.hpp"
+#include "solver_interfaces/greedy_incremental_interface.hpp"
 #include "solver_interfaces/static_decremental_interface.hpp"
 #include "solver_interfaces/static_incremental_interface.hpp"
-#include "solver_interfaces/greedy_incremental_interface.hpp"
 using namespace fhamonic;
 
 // #include "landscape_opt/parsers/parse_instance.hpp"
@@ -47,6 +47,26 @@ using namespace fhamonic;
 void init_logging() {
     logging::core::get()->set_filter(logging::trivial::severity >=
                                      logging::trivial::warning);
+}
+
+void print_paragraph(std::ostream & os, std::size_t offset,
+                     std::size_t column_width, const std::string & str) {
+    std::size_t line_start = 0;
+
+    while(str.size() - line_start > column_width) {
+        std::size_t n = str.rfind(' ', line_start + column_width);
+        if(n <= line_start) {
+            os << str.substr(line_start, column_width - 1) << '-' << '\n'
+               << std::string(offset, ' ');
+            line_start += column_width - 1;
+        } else {
+            os << str.substr(line_start, n - line_start) << '\n'
+               << std::string(offset, ' ');
+            line_start = n + 1;
+        }
+    }
+
+    os << str.substr(line_start) << '\n';
 }
 
 static bool process_command_line(
@@ -76,13 +96,15 @@ static bool process_command_line(
             std::ranges::views::transform(solver_interfaces, [&](auto && s) {
                 return s->name().size();
             }));
-        for(auto & s : solver_interfaces)
+
+        const std::size_t offset =
+            std::max(algorithm_name_max_length + 1, std::size_t(24));
+
+        for(auto & s : solver_interfaces) {
             std::cout << "  " << s->name()
-                      << std::string(std::max(algorithm_name_max_length,
-                                              std::size_t(25)) +
-                                         1 - s->name().size(),
-                                     ' ')
-                      << s->description() << '\n';
+                      << std::string(offset - s->name().size() - 2, ' ');
+            print_paragraph(std::cout, offset, 80 - offset, s->description());
+        }
         std::cout << std::endl;
         return false;
     };

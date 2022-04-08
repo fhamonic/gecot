@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <optional>
 
@@ -199,19 +200,29 @@ int main(int argc, const char * argv[]) {
 
     Instance::Solution solution = solver->solve(instance, budget);
 
-    std::cout << "Solution:" << std::endl;
-    const std::size_t option_name_max_length = std::ranges::max(
-        std::ranges::views::transform(instance.options(), [&](auto && o) {
-            return instance.option_name(o).size();
-        }));
-    for(auto && o : instance.options()) {
-        std::cout << "  " << instance.option_name(o)
-                  << std::string(option_name_max_length + 1 -
-                                     instance.option_name(o).size(),
-                                 ' ')
-                  << solution[o] << "\n";
+    if(!output_in_file) {
+        std::cout << "Solution:" << std::endl;
+        const std::size_t option_name_max_length = std::ranges::max(
+            std::ranges::views::transform(instance.options(), [&](auto && o) {
+                return instance.option_name(o).size();
+            }));
+        for(auto && o : instance.options()) {
+            std::cout << "  " << instance.option_name(o)
+                      << std::string(option_name_max_length + 1 -
+                                         instance.option_name(o).size(),
+                                     ' ')
+                      << solution[o] << '\n';
+        }
+        std::cout << std::endl;
+
+    } else {
+        std::ofstream output_file(output_csv);
+        output_file << "options_id,value\n";
+        for(auto && o : instance.options()) {
+            output_file << instance.option_name(o) << ',' << solution[o]
+                        << '\n';
+        }
     }
-    std::cout << std::endl;
 
     return EXIT_SUCCESS;
 }

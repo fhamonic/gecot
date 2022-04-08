@@ -29,7 +29,7 @@ struct GreedyIncremental {
         using Option = typename I::Option;
         using Solution = typename I::Solution;
 
-        int time_ms = 0;
+        // int time_ms = 0;
         Chrono chrono;
         Solution solution = instance.create_solution();
 
@@ -93,7 +93,7 @@ struct GreedyIncremental {
 
             if(options.empty()) break;
 
-            std::pair<Option, double> best_option_p;
+            std::pair<double, Option> best_option_p;
             if(parallel) {
                 best_option_p = tbb::parallel_reduce(
                     tbb::blocked_range(options.begin(), options.end()),
@@ -107,13 +107,17 @@ struct GreedyIncremental {
                     std::pair<double, Option>(-1.0, -1));
             }
 
-            const double price = instance.option_cost(best_option_p.first);
+            const double price = instance.option_cost(best_option_p.second);
             purchaised += price;
-            solution[best_option_p.first] = 1.0;
-            prec_eca += best_option_p.second * price;
+            solution[best_option_p.second] = 1.0;
+            prec_eca += best_option_p.first * price;
+
+            options.erase(std::remove(options.begin(), options.end(),
+                                      best_option_p.second),
+                          options.end());
 
             if(verbose) {
-                std::cout << "add option: " << best_option_p.first
+                std::cout << "add option: " << best_option_p.second
                           << "\n\t costing: " << price
                           << "\n\t total cost: " << purchaised << std::endl;
             }

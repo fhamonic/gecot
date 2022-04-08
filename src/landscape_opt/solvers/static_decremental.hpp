@@ -30,7 +30,7 @@ struct StaticDecremental {
         using Option = typename I::Option;
         using Solution = typename I::Solution;
 
-        int time_ms = 0;
+        // int time_ms = 0;
         Chrono chrono;
         Solution solution = instance.create_solution();
         double purchaised = 0.0;
@@ -212,7 +212,7 @@ struct StaticDecremental {
                 }
             }
         }
-        time_ms = chrono.timeMs();
+        // time_ms = chrono.timeMs();
 
         return solution;
     }

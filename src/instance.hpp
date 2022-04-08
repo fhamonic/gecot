@@ -56,7 +56,7 @@ public:
     }
 
     bool contains_option(Option i) const noexcept {
-        return i >= 0 && i < nb_options();
+        return i >= 0 && i < int(nb_options());
     }
     bool contains_option(std::string identifier) const noexcept {
         return _option_name_to_id_map.contains(identifier);

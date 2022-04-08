@@ -30,14 +30,12 @@ struct GreedyDecremental {
         using Option = typename I::Option;
         using Solution = typename I::Solution;
 
-        int time_ms = 0;
+        // int time_ms = 0;
         Chrono chrono;
         Solution solution = instance.create_solution();
         double purchaised = 0.0;
 
         std::vector<Option> options;
-        std::vector<double> options_ratios(instance.options().size());
-
         for(auto && option : instance.options()) {
             const double price = instance.option_cost(option);
             purchaised += price;
@@ -48,8 +46,12 @@ struct GreedyDecremental {
         const auto nodeOptions = detail::computeOptionsForNodes(instance);
         const auto arcOptions = detail::computeOptionsForArcs(instance);
 
-        QualityMap enhanced_qm = instance.landscape().quality_map();
-        ProbabilityMap enhanced_pm = instance.landscape().probability_map();
+        const QualityMap & original_qm = instance.landscape().quality_map();
+        const ProbabilityMap & original_pm =
+            instance.landscape().probability_map();
+
+        QualityMap enhanced_qm = original_qm;
+        ProbabilityMap enhanced_pm = original_pm;
         for(auto && option : options) {
             for(auto && [u, quality_gain] : nodeOptions[option])
                 enhanced_qm[u] += quality_gain;
@@ -57,27 +59,77 @@ struct GreedyDecremental {
                 enhanced_pm[a] = std::max(enhanced_pm[a], enhanced_prob);
         }
 
-        const double enhanced_eca =
+        double enhanced_eca =
             eca(instance.landscape().graph(), enhanced_qm, enhanced_pm);
         if(verbose) {
             std::cout << "ECA with all possible improvments: " << enhanced_eca
                       << std::endl;
         }
 
-        for(;;) {
-            std::pair<Option, double> best_option_p;
+        auto compute_delta_eca_dec =
+            [&](const tbb::blocked_range<decltype(options.begin())> &
+                    options_block,
+                std::pair<double, Option> init) {
+                QualityMap qm = enhanced_qm;
+                ProbabilityMap pm = enhanced_pm;
+
+                for(auto it = options_block.begin();;) {
+                    Option option = *it;
+                    for(auto && [u, quality_gain] : nodeOptions[option])
+                        qm[u] -= quality_gain;
+                    for(auto && [a, enhanced_prob] : arcOptions[option]) {
+                        pm[a] = original_pm[a];
+                        for(auto && [enhanced_prob, i] :
+                            instance.arc_options_map()[a]) {
+                            if(solution[i] == 0 || option == i) continue;
+                            pm[a] = std::max(pm[a], enhanced_prob);
+                        }
+                    }
+
+                    const double decreased_eca =
+                        eca(instance.landscape().graph(), qm, pm);
+
+                    const double ratio = (enhanced_eca - decreased_eca) /
+                                         instance.option_cost(option);
+
+                    if(init.first > ratio) init = std::make_pair(ratio, option);
+
+                    if(++it == options_block.end()) break;
+
+                    for(auto && [u, quality_gain] : nodeOptions[option])
+                        qm[u] = enhanced_qm[u];
+                    for(auto && [a, enhanced_prob] : arcOptions[option])
+                        pm[a] = enhanced_pm[a];
+                }
+
+                return init;
+            };
+
+        while(purchaised > budget) {
+            std::pair<double, Option> worst_option_p;
             if(parallel) {
-                best_option_p = tbb::parallel_reduce(
+                worst_option_p = tbb::parallel_reduce(
                     tbb::blocked_range(options.begin(), options.end()),
-                    std::pair<double, Option>(-1.0, -1), compute_delta_eca_inc,
-                    [](auto && p1, auto && p2) {
+                    std::pair<double, Option>(
+                        std::numeric_limits<double>::max(), -1),
+                    compute_delta_eca_dec, [](auto && p1, auto && p2) {
                         return p1.first > p2.first ? p1 : p2;
                     });
             } else {
-                best_option_p = compute_delta_eca_inc(
+                worst_option_p = compute_delta_eca_dec(
                     tbb::blocked_range(options.begin(), options.end()),
-                    std::pair<double, Option>(-1.0, -1));
+                    std::pair<double, Option>(
+                        std::numeric_limits<double>::max(), -1));
             }
+
+            const double price = instance.option_cost(worst_option_p.second);
+            purchaised -= price;
+            solution[worst_option_p.second] = 0.0;
+            enhanced_eca -= worst_option_p.first * price;
+
+            options.erase(std::remove(options.begin(), options.end(),
+                                      worst_option_p.second),
+                          options.end());
         }
 
         // std::vector<Option> options =
@@ -106,7 +158,8 @@ struct GreedyDecremental {
         //             const double ratio = (increased_eca - prec_eca) /
         //                                  instance.option_cost(option);
 
-        //             if(init.first < ratio) init = std::make_pair(ratio, option);
+        //             if(init.first < ratio) init = std::make_pair(ratio,
+        //             option);
 
         //             if(++it == options_block.end()) break;
 
@@ -124,7 +177,8 @@ struct GreedyDecremental {
         //     options.erase(
         //         std::remove_if(options.begin(), options.end(),
         //                        [&](Option i) {
-        //                            return purchaised + instance.option_cost(i) >
+        //                            return purchaised +
+        //                            instance.option_cost(i) >
         //                                   budget;
         //                        }),
         //         options.end());
@@ -135,7 +189,8 @@ struct GreedyDecremental {
         //     if(parallel) {
         //         best_option_p = tbb::parallel_reduce(
         //             tbb::blocked_range(options.begin(), options.end()),
-        //             std::pair<double, Option>(-1.0, -1), compute_delta_eca_inc,
+        //             std::pair<double, Option>(-1.0, -1),
+        //             compute_delta_eca_inc,
         //             [](auto && p1, auto && p2) {
         //                 return p1.first > p2.first ? p1 : p2;
         //             });

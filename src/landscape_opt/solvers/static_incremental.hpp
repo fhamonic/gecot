@@ -29,7 +29,7 @@ struct StaticIncremental {
         using Option = typename I::Option;
         using Solution = typename I::Solution;
 
-        int time_ms = 0;
+        // int time_ms = 0;
         Chrono chrono;
         Solution solution = instance.create_solution();
 
@@ -87,7 +87,6 @@ struct StaticIncremental {
             };
 
         if(parallel) {
-            auto options_range = instance.options();
             tbb::parallel_for(
                 tbb::blocked_range(options.begin(), options.end()),
                 compute_delta_eca_inc);
@@ -114,7 +113,7 @@ struct StaticIncremental {
             }
         }
 
-        time_ms = chrono.timeMs();
+        // time_ms = chrono.timeMs();
 
         return solution;
     }

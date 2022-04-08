@@ -84,5 +84,5 @@ target_link_libraries(lscp_solve PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser
 target_link_libraries(lscp_solve PUBLIC nlohmann_json::nlohmann_json)
 target_link_libraries(lscp_solve PUBLIC phmap::phmap)
 
-target_compile_options(lscp_solve PUBLIC -fconcepts-diagnostics-depth=4)
+target_compile_options(lscp_solve PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 

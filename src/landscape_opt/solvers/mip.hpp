@@ -2,23 +2,16 @@
 #define LANDSCAPE_OPT_SOLVERS_MIP_HPP
 
 #include <tbb/blocked_range.h>
-<<<<<<< HEAD
-#include <tbb/parallel_for.h>
-=======
 #include <tbb/parallel_reduce.h>
->>>>>>> 6a84e26ea03dee4b75d2d972869e7b095eafdeed
 
 #include <range/v3/algorithm/sort.hpp>
 #include <range/v3/range/conversion.hpp>
 #include <range/v3/view/zip.hpp>
 
-<<<<<<< HEAD
-=======
 #include "mippp/model.hpp"
 #include "mippp/operators.hpp"
 #include "mippp/xsum.hpp"
 
->>>>>>> 6a84e26ea03dee4b75d2d972869e7b095eafdeed
 #include "concepts/instance.hpp"
 #include "helper.hpp"
 #include "indices/eca.hpp"

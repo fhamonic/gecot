@@ -2,12 +2,23 @@
 #define LANDSCAPE_OPT_SOLVERS_MIP_HPP
 
 #include <tbb/blocked_range.h>
+<<<<<<< HEAD
 #include <tbb/parallel_for.h>
+=======
+#include <tbb/parallel_reduce.h>
+>>>>>>> 6a84e26ea03dee4b75d2d972869e7b095eafdeed
 
 #include <range/v3/algorithm/sort.hpp>
 #include <range/v3/range/conversion.hpp>
 #include <range/v3/view/zip.hpp>
 
+<<<<<<< HEAD
+=======
+#include "mippp/model.hpp"
+#include "mippp/operators.hpp"
+#include "mippp/xsum.hpp"
+
+>>>>>>> 6a84e26ea03dee4b75d2d972869e7b095eafdeed
 #include "concepts/instance.hpp"
 #include "helper.hpp"
 #include "indices/eca.hpp"
@@ -33,118 +44,57 @@ struct MIP {
         // int time_ms = 0;
         Chrono chrono;
         Solution solution = instance.create_solution();
-
-        const QualityMap & quality_map = instance.landscape().quality_map();
-        const ProbabilityMap & probability_map =
+        const Graph & graph = instance.landscape().graph();
+        const QualityMap & quality = instance.landscape().quality_map();
+        const ProbabilityMap & probality =
             instance.landscape().probability_map();
 
-        std::vector<Graph::vertex> target_vertices;
-        std::vector<int> ids(graph.nb_vertices(), -1);
+        using namespace mippp;
+        using Model = Model<GrbTraits>;
+        Model model;
+
+        auto F_vars = model.add_vars(graph.nb_vertices(),
+                                     [](Graph::vertex v) { return v; });
+        auto Phi_vars = model.add_vars(
+            graph.nb_vertices() * graph.nb_arcs(),
+            [n = graph.nb_vertices()](Graph::vertex v, Graph::arc a) {
+                return v * n + a;
+            });
+        auto X_vars = model.add_vars(instance.options().size(),
+                                     [](Option i) { return i; },
+                                     {.type = Model::ColType::BINARY});
+
+        model.add_obj(xsum(graph.vertices(), F_vars, quality));
         for(auto && t : graph.vertices()) {
-            if(quality_map[t] == 0 && !instance.node_options_map()[t]) continue;
-            ids[t] = target_vertices.size();
-            target_vertices.emplace_back(t);
+            auto Phi_t_var = [&Phi_vars, t](Graph::arc a) {
+                return Phi_vars(t, a);
+            };
+            for(auto && u : graph.vertices()) {
+                if(u == t) continue;
+                model.add_constraint(
+                    xsum(graph.out_arcs(u), Phi_t_var) -
+                        xsum(graph.in_arcs(u), Phi_t_var, probality) <=
+                    quality[u] +
+                        xsum(
+                            instance.node_options_map()[u],
+                            [&X_vars](auto && p) { return X_vars(p.second); },
+                            [](auto && p) { return p.first; }));
+            }
+            model.add_constraint(
+                xsum(graph.in_arcs(t), Phi_t_var, probality) <=
+                quality[t] +
+                    xsum(
+                        instance.node_options_map()[t],
+                        [&X_vars](auto && p) { return X_vars(p.second); },
+                        [](auto && p) { return p.first; }) -
+                    F_vars(t));
         }
 
-        ////////////////////////////////////////////////////////////////////////
-        // Columns : Objective
-        ////////////////////
-        for(auto && t : target_vertices) {
-            if(quality_map[t] == 0 && !plan.contains(t)) continue;
-            // sum w(t) * f_t
-            const int f_t = vars.f.id(t);
-            solver_builder.setObjective(f_t, landscape.getQuality(t));
-            for(auto const & e : instance.node_options_map()[t]) {
-                const int restored_f_t = vars.restored_f.id(e);
-                solver_builder.setObjective(restored_f_t, e.quality_gain);
-            }
-        }
-        ////////////////////////////////////////////////////////////////////////
-        // Rows : Constraints
-        ////////////////////
-        for(MutableLandscape::NodeIt t(graph); t != lemon::INVALID; ++t) {
-            if(landscape.getQuality(t) == 0 && !plan.contains(t)) continue;
-            const int f_t = vars.f.id(t);
-            // out_flow(u) - in_flow(u) <= w(u)
-            for(MutableLandscape::NodeIt u(graph); u != lemon::INVALID; ++u) {
-                // out flow
-                for(MutableLandscape::Graph::OutArcIt b(graph, u);
-                    b != lemon::INVALID; ++b) {
-                    const int x_tb = vars.x.id(t, b);
-                    solver_builder.buffEntry(x_tb, 1);
-                    for(auto const & e : plan[b]) {
-                        const int restored_x_t_b = vars.restored_x.id(t, e);
-                        solver_builder.buffEntry(restored_x_t_b, 1);
-                    }
-                }
-                // in flow
-                for(MutableLandscape::Graph::InArcIt a(graph, u);
-                    a != lemon::INVALID; ++a) {
-                    const int x_ta = vars.x.id(t, a);
-                    solver_builder.buffEntry(x_ta,
-                                             -landscape.getProbability(a));
-                    for(auto const & e : plan[a]) {
-                        const int restored_x_t_a = vars.restored_x.id(t, e);
-                        solver_builder.buffEntry(restored_x_t_a,
-                                                 -e.restored_probability);
-                    }
-                }
-                // optional injected flow
-                for(auto const & e : plan[u]) {
-                    const int y_u = vars.y.id(e.option);
-                    solver_builder.buffEntry(y_u, -e.quality_gain);
-                }
-                // optimisation variable
-                if(u == t) solver_builder.buffEntry(f_t, 1);
-                // injected flow
-                solver_builder.pushRow(-OSI_Builder::INFTY,
-                                       landscape.getQuality(u));
-            }
+        model.add_constraint(
+            xsum(instance.options(), X_vars, [&instance](auto && o) {
+                return instance.option_cost(o);
+            }) <= budget);
 
-            // x_a < y_i * M
-            for(MutableLandscape::ArcIt a(graph); a != lemon::INVALID; ++a) {
-                for(auto const & e : plan[a]) {
-                    const int y_i = vars.y.id(e.option);
-                    const int x_ta = vars.restored_x.id(t, e);
-                    solver_builder.buffEntry(y_i, M[graph.source(a)]);
-                    solver_builder.buffEntry(x_ta, -1);
-                    solver_builder.pushRow(0, OSI_Builder::INFTY);
-                }
-            }
-
-            // restored_f_t <= f_t
-            // restored_f_t <= y_i * M
-            for(const auto & e : plan[t]) {
-                const int y_i = vars.y.id(e.option);
-                const int f_t = vars.f.id(t);
-                const int restored_f_t = vars.restored_f.id(e);
-                solver_builder.buffEntry(f_t, 1);
-                solver_builder.buffEntry(restored_f_t, -1);
-                solver_builder.pushRow(0, OSI_Builder::INFTY);
-
-                solver_builder.buffEntry(y_i, M[t]);
-                solver_builder.buffEntry(restored_f_t, -1);
-                solver_builder.pushRow(0, OSI_Builder::INFTY);
-            }
-        }
-        ////////////////////
-        // sum y_i < B
-        for(const RestorationPlan<MutableLandscape>::Option i :
-            plan.options()) {
-            const int y_i = vars.y.id(i);
-            solver_builder.buffEntry(y_i, plan.getCost(i));
-        }
-        solver_builder.pushRow(-OSI_Builder::INFTY, B);
-        ////////////////////
-        // integer constraints
-        if(!relaxed) {
-            for(RestorationPlan<MutableLandscape>::Option i : plan.options()) {
-                const int y_i = vars.y.id(i);
-                solver_builder.setInteger(y_i);
-            }
-        }
-
-        // time_ms = chrono.timeMs();
         return solution;
     }
 };
@@ -154,3 +104,80 @@ struct MIP {
 }  // namespace fhamonic
 
 #endif  // LANDSCAPE_OPT_SOLVERS_MIP_HPP
+
+// Solution Solvers::PL_ECA_2::solve(
+//     const MutableLandscape & landscape,
+//     const RestorationPlan<MutableLandscape> & plan, const double B) const {
+//     Solution solution(landscape, plan);
+//     const int log_level = params.at("log")->getInt();
+//     const int timeout = params.at("timeout")->getInt();
+//     (void)timeout;  // pas bien
+//     const bool relaxed = params.at("relaxed")->getBool();
+//     Chrono chrono;
+//     OSI_Builder solver_builder;
+//     Variables vars(landscape, plan);
+//     insert_variables(solver_builder, vars);
+//     if(log_level > 0)
+//         std::cout << name()
+//                   << ": Start filling solver : " <<
+//                   solver_builder.getNbVars()
+//                   << " variables" << std::endl;
+//     fill_solver(solver_builder, landscape, plan, B, vars, relaxed);
+//     // OsiGrbSolverInterface * solver =
+//     // solver_builder.buildSolver<OsiGrbSolverInterface>(OSI_Builder::MAX);
+//     OsiSolverInterface * solver =
+//         solver_builder.buildSolver<OsiClpSolverInterface>(OSI_Builder::MAX);
+//     if(log_level <= 1) solver->setHintParam(OsiDoReducePrint);
+//     if(log_level >= 1) {
+//         if(log_level >= 2) {
+//             name_variables(solver_builder, landscape, plan, vars);
+//             OsiClpSolverInterface * solver_clp =
+//                 solver_builder.buildSolver<OsiClpSolverInterface>(
+//                     OSI_Builder::MAX);
+//             solver_clp->writeLp("pl_eca_2");
+//             delete solver_clp;
+//             std::cout << name() << ": LP printed to 'pl_eca_2.lp'" <<
+//             std::endl;
+//         }
+//         std::cout << name() << ": Complete filling solver : "
+//                   << solver_builder.getNbConstraints() << " constraints in "
+//                   << chrono.lapTimeMs() << " ms" << std::endl;
+//         std::cout << name() << ": Start solving" << std::endl;
+//     }
+//     ////////////////////
+//     // GRBsetdblparam(GRBgetenv(solver->getLpPtr()), GRB_DBL_PAR_MIPGAP,
+//     1e-8);
+//     // GRBsetintparam(GRBgetenv(solver->getLpPtr()),
+//     GRB_INT_PAR_LOGTOCONSOLE,
+//     // (log_level >= 2 ? 1 : 0));
+//     GRBsetintparam(GRBgetenv(solver->getLpPtr()),
+//     // GRB_DBL_PAR_TIMELIMIT, timeout);
+//     solver->branchAndBound();
+//     ////////////////////
+//     const double * var_solution = solver->getColSolution();
+//     if(var_solution == nullptr) {
+//         std::cerr << name() << ": Fail" << std::endl;
+//         delete solver;
+//         assert(false);
+//     }
+//     for(const RestorationPlan<MutableLandscape>::Option i : plan.options()) {
+//         const int y_i = vars.y.id(i);
+//         const double value = var_solution[y_i];
+//         solution.set(i, value);
+//     }
+//     solution.setComputeTimeMs(chrono.timeMs());
+//     solution.obj = solver->getObjValue();
+//     solution.nb_vars = solver_builder.getNbNonZeroVars();
+//     solution.nb_constraints = solver_builder.getNbConstraints();
+//     solution.nb_elems = solver->getNumElements();
+//     if(log_level >= 1) {
+//         std::cout << name()
+//                   << ": Complete solving : " << solution.getComputeTimeMs()
+//                   << " ms" << std::endl;
+//         std::cout << name() << ": ECA from obj : " << std::sqrt(solution.obj)
+//                   << std::endl;
+//     }
+//     delete solver;
+
+//     return solution;
+// }

@@ -107,17 +107,23 @@ struct GreedyIncremental {
                     std::pair<double, Option>(-1.0, -1));
             }
 
-            const double price = instance.option_cost(best_option_p.second);
+            Option best_option = best_option_p.second;
+            const double price = instance.option_cost(best_option);
             purchaised += price;
-            solution[best_option_p.second] = 1.0;
+            solution[best_option] = 1.0;
             prec_eca += best_option_p.first * price;
 
-            options.erase(std::remove(options.begin(), options.end(),
-                                      best_option_p.second),
-                          options.end());
+            for(auto && [u, quality_gain] : nodeOptions[best_option])
+                current_qm[u] += quality_gain;
+            for(auto && [a, enhanced_prob] : arcOptions[best_option])
+                current_qm[a] = std::max(current_qm[a], enhanced_prob);
+
+            options.erase(
+                std::remove(options.begin(), options.end(), best_option),
+                options.end());
 
             if(verbose) {
-                std::cout << "add option: " << best_option_p.second
+                std::cout << "add option: " << best_option
                           << "\n\t costing: " << price
                           << "\n\t total cost: " << purchaised << std::endl;
             }

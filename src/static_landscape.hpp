@@ -26,10 +26,10 @@ private:
     ProbabilityMap _arc_probability_map;
 
     std::vector<std::string> _node_names;
-    phmap::node_hash_map<std::string, melon::static_digraph::vertex>
+    phmap::node_hash_map<std::string, melon::static_digraph::vertex_t>
         _name_to_vertex_map;
     std::vector<std::string> _arc_names;
-    phmap::node_hash_map<std::string, melon::static_digraph::arc>
+    phmap::node_hash_map<std::string, melon::static_digraph::arc_t>
         _name_to_arc_map;
 
 public:
@@ -43,10 +43,10 @@ public:
     StaticLandscape(
         const Graph & g, const QualityMap & qm, const ProbabilityMap & pm,
         const std::vector<std::string> & node_names,
-        const phmap::node_hash_map<std::string, melon::static_digraph::vertex>
+        const phmap::node_hash_map<std::string, melon::static_digraph::vertex_t>
             name_to_vertex_map,
         const std::vector<std::string> & arc_names,
-        const phmap::node_hash_map<std::string, melon::static_digraph::arc>
+        const phmap::node_hash_map<std::string, melon::static_digraph::arc_t>
             name_to_arc_map)
         : _graph(g)
         , _node_quality_map(qm)
@@ -66,11 +66,11 @@ public:
     bool contains_arc(const std::string & name) const {
         return _name_to_arc_map.contains(name);
     }
-    Graph::vertex vertex_from_name(const std::string & name) const {
+    Graph::vertex_t vertex_from_name(const std::string & name) const {
         assert(contains_vertex(name));
         return _name_to_vertex_map.at(name);
     }
-    Graph::arc arc_from_name(const std::string & name) const {
+    Graph::arc_t arc_from_name(const std::string & name) const {
         assert(contains_arc(name));
         return _name_to_arc_map.at(name);
     }

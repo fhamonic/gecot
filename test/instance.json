@@ -31,7 +31,7 @@
             "file": "arc_options.csv",
             "columns": {
                 "option_id": "id",
-                "arc_id": "arc",
+                "arc_id": "arc_t",
                 "improved_probability": "prob"
             }
         }

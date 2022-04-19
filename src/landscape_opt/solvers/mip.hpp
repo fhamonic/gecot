@@ -47,10 +47,10 @@ struct MIP {
         Model model;
 
         auto F_vars = model.add_vars(graph.nb_vertices(),
-                                     [](Graph::vertex v) { return v; });
+                                     [](Graph::vertex_t v) { return v; });
         auto Phi_vars = model.add_vars(
             graph.nb_vertices() * graph.nb_arcs(),
-            [n = graph.nb_vertices()](Graph::vertex v, Graph::arc a) {
+            [n = graph.nb_vertices()](Graph::vertex_t v, Graph::arc_t a) {
                 return v * n + a;
             });
         auto X_vars = model.add_vars(instance.options().size(),
@@ -59,7 +59,7 @@ struct MIP {
 
         model.add_obj(xsum(graph.vertices(), F_vars, quality));
         for(auto && t : graph.vertices()) {
-            auto Phi_t_var = [&Phi_vars, t](Graph::arc a) {
+            auto Phi_t_var = [&Phi_vars, t](Graph::arc_t a) {
                 return Phi_vars(t, a);
             };
             for(auto && u : graph.vertices()) {

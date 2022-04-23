@@ -18,7 +18,8 @@ class Instance {
 public:
     using Landscape = StaticLandscape;
     using Option = int;
-    using Solution = std::vector<double>;
+    using Solution = std::vector<bool>;
+    using OptionPotentialMap = std::vector<double>;
 
 private:
     std::vector<double> _options_costs;
@@ -38,7 +39,10 @@ public:
             static_cast<Option>(0), static_cast<Option>(nb_options()));
     }
     double option_cost(Option o) const { return _options_costs[o]; }
-    Solution create_solution() const { return Solution(nb_options(), 0.0); }
+    Solution create_solution() const { return Solution(nb_options(), false); }
+    OptionPotentialMap create_options_potentials_map() const {
+        return OptionPotentialMap(nb_options(), 0.0);
+    }
 
     auto & landscape() const noexcept { return _landscape; }
     auto & node_options_map() const noexcept { return _node_options_map; }

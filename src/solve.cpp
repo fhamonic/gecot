@@ -108,10 +108,10 @@ static bool process_command_line(
             "instance,i",
             po::value<std::filesystem::path>(&instances_description_json_file)
                 ->required(),
-            "Instance json file")(
+            "Instance JSON file")(
             "budget,B", po::value<double>(&budget)->required(), "Budget value")(
             "output,o", po::value<std::filesystem::path>(&output_csv_file),
-            "Solution output file");
+            "Output solution in CSV file");
 
         po::positional_options_description p;
         p.add("algorithm", 1);
@@ -182,9 +182,6 @@ static bool process_command_line(
 }
 
 int main(int argc, const char * argv[]) {
-    (void)argc;
-    (void)argv;
-
     std::shared_ptr<AbstractSolver> solver;
     std::filesystem::path instances_description_json;
     double budget;
@@ -219,7 +216,7 @@ int main(int argc, const char * argv[]) {
 
     } else {
         std::ofstream output_file(output_csv);
-        output_file << "options_id,value\n";
+        output_file << "option_id,value\n";
         for(auto && o : instance.options()) {
             output_file << instance.option_name(o) << ',' << solution[o]
                         << '\n';

@@ -67,16 +67,16 @@ static bool process_command_line(
     auto print_soft_name = []() { std::cout << "LSCP 0.1\n\n"; };
     auto print_usage = []() {
         std::cout << R"(Usage:
-  lcsp_solve --help
-  lcsp_solve --list-algorithms
-  lcsp_solve <algorithm> --list-params
-  lcsp_solve <algorithm> <instance> <budget> [<params> ...]
+  lcsp_rank --help
+  lcsp_rank --list-algorithms
+  lcsp_rank <algorithm> --list-params
+  lcsp_rank <algorithm> <instance> [<params> ...]
 
 )";
     };
 
     auto print_available_algorithms = [&solver_interfaces]() {
-        std::cout << "Available algorithms:\n";
+        std::cout << "Available ranking algorithms:\n";
         const std::size_t algorithm_name_max_length = std::ranges::max(
             std::ranges::views::transform(solver_interfaces, [&](auto && s) {
                 return s->name().size();

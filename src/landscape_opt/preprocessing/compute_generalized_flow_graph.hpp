@@ -20,6 +20,8 @@ auto compute_generalized_flow_graph(const I & instance_case,
     using Graph = typename I::Landscape::Graph;
     using vertex_t = Graph ::vertex_t;
     using arc_t = Graph ::arc_t;
+
+    
 }
 
 }  // namespace landscape_opt

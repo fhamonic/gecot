@@ -78,7 +78,7 @@ static bool process_command_line(
     };
 
     auto print_available_algorithms = [&solver_interfaces]() {
-        std::cout << "Available algorithms:\n";
+        std::cout << "Available solving algorithms:\n";
         const std::size_t algorithm_name_max_length = std::ranges::max(
             std::ranges::views::transform(solver_interfaces, [&](auto && s) {
                 return s->name().size();

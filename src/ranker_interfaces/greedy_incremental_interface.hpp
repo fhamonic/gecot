@@ -5,18 +5,6 @@
 
 #include <boost/program_options.hpp>
 
-<<<<<<< HEAD
-#include "landscape_opt/solvers/greedy_incremental.hpp"
-
-#include "instance.hpp"
-#include "solver_interfaces/abstract_solver.hpp"
-
-namespace fhamonic {
-
-class GreedyIncrementalInterface : public AbstractSolver {
-private:
-    landscape_opt::solvers::GreedyIncremental solver;
-=======
 #include "landscape_opt/rankers/greedy_incremental.hpp"
 
 #include "instance.hpp"
@@ -27,7 +15,6 @@ namespace fhamonic {
 class GreedyIncrementalInterface : public AbstractRanker {
 private:
     landscape_opt::rankers::GreedyIncremental ranker;
->>>>>>> a05a4a85bcd5a46a71a30f4b5faa4258309b6a2e
     boost::program_options::options_description desc;
 
 public:
@@ -45,15 +32,6 @@ public:
             vm);
         po::notify(vm);
 
-<<<<<<< HEAD
-        solver.verbose = vm.count("verbose") > 0;
-        solver.parallel = vm.count("parallel") > 0;
-    }
-
-    typename Instance::Solution solve(const Instance & instance,
-                                      const double B) const {
-        return solver.solve(instance, B);
-=======
         ranker.verbose = vm.count("verbose") > 0;
         ranker.parallel = vm.count("parallel") > 0;
     }
@@ -61,7 +39,6 @@ public:
     typename Instance::OptionPotentialMap rank_options(
         const Instance & instance) const {
         return ranker.rank_options(instance);
->>>>>>> a05a4a85bcd5a46a71a30f4b5faa4258309b6a2e
     };
 
     std::string name() const { return "greedy_incremental"; }

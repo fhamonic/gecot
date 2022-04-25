@@ -75,7 +75,7 @@ static bool process_command_line(
 )";
     };
 
-    auto print_available_algorithms = [&solver_interfaces]() {
+    auto print_available_algorithms = [&ranker_interfaces]() {
         std::cout << "Available ranking algorithms:\n";
         const std::size_t algorithm_name_max_length = std::ranges::max(
             std::ranges::views::transform(ranker_interfaces, [&](auto && s) {

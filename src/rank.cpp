@@ -12,19 +12,19 @@ namespace po = boost::program_options;
 #include <boost/log/trivial.hpp>
 namespace logging = boost::log;
 
-// #include "landscape_opt/solvers/mip_xue.hpp"
-// #include "landscape_opt/solvers/mip_eca.hpp"
-// #include "landscape_opt/solvers/mip_eca_preprocessed.hpp"
-// #include "landscape_opt/solvers/randomized_rounding.hpp"
+// #include "landscape_opt/rankers/mip_xue.hpp"
+// #include "landscape_opt/rankers/mip_eca.hpp"
+// #include "landscape_opt/rankers/mip_eca_preprocessed.hpp"
+// #include "landscape_opt/rankers/randomized_rounding.hpp"
 
 #include "instance.hpp"
 #include "parse_instance.hpp"
 
-#include "solver_interfaces/abstract_solver.hpp"
-#include "solver_interfaces/greedy_decremental_interface.hpp"
-#include "solver_interfaces/greedy_incremental_interface.hpp"
-#include "solver_interfaces/static_decremental_interface.hpp"
-#include "solver_interfaces/static_incremental_interface.hpp"
+#include "ranker_interfaces/abstract_ranker.hpp"
+#include "ranker_interfaces/greedy_decremental_interface.hpp"
+#include "ranker_interfaces/greedy_incremental_interface.hpp"
+#include "ranker_interfaces/static_decremental_interface.hpp"
+#include "ranker_interfaces/static_incremental_interface.hpp"
 
 using namespace fhamonic;
 
@@ -55,10 +55,10 @@ void print_paragraph(std::ostream & os, std::size_t offset,
 
 static bool process_command_line(
     const std::vector<std::string> & args,
-    std::shared_ptr<AbstractSolver> & solver,
-    std::filesystem::path & instances_description_json_file, double & budget,
+    std::shared_ptr<AbstractRanker> & ranker,
+    std::filesystem::path & instances_description_json_file,
     bool & output_in_file, std::filesystem::path & output_csv_file) {
-    std::vector<std::shared_ptr<AbstractSolver>> solver_interfaces{
+    std::vector<std::shared_ptr<AbstractRanker>> ranker_interfaces{
         std::make_unique<StaticIncrementalInterface>(),
         std::make_unique<StaticDecrementalInterface>(),
         std::make_unique<GreedyIncrementalInterface>(),
@@ -78,14 +78,14 @@ static bool process_command_line(
     auto print_available_algorithms = [&solver_interfaces]() {
         std::cout << "Available ranking algorithms:\n";
         const std::size_t algorithm_name_max_length = std::ranges::max(
-            std::ranges::views::transform(solver_interfaces, [&](auto && s) {
+            std::ranges::views::transform(ranker_interfaces, [&](auto && s) {
                 return s->name().size();
             }));
 
         const std::size_t offset =
             std::max(algorithm_name_max_length + 1, std::size_t(24));
 
-        for(auto & s : solver_interfaces) {
+        for(auto & s : ranker_interfaces) {
             std::cout << "  " << s->name()
                       << std::string(offset - s->name().size() - 2, ' ');
             print_paragraph(std::cout, offset, 80 - offset, s->description());
@@ -94,27 +94,25 @@ static bool process_command_line(
         return false;
     };
 
-    std::string solver_name;
+    std::string ranker_name;
 
     try {
         po::options_description desc("Allowed options");
         desc.add_options()("help,h", "Display this help message")(
             "list-algorithms", "List the available algorithms")(
             "list-params", "List the parameters of the chosen algorithm")(
-            "algorithm,a", po::value<std::string>(&solver_name)->required(),
+            "algorithm,a", po::value<std::string>(&ranker_name)->required(),
             "Algorithm to use")(
             "instance,i",
             po::value<std::filesystem::path>(&instances_description_json_file)
                 ->required(),
-            "Instance json file")(
-            "budget,B", po::value<double>(&budget)->required(), "Budget value")(
+            "Instance JSON file")(
             "output,o", po::value<std::filesystem::path>(&output_csv_file),
-            "Solution output file");
+            "Output option potentials in CSV file");
 
         po::positional_options_description p;
         p.add("algorithm", 1);
         p.add("instance", 1);
-        p.add("budget", 1);
         po::variables_map vm;
         po::parsed_options parsed = po::basic_command_line_parser(args)
                                         .options(desc)
@@ -138,17 +136,17 @@ static bool process_command_line(
         }
 
         if(vm.count("algorithm")) {
-            solver_name = vm["algorithm"].as<std::string>();
+            ranker_name = vm["algorithm"].as<std::string>();
             bool found = false;
-            for(auto & s : solver_interfaces) {
-                if(s->name() == solver_name) {
-                    solver = std::move(s);
+            for(auto & s : ranker_interfaces) {
+                if(s->name() == ranker_name) {
+                    ranker = std::move(s);
                     found = true;
                     break;
                 }
             }
             if(!found) {
-                std::cout << "Error: the argument ('" << solver_name
+                std::cout << "Error: the argument ('" << ranker_name
                           << "') for option '--algorithm' is invalid\n\n";
                 print_available_algorithms();
                 return false;
@@ -161,7 +159,7 @@ static bool process_command_line(
                     "Option '--list-params' requires option '--algorithm'."));
             }
             print_soft_name();
-            std::cout << solver->options_description();
+            std::cout << ranker->options_description();
             std::cout << std::endl;
             return false;
         }
@@ -170,7 +168,7 @@ static bool process_command_line(
         std::vector<std::string> opts =
             po::collect_unrecognized(parsed.options, po::exclude_positional);
 
-        solver->parse(opts);
+        ranker->parse(opts);
         output_in_file = vm.count("output");
     } catch(std::exception & e) {
         std::cerr << "Error: " << e.what() << "\n";
@@ -180,28 +178,24 @@ static bool process_command_line(
 }
 
 int main(int argc, const char * argv[]) {
-    (void)argc;
-    (void)argv;
-
-    std::shared_ptr<AbstractSolver> solver;
+    std::shared_ptr<AbstractRanker> ranker;
     std::filesystem::path instances_description_json;
-    double budget;
     bool output_in_file;
     std::filesystem::path output_csv;
 
     std::vector<std::string> args(argv + 1, argv + argc);
-    bool valid_command =
-        process_command_line(args, solver, instances_description_json, budget,
-                             output_in_file, output_csv);
+    bool valid_command = process_command_line(
+        args, ranker, instances_description_json, output_in_file, output_csv);
     if(!valid_command) return EXIT_FAILURE;
     init_logging();
 
     Instance instance = parse_instance(instances_description_json);
 
-    Instance::Solution solution = solver->solve(instance, budget);
+    Instance::OptionPotentialMap option_potentials =
+        ranker->rank_options(instance);
 
     if(!output_in_file) {
-        std::cout << "Solution:" << std::endl;
+        std::cout << "option_potentials:" << std::endl;
         const std::size_t option_name_max_length = std::ranges::max(
             std::ranges::views::transform(instance.options(), [&](auto && o) {
                 return instance.option_name(o).size();
@@ -211,15 +205,15 @@ int main(int argc, const char * argv[]) {
                       << std::string(option_name_max_length + 1 -
                                          instance.option_name(o).size(),
                                      ' ')
-                      << solution[o] << '\n';
+                      << option_potentials[o] << '\n';
         }
         std::cout << std::endl;
 
     } else {
         std::ofstream output_file(output_csv);
-        output_file << "options_id,value\n";
+        output_file << "option_id,potential\n";
         for(auto && o : instance.options()) {
-            output_file << instance.option_name(o) << ',' << solution[o]
+            output_file << instance.option_name(o) << ',' << option_potentials[o]
                         << '\n';
         }
     }

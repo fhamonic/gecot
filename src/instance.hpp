@@ -71,9 +71,10 @@ public:
     const std::string & option_name(Option i) const noexcept {
         return _options_names[i];
     }
-    Option option_from_name(std::string identifier) const noexcept {
-        assert(contains_option(identifier));
-        return _option_name_to_id_map.at(identifier);
+    Option option_from_name(const std::string & name) const {
+        if(!contains_option(name))
+            throw std::invalid_argument("unknwon option id '" + name + "'");
+        return _option_name_to_id_map.at(name);
     }
 
     void set_landscape(StaticLandscape && l) noexcept {

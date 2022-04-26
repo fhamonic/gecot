@@ -40,8 +40,8 @@ find_package(Boost REQUIRED COMPONENTS program_options)
 find_package(Eigen3 REQUIRED)
 find_package(range-v3 REQUIRED)
 
-find_package(COIN REQUIRED)
-find_package(GUROBI REQUIRED)
+# find_package(COIN REQUIRED)
+# find_package(GUROBI REQUIRED)
 
 # ################### LIB target ####################
 add_library(landscape_opt INTERFACE)

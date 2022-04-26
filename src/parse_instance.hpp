@@ -1,6 +1,7 @@
 #ifndef INSTANCE2_PARSER_HPP
 #define INSTANCE2_PARSER_HPP
 
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
@@ -173,11 +174,19 @@ parse_node_options(T json_object, std::filesystem::path parent_path,
     detail::configure_csv_reader(node_options_csv, node_options_json,
                                  "option_id", "node_id", "quality_gain");
 
-    std::string option_id, node_id;
-    double quality_gain;
-    while(node_options_csv.read_row(option_id, node_id, quality_gain)) {
-        node_options[landscape.vertex_from_name(node_id)].emplace_back(
-            quality_gain, instance.option_from_name(option_id));
+    std::size_t line_no = 2;
+    try {
+        std::string option_id, node_id;
+        double quality_gain;
+        while(node_options_csv.read_row(option_id, node_id, quality_gain)) {
+            node_options[landscape.vertex_from_name(node_id)].emplace_back(
+                quality_gain, instance.option_from_name(option_id));
+            ++line_no;
+        }
+    } catch(const std::invalid_argument & e) {
+        throw std::invalid_argument(node_options_csv_path.filename().string() +
+                                    " line " + std::to_string(line_no) + ": " +
+                                    e.what());
     }
 
     return node_options;
@@ -198,11 +207,20 @@ std::vector<std::vector<std::pair<double, Instance::Option>>> parse_arc_options(
     detail::configure_csv_reader(arc_options_csv, arc_options_json, "option_id",
                                  "arc_id", "improved_probability");
 
-    std::string option_id, arc_id;
-    double improved_probability;
-    while(arc_options_csv.read_row(option_id, arc_id, improved_probability)) {
-        arc_options[landscape.arc_from_name(arc_id)].emplace_back(
-            improved_probability, instance.option_from_name(option_id));
+    std::size_t line_no = 2;
+    try {
+        std::string option_id, arc_id;
+        double improved_probability;
+        while(
+            arc_options_csv.read_row(option_id, arc_id, improved_probability)) {
+            arc_options[landscape.arc_from_name(arc_id)].emplace_back(
+                improved_probability, instance.option_from_name(option_id));
+            ++line_no;
+        }
+    } catch(const std::invalid_argument & e) {
+        throw std::invalid_argument(arc_options_csv_path.filename().string() +
+                                    " line " + std::to_string(line_no) + ": " +
+                                    e.what());
     }
 
     return arc_options;

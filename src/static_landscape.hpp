@@ -2,6 +2,7 @@
 #define LANDSCAPE_HPP
 
 #include <cassert>
+#include <exception>
 #include <memory>
 #include <string>
 #include <utility>
@@ -56,9 +57,9 @@ public:
         , _arc_names(arc_names)
         , _name_to_arc_map(name_to_arc_map) {}
 
-    auto & graph() const { return _graph; }
-    auto & quality_map() const { return _node_quality_map; };
-    auto & probability_map() const { return _arc_probability_map; };
+    auto & graph() const noexcept { return _graph; }
+    auto & quality_map() const noexcept { return _node_quality_map; };
+    auto & probability_map() const noexcept { return _arc_probability_map; };
 
     bool contains_vertex(const std::string & name) const {
         return _name_to_vertex_map.contains(name);
@@ -67,11 +68,13 @@ public:
         return _name_to_arc_map.contains(name);
     }
     Graph::vertex_t vertex_from_name(const std::string & name) const {
-        assert(contains_vertex(name));
+        if(!contains_vertex(name))
+            throw std::invalid_argument("unknwon vertex id '" + name + "'");
         return _name_to_vertex_map.at(name);
     }
     Graph::arc_t arc_from_name(const std::string & name) const {
-        assert(contains_arc(name));
+        if(!contains_arc(name))
+            throw std::invalid_argument("unknwon arc id '" + name + "'");
         return _name_to_arc_map.at(name);
     }
 };

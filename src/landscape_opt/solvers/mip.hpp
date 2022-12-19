@@ -37,10 +37,10 @@ struct MIP {
         Solution solution = instance.create_solution();
 
         auto [graph, quality_map, vertex_options_map, probability_map,
-              arc_options_map] = generalized_flow_graph(instance);
+              arc_option_map] = generalized_flow_graph(instance);
 
         auto big_M_map = compute_big_M_map(graph, quality_map,
-                                           vertex_options_map, probability_map);
+                                           vertex_options_map, probability_map, parallel);
 
         using namespace mippp;
         using MIP = mip_model<default_solver_traits>;
@@ -61,6 +61,12 @@ struct MIP {
 
         model.add_obj(xsum(graph.vertices(), F_vars, quality_map));
         for(auto && t : graph.vertices()) {
+            for(const auto & [quality_gain, option] : vertex_options_map[t]) {
+                auto F_prime_t_var = model.add_var();
+                model.add_constraint(F_prime_t_var <= F_vars(t));
+                model.add_constraint(F_prime_t_var <= big_M_map[t] * X_vars(option));
+                model.add_obj(quality_gain * F_prime_t_var);
+            }
             auto Phi_t_var = [&Phi_vars, t](const melon::arc_t<Graph> a) {
                 return Phi_vars(t, a);
             };
@@ -85,9 +91,9 @@ struct MIP {
                         [](auto && p) { return p.first; }));
 
             for(auto && a : graph.arcs()) {
-                if(!arc_options_map[a].has_value()) continue;
+                if(!arc_option_map[a].has_value()) continue;
                 model.add_constraint(Phi_t_var(a) <=
-                                     X_vars(arc_options_map[a].value()) *
+                                     X_vars(arc_option_map[a].value()) *
                                          big_M_map[graph.source(a)]);
             }
         }
@@ -118,80 +124,3 @@ struct MIP {
 }  // namespace fhamonic
 
 #endif  // LANDSCAPE_OPT_SOLVERS_MIP_HPP
-
-// Solution Solvers::PL_ECA_2::solve(
-//     const MutableLandscape & landscape,
-//     const RestorationPlan<MutableLandscape> & plan, const double B) const {
-//     Solution solution(landscape, plan);
-//     const int log_level = params.at("log")->getInt();
-//     const int timeout = params.at("timeout")->getInt();
-//     (void)timeout;  // pas bien
-//     const bool relaxed = params.at("relaxed")->getBool();
-//     Chrono chrono;
-//     OSI_Builder solver_builder;
-//     Variables vars(landscape, plan);
-//     insert_variables(solver_builder, vars);
-//     if(log_level > 0)
-//         std::cout << name()
-//                   << ": Start filling solver : " <<
-//                   solver_builder.getNbVars()
-//                   << " variables" << std::endl;
-//     fill_solver(solver_builder, landscape, plan, B, vars, relaxed);
-//     // OsiGrbSolverInterface * solver =
-//     // solver_builder.buildSolver<OsiGrbSolverInterface>(OSI_Builder::MAX);
-//     OsiSolverInterface * solver =
-//         solver_builder.buildSolver<OsiClpSolverInterface>(OSI_Builder::MAX);
-//     if(log_level <= 1) solver->setHintParam(OsiDoReducePrint);
-//     if(log_level >= 1) {
-//         if(log_level >= 2) {
-//             name_variables(solver_builder, landscape, plan, vars);
-//             OsiClpSolverInterface * solver_clp =
-//                 solver_builder.buildSolver<OsiClpSolverInterface>(
-//                     OSI_Builder::MAX);
-//             solver_clp->writeLp("pl_eca_2");
-//             delete solver_clp;
-//             std::cout << name() << ": LP printed to 'pl_eca_2.lp'" <<
-//             std::endl;
-//         }
-//         std::cout << name() << ": Complete filling solver : "
-//                   << solver_builder.getNbConstraints() << " constraints in "
-//                   << chrono.lapTimeMs() << " ms" << std::endl;
-//         std::cout << name() << ": Start solving" << std::endl;
-//     }
-//     ////////////////////
-//     // GRBsetdblparam(GRBgetenv(solver->getLpPtr()), GRB_DBL_PAR_MIPGAP,
-//     1e-8);
-//     // GRBsetintparam(GRBgetenv(solver->getLpPtr()),
-//     GRB_INT_PAR_LOGTOCONSOLE,
-//     // (log_level >= 2 ? 1 : 0));
-//     GRBsetintparam(GRBgetenv(solver->getLpPtr()),
-//     // GRB_DBL_PAR_TIMELIMIT, timeout);
-//     solver->branchAndBound();
-//     ////////////////////
-//     const double * var_solution = solver->getColSolution();
-//     if(var_solution == nullptr) {
-//         std::cerr << name() << ": Fail" << std::endl;
-//         delete solver;
-//         assert(false);
-//     }
-//     for(const RestorationPlan<MutableLandscape>::Option i : plan.options()) {
-//         const int y_i = vars.y.id(i);
-//         const double value = var_solution[y_i];
-//         solution.set(i, value);
-//     }
-//     solution.setComputeTimeMs(chrono.timeMs());
-//     solution.obj = solver->getObjValue();
-//     solution.nb_vars = solver_builder.getNbNonZeroVars();
-//     solution.nb_constraints = solver_builder.getNbConstraints();
-//     solution.nb_elems = solver->getNumElements();
-//     if(log_level >= 1) {
-//         std::cout << name()
-//                   << ": Complete solving : " << solution.getComputeTimeMs()
-//                   << " ms" << std::endl;
-//         std::cout << name() << ": ECA from obj : " << std::sqrt(solution.obj)
-//                   << std::endl;
-//     }
-//     delete solver;
-
-//     return solution;
-// }

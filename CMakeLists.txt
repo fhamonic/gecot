@@ -40,9 +40,6 @@ find_package(Boost REQUIRED COMPONENTS program_options)
 find_package(Eigen3 REQUIRED)
 find_package(range-v3 REQUIRED)
 
-# find_package(COIN REQUIRED)
-# find_package(GUROBI REQUIRED)
-
 # ################### LIB target ####################
 add_library(landscape_opt INTERFACE)
 target_include_directories(landscape_opt INTERFACE src/landscape_opt)
@@ -57,15 +54,6 @@ target_link_libraries(landscape_opt INTERFACE mippp)
 
 # silence false positive warinings from range-v3 invoke.hpp
 target_compile_options(landscape_opt INTERFACE -Warray-bounds=0)
-
-# target_include_directories(landscape_opt INTERFACE ${COIN_INCLUDE_DIR})
-# target_link_libraries(landscape_opt INTERFACE ${COIN_LIBRARIES})
-
-# if(${WITH_GUROBI} STREQUAL "ON")
-#     target_include_directories(landscape_opt INTERFACE ${GUROBI_INCLUDE_DIR})
-#     target_link_libraries(landscape_opt INTERFACE ${GUROBI_LIBRARIES})
-# endif()
-
 
 # # ################## TEST target ####################
 # # enable_testing()

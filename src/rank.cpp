@@ -36,7 +36,6 @@ void init_logging() {
 void print_paragraph(std::ostream & os, std::size_t offset,
                      std::size_t column_width, const std::string & str) {
     std::size_t line_start = 0;
-
     while(str.size() - line_start > column_width) {
         std::size_t n = str.rfind(' ', line_start + column_width);
         if(n <= line_start) {
@@ -49,7 +48,6 @@ void print_paragraph(std::ostream & os, std::size_t offset,
             line_start = n + 1;
         }
     }
-
     os << str.substr(line_start) << '\n';
 }
 
@@ -208,13 +206,12 @@ int main(int argc, const char * argv[]) {
                       << option_potentials[o] << '\n';
         }
         std::cout << std::endl;
-
     } else {
         std::ofstream output_file(output_csv);
         output_file << "option_id,potential\n";
         for(auto && o : instance.options()) {
-            output_file << instance.option_name(o) << ',' << option_potentials[o]
-                        << '\n';
+            output_file << instance.option_name(o) << ','
+                        << option_potentials[o] << '\n';
         }
     }
 

@@ -10,7 +10,7 @@
 #include <fast-cpp-csv-parser/csv.h>
 #include <nlohmann/json.hpp>
 
-#include "melon/arc_list_builder.hpp"
+#include "melon/static_digraph_builder.hpp"
 
 #include "instance.hpp"
 
@@ -105,9 +105,9 @@ StaticLandscape parse_landscape(T json_object,
     std::vector<double> node_quality_map;
 
     std::vector<std::string> node_names;
-    phmap::node_hash_map<std::string, melon::static_digraph::vertex_t>
+    phmap::node_hash_map<std::string, melon::vertex_t<melon::static_digraph>>
         name_to_vertex_map;
-    phmap::node_hash_map<std::string, melon::static_digraph::arc_t>
+    phmap::node_hash_map<std::string, melon::arc_t<melon::static_digraph>>
         name_to_arc_map;
 
     detail::assert_json_properties(
@@ -130,8 +130,8 @@ StaticLandscape parse_landscape(T json_object,
         name_to_vertex_map[node_id] = node_names.size() - 1;
     }
 
-    melon::arc_list_builder<melon::static_digraph, double, std::string> builder(
-        node_quality_map.size());
+    melon::static_digraph_builder<melon::static_digraph, double, std::string>
+        builder(node_quality_map.size());
 
     auto arcs_json = json_object["arcs"];
     std::filesystem::path arcs_csv_path = arcs_json["file"];

@@ -10,6 +10,7 @@
 
 #include <parallel_hashmap/phmap.h>
 
+#include "melon/concepts/graph.hpp"
 #include "melon/static_digraph.hpp"
 
 namespace fhamonic {
@@ -27,10 +28,10 @@ private:
     ProbabilityMap _arc_probability_map;
 
     std::vector<std::string> _node_names;
-    phmap::node_hash_map<std::string, melon::static_digraph::vertex_t>
+    phmap::node_hash_map<std::string, melon::vertex_t<melon::static_digraph>>
         _name_to_vertex_map;
     std::vector<std::string> _arc_names;
-    phmap::node_hash_map<std::string, melon::static_digraph::arc_t>
+    phmap::node_hash_map<std::string, melon::arc_t<melon::static_digraph>>
         _name_to_arc_map;
 
 public:
@@ -44,10 +45,12 @@ public:
     StaticLandscape(
         const Graph & g, const QualityMap & qm, const ProbabilityMap & pm,
         const std::vector<std::string> & node_names,
-        const phmap::node_hash_map<std::string, melon::static_digraph::vertex_t>
+        const phmap::node_hash_map<std::string,
+                                   melon::vertex_t<melon::static_digraph>>
             name_to_vertex_map,
         const std::vector<std::string> & arc_names,
-        const phmap::node_hash_map<std::string, melon::static_digraph::arc_t>
+        const phmap::node_hash_map<std::string,
+                                   melon::arc_t<melon::static_digraph>>
             name_to_arc_map)
         : _graph(g)
         , _node_quality_map(qm)
@@ -67,12 +70,12 @@ public:
     bool contains_arc(const std::string & name) const {
         return _name_to_arc_map.contains(name);
     }
-    Graph::vertex_t vertex_from_name(const std::string & name) const {
+    [[nodiscard]] auto vertex_from_name(const std::string & name) const {
         if(!contains_vertex(name))
             throw std::invalid_argument("unknwon vertex id '" + name + "'");
         return _name_to_vertex_map.at(name);
     }
-    Graph::arc_t arc_from_name(const std::string & name) const {
+    [[nodiscard]] auto arc_from_name(const std::string & name) const {
         if(!contains_arc(name))
             throw std::invalid_argument("unknwon arc id '" + name + "'");
         return _name_to_arc_map.at(name);

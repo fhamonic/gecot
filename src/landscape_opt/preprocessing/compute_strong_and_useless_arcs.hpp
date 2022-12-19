@@ -16,7 +16,7 @@ auto compute_strong_and_useless_arcs(const Graph & graph,
                                      const LM & upper_lengths) {
     using node_t = typename Graph::node_t;
     using node_arcs_map = typename Graph::node_map<tbb::concurrent_vector<Arc>>;
-    using arc_t = typename Graph::arc_t;
+    using arc_t = melon::arc_t<typename Graph>;
 
     node_arcs_map strong_arcs_map(graph.nb_vertices());
     node_arcs_map useless_arcs_map(graph.nb_vertices());

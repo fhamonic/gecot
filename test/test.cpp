@@ -9,8 +9,6 @@ int main(int argc, char ** argv) {
 }
 
 GTEST_TEST(IdentifyStrong2, test) {
-    std::cout << "1 == 1 ?" << std::endl;
-    EXPECT_EQ(1, 1);
     using Graph = lemon::ListDigraph;
     using Node = Graph::Node;
     using Arc = Graph::Arc;
@@ -68,8 +66,6 @@ GTEST_TEST(IdentifyStrong2, test) {
 }
 
 GTEST_TEST(IdentifyStrong1, test) {
-    std::cout << "1 == 1 ?" << std::endl;
-    EXPECT_EQ(1, 1);
     using Graph = lemon::ListDigraph;
     using Node = Graph::Node;
     using Arc = Graph::Arc;

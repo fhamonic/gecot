@@ -28,59 +28,64 @@ struct MIP {
     template <concepts::Instance I>
     typename I::Solution solve(const I & instance, const double budget) const {
         using Landscape = typename I::Landscape;
-        using Graph = typename I::Landscape::Graph;
-        using QualityMap = typename Landscape::QualityMap;
-        using ProbabilityMap = typename Landscape::ProbabilityMap;
+        using Graph = typename Landscape::Graph;
         using Option = typename I::Option;
         using Solution = typename I::Solution;
 
         // int time_ms = 0;
         Chrono chrono;
         Solution solution = instance.create_solution();
-        const Graph & graph = instance.landscape().graph();
-        const QualityMap & quality = instance.landscape().quality_map();
-        const ProbabilityMap & probality =
-            instance.landscape().probability_map();
+
+        auto [graph, quality_map, node_options_map, probability_map,
+              arc_options_map] = generalized_flow_graph(instance);
 
         using namespace mippp;
-        using Model = Model<GrbTraits>;
-        Model model;
+        using MIP = mip_model<default_solver_traits>;
+        MIP model;
 
         auto F_vars = model.add_vars(graph.nb_vertices(),
-                                     [](Graph::vertex_t v) { return v; });
+                                     [](const melon::vertex_t<Graph> v) { return v; });
         auto Phi_vars = model.add_vars(
             graph.nb_vertices() * graph.nb_arcs(),
-            [n = graph.nb_vertices()](Graph::vertex_t v, Graph::arc_t a) {
+            [n = graph.nb_vertices()](const melon::vertex_t<Graph> v,
+                                      const melon::arc_t<Graph> a) {
                 return v * n + a;
             });
         auto X_vars = model.add_vars(instance.options().size(),
                                      [](Option i) { return i; },
-                                     {.type = Model::ColType::BINARY});
+                                     {.type = MIP::var_category::binary});
 
-        model.add_obj(xsum(graph.vertices(), F_vars, quality));
+        model.add_obj(xsum(graph.vertices(), F_vars, quality_map));
         for(auto && t : graph.vertices()) {
-            auto Phi_t_var = [&Phi_vars, t](Graph::arc_t a) {
+            auto Phi_t_var = [&Phi_vars, t](const melon::arc_t<Graph> a) {
                 return Phi_vars(t, a);
             };
             for(auto && u : graph.vertices()) {
                 if(u == t) continue;
                 model.add_constraint(
                     xsum(graph.out_arcs(u), Phi_t_var) -
-                        xsum(graph.in_arcs(u), Phi_t_var, probality) <=
-                    quality[u] +
+                        xsum(graph.in_arcs(u), Phi_t_var, probability_map) <=
+                    quality_map[u] +
                         xsum(
-                            instance.node_options_map()[u],
+                            node_options_map[u],
                             [&X_vars](auto && p) { return X_vars(p.second); },
                             [](auto && p) { return p.first; }));
             }
             model.add_constraint(
-                xsum(graph.in_arcs(t), Phi_t_var, probality) <=
-                quality[t] +
+                xsum(graph.in_arcs(t), Phi_t_var, probability_map) <=
+                quality_map[t] +
                     xsum(
-                        instance.node_options_map()[t],
+                        node_options_map[t],
                         [&X_vars](auto && p) { return X_vars(p.second); },
                         [](auto && p) { return p.first; }) -
                     F_vars(t));
+
+            for(auto && a : graph.arcs()) {
+                if(!arc_options_map[a].has_value()) continue;
+                model.add_constraint(
+                    xsum(Phi_t_var(a) <=
+                         X_vars(arc_options_map[a].value()) * big_M(a)));
+            }
         }
 
         model.add_constraint(

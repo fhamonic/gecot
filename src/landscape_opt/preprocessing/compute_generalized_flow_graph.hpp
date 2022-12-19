@@ -6,20 +6,20 @@
 
 #include "melon/adaptor/reverse.hpp"
 #include "melon/algorithm/dijkstra.hpp"
-#include "melon/algorithm/robust_fiber.hpp"
+#include "melon/algorithm/strong_fiber.hpp"
 
-#include "concepts/instance_case.hpp.hpp"
+#include "concepts/instance_case.hpp"
 
 namespace fhamonic {
 namespace landscape_opt {
 
 template <concepts::InstanceCase I>
 auto compute_generalized_flow_graph(const I & instance_case,
-                                    typename I::Landscape::Graph::vertex_t t) {
+                                    melon::vertex_t<typename I::Landscape::Graph> t) {
     using Landscape = typename I::Landscape;
     using Graph = typename I::Landscape::Graph;
-    using vertex_t = Graph ::vertex_t;
-    using arc_t = Graph ::arc_t;
+    using vertex = melon::vertex_t<Graph>;
+    using arc = melon::arc_t<Graph>;
 
     
 }

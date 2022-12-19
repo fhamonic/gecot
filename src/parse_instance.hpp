@@ -166,29 +166,30 @@ parse_node_options(T json_object, std::filesystem::path parent_path,
     std::vector<std::vector<std::pair<double, Instance::Option>>> node_options(
         landscape.graph().nb_vertices());
 
-    auto node_options_json = json_object["node_options"];
-    std::filesystem::path node_options_csv_path = node_options_json["file"];
-    if(node_options_csv_path.is_relative())
-        node_options_csv_path = (parent_path / node_options_csv_path);
-    io::CSVReader<3> node_options_csv(node_options_csv_path);
-    detail::configure_csv_reader(node_options_csv, node_options_json,
-                                 "option_id", "node_id", "quality_gain");
+    if(json_object.contains("node_options")) {
+        auto node_options_json = json_object["node_options"];
+        std::filesystem::path node_options_csv_path = node_options_json["file"];
+        if(node_options_csv_path.is_relative())
+            node_options_csv_path = (parent_path / node_options_csv_path);
+        io::CSVReader<3> node_options_csv(node_options_csv_path);
+        detail::configure_csv_reader(node_options_csv, node_options_json,
+                                     "option_id", "node_id", "quality_gain");
 
-    std::size_t line_no = 2;
-    try {
-        std::string option_id, node_id;
-        double quality_gain;
-        while(node_options_csv.read_row(option_id, node_id, quality_gain)) {
-            node_options[landscape.vertex_from_name(node_id)].emplace_back(
-                quality_gain, instance.option_from_name(option_id));
-            ++line_no;
+        std::size_t line_no = 2;
+        try {
+            std::string option_id, node_id;
+            double quality_gain;
+            while(node_options_csv.read_row(option_id, node_id, quality_gain)) {
+                node_options[landscape.vertex_from_name(node_id)].emplace_back(
+                    quality_gain, instance.option_from_name(option_id));
+                ++line_no;
+            }
+        } catch(const std::invalid_argument & e) {
+            throw std::invalid_argument(
+                node_options_csv_path.filename().string() + " line " +
+                std::to_string(line_no) + ": " + e.what());
         }
-    } catch(const std::invalid_argument & e) {
-        throw std::invalid_argument(node_options_csv_path.filename().string() +
-                                    " line " + std::to_string(line_no) + ": " +
-                                    e.what());
     }
-
     return node_options;
 }
 
@@ -199,28 +200,31 @@ std::vector<std::vector<std::pair<double, Instance::Option>>> parse_arc_options(
     std::vector<std::vector<std::pair<double, Instance::Option>>> arc_options(
         landscape.graph().nb_arcs());
 
-    auto arc_options_json = json_object["arc_options"];
-    std::filesystem::path arc_options_csv_path = arc_options_json["file"];
-    if(arc_options_csv_path.is_relative())
-        arc_options_csv_path = (parent_path / arc_options_csv_path);
-    io::CSVReader<3> arc_options_csv(arc_options_csv_path);
-    detail::configure_csv_reader(arc_options_csv, arc_options_json, "option_id",
-                                 "arc_id", "improved_probability");
+    if(json_object.contains("arc_options")) {
+        auto arc_options_json = json_object["arc_options"];
+        std::filesystem::path arc_options_csv_path = arc_options_json["file"];
+        if(arc_options_csv_path.is_relative())
+            arc_options_csv_path = (parent_path / arc_options_csv_path);
+        io::CSVReader<3> arc_options_csv(arc_options_csv_path);
+        detail::configure_csv_reader(arc_options_csv, arc_options_json,
+                                     "option_id", "arc_id",
+                                     "improved_probability");
 
-    std::size_t line_no = 2;
-    try {
-        std::string option_id, arc_id;
-        double improved_probability;
-        while(
-            arc_options_csv.read_row(option_id, arc_id, improved_probability)) {
-            arc_options[landscape.arc_from_name(arc_id)].emplace_back(
-                improved_probability, instance.option_from_name(option_id));
-            ++line_no;
+        std::size_t line_no = 2;
+        try {
+            std::string option_id, arc_id;
+            double improved_probability;
+            while(arc_options_csv.read_row(option_id, arc_id,
+                                           improved_probability)) {
+                arc_options[landscape.arc_from_name(arc_id)].emplace_back(
+                    improved_probability, instance.option_from_name(option_id));
+                ++line_no;
+            }
+        } catch(const std::invalid_argument & e) {
+            throw std::invalid_argument(
+                arc_options_csv_path.filename().string() + " line " +
+                std::to_string(line_no) + ": " + e.what());
         }
-    } catch(const std::invalid_argument & e) {
-        throw std::invalid_argument(arc_options_csv_path.filename().string() +
-                                    " line " + std::to_string(line_no) + ": " +
-                                    e.what());
     }
 
     return arc_options;
@@ -324,9 +328,7 @@ Instance parse_instance(std::filesystem::path instance_path) {
     auto case_json = instance_json["case"];
     detail::assert_json_properties(
         case_json, {{"nodes", nlohmann::detail::value_t::object},
-                    {"arcs", nlohmann::detail::value_t::object},
-                    {"node_options", nlohmann::detail::value_t::object},
-                    {"arc_options", nlohmann::detail::value_t::object}});
+                    {"arcs", nlohmann::detail::value_t::object}});
     instance.set_landscape(
         parse_landscape(case_json, instance_path.parent_path()));
 

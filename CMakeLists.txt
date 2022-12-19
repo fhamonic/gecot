@@ -55,6 +55,9 @@ target_link_libraries(landscape_opt INTERFACE range-v3::range-v3)
 target_link_libraries(landscape_opt INTERFACE melon)
 target_link_libraries(landscape_opt INTERFACE mippp)
 
+# silence false positive warinings from range-v3 invoke.hpp
+target_compile_options(landscape_opt INTERFACE -Warray-bounds=0)
+
 # target_include_directories(landscape_opt INTERFACE ${COIN_INCLUDE_DIR})
 # target_link_libraries(landscape_opt INTERFACE ${COIN_LIBRARIES})
 

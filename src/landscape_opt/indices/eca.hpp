@@ -16,13 +16,16 @@ template <typename GR, typename PM>
 struct eca_dijkstra_traits {
     using semiring = melon::most_reliable_path_semiring<
         melon::mapped_value_t<PM, melon::arc_t<GR>>>;
+    struct entry_cmp {
+        [[nodiscard]] constexpr bool operator()(
+            const auto & e1, const auto & e2) const noexcept {
+            return semiring::less(e1.second, e2.second);
+        }
+    };
     using heap =
         melon::d_ary_heap<4, melon::vertex_t<GR>,
                           melon::mapped_value_t<PM, melon::arc_t<GR>>,
-                          decltype([](const auto & e1, const auto & e2) {
-                              return semiring::less(e1.second, e2.second);
-                          }),
-                          melon::vertex_map_t<GR, std::size_t>>;
+                          entry_cmp, melon::vertex_map_t<GR, std::size_t>>;
 
     static constexpr bool store_paths = false;
     static constexpr bool store_distances = false;

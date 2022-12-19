@@ -19,13 +19,16 @@ template <typename GR, typename PM>
 struct parallel_eca_dijkstra_traits {
     using semiring = melon::most_reliable_path_semiring<
         melon::mapped_value_t<PM, melon::arc_t<GR>>>;
+    struct entry_cmp {
+        [[nodiscard]] constexpr bool operator()(
+            const auto & e1, const auto & e2) const noexcept {
+            return semiring::less(e1.second, e2.second);
+        }
+    };
     using heap =
         melon::d_ary_heap<4, melon::vertex_t<GR>,
                           melon::mapped_value_t<PM, melon::arc_t<GR>>,
-                          decltype([](const auto & e1, const auto & e2) {
-                              return semiring::less(e1.second, e2.second);
-                          }),
-                          melon::vertex_map_t<GR, std::size_t>>;
+                          entry_cmp, melon::vertex_map_t<GR, std::size_t>>;
 
     static constexpr bool store_paths = false;
     static constexpr bool store_distances = false;
@@ -39,12 +42,12 @@ double parallel_eca(const GR & graph, const QM & quality_map,
 
     double eca_sum = tbb::parallel_reduce(
         tbb::blocked_range(vertices_range.begin(), vertices_range.end()), 0.0,
-        [&](auto && nodes_subrange, double init) {
+        [&](auto && vertices_subrange, double init) {
             melon::dijkstra<GR, PM,
                             detail::parallel_eca_dijkstra_traits<GR, PM>>
                 algo(graph, probability_map);
 
-            for(auto && s : nodes_subrange) {
+            for(auto && s : vertices_subrange) {
                 if(quality_map[s] == 0) continue;
                 double sum = 0.0;
                 algo.reset();

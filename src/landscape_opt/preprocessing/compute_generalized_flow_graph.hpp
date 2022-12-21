@@ -1,12 +1,9 @@
 #ifndef LANDSCAPE_OPT_COMPUTE_GENERALIZED_FLOW_GRAPH_HPP
 #define LANDSCAPE_OPT_COMPUTE_GENERALIZED_FLOW_GRAPH_HPP
 
-#include <algorithm>
-#include <atomic>
-
-#include "melon/adaptor/reverse.hpp"
-#include "melon/algorithm/dijkstra.hpp"
-#include "melon/algorithm/strong_fiber.hpp"
+#include "melon/concepts/graph.hpp"
+#include "melon/static_digraph.hpp"
+#include "melon/static_digraph_builder.hpp"
 
 #include "concepts/instance_case.hpp"
 
@@ -14,14 +11,35 @@ namespace fhamonic {
 namespace landscape_opt {
 
 template <concepts::InstanceCase I>
-auto compute_generalized_flow_graph(const I & instance_case,
-                                    melon::vertex_t<typename I::Landscape::Graph> t) {
+auto compute_generalized_flow_graph(const I & instance_case) {
     using Landscape = typename I::Landscape;
-    using Graph = typename I::Landscape::Graph;
-    using vertex = melon::vertex_t<Graph>;
-    using arc = melon::arc_t<Graph>;
+    using Graph = typename Landscape::Graph;
+    using ProbabilityMap = typename Landscape::ProbabilityMap;
+    using Option = typename I::Option;
 
-    
+    const Graph & original_graph = instance_case.landscape().graph();
+    const ProbabilityMap & original_probability_map =
+        instance_case.landscape().probability_map();
+
+    melon::static_digraph_builder<melon::static_digraph, double,
+                                  std::optional<Option>>
+        builder(original_graph.nb_vertices());
+
+    for(auto && a : original_graph.arcs()) {
+        builder.add_arc(original_graph.source(a), original_graph.target(a),
+                        original_probability_map[a], std::nullopt);
+        for(auto && [enhanced_prob, option] :
+            instance_case.arc_options_map()[a]) {
+            builder.add_arc(original_graph.source(a), original_graph.target(a),
+                            enhanced_prob, std::make_optional(option));
+        }
+    }
+
+    auto [graph, probability_map, arc_options_map] = builder.build();
+
+    return std::make_tuple(graph, instance_case.landscape().quality_map(),
+                           instance_case.vertex_options_map(), probability_map,
+                           arc_options_map);
 }
 
 }  // namespace landscape_opt

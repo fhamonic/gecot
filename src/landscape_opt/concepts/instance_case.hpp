@@ -15,7 +15,7 @@ template <typename T>
 concept InstanceCase = requires(T ic, typename T::Landscape,
                                 typename T::Option o) {
     ic.landscape();
-    ic.node_options_map();
+    ic.vertex_options_map();
     ic.arc_options_map();
 };
 

@@ -69,7 +69,7 @@ struct MIP {
                         xsum(graph.in_arcs(u), Phi_t_var, probality) <=
                     quality[u] +
                         xsum(
-                            instance.node_options_map()[u],
+                            instance.vertex_options_map()[u],
                             [&X_vars](auto && p) { return X_vars(p.second); },
                             [](auto && p) { return p.first; }));
             }
@@ -77,7 +77,7 @@ struct MIP {
                 xsum(graph.in_arcs(t), Phi_t_var, probality) <=
                 quality[t] +
                     xsum(
-                        instance.node_options_map()[t],
+                        instance.vertex_options_map()[t],
                         [&X_vars](auto && p) { return X_vars(p.second); },
                         [](auto && p) { return p.first; }) -
                     F_vars(t));

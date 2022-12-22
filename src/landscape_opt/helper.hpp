@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "concepts/instance.hpp"
+#include "indices/eca.hpp"
 
 namespace fhamonic {
 namespace landscape_opt {
@@ -37,9 +38,29 @@ computeOptionsForArcs(const I & instance) noexcept {
     return arcOptionsMap;
 }
 
-// template <concepts::Instance I>
-// typename Instance::Option compute_best_option(instance, taken_options ou
-// solutionc)
+template <concepts::Instance I>
+double compute_solution_eca(const I & instance,
+                            const typename I::Solution & solution) {
+    using Landscape = typename I::Landscape;
+    using QualityMap = typename Landscape::QualityMap;
+    using ProbabilityMap = typename Landscape::ProbabilityMap;
+
+    const auto nodeOptions = detail::computeOptionsForNodes(instance);
+    const auto arcOptions = detail::computeOptionsForArcs(instance);
+
+    QualityMap enhanced_qm = instance.landscape().quality_map();
+    ProbabilityMap enhanced_pm = instance.landscape().probability_map();
+
+    for(auto && option : instance.options()) {
+        if(!solution[option]) continue;
+        for(auto && [u, quality_gain] : nodeOptions[option])
+            enhanced_qm[u] += quality_gain;
+        for(auto && [a, enhanced_prob] : arcOptions[option])
+            enhanced_pm[a] = std::max(enhanced_pm[a], enhanced_prob);
+    }
+
+    return eca(instance.landscape().graph(), enhanced_qm, enhanced_pm);
+}
 
 // typename Instance::Option compute_worst_option(instance, taken_options)
 

@@ -260,7 +260,6 @@ struct GreedyDecremental {
                     return init;
                 };
 
-            double purchaised = 0.0;
             for(;;) {
                 options.erase(
                     std::remove_if(options.begin(), options.end(),

@@ -17,6 +17,8 @@ namespace logging = boost::log;
 // #include "landscape_opt/solvers/mip_eca_preprocessed.hpp"
 // #include "landscape_opt/solvers/randomized_rounding.hpp"
 
+#include "landscape_opt/helper.hpp"
+
 #include "instance.hpp"
 #include "parse_instance.hpp"
 
@@ -200,6 +202,10 @@ int main(int argc, const char * argv[]) {
     Instance::Solution solution = solver->solve(instance, budget);
 
     if(!output_in_file) {
+        std::cout.precision(10);
+        const double eca =
+            landscape_opt::detail::compute_solution_eca(instance, solution);
+        std::cout << "ECA: " << eca << std::endl;
         std::cout << "Solution:" << std::endl;
         const std::size_t option_name_max_length = std::ranges::max(
             std::ranges::views::transform(instance.options(), [&](auto && o) {

@@ -15,64 +15,72 @@
 #include "helper.hpp"
 #include "indices/eca.hpp"
 #include "indices/parallel_eca.hpp"
-#include "preprocessing/compute_big_M_map.hpp"
-#include "preprocessing/compute_generalized_flow_graph.hpp"
 #include "utils/chrono.hpp"
+#include "preprocessing/compute_strong_and_useless_arcs.hpp"
 
 namespace fhamonic {
 namespace landscape_opt {
 namespace solvers {
 
-struct MIP {
+struct preprocessed_MIP {
     bool verbose = false;
     bool parallel = false;
 
     template <concepts::Instance I>
     typename I::Solution solve(const I & instance, const double budget) const {
         using Landscape = typename I::Landscape;
-        using Graph = typename Landscape::Graph;
+        using OriginalGraph = typename Landscape::Graph;
         using Option = typename I::Option;
         using Solution = typename I::Solution;
 
-        // int time_ms = 0;
         Chrono chrono;
         Solution solution = instance.create_solution();
-
-        const auto [graph, quality_map, vertex_options_map, probability_map,
-                    arc_option_map] = compute_generalized_flow_graph(instance);
-
-        const auto big_M_map = compute_big_M_map(
-            graph, quality_map, vertex_options_map, probability_map, parallel);
-
         using namespace mippp;
         using MIP = mip_model<default_solver_traits>;
         MIP model;
 
-        const auto F_vars =
-            model.add_vars(graph.nb_vertices(),
-                           [](const melon::vertex_t<Graph> v) { return v; });
-        const auto Phi_vars = model.add_vars(
-            graph.nb_vertices() * graph.nb_arcs(),
-            [n = graph.nb_vertices()](const melon::vertex_t<Graph> v,
-                                      const melon::arc_t<Graph> a) {
-                return v * n + a;
-            });
         const auto X_vars = model.add_vars(
             instance.options().size(), [](Option i) { return i; },
             {.upper_bound = 1, .type = MIP::var_category::binary});
 
-        model.add_obj(xsum(graph.vertices(), F_vars, quality_map));
-        for(const auto & t : graph.vertices()) {
-            for(const auto & [quality_gain, option] : vertex_options_map[t]) {
+        model.add_constraint(
+            xsum(instance.options(), X_vars, [&instance](Option i) {
+                return instance.option_cost(i);
+            }) <= budget);
+
+        const OriginalGraph & original_graph = instance.landscape().graph();
+        const auto & original_quality_map = instance.landscape().quality_map();
+        const auto & original_vertex_options_map = instance.vertex_options_map();
+
+        const auto F_vars = model.add_vars(
+            original_graph.nb_vertices(),
+            [](const melon::vertex_t<OriginalGraph> v) { return v; });
+
+        model.add_obj(
+            xsum(original_graph.vertices(), F_vars, original_quality_map));
+
+        const auto [strong_arcs_map, useless_arcs_map] =
+            compute_strong_and_useless_arcs(instance, parallel);
+
+        for(const auto & original_t : original_graph.vertices()) {
+            const auto [graph, quality_map, vertex_options_map, probability_map,
+                        arc_option_map, t] =
+                compute_contracted_generalized_flow_graph(instance, strong_arcs_map,
+                                                  useless_arcs_map, original_t);
+            const auto big_M_map =
+                compute_big_M_map(graph, quality_map, vertex_options_map,
+                                  probability_map, parallel);
+
+            for(const auto & [quality_gain, option] :
+                original_vertex_options_map[original_t]) {
                 const auto F_prime_t_var = model.add_var();
-                model.add_constraint(F_prime_t_var <= F_vars(t));
+                model.add_constraint(F_prime_t_var <= F_vars(original_t));
                 model.add_constraint(F_prime_t_var <=
                                      big_M_map[t] * X_vars(option));
                 model.add_obj(quality_gain * F_prime_t_var);
             }
-            const auto Phi_t_var = [&Phi_vars, t](const auto & a) {
-                return Phi_vars(t, a);
-            };
+            const auto Phi_t_var = model.add_vars(
+                graph.nb_arcs(), [](const auto & a) { return a; });
             for(const auto & u : graph.vertices()) {
                 if(u == t) continue;
                 model.add_constraint(
@@ -102,11 +110,6 @@ struct MIP {
                                          big_M_map[graph.source(a)]);
             }
         }
-
-        model.add_constraint(
-            xsum(instance.options(), X_vars, [&instance](const auto & o) {
-                return instance.option_cost(o);
-            }) <= budget);
 
         // std::cout << model << std::endl;
 

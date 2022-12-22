@@ -47,19 +47,19 @@ struct MIP {
         Model model;
 
         auto F_vars = model.add_vars(graph.nb_vertices(),
-                                     [](Graph::vertex_t v) { return v; });
+                                     [](const melon::vertex_t<Graph> v) { return v; });
         auto Phi_vars = model.add_vars(
             graph.nb_vertices() * graph.nb_arcs(),
-            [n = graph.nb_vertices()](Graph::vertex_t v, Graph::arc_t a) {
+            [n = graph.nb_vertices()](const melon::vertex_t<Graph> v, const melon::arc_t<Graph> a) {
                 return v * n + a;
             });
         auto X_vars = model.add_vars(instance.options().size(),
-                                     [](Option i) { return i; },
+                                     [](const Option i) { return i; },
                                      {.type = Model::ColType::BINARY});
 
         model.add_obj(xsum(graph.vertices(), F_vars, quality));
         for(auto && t : graph.vertices()) {
-            auto Phi_t_var = [&Phi_vars, t](Graph::arc_t a) {
+            auto Phi_t_var = [&Phi_vars, t](melon::arc_t<Graph> a) {
                 return Phi_vars(t, a);
             };
             for(auto && u : graph.vertices()) {
@@ -69,7 +69,7 @@ struct MIP {
                         xsum(graph.in_arcs(u), Phi_t_var, probality) <=
                     quality[u] +
                         xsum(
-                            instance.node_options_map()[u],
+                            instance.vertex_options_map()[u],
                             [&X_vars](auto && p) { return X_vars(p.second); },
                             [](auto && p) { return p.first; }));
             }
@@ -77,7 +77,7 @@ struct MIP {
                 xsum(graph.in_arcs(t), Phi_t_var, probality) <=
                 quality[t] +
                     xsum(
-                        instance.node_options_map()[t],
+                        instance.vertex_options_map()[t],
                         [&X_vars](auto && p) { return X_vars(p.second); },
                         [](auto && p) { return p.first; }) -
                     F_vars(t));

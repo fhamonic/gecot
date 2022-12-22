@@ -14,23 +14,45 @@
 namespace fhamonic {
 namespace landscape_opt {
 
+namespace detail {
+template <typename GR, typename PM>
+struct parallel_eca_dijkstra_traits {
+    using semiring = melon::most_reliable_path_semiring<
+        melon::mapped_value_t<PM, melon::arc_t<GR>>>;
+    struct entry_cmp {
+        [[nodiscard]] constexpr bool operator()(
+            const auto & e1, const auto & e2) const noexcept {
+            return semiring::less(e1.second, e2.second);
+        }
+    };
+    using heap =
+        melon::d_ary_heap<4, melon::vertex_t<GR>,
+                          melon::mapped_value_t<PM, melon::arc_t<GR>>,
+                          entry_cmp, melon::vertex_map_t<GR, std::size_t>>;
+
+    static constexpr bool store_paths = false;
+    static constexpr bool store_distances = false;
+};
+}  // namespace detail
+
 template <typename GR, typename QM, typename PM>
 double parallel_eca(const GR & graph, const QM & quality_map,
-           const PM & probability_map) {
-    auto nodes_range = graph.vertices();
+                    const PM & probability_map) {
+    auto vertices_range = melon::vertices(graph);
 
     double eca_sum = tbb::parallel_reduce(
-        tbb::blocked_range(nodes_range.begin(), nodes_range.end()), 0.0,
-        [&](auto && nodes_subrange, double init) {
-            melon::Dijkstra<GR, PM, melon::TRACK_NONE,
-                            melon::DijkstraMostProbablePathSemiring<double>>
-                dijkstra(graph, probability_map);
+        tbb::blocked_range(vertices_range.begin(), vertices_range.end()), 0.0,
+        [&](auto && vertices_subrange, double init) {
+            melon::dijkstra<GR, PM,
+                            detail::parallel_eca_dijkstra_traits<GR, PM>>
+                algo(graph, probability_map);
 
-            for(auto && s : nodes_subrange) {
+            for(auto && s : vertices_subrange) {
+                if(quality_map[s] == 0) continue;
                 double sum = 0.0;
-                dijkstra.reset();
-                dijkstra.add_source(s);
-                for(const auto & [u, prob] : dijkstra) {
+                algo.reset();
+                algo.add_source(s);
+                for(const auto & [u, prob] : algo) {
                     sum += quality_map[u] * prob;
                 }
                 init += quality_map[s] * sum;

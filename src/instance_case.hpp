@@ -36,7 +36,7 @@ struct InstanceCase {
     std::vector<std::string> arc_names;
     phmap::node_hash_map<std::string, unsigned int> arc_name_to_id_map;
 
-    std::vector<std::vector<std::pair<Option, double>>> node_options_map;
+    std::vector<std::vector<std::pair<Option, double>>> vertex_options_map;
     std::vector<std::vector<std::pair<Option, double>>> arc_options_map;
 };
 

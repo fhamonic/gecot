@@ -8,37 +8,13 @@
 #include "melon/algorithm/strong_fiber.hpp"
 
 #include "helper.hpp"
+#include "preprocessing/compute_strong_and_useless_arcs.hpp"
 
 namespace fhamonic {
 namespace landscape_opt {
-namespace detail {
-template <typename G, typename T>
-struct strong_arc_default_traits {
-    using semiring = melon::most_reliable_path_semiring<T>;
-    template <typename CMP = std::less<std::pair<melon::vertex_t<G>, T>>>
-    using heap = melon::d_ary_heap<2, melon::vertex_t<G>, T, CMP,
-                                   melon::vertex_map_t<G, std::size_t>>;
-
-    static constexpr bool strictly_strong = false;
-    static constexpr bool store_distances = false;
-    static constexpr bool store_paths = false;
-};
-template <typename G, typename T>
-struct useless_arc_default_traits {
-    using semiring = melon::most_reliable_path_semiring<T>;
-    template <typename CMP = std::less<std::pair<melon::vertex_t<G>, T>>>
-    using heap = melon::d_ary_heap<2, melon::vertex_t<G>, T, CMP,
-                                   melon::vertex_map_t<G, std::size_t>>;
-
-    static constexpr bool strictly_strong = true;
-    static constexpr bool store_distances = false;
-    static constexpr bool store_paths = false;
-};
-
-}  // namespace detail
 
 template <concepts::InstanceCase I>
-auto compute_strong_and_useless_arcs(const I & instance_case,
+auto compute_constrained_strong_and_useless_arcs(const I & instance_case,
                                      const bool parallel = false) {
     using LS = typename I::Landscape;
     using GR = typename LS::Graph;

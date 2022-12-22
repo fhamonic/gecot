@@ -28,7 +28,7 @@ private:
 
     Landscape _landscape;
 
-    std::vector<std::vector<std::pair<double, Option>>> _node_options_map;
+    std::vector<std::vector<std::pair<double, Option>>> _vertex_options_map;
     std::vector<std::vector<std::pair<double, Option>>> _arc_options_map;
 
 public:
@@ -45,7 +45,7 @@ public:
     }
 
     auto & landscape() const noexcept { return _landscape; }
-    auto & node_options_map() const noexcept { return _node_options_map; }
+    auto & vertex_options_map() const noexcept { return _vertex_options_map; }
     auto & arc_options_map() const noexcept { return _arc_options_map; }
 
     std::size_t nb_options() const noexcept { return _options_costs.size(); }
@@ -83,7 +83,7 @@ public:
     void set_node_options(
         std::vector<std::vector<std::pair<double, Instance::Option>>> &&
             node_options) noexcept {
-        _node_options_map = std::move(node_options);
+        _vertex_options_map = std::move(node_options);
     }
     void set_arc_options(
         std::vector<std::vector<std::pair<double, Instance::Option>>> &&

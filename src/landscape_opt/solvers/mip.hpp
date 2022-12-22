@@ -1,6 +1,8 @@
 #ifndef LANDSCAPE_OPT_SOLVERS_MIP_HPP
 #define LANDSCAPE_OPT_SOLVERS_MIP_HPP
 
+#include <stdexcept>
+
 #include <range/v3/algorithm/sort.hpp>
 #include <range/v3/range/conversion.hpp>
 #include <range/v3/view/zip.hpp>
@@ -113,7 +115,11 @@ struct MIP {
         auto solver = model.build();
         solver.set_loglevel(verbose ? 1 : 0);
         solver.set_timeout(3600);
-        solver.optimize();
+        auto ret_code = solver.optimize();
+        if(ret_code != 0)
+            throw std::runtime_error(
+                "The thirdparty MIP solver failed with code " +
+                std::to_string(ret_code));
         const auto solver_solution = solver.get_solution();
 
         for(const auto & i : instance.options()) {

@@ -8,7 +8,7 @@
     },
     "case": {
         "name": "",
-        "nodes": {
+        "vertices": {
             "file": "stretches.csv",
             "columns": {
                 "id": "id",

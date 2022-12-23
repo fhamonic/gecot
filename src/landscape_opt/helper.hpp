@@ -23,16 +23,16 @@ namespace detail {
 template <concepts::Instance I>
 std::vector<std::vector<
     std::pair<melon::vertex_t<typename I::Landscape::Graph>, double>>>
-computeOptionsForNodes(const I & instance) noexcept {
+computeOptionsForVertices(const I & instance) noexcept {
     std::vector<std::vector<
         std::pair<melon::vertex_t<typename I::Landscape::Graph>, double>>>
-        nodeOptionsMap(instance.options().size());
+        vertexOptionsMap(instance.options().size());
     for(auto && u : instance.landscape().graph().vertices()) {
         for(auto && [quality_gain, option] : instance.vertex_options_map()[u]) {
-            nodeOptionsMap[option].emplace_back(u, quality_gain);
+            vertexOptionsMap[option].emplace_back(u, quality_gain);
         }
     }
-    return nodeOptionsMap;
+    return vertexOptionsMap;
 }
 
 template <concepts::Instance I>
@@ -55,7 +55,7 @@ double compute_solution_eca(const I & instance,
     using QualityMap = typename Landscape::QualityMap;
     using ProbabilityMap = typename Landscape::ProbabilityMap;
 
-    const auto nodeOptions = detail::computeOptionsForNodes(instance);
+    const auto vertexOptions = detail::computeOptionsForVertices(instance);
     const auto arcOptions = detail::computeOptionsForArcs(instance);
 
     QualityMap enhanced_qm = instance.landscape().quality_map();
@@ -63,7 +63,7 @@ double compute_solution_eca(const I & instance,
 
     for(auto && option : instance.options()) {
         if(!solution[option]) continue;
-        for(auto && [u, quality_gain] : nodeOptions[option])
+        for(auto && [u, quality_gain] : vertexOptions[option])
             enhanced_qm[u] += quality_gain;
         for(auto && [a, enhanced_prob] : arcOptions[option])
             enhanced_pm[a] = std::max(enhanced_pm[a], enhanced_prob);

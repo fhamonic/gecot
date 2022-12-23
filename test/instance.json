@@ -8,8 +8,8 @@
     },
     "case": {
         "name": "",
-        "nodes": {
-            "file": "nodes.csv",
+        "vertices": {
+            "file": "vertices.csv",
             "columns": {
                 "id": "id",
                 "quality": "quality"
@@ -24,8 +24,8 @@
                 "probability": "arc_probability"
             }
         },
-        "node_options": {
-            "file": "node_options.csv"
+        "vertex_options": {
+            "file": "vertex_options.csv"
         },
         "arc_options": {
             "file": "arc_options.csv",

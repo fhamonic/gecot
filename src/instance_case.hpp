@@ -28,11 +28,11 @@ struct InstanceCase {
     double coef;
     void * graph;
 
-    std::vector<double> node_quality_map;
+    std::vector<double> vertex_quality_map;
     std::vector<double> arc_probability_map;
 
-    std::vector<std::string> node_names;
-    phmap::node_hash_map<std::string, unsigned int> node_name_to_id_map;
+    std::vector<std::string> vertex_names;
+    phmap::node_hash_map<std::string, unsigned int> vertex_name_to_id_map;
     std::vector<std::string> arc_names;
     phmap::node_hash_map<std::string, unsigned int> arc_name_to_id_map;
 

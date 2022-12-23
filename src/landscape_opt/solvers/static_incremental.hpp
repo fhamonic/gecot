@@ -33,7 +33,7 @@ struct StaticIncremental {
         Chrono chrono;
         Solution solution = instance.create_solution();
 
-        const auto nodeOptions = detail::computeOptionsForNodes(instance);
+        const auto vertexOptions = detail::computeOptionsForVertices(instance);
         const auto arcOptions = detail::computeOptionsForArcs(instance);
 
         const double base_eca = eca(instance.landscape());
@@ -53,7 +53,7 @@ struct StaticIncremental {
             options.end());
 
         auto compute_delta_eca_inc =
-            [&instance, &nodeOptions, &arcOptions, base_eca, &options_ratios](
+            [&instance, &vertexOptions, &arcOptions, base_eca, &options_ratios](
                 const tbb::blocked_range<decltype(options.begin())> &
                     options_block) {
                 const QualityMap & original_qm =
@@ -66,7 +66,7 @@ struct StaticIncremental {
 
                 for(auto it = options_block.begin();;) {
                     Option option = *it;
-                    for(auto && [u, quality_gain] : nodeOptions[option])
+                    for(auto && [u, quality_gain] : vertexOptions[option])
                         qm[u] += quality_gain;
                     for(auto && [a, enhanced_prob] : arcOptions[option])
                         pm[a] = std::max(pm[a], enhanced_prob);
@@ -79,7 +79,7 @@ struct StaticIncremental {
 
                     if(++it == options_block.end()) break;
 
-                    for(auto && [u, quality_gain] : nodeOptions[option])
+                    for(auto && [u, quality_gain] : vertexOptions[option])
                         qm[u] = original_qm[u];
                     for(auto && [a, enhanced_prob] : arcOptions[option])
                         pm[a] = original_pm[a];

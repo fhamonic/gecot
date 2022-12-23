@@ -1,24 +1,24 @@
-#ifndef LSCP_STATIC_INCREMENTAL_INTERFACE_HPP
-#define LSCP_STATIC_INCREMENTAL_INTERFACE_HPP
+#ifndef LSCP_PREPROCESSED_MIP_INTERFACE_HPP
+#define LSCP_PREPROCESSED_MIP_INTERFACE_HPP
 
 #include <sstream>
 
 #include <boost/program_options.hpp>
 
-#include "landscape_opt/solvers/static_incremental.hpp"
+#include "landscape_opt/solvers/preprocessed_mip.hpp"
 
 #include "instance.hpp"
 #include "solver_interfaces/abstract_solver.hpp"
 
 namespace fhamonic {
 
-class StaticIncrementalInterface : public AbstractSolver {
+class PreprocessedMIPInterface : public AbstractSolver {
 private:
-    landscape_opt::solvers::StaticIncremental solver;
+    landscape_opt::solvers::preprocessed_MIP solver;
     boost::program_options::options_description desc;
 
 public:
-    StaticIncrementalInterface() : desc(name() + " options") {
+    PreprocessedMIPInterface() : desc(name() + " options") {
         desc.add_options()("verbose,v", "Log the algorithm steps")(
             "parallel,p", "Use multithreaded version");
     }
@@ -41,19 +41,20 @@ public:
         return solver.solve(instance, B);
     };
 
-    std::string name() const { return "static_incremental"; }
+    std::string name() const { return "preprocessed_mip"; }
     std::string description() const {
-        return "From the base landscape, add the options with the best "
-               "gain/cost ratio.";
+        return "MIP formulation with preprocessing, from 'Optimizing the "
+               "ecological connectivity of landscapes', François Hamonic, "
+               "Cécile Albert, Basile Couëtoux, Yann Vaxès";
     }
     std::string options_description() const {
         std::ostringstream s;
         s << desc;
         return s.str();
     }
-    std::string string() const { return "static_incremental"; }
+    std::string string() const { return "mip"; }
 };
 
 }  // namespace fhamonic
 
-#endif  // LSCP_STATIC_INCREMENTAL_INTERFACE_HPP
+#endif  // LSCP_PREPROCESSED_MIP_INTERFACE_HPP

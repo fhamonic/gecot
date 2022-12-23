@@ -34,7 +34,7 @@ struct StaticIncremental {
         OptionPotentialMap options_potentials =
             instance.create_options_potentials_map();
 
-        const auto nodeOptions = detail::computeOptionsForNodes(instance);
+        const auto vertexOptions = detail::computeOptionsForVertices(instance);
         const auto arcOptions = detail::computeOptionsForArcs(instance);
 
         const double base_eca = eca(instance.landscape());
@@ -54,7 +54,7 @@ struct StaticIncremental {
 
                 for(auto it = options_block.begin();;) {
                     Option option = *it;
-                    for(auto && [u, quality_gain] : nodeOptions[option])
+                    for(auto && [u, quality_gain] : vertexOptions[option])
                         qm[u] += quality_gain;
                     for(auto && [a, enhanced_prob] : arcOptions[option])
                         pm[a] = std::max(pm[a], enhanced_prob);
@@ -67,7 +67,7 @@ struct StaticIncremental {
 
                     if(++it == options_block.end()) break;
 
-                    for(auto && [u, quality_gain] : nodeOptions[option])
+                    for(auto && [u, quality_gain] : vertexOptions[option])
                         qm[u] = original_qm[u];
                     for(auto && [a, enhanced_prob] : arcOptions[option])
                         pm[a] = original_pm[a];

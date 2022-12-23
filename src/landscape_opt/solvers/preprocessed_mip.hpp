@@ -1,5 +1,7 @@
-#ifndef LANDSCAPE_OPT_SOLVERS_MIP_HPP
-#define LANDSCAPE_OPT_SOLVERS_MIP_HPP
+#ifndef LANDSCAPE_OPT_SOLVERS_PREPROCESSED_MIP_HPP
+#define LANDSCAPE_OPT_SOLVERS_PREPROCESSED_MIP_HPP
+
+#include <type_traits>
 
 #include <range/v3/algorithm/sort.hpp>
 #include <range/v3/range/conversion.hpp>
@@ -15,6 +17,7 @@
 #include "helper.hpp"
 #include "indices/eca.hpp"
 #include "indices/parallel_eca.hpp"
+#include "preprocessing/compute_contracted_generalized_flow_graph.hpp"
 #include "preprocessing/compute_strong_and_useless_arcs.hpp"
 #include "utils/chrono.hpp"
 
@@ -68,6 +71,7 @@ struct preprocessed_MIP {
                         arc_option_map, t] =
                 compute_contracted_generalized_flow_graph(
                     instance, strong_arcs_map, useless_arcs_map, original_t);
+            using Graph = std::decay_t<decltype(graph)>;
             const auto big_M_map =
                 compute_big_M_map(graph, quality_map, vertex_options_map,
                                   probability_map, parallel);
@@ -133,4 +137,4 @@ struct preprocessed_MIP {
 }  // namespace landscape_opt
 }  // namespace fhamonic
 
-#endif  // LANDSCAPE_OPT_SOLVERS_MIP_HPP
+#endif  // LANDSCAPE_OPT_SOLVERS_PREPROCESSED_MIP_HPP

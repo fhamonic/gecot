@@ -34,7 +34,7 @@ struct GreedyDecremental {
         OptionPotentialMap options_potentials =
             instance.create_options_potentials_map();
 
-        const auto nodeOptions = detail::computeOptionsForNodes(instance);
+        const auto vertexOptions = detail::computeOptionsForVertices(instance);
         const auto arcOptions = detail::computeOptionsForArcs(instance);
 
         const QualityMap & original_qm = instance.landscape().quality_map();
@@ -44,7 +44,7 @@ struct GreedyDecremental {
         QualityMap current_qm = original_qm;
         ProbabilityMap current_pm = original_pm;
         for(auto && option : options) {
-            for(auto && [u, quality_gain] : nodeOptions[option])
+            for(auto && [u, quality_gain] : vertexOptions[option])
                 current_qm[u] += quality_gain;
             for(auto && [a, current_prob] : arcOptions[option])
                 current_pm[a] = std::max(current_pm[a], current_prob);
@@ -66,7 +66,7 @@ struct GreedyDecremental {
 
                 for(auto it = options_block.begin();;) {
                     Option option = *it;
-                    for(auto && [u, quality_gain] : nodeOptions[option])
+                    for(auto && [u, quality_gain] : vertexOptions[option])
                         qm[u] -= quality_gain;
                     for(auto && [a, current_prob] : arcOptions[option]) {
                         pm[a] = original_pm[a];
@@ -88,7 +88,7 @@ struct GreedyDecremental {
 
                     if(++it == options_block.end()) break;
 
-                    for(auto && [u, quality_gain] : nodeOptions[option])
+                    for(auto && [u, quality_gain] : vertexOptions[option])
                         qm[u] = current_qm[u];
                     for(auto && [a, current_prob] : arcOptions[option])
                         pm[a] = current_pm[a];
@@ -121,7 +121,7 @@ struct GreedyDecremental {
             current_eca -= worst_option_p.first * price;
             options_potentials[worst_option] = nb_options - options.size() + 1;
 
-            for(auto && [u, quality_gain] : nodeOptions[worst_option])
+            for(auto && [u, quality_gain] : vertexOptions[worst_option])
                 current_qm[u] -= quality_gain;
             for(auto && [a, current_prob] : arcOptions[worst_option]) {
                 current_pm[a] = original_pm[a];

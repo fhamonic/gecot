@@ -24,10 +24,10 @@ public:
 private:
     Graph _graph;
 
-    QualityMap _node_quality_map;
+    QualityMap _vertex_quality_map;
     ProbabilityMap _arc_probability_map;
 
-    std::vector<std::string> _node_names;
+    std::vector<std::string> _vertex_names;
     phmap::node_hash_map<std::string, melon::vertex_t<melon::static_digraph>>
         _name_to_vertex_map;
     std::vector<std::string> _arc_names;
@@ -44,7 +44,7 @@ public:
 
     StaticLandscape(
         const Graph & g, const QualityMap & qm, const ProbabilityMap & pm,
-        const std::vector<std::string> & node_names,
+        const std::vector<std::string> & vertex_names,
         const phmap::node_hash_map<std::string,
                                    melon::vertex_t<melon::static_digraph>>
             name_to_vertex_map,
@@ -53,15 +53,15 @@ public:
                                    melon::arc_t<melon::static_digraph>>
             name_to_arc_map)
         : _graph(g)
-        , _node_quality_map(qm)
+        , _vertex_quality_map(qm)
         , _arc_probability_map(pm)
-        , _node_names(node_names)
+        , _vertex_names(vertex_names)
         , _name_to_vertex_map(name_to_vertex_map)
         , _arc_names(arc_names)
         , _name_to_arc_map(name_to_arc_map) {}
 
     auto & graph() const noexcept { return _graph; }
-    auto & quality_map() const noexcept { return _node_quality_map; };
+    auto & quality_map() const noexcept { return _vertex_quality_map; };
     auto & probability_map() const noexcept { return _arc_probability_map; };
 
     bool contains_vertex(const std::string & name) const {

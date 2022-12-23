@@ -33,7 +33,7 @@ struct GreedyIncremental {
         Chrono chrono;
         Solution solution = instance.create_solution();
 
-        const auto nodeOptions = detail::computeOptionsForNodes(instance);
+        const auto vertexOptions = detail::computeOptionsForVertices(instance);
         const auto arcOptions = detail::computeOptionsForArcs(instance);
 
         double prec_eca = eca(instance.landscape());
@@ -57,7 +57,7 @@ struct GreedyIncremental {
 
                 for(auto it = options_block.begin();;) {
                     Option option = *it;
-                    for(auto && [u, quality_gain] : nodeOptions[option])
+                    for(auto && [u, quality_gain] : vertexOptions[option])
                         qm[u] += quality_gain;
                     for(auto && [a, enhanced_prob] : arcOptions[option])
                         pm[a] = std::max(pm[a], enhanced_prob);
@@ -72,7 +72,7 @@ struct GreedyIncremental {
 
                     if(++it == options_block.end()) break;
 
-                    for(auto && [u, quality_gain] : nodeOptions[option])
+                    for(auto && [u, quality_gain] : vertexOptions[option])
                         qm[u] = current_qm[u];
                     for(auto && [a, enhanced_prob] : arcOptions[option])
                         pm[a] = current_pm[a];
@@ -113,7 +113,7 @@ struct GreedyIncremental {
             solution[best_option] = 1.0;
             prec_eca += best_option_p.first * price;
 
-            for(auto && [u, quality_gain] : nodeOptions[best_option])
+            for(auto && [u, quality_gain] : vertexOptions[best_option])
                 current_qm[u] += quality_gain;
             for(auto && [a, enhanced_prob] : arcOptions[best_option])
                 current_qm[a] = std::max(current_qm[a], enhanced_prob);

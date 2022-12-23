@@ -43,10 +43,9 @@ public:
 
     std::string name() const { return "mip"; }
     std::string description() const {
-        return "Mixed Integer Program from 'Optimizing the ecological "
-               "connectivity of landscapes with generalized flow models and "
-               "preprocessing', François Hamonic, Cécile Albert, Basile "
-               "Couëtoux, Yann Vaxès";
+        return "MIP formulation without preprocessing, from 'Optimizing the "
+               "ecological connectivity of landscapes', François Hamonic, "
+               "Cécile Albert, Basile Couëtoux, Yann Vaxès";
     }
     std::string options_description() const {
         std::ostringstream s;

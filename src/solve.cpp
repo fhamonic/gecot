@@ -26,6 +26,7 @@ namespace logging = boost::log;
 #include "solver_interfaces/greedy_decremental_interface.hpp"
 #include "solver_interfaces/greedy_incremental_interface.hpp"
 #include "solver_interfaces/mip_interface.hpp"
+#include "solver_interfaces/preprocessed_mip_interface.hpp"
 #include "solver_interfaces/static_decremental_interface.hpp"
 #include "solver_interfaces/static_incremental_interface.hpp"
 
@@ -64,7 +65,8 @@ static bool process_command_line(
         std::make_unique<StaticDecrementalInterface>(),
         std::make_unique<GreedyIncrementalInterface>(),
         std::make_unique<GreedyDecrementalInterface>(),
-        std::make_unique<MIPInterface>()};
+        std::make_unique<MIPInterface>(),
+        std::make_unique<PreprocessedMIPInterface>()};
 
     auto print_soft_name = []() { std::cout << "LSCP 0.1\n\n"; };
     auto print_usage = []() {

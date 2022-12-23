@@ -80,10 +80,10 @@ public:
     void set_landscape(StaticLandscape && l) noexcept {
         _landscape = std::move(l);
     }
-    void set_node_options(
+    void set_vertex_options(
         std::vector<std::vector<std::pair<double, Instance::Option>>> &&
-            node_options) noexcept {
-        _vertex_options_map = std::move(node_options);
+            vertex_options) noexcept {
+        _vertex_options_map = std::move(vertex_options);
     }
     void set_arc_options(
         std::vector<std::vector<std::pair<double, Instance::Option>>> &&

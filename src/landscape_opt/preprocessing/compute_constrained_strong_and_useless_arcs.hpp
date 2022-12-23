@@ -5,6 +5,7 @@
 
 #include <tbb/concurrent_vector.h>
 
+#include "melon/concepts/graph.hpp"
 #include "melon/algorithm/strong_fiber.hpp"
 
 #include "helper.hpp"
@@ -19,7 +20,7 @@ auto compute_constrained_strong_and_useless_arcs(const I & instance_case,
     using LS = typename I::Landscape;
     using GR = typename LS::Graph;
     using PM = typename LS::ProbabilityMap;
-    using arc_t = melon::arc_t<typename GR>;
+    using arc_t = melon::arc_t<GR>;
 
     auto strong_arcs_map =
         melon::create_vertex_map<tbb::concurrent_vector<arc_t>>(graph);

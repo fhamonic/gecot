@@ -10,27 +10,27 @@ int main(int argc, char ** argv) {
 
 GTEST_TEST(IdentifyStrong2, test) {
     using Graph = lemon::ListDigraph;
-    using Node = Graph::Node;
+    using Vertex = Graph::Vertex;
     using Arc = Graph::Arc;
     using ArcMap = Graph::ArcMap<double>;
 
     Graph graph;
     ArcMap lower(graph), upper(graph);
-    auto addArc = [&](Node u, Node v, double l1, double l2) {
+    auto addArc = [&](Vertex u, Vertex v, double l1, double l2) {
         Arc uv = graph.addArc(u, v);
         lower[uv] = l1;
         upper[uv] = l2;
         return uv;
     };
 
-    Node a = graph.addNode();
-    Node b = graph.addNode();
-    Node c = graph.addNode();
-    Node d = graph.addNode();
-    Node e = graph.addNode();
-    Node f = graph.addNode();
-    Node g = graph.addNode();
-    Node h = graph.addNode();
+    Vertex a = graph.addVertex();
+    Vertex b = graph.addVertex();
+    Vertex c = graph.addVertex();
+    Vertex d = graph.addVertex();
+    Vertex e = graph.addVertex();
+    Vertex f = graph.addVertex();
+    Vertex g = graph.addVertex();
+    Vertex h = graph.addVertex();
 
     Arc ab = addArc(a, b, 1, 2);
     Arc ag = addArc(a, g, 1, 2);
@@ -57,41 +57,41 @@ GTEST_TEST(IdentifyStrong2, test) {
 
     lemon::IdentifyStrong<Graph, ArcMap> identifyStrong(graph, upper, lower);
     identifyStrong.run(ag);
-    auto strong_nodes = identifyStrong.getLabeledNodesList();
+    auto strong_vertices = identifyStrong.getLabeledVerticesList();
 
-    EXPECT_EQ(strong_nodes.size(), 3);
-    EXPECT_EQ(strong_nodes[0], g);
-    EXPECT_EQ(strong_nodes[1], f);
-    EXPECT_EQ(strong_nodes[2], e);
+    EXPECT_EQ(strong_vertices.size(), 3);
+    EXPECT_EQ(strong_vertices[0], g);
+    EXPECT_EQ(strong_vertices[1], f);
+    EXPECT_EQ(strong_vertices[2], e);
 }
 
 GTEST_TEST(IdentifyStrong1, test) {
     using Graph = lemon::ListDigraph;
-    using Node = Graph::Node;
+    using Vertex = Graph::Vertex;
     using Arc = Graph::Arc;
     using ArcMap = Graph::ArcMap<double>;
 
     Graph graph;
     ArcMap lower(graph), upper(graph);
-    auto addArc = [&](Node u, Node v, double l1, double l2) {
+    auto addArc = [&](Vertex u, Vertex v, double l1, double l2) {
         Arc uv = graph.addArc(u, v);
         lower[uv] = l1;
         upper[uv] = l2;
         return uv;
     };
 
-    Node a = graph.addNode();
-    Node b = graph.addNode();
-    Node c = graph.addNode();
+    Vertex a = graph.addVertex();
+    Vertex b = graph.addVertex();
+    Vertex c = graph.addVertex();
 
     Arc ab = addArc(a, b, 1, 2);
     Arc bc = addArc(b, c, 3, 3);
 
     lemon::IdentifyStrong<Graph, ArcMap> identifyStrong(graph, upper, lower);
     identifyStrong.run(ab);
-    auto strong_nodes = identifyStrong.getLabeledNodesList();
+    auto strong_vertices = identifyStrong.getLabeledVerticesList();
 
-    EXPECT_EQ(strong_nodes.size(), 2);
-    EXPECT_EQ(strong_nodes[0], b);
-    EXPECT_EQ(strong_nodes[1], c);
+    EXPECT_EQ(strong_vertices.size(), 2);
+    EXPECT_EQ(strong_vertices[0], b);
+    EXPECT_EQ(strong_vertices[1], c);
 }

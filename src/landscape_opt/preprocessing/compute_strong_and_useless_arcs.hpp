@@ -43,22 +43,23 @@ auto compute_strong_and_useless_arcs(const I & instance_case,
     using LS = typename I::Landscape;
     using GR = typename LS::Graph;
     using PM = typename LS::ProbabilityMap;
-    using arc_t = melon::arc_t<typename GR>;
+    using arc_t = melon::arc_t<GR>;
+
+    const LS & landscape = instance_case.landscape();
+    const GR & graph = landscape.graph();
 
     auto strong_arcs_map =
         melon::create_vertex_map<tbb::concurrent_vector<arc_t>>(graph);
     auto useless_arcs_map =
         melon::create_vertex_map<tbb::concurrent_vector<arc_t>>(graph);
 
-    const LS & landscape = instance_case.landscape();
-    const GR & graph = landscape.graph();
     auto arcs_range = graph.arcs();
-    const PM & upper_length = landscape.probability_map();
-    PM lower_length = upper_length;
+    const PM & upper_length_map = landscape.probability_map();
+    PM lower_length_map = upper_length_map;
     const auto & arc_options_map = instance_case.arc_options_map();
     for(const arc_t & a : arcs_range) {
         for(const auto & [improved_prob, option] : arc_options_map[a]) {
-            lower_length[a] = std::max(lower_length[a], improved_prob);
+            lower_length_map[a] = std::max(lower_length_map[a], improved_prob);
         }
     }
 
@@ -67,7 +68,7 @@ auto compute_strong_and_useless_arcs(const I & instance_case,
                 arcs_block) {
             melon::strong_fiber<GR, PM, PM,
                                 detail::strong_arc_default_traits<GR, double>>
-                algo(graph, lower_lengths, upper_lengths);
+                algo(graph, lower_length_map, upper_length_map);
             for(const auto & uv : arcs_block) {
                 algo.reset().add_strong_arc_source(uv);
                 for(const auto & [u, u_dist] : algo) {
@@ -87,9 +88,9 @@ auto compute_strong_and_useless_arcs(const I & instance_case,
     auto compute_useless_arcs =
         [&](const tbb::blocked_range<decltype(arcs_range.begin())> &
                 arcs_block) {
-            melon::strong_fiber<GR, PM, LM,
+            melon::strong_fiber<GR, PM, PM,
                                 detail::useless_arc_default_traits<GR, double>>
-                algo(graph, lower_lengths, upper_lengths);
+                algo(graph, lower_length_map, upper_length_map);
             for(const auto & uv : arcs_block) {
                 algo.reset().add_useless_arc_source(uv);
                 for(const auto & [u, u_dist] : algo) {

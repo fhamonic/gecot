@@ -1,6 +1,7 @@
 #ifndef LANDSCAPE_OPT_COMPUTE_CONTRACTED_GENERALIZED_FLOW_GRAPH_HPP
 #define LANDSCAPE_OPT_COMPUTE_CONTRACTED_GENERALIZED_FLOW_GRAPH_HPP
 
+#include "melon/algorithm/breadth_first_search.hpp"
 #include "melon/concepts/graph.hpp"
 #include "melon/mutable_digraph.hpp"
 
@@ -36,8 +37,10 @@ auto compute_contracted_generalized_flow_graph(const I & instance_case,
     auto probability_map = instance_case.landscape().probability_map();
     auto arc_options_map = instance_case.landscape().arc_options_map();
 
+    // remove useless arcs
     for(const auto & a : useless_arcs_map) graph.remove_arc(a);
 
+    // contract strong arcs
     std::vector<melon::arc_t<melon::mutable_digraph>> in_arcs_tmp;
     for(const auto & uv : strong_arcs_map) {
         if(!arc_options_map[uv].empty()) continue;
@@ -60,6 +63,22 @@ auto compute_contracted_generalized_flow_graph(const I & instance_case,
         for(const auto & [quality_gain, option] : vertex_options_map[u])
             vertex_options_map[v].emplace_back(uv_prob * quality_gain, option);
         graph.remove_vertex(u);
+    }
+
+    // remove vertices that cannot be traversed by flow
+    melon::breadth_first_search bfs(graph);
+    for(const auto & v : graph.vertices()) {
+        if(quality_map[v] == 0 && vertex_options_map[v].empty()) continue;
+        if(bfs.reached()) continue;
+        bfs.add_source(v).run();
+    }
+    std::vector<melon::vertex_t<melon::mutable_digraph>> vertices_to_delete_tmp;
+    std::ranges::copy(std::ranges::views::filter(
+                          graph.vertices(),
+                          [&bfs](const auto & v) { return bfs.reached(v); }),
+                      std::back_inserter(vertices_to_delete_tmp));
+    for(const auto & v : vertices_to_delete_tmp) {
+        graph.remove_vertex(v);
     }
 
     return std::make_tuple(graph, quality_map, vertex_options_map,

@@ -52,15 +52,9 @@ struct MIP {
 
         const auto F_vars =
             model.add_vars(graph.nb_vertices(),
-                           [](const melon::vertex_t<Graph> v) { return v; });
-        const auto Phi_vars = model.add_vars(
-            graph.nb_vertices() * graph.nb_arcs(),
-            [n = graph.nb_vertices()](const melon::vertex_t<Graph> v,
-                                      const melon::arc_t<Graph> a) {
-                return v * n + a;
-            });
+                           [](const melon::vertex_t<Graph> & v) { return v; });
         const auto X_vars = model.add_vars(
-            instance.options().size(), [](Option i) { return i; },
+            instance.options().size(), [](const Option i) { return i; },
             {.upper_bound = 1, .type = MIP::var_category::binary});
 
         model.add_obj(xsum(graph.vertices(), F_vars, quality_map));
@@ -72,14 +66,14 @@ struct MIP {
                                      big_M_map[t] * X_vars(option));
                 model.add_obj(quality_gain * F_prime_t_var);
             }
-            const auto Phi_t_var = [&Phi_vars, t](const auto & a) {
-                return Phi_vars(t, a);
-            };
+            const auto Phi_t_vars =
+                model.add_vars(graph.nb_arcs(),
+                               [](const melon::arc_t<Graph> & a) { return a; });
             for(const auto & u : graph.vertices()) {
                 if(u == t) continue;
                 model.add_constraint(
-                    xsum(graph.out_arcs(u), Phi_t_var) <=
-                    xsum(graph.in_arcs(u), Phi_t_var, probability_map) +
+                    xsum(graph.out_arcs(u), Phi_t_vars) <=
+                    xsum(graph.in_arcs(u), Phi_t_vars, probability_map) +
                         quality_map[u] +
                         xsum(
                             vertex_options_map[u],
@@ -89,8 +83,8 @@ struct MIP {
                             [](const auto & p) { return p.first; }));
             }
             model.add_constraint(
-                F_vars(t) + xsum(graph.out_arcs(t), Phi_t_var) <=
-                xsum(graph.in_arcs(t), Phi_t_var, probability_map) +
+                F_vars(t) + xsum(graph.out_arcs(t), Phi_t_vars) <=
+                xsum(graph.in_arcs(t), Phi_t_vars, probability_map) +
                     quality_map[t] +
                     xsum(
                         vertex_options_map[t],
@@ -99,9 +93,9 @@ struct MIP {
 
             for(const auto & a : graph.arcs()) {
                 if(!arc_option_map[a].has_value()) continue;
-                model.add_constraint(Phi_t_var(a) <=
-                                     X_vars(arc_option_map[a].value()) *
-                                         big_M_map[graph.source(a)]);
+                model.add_constraint(Phi_t_vars(a) <=
+                                     big_M_map[graph.source(a)] *
+                                         X_vars(arc_option_map[a].value()));
             }
         }
 
@@ -110,7 +104,7 @@ struct MIP {
                 return instance.option_cost(o);
             }) <= budget);
 
-        // std::cout << model << std::endl;
+        if(verbose) std::cout << model << std::endl;
 
         auto solver = model.build();
         solver.set_loglevel(verbose ? 1 : 0);

@@ -30,14 +30,11 @@ auto compute_big_M_map(const GR & graph, const QM & quality_map,
             algo(ReverseGraph(graph), probability_map);
 
         for(auto && s : vertices_subrange) {
-            if(quality_map[s] == 0) continue;
-            double sum = 0.0;
-            algo.reset();
-            algo.add_source(s);
-            for(const auto & [u, prob] : algo) {
-                sum += prob * improved_quality_map[u];
+            big_M_map[s] = 0;
+            algo.reset().add_source(s);
+            for(const auto & [t, t_prob] : algo) {
+                big_M_map[s] += t_prob * improved_quality_map[t];
             }
-            big_M_map[s] = sum;
         }
     };
 

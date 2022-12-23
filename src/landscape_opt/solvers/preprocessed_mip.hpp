@@ -15,8 +15,8 @@
 #include "helper.hpp"
 #include "indices/eca.hpp"
 #include "indices/parallel_eca.hpp"
-#include "utils/chrono.hpp"
 #include "preprocessing/compute_strong_and_useless_arcs.hpp"
+#include "utils/chrono.hpp"
 
 namespace fhamonic {
 namespace landscape_opt {
@@ -50,7 +50,8 @@ struct preprocessed_MIP {
 
         const OriginalGraph & original_graph = instance.landscape().graph();
         const auto & original_quality_map = instance.landscape().quality_map();
-        const auto & original_vertex_options_map = instance.vertex_options_map();
+        const auto & original_vertex_options_map =
+            instance.vertex_options_map();
 
         const auto F_vars = model.add_vars(
             original_graph.nb_vertices(),
@@ -65,8 +66,8 @@ struct preprocessed_MIP {
         for(const auto & original_t : original_graph.vertices()) {
             const auto [graph, quality_map, vertex_options_map, probability_map,
                         arc_option_map, t] =
-                compute_contracted_generalized_flow_graph(instance, strong_arcs_map,
-                                                  useless_arcs_map, original_t);
+                compute_contracted_generalized_flow_graph(
+                    instance, strong_arcs_map, useless_arcs_map, original_t);
             const auto big_M_map =
                 compute_big_M_map(graph, quality_map, vertex_options_map,
                                   probability_map, parallel);
@@ -79,13 +80,14 @@ struct preprocessed_MIP {
                                      big_M_map[t] * X_vars(option));
                 model.add_obj(quality_gain * F_prime_t_var);
             }
-            const auto Phi_t_var = model.add_vars(
-                graph.nb_arcs(), [](const auto & a) { return a; });
+            const auto Phi_t_vars =
+                model.add_vars(graph.nb_arcs(),
+                               [](const melon::arc_t<Graph> & a) { return a; });
             for(const auto & u : graph.vertices()) {
                 if(u == t) continue;
                 model.add_constraint(
-                    xsum(graph.out_arcs(u), Phi_t_var) <=
-                    xsum(graph.in_arcs(u), Phi_t_var, probability_map) +
+                    xsum(graph.out_arcs(u), Phi_t_vars) <=
+                    xsum(graph.in_arcs(u), Phi_t_vars, probability_map) +
                         quality_map[u] +
                         xsum(
                             vertex_options_map[u],
@@ -95,8 +97,8 @@ struct preprocessed_MIP {
                             [](const auto & p) { return p.first; }));
             }
             model.add_constraint(
-                F_vars(t) + xsum(graph.out_arcs(t), Phi_t_var) <=
-                xsum(graph.in_arcs(t), Phi_t_var, probability_map) +
+                F_vars(t) + xsum(graph.out_arcs(t), Phi_t_vars) <=
+                xsum(graph.in_arcs(t), Phi_t_vars, probability_map) +
                     quality_map[t] +
                     xsum(
                         vertex_options_map[t],
@@ -105,7 +107,7 @@ struct preprocessed_MIP {
 
             for(const auto & a : graph.arcs()) {
                 if(!arc_option_map[a].has_value()) continue;
-                model.add_constraint(Phi_t_var(a) <=
+                model.add_constraint(Phi_t_vars(a) <=
                                      X_vars(arc_option_map[a].value()) *
                                          big_M_map[graph.source(a)]);
             }

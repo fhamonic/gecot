@@ -57,12 +57,12 @@ struct MIP {
                                      [](const Option i) { return i; },
                                      {.type = Model::ColType::BINARY});
 
-        model.add_obj(xsum(graph.vertices(), F_vars, quality));
-        for(auto && t : graph.vertices()) {
+        model.add_obj(xsum(melon::vertices(graph), F_vars, quality));
+        for(auto && t : melon::vertices(graph)) {
             auto Phi_t_var = [&Phi_vars, t](melon::arc_t<Graph> a) {
                 return Phi_vars(t, a);
             };
-            for(auto && u : graph.vertices()) {
+            for(auto && u : melon::vertices(graph)) {
                 if(u == t) continue;
                 model.add_constraint(
                     xsum(graph.out_arcs(u), Phi_t_var) -

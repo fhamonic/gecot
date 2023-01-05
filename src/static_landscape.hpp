@@ -10,8 +10,8 @@
 
 #include <parallel_hashmap/phmap.h>
 
-#include "melon/concepts/graph.hpp"
-#include "melon/static_digraph.hpp"
+#include "melon/graph.hpp"
+#include "melon/container/static_digraph.hpp"
 
 namespace fhamonic {
 

@@ -11,7 +11,7 @@
 #include "mippp/operators.hpp"
 #include "mippp/xsum.hpp"
 
-#include "melon/concepts/graph.hpp"
+#include "melon/graph.hpp"
 
 #include "concepts/instance.hpp"
 #include "helper.hpp"
@@ -57,8 +57,8 @@ struct MIP {
             instance.options().size(), [](const Option i) { return i; },
             {.upper_bound = 1, .type = MIP::var_category::binary});
 
-        model.add_obj(xsum(graph.vertices(), F_vars, quality_map));
-        for(const auto & t : graph.vertices()) {
+        model.add_obj(xsum(melon::vertices(graph), F_vars, quality_map));
+        for(const auto & t : melon::vertices(graph)) {
             for(const auto & [quality_gain, option] : vertex_options_map[t]) {
                 const auto F_prime_t_var = model.add_var();
                 model.add_constraint(F_prime_t_var <= F_vars(t));
@@ -69,7 +69,7 @@ struct MIP {
             const auto Phi_t_vars =
                 model.add_vars(graph.nb_arcs(),
                                [](const melon::arc_t<Graph> & a) { return a; });
-            for(const auto & u : graph.vertices()) {
+            for(const auto & u : melon::vertices(graph)) {
                 if(u == t) continue;
                 model.add_constraint(
                     xsum(graph.out_arcs(u), Phi_t_vars) <=
@@ -91,10 +91,10 @@ struct MIP {
                         [&X_vars](const auto & p) { return X_vars(p.second); },
                         [](const auto & p) { return p.first; }));
 
-            for(const auto & a : graph.arcs()) {
+            for(const auto & a : melon::arcs(graph)) {
                 if(!arc_option_map[a].has_value()) continue;
                 model.add_constraint(Phi_t_vars(a) <=
-                                     big_M_map[graph.source(a)] *
+                                     big_M_map[melon::arc_source(graph,a)] *
                                          X_vars(arc_option_map[a].value()));
             }
         }

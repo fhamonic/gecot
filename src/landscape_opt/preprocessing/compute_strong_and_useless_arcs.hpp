@@ -53,7 +53,7 @@ auto compute_strong_and_useless_arcs(const I & instance_case,
     auto useless_arcs_map =
         melon::create_vertex_map<tbb::concurrent_vector<arc_t>>(graph);
 
-    auto arcs_range = graph.arcs();
+    auto arcs_range = melon::arcs(graph);
     const PM & upper_length_map = landscape.probability_map();
     PM lower_length_map = upper_length_map;
     const auto & arc_options_map = instance_case.arc_options_map();

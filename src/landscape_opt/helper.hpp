@@ -8,9 +8,9 @@
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 
-#include "melon/concepts/graph.hpp"
-#include "melon/static_digraph.hpp"
-#include "melon/static_digraph_builder.hpp"
+#include "melon/container/static_digraph.hpp"
+#include "melon/graph.hpp"
+#include "melon/utility/static_digraph_builder.hpp"
 
 #include "concepts/instance.hpp"
 #include "indices/eca.hpp"

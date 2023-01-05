@@ -1,9 +1,9 @@
 #ifndef LANDSCAPE_OPT_COMPUTE_BIG_M_MAP_HPP
 #define LANDSCAPE_OPT_COMPUTE_BIG_M_MAP_HPP
 
-#include "melon/adaptor/reverse.hpp"
 #include "melon/algorithm/dijkstra.hpp"
-#include "melon/concepts/graph.hpp"
+#include "melon/graph.hpp"
+#include "melon/views/reverse.hpp"
 
 #include "concepts/instance_case.hpp"
 #include "indices/parallel_eca.hpp"
@@ -24,10 +24,13 @@ auto compute_big_M_map(const GR & graph, const QM & quality_map,
     }
 
     auto compute_big_Ms = [&](auto && vertices_subrange) {
-        using ReverseGraph = melon::adaptors::reverse<GR>;
-        melon::dijkstra<ReverseGraph, PM,
-                        detail::parallel_eca_dijkstra_traits<ReverseGraph, PM>>
-            algo(ReverseGraph(graph), probability_map);
+        using ReverseGraph = melon::views::reverse<GR>;
+        // melon::dijkstra<ReverseGraph, PM,
+        //                 detail::parallel_eca_dijkstra_traits<ReverseGraph, PM>>
+        //     algo(ReverseGraph(graph), probability_map);
+        melon::dijkstra<GR, PM,
+                        detail::parallel_eca_dijkstra_traits<GR, PM>>
+            algo(graph, probability_map);
 
         for(auto && s : vertices_subrange) {
             big_M_map[s] = 0;
@@ -38,14 +41,26 @@ auto compute_big_M_map(const GR & graph, const QM & quality_map,
         }
     };
 
-    auto vertices_range = melon::vertices(graph);
-    if(parallel) {
-        tbb::parallel_for(
-            tbb::blocked_range(vertices_range.begin(), vertices_range.end()),
-            compute_big_Ms);
+    auto do_compute = [&](auto && vertices_range) {
+        if(parallel) {
+            tbb::parallel_for(tbb::blocked_range(vertices_range.begin(),
+                                                 vertices_range.end()),
+                              compute_big_Ms);
+        } else {
+            compute_big_Ms(tbb::blocked_range(vertices_range.begin(),
+                                              vertices_range.end()));
+        }
+    };
+
+    if constexpr(std::ranges::random_access_range<
+                     melon::vertices_range_t<GR>>) {
+        do_compute(std::views::common(melon::vertices(graph)));
+
     } else {
-        compute_big_Ms(
-            tbb::blocked_range(vertices_range.begin(), vertices_range.end()));
+        auto vertices_range = std::views::common(melon::vertices(graph));
+        std::vector<melon::vertex_t<GR>> vertices_vector(vertices_range.begin(),
+                                                         vertices_range.end());
+        do_compute(vertices_vector);
     }
     return big_M_map;
 }

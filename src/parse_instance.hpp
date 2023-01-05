@@ -10,7 +10,7 @@
 #include <fast-cpp-csv-parser/csv.h>
 #include <nlohmann/json.hpp>
 
-#include "melon/static_digraph_builder.hpp"
+#include "melon/utility/static_digraph_builder.hpp"
 
 #include "instance.hpp"
 
@@ -150,7 +150,7 @@ StaticLandscape parse_landscape(T json_object,
 
     auto [graph, arc_probability_map, arc_names] = builder.build();
 
-    for(auto && a : graph.arcs()) {
+    for(auto && a : melon::arcs(graph)) {
         name_to_arc_map[arc_names[a]] = a;
     }
 
@@ -162,14 +162,15 @@ StaticLandscape parse_landscape(T json_object,
 template <typename T, typename I>
 std::vector<std::vector<std::pair<double, Instance::Option>>>
 parse_vertex_options_if_exists(T json_object, std::filesystem::path parent_path,
-                             const I & instance,
-                             const StaticLandscape & landscape) {
-    std::vector<std::vector<std::pair<double, Instance::Option>>> vertex_options(
-        landscape.graph().nb_vertices());
+                               const I & instance,
+                               const StaticLandscape & landscape) {
+    std::vector<std::vector<std::pair<double, Instance::Option>>>
+        vertex_options(landscape.graph().nb_vertices());
 
     if(json_object.contains("vertex_options")) {
         auto vertex_options_json = json_object["vertex_options"];
-        std::filesystem::path vertex_options_csv_path = vertex_options_json["file"];
+        std::filesystem::path vertex_options_csv_path =
+            vertex_options_json["file"];
         if(vertex_options_csv_path.is_relative())
             vertex_options_csv_path = (parent_path / vertex_options_csv_path);
         io::CSVReader<3> vertex_options_csv(vertex_options_csv_path);
@@ -180,9 +181,11 @@ parse_vertex_options_if_exists(T json_object, std::filesystem::path parent_path,
         try {
             std::string option_id, vertex_id;
             double quality_gain;
-            while(vertex_options_csv.read_row(option_id, vertex_id, quality_gain)) {
-                vertex_options[landscape.vertex_from_name(vertex_id)].emplace_back(
-                    quality_gain, instance.option_from_name(option_id));
+            while(vertex_options_csv.read_row(option_id, vertex_id,
+                                              quality_gain)) {
+                vertex_options[landscape.vertex_from_name(vertex_id)]
+                    .emplace_back(quality_gain,
+                                  instance.option_from_name(option_id));
                 ++line_no;
             }
         } catch(const std::invalid_argument & e) {
@@ -277,9 +280,11 @@ parse_arc_options_if_exists(T json_object, std::filesystem::path parent_path,
 //         auto vertices_json = case_json["vertices"];
 //         std::filesystem::path vertices_csv_path = vertices_json["file"];
 //         if(vertices_csv_path.is_relative())
-//             vertices_csv_path = (instance_path.parent_path() / vertices_csv_path);
+//             vertices_csv_path = (instance_path.parent_path() /
+//             vertices_csv_path);
 //         io::CSVReader<2> vertices_csv(vertices_csv_path);
-//         detail::configure_csv_reader(vertices_csv, vertices_json, "vertex_id",
+//         detail::configure_csv_reader(vertices_csv, vertices_json,
+//         "vertex_id",
 //                                      "vertex_quality");
 
 //         std::string vertex_id;
@@ -336,7 +341,7 @@ Instance parse_instance(std::filesystem::path instance_path) {
 
     instance.set_vertex_options(
         parse_vertex_options_if_exists(case_json, instance_path.parent_path(),
-                                     instance, instance.landscape()));
+                                       instance, instance.landscape()));
 
     instance.set_arc_options(
         parse_arc_options_if_exists(case_json, instance_path.parent_path(),

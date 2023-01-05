@@ -5,7 +5,7 @@
 
 #include <tbb/concurrent_vector.h>
 
-#include "melon/concepts/graph.hpp"
+#include "melon/graph.hpp"
 #include "melon/algorithm/strong_fiber.hpp"
 
 #include "helper.hpp"
@@ -29,7 +29,7 @@ auto compute_constrained_strong_and_useless_arcs(const I & instance_case,
 
     const LS & landscape = instance_case.landscape();
     const GR & graph = landscape.graph();
-    auto arcs_range = graph.arcs();
+    auto arcs_range = melon::arcs(graph);
     const PM & upper_length = landscape.probability_map();
     PM lower_length = upper_length;
     const auto & arc_options_map = instance_case.arc_options_map();

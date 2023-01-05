@@ -11,7 +11,7 @@
 #include "mippp/operators.hpp"
 #include "mippp/xsum.hpp"
 
-#include "melon/concepts/graph.hpp"
+#include "melon/graph.hpp"
 
 #include "concepts/instance.hpp"
 #include "helper.hpp"
@@ -60,15 +60,15 @@ struct preprocessed_MIP {
             original_graph.nb_vertices(),
             [](const melon::vertex_t<OriginalGraph> v) { return v; });
 
-        model.add_obj(
-            xsum(original_graph.vertices(), F_vars, original_quality_map));
+        model.add_obj(xsum(melon::vertices(original_graph), F_vars,
+                           original_quality_map));
 
         const auto [strong_arcs_map, useless_arcs_map] =
             compute_strong_and_useless_arcs(instance, parallel);
 
-        for(const auto & original_t : original_graph.vertices()) {
-            const auto [graph, quality_map, vertex_options_map, probability_map,
-                        arc_option_map, t] =
+        for(const auto & original_t : melon::vertices(original_graph)) {
+            const auto [graph, quality_map, vertex_options_map, arc_no,
+                        probability_map, arc_option_map, t] =
                 compute_contracted_generalized_flow_graph(
                     instance, strong_arcs_map, useless_arcs_map, original_t);
             using Graph = std::decay_t<decltype(graph)>;
@@ -84,10 +84,10 @@ struct preprocessed_MIP {
                                      big_M_map[t] * X_vars(option));
                 model.add_obj(quality_gain * F_prime_t_var);
             }
-            const auto Phi_t_vars =
-                model.add_vars(graph.nb_arcs(),
-                               [](const melon::arc_t<Graph> & a) { return a; });
-            for(const auto & u : graph.vertices()) {
+            const auto Phi_t_vars = model.add_vars(
+                graph.nb_arcs(),
+                [&arc_no](const melon::arc_t<Graph> & a) { return arc_no[a]; });
+            for(const auto & u : melon::vertices(graph)) {
                 if(u == t) continue;
                 model.add_constraint(
                     xsum(graph.out_arcs(u), Phi_t_vars) <=
@@ -101,7 +101,7 @@ struct preprocessed_MIP {
                             [](const auto & p) { return p.first; }));
             }
             model.add_constraint(
-                F_vars(t) + xsum(graph.out_arcs(t), Phi_t_vars) <=
+                F_vars(original_t) + xsum(graph.out_arcs(t), Phi_t_vars) <=
                 xsum(graph.in_arcs(t), Phi_t_vars, probability_map) +
                     quality_map[t] +
                     xsum(
@@ -109,15 +109,16 @@ struct preprocessed_MIP {
                         [&X_vars](const auto & p) { return X_vars(p.second); },
                         [](const auto & p) { return p.first; }));
 
-            for(const auto & a : graph.arcs()) {
+            for(const auto & a : melon::arcs(graph)) {
                 if(!arc_option_map[a].has_value()) continue;
-                model.add_constraint(Phi_t_vars(a) <=
-                                     X_vars(arc_option_map[a].value()) *
-                                         big_M_map[graph.source(a)]);
+                model.add_constraint(
+                    Phi_t_vars(a) <=
+                    X_vars(arc_option_map[a].value()) *
+                        big_M_map[melon::arc_source(graph, a)]);
             }
         }
 
-        // std::cout << model << std::endl;
+        std::cout << model << std::endl;
 
         auto solver = model.build();
         solver.set_loglevel(verbose ? 1 : 0);

@@ -7,7 +7,7 @@
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_reduce.h>
 
-#include "melon/all.hpp"
+#include "melon/algorithm/dijkstra.hpp"
 
 #include "concepts/landscape.hpp"
 

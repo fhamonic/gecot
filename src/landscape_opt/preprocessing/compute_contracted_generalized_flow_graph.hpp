@@ -43,8 +43,6 @@ auto compute_contracted_generalized_flow_graph(const I & instance_case,
         original_to_new_arc_map[a] = new_arc;
         added_arcs.emplace_back(new_arc, original_probability_map[a],
                                 std::nullopt);
-    }
-    for(auto && a : melon::arcs(original_graph)) {
         for(auto && [enhanced_prob, option] :
             instance_case.arc_options_map()[a]) {
             added_arcs.emplace_back(
@@ -109,9 +107,8 @@ auto compute_contracted_generalized_flow_graph(const I & instance_case,
         arc_no_map[a] = arc_no++;
     }
 
-    return std::make_tuple(graph, quality_map,
-                           vertex_options_map, arc_no_map, probability_map, arc_option_map,
-                           original_t);
+    return std::make_tuple(graph, quality_map, vertex_options_map, arc_no_map,
+                           probability_map, arc_option_map, original_t);
 }
 
 }  // namespace landscape_opt

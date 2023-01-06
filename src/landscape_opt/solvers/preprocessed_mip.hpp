@@ -67,7 +67,7 @@ struct preprocessed_MIP {
             compute_strong_and_useless_arcs(instance, parallel);
 
         for(const auto & original_t : melon::vertices(original_graph)) {
-            const auto [graph, quality_map, vertex_options_map, arc_no,
+            const auto [graph, quality_map, vertex_options_map, arc_no_map,
                         probability_map, arc_option_map, t] =
                 compute_contracted_generalized_flow_graph(
                     instance, strong_arcs_map, useless_arcs_map, original_t);
@@ -85,8 +85,9 @@ struct preprocessed_MIP {
                 model.add_obj(quality_gain * F_prime_t_var);
             }
             const auto Phi_t_vars = model.add_vars(
-                graph.nb_arcs(),
-                [&arc_no](const melon::arc_t<Graph> & a) { return arc_no[a]; });
+                graph.nb_arcs(), [&arc_no_map](const melon::arc_t<Graph> & a) {
+                    return arc_no_map[a];
+                });
             for(const auto & u : melon::vertices(graph)) {
                 if(u == t) continue;
                 model.add_constraint(
@@ -118,7 +119,7 @@ struct preprocessed_MIP {
             }
         }
 
-        std::cout << model << std::endl;
+        if(verbose) std::cout << model << std::endl;
 
         auto solver = model.build();
         solver.set_loglevel(verbose ? 1 : 0);

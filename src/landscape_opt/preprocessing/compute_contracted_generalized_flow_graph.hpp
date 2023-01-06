@@ -19,26 +19,30 @@ auto compute_contracted_generalized_flow_graph(const I & instance_case,
                                                const auto & useless_arcs_map,
                                                const auto & original_t) {
     using Landscape = typename I::Landscape;
-    using Graph = typename Landscape::Graph;
+    using OrigGraph = typename Landscape::Graph;
     using Option = typename I::Option;
+    using Graph = melon::mutable_digraph;
 
-    const Graph & original_graph = instance_case.landscape().graph();
-    melon::mutable_digraph graph;
+    const OrigGraph & original_graph = instance_case.landscape().graph();
+    Graph graph;
     for([[maybe_unused]] const auto & v : melon::vertices(original_graph)) {
         std::ignore = graph.create_vertex();
     }
     auto quality_map = instance_case.landscape().quality_map();
     auto vertex_options_map = instance_case.vertex_options_map();
 
+    auto original_to_new_arc_map =
+        melon::create_arc_map<melon::arc_t<Graph>>(original_graph);
     std::vector<std::tuple<melon::arc_t<Graph>, double, std::optional<Option>>>
         added_arcs;
     const auto & original_probability_map =
         instance_case.landscape().probability_map();
     for(const auto & a : melon::arcs(original_graph)) {
-        added_arcs.emplace_back(
-            graph.create_arc(melon::arc_source(original_graph, a),
-                             melon::arc_target(original_graph, a)),
-            original_probability_map[a], std::nullopt);
+        auto new_arc = graph.create_arc(melon::arc_source(original_graph, a),
+                                        melon::arc_target(original_graph, a));
+        original_to_new_arc_map[a] = new_arc;
+        added_arcs.emplace_back(new_arc, original_probability_map[a],
+                                std::nullopt);
     }
     for(auto && a : melon::arcs(original_graph)) {
         for(auto && [enhanced_prob, option] :
@@ -57,12 +61,14 @@ auto compute_contracted_generalized_flow_graph(const I & instance_case,
     }
 
     // remove useless arcs
-    for(const auto & a : useless_arcs_map[original_t]) graph.remove_arc(a);
+    for(const auto & a : useless_arcs_map[original_t])
+        graph.remove_arc(original_to_new_arc_map[a]);
 
     // contract strong arcs
     std::vector<melon::arc_t<melon::mutable_digraph>> in_arcs_tmp;
-    for(const auto & uv : strong_arcs_map[original_t]) {
-        if(!instance_case.arc_options_map()[uv].empty()) continue;
+    for(const auto & original_uv : strong_arcs_map[original_t]) {
+        if(!instance_case.arc_options_map()[original_uv].empty()) continue;
+        auto uv = original_to_new_arc_map[original_uv];
         if(!graph.is_valid_arc(uv)) continue;
         const auto u = melon::arc_source(graph, uv);
         const auto v = melon::arc_target(graph, uv);
@@ -88,24 +94,24 @@ auto compute_contracted_generalized_flow_graph(const I & instance_case,
         if(bfs.reached(v)) continue;
         bfs.add_source(v).run();
     }
-    std::vector<melon::vertex_t<melon::mutable_digraph>>
-    vertices_to_delete_tmp; std::ranges::copy(std::ranges::views::filter(
+    std::vector<melon::vertex_t<melon::mutable_digraph>> vertices_to_delete_tmp;
+    std::ranges::copy(std::ranges::views::filter(
                           melon::vertices(graph),
-                          [&bfs](const auto & v) { return !bfs.reached(v);
-                          }),
+                          [&bfs](const auto & v) { return !bfs.reached(v); }),
                       std::back_inserter(vertices_to_delete_tmp));
     for(const auto & v : vertices_to_delete_tmp) {
         graph.remove_vertex(v);
     }
 
-    auto arc_no = melon::create_arc_map<std::size_t>(graph);
-    std::size_t cpt = 0;
+    auto arc_no_map = melon::create_arc_map<std::size_t>(graph);
+    std::size_t arc_no = 0;
     for(auto && a : melon::arcs(graph)) {
-        arc_no[a] = cpt++;
+        arc_no_map[a] = arc_no++;
     }
 
-    return std::make_tuple(graph, quality_map, vertex_options_map,
-                           arc_no, probability_map, arc_option_map, original_t);
+    return std::make_tuple(graph, quality_map,
+                           vertex_options_map, arc_no_map, probability_map, arc_option_map,
+                           original_t);
 }
 
 }  // namespace landscape_opt

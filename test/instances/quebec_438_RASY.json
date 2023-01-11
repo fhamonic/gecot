@@ -1,0 +1,33 @@
+{
+    "options": {
+        "file": "Quebec_438_RASY/options.csv"
+    },
+    "case": {
+        "name": "",
+        "vertices": {
+            "file": "Quebec_438_RASY/vertices.csv",
+            "columns": {
+                "id": "vertex_id"
+            }
+        },
+        "arcs": {
+            "file": "Quebec_438_RASY/arcs.csv",
+            "columns": {
+                "id": "arc_id",
+                "probability": "prob"
+            }
+        },
+        "vertex_options": {
+            "file": "Quebec_438_RASY/vertices_options.csv",
+            "columns": {
+                "node_id": "vertex_id"
+            }
+        },
+        "arc_options": {
+            "file": "Quebec_438_RASY/arcs_options.csv",
+            "columns": {
+                "improved_probability": "restored_prob"
+            }
+        }
+    }
+}

@@ -94,7 +94,7 @@ struct MIP {
             for(const auto & a : melon::arcs(graph)) {
                 if(!arc_option_map[a].has_value()) continue;
                 model.add_constraint(Phi_t_vars(a) <=
-                                     big_M_map[melon::arc_source(graph,a)] *
+                                     big_M_map[melon::arc_source(graph, a)] *
                                          X_vars(arc_option_map[a].value()));
             }
         }

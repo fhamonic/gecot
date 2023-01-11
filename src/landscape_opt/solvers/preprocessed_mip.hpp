@@ -130,7 +130,7 @@ struct preprocessed_MIP {
         for(const auto & i : instance.options()) {
             solution[i] = solver_solution[X_vars(i).id()];
         }
-
+        
         return solution;
     }
 };

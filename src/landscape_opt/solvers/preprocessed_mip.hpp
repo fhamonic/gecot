@@ -101,6 +101,9 @@ struct preprocessed_MIP {
                             },
                             [](const auto & p) { return p.first; }));
             }
+
+            std::cout << "Il y a des arcs sortant de t ? : " << std::ranges::distance(graph.out_arcs(t)) << std::endl;
+
             model.add_constraint(
                 F_vars(original_t) + xsum(graph.out_arcs(t), Phi_t_vars) <=
                 xsum(graph.in_arcs(t), Phi_t_vars, probability_map) +

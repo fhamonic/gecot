@@ -71,8 +71,8 @@ auto compute_strong_and_useless_arcs(const I & instance_case,
                 algo(graph, lower_length_map, upper_length_map);
             for(const auto & uv : arcs_block) {
                 algo.reset().add_strong_arc_source(uv);
-                for(const auto & [u, u_dist] : algo) {
-                    strong_arcs_map[u].push_back(uv);
+                for(const auto & [w, w_dist] : algo) {
+                    strong_arcs_map[w].push_back(uv);
                 }
             }
         };
@@ -92,9 +92,10 @@ auto compute_strong_and_useless_arcs(const I & instance_case,
                                 detail::useless_arc_default_traits<GR, double>>
                 algo(graph, lower_length_map, upper_length_map);
             for(const auto & uv : arcs_block) {
+                useless_arcs_map[graph.arc_source(uv)].push_back(uv);
                 algo.reset().add_useless_arc_source(uv);
-                for(const auto & [u, u_dist] : algo) {
-                    useless_arcs_map[u].push_back(uv);
+                for(const auto & [w, w_dist] : algo) {
+                    useless_arcs_map[w].push_back(uv);
                 }
             }
         };

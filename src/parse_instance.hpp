@@ -144,6 +144,9 @@ StaticLandscape parse_landscape(T json_object,
     std::string arc_id, from, to;
     double arc_probability;
     while(arcs_csv.read_row(arc_id, from, to, arc_probability)) {
+        if(arc_probability < 0 || arc_probability > 1)
+            throw std::invalid_argument('\'' + std::to_string(arc_probability) +
+                                        "' is not a valid probability");
         builder.add_arc(name_to_vertex_map[from], name_to_vertex_map[to],
                         arc_probability, arc_id);
     }

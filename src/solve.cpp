@@ -13,8 +13,6 @@ namespace po = boost::program_options;
 namespace logging = boost::log;
 
 // #include "landscape_opt/solvers/mip_xue.hpp"
-// #include "landscape_opt/solvers/mip_eca.hpp"
-// #include "landscape_opt/solvers/mip_eca_preprocessed.hpp"
 // #include "landscape_opt/solvers/randomized_rounding.hpp"
 
 #include "landscape_opt/helper.hpp"

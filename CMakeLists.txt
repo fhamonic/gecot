@@ -42,7 +42,7 @@ find_package(range-v3 REQUIRED)
 
 # ################### LIB target ####################
 add_library(landscape_opt INTERFACE)
-target_include_directories(landscape_opt INTERFACE src/landscape_opt)
+target_include_directories(landscape_opt INTERFACE ${PROJECT_SOURCE_DIR}/include)
 
 target_link_libraries(landscape_opt INTERFACE TBB::tbb)
 target_link_libraries(landscape_opt INTERFACE Boost::Boost)
@@ -51,23 +51,10 @@ target_link_libraries(landscape_opt INTERFACE range-v3::range-v3)
 
 target_link_libraries(landscape_opt INTERFACE melon)
 target_link_libraries(landscape_opt INTERFACE mippp)
-target_compile_definitions(landscape_opt INTERFACE MIPPP_PREFERED_SOLVER=MIPPP_COIN)
-
-# # ################## TEST target ####################
-# # enable_testing()
-
-# # add_executable(test_test test/test.cpp)
-# # target_include_directories(test_test PUBLIC include)
-# # target_link_libraries(test_test CONAN_PKG::gtest)
-# # target_link_libraries(test_test landscape_opt)
-
-# # include(GoogleTest)
-# # gtest_discover_tests(test_test)
+target_compile_definitions(landscape_opt INTERFACE MIPPP_PREFERED_SOLVER=MIPPP_GUROBI)
 
 # # ################## EXEC target ####################
-
 add_executable(lscp_solve src/solve.cpp)
-target_include_directories(lscp_solve PUBLIC src include)
 target_link_libraries(lscp_solve PUBLIC landscape_opt)
 target_link_libraries(lscp_solve PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser)
 target_link_libraries(lscp_solve PUBLIC nlohmann_json::nlohmann_json)
@@ -77,7 +64,6 @@ target_compile_options(lscp_solve PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 
 
 add_executable(lscp_rank src/rank.cpp)
-target_include_directories(lscp_rank PUBLIC src include)
 target_link_libraries(lscp_rank PUBLIC landscape_opt)
 target_link_libraries(lscp_rank PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser)
 target_link_libraries(lscp_rank PUBLIC nlohmann_json::nlohmann_json)
@@ -85,3 +71,10 @@ target_link_libraries(lscp_rank PUBLIC phmap::phmap)
 
 target_compile_options(lscp_rank PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 
+# ################### TESTS ######################
+if(ENABLE_TESTING)
+  enable_testing()
+  message("Building Tests.")
+  set_project_warnings(landscape_opt)
+  add_subdirectory(test)
+endif()

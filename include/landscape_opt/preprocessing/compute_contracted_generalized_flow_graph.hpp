@@ -50,7 +50,14 @@ auto compute_contracted_generalized_flow_graph(const I & instance_case,
         added_arcs;
     const auto & original_probability_map =
         instance_case.landscape().probability_map();
+
+    // trasnform the useless arcs map
+    auto arc_uselessness_map = melon::create_arc_map<bool>(original_graph, false);
+    for(const auto & a : useless_arcs_map[original_t])
+        arc_uselessness_map[a] = true;
+
     for(const auto & a : melon::arcs(original_graph)) {
+        if(arc_uselessness_map[a]) continue; // filter the useless arcs
         auto new_arc_source =
             original_to_new_vertex_map[melon::arc_source(original_graph, a)];
         auto new_arc_target =
@@ -72,10 +79,6 @@ auto compute_contracted_generalized_flow_graph(const I & instance_case,
         probability_map[a] = prob;
         arc_option_map[a] = option;
     }
-
-    // remove useless arcs
-    for(const auto & a : useless_arcs_map[original_t])
-        graph.remove_arc(original_to_new_arc_map[a]);
 
     // contract strong arcs
     std::vector<melon::arc_t<melon::mutable_digraph>> in_arcs_tmp;
@@ -115,6 +118,7 @@ auto compute_contracted_generalized_flow_graph(const I & instance_case,
     for(const auto & v : vertices_to_delete_tmp) {
         graph.remove_vertex(v);
     }
+
 
     auto arc_no_map = melon::create_arc_map<std::size_t>(graph);
     std::size_t arc_no = 0;

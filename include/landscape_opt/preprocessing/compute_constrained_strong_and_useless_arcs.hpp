@@ -39,7 +39,8 @@ auto compute_constrained_strong_and_useless_arcs(const I & instance_case,
     const int nb_mus = 5;
     double max_mu = 0;
     for(auto && i : instance_case.options()) {
-        const double arc_cost = instance_case.option_cost(i) / arcOptions[i].size();
+        const double arc_cost =
+            instance_case.option_cost(i) / arcOptions[i].size();
         for(auto && [a, enhanced_prob] : arcOptions[i]) {
             max_mu =
                 std::max(max_mu, std::log(enhanced_prob / upper_length_map[a]) /
@@ -51,14 +52,13 @@ auto compute_constrained_strong_and_useless_arcs(const I & instance_case,
     for(int i = 0; i < nb_mus; ++i) {
         const double mu = max_mu * i / nb_mus;
         modified_lower_length_maps.emplace_back(mu, upper_length_map);
-        auto & modified_lower_length_map =
-            modified_lower_length_maps.back().second;
+        auto & mu_length_map = modified_lower_length_maps.back().second;
         for(auto && i : instance_case.options()) {
             const double modifier = std::exp(
                 -mu * instance_case.option_cost(i) / arcOptions[i].size());
             for(auto && [a, enhanced_prob] : arcOptions[i]) {
-                modified_lower_length_maps[a] =
-                    std::max(mu_lower_length_map[a], modifier * enhanced_prob);
+                mu_length_map[a] =
+                    std::max(mu_length_map[a], modifier * enhanced_prob);
             }
         }
     }
@@ -70,9 +70,13 @@ auto compute_constrained_strong_and_useless_arcs(const I & instance_case,
                                 detail::strong_arc_default_traits<GR, double>>
                 algo(graph, lower_length_map, upper_length_map);
             for(const auto & uv : arcs_block) {
-                algo.reset().add_strong_arc_source(uv);
-                for(const auto & [w, w_dist] : algo) {
-                    strong_arcs_map[w].push_back(uv);
+                for(auto && [mu, mu_length_map] : modified_lower_length_maps) {
+                    algo.reset()
+                        .set_lower_length_map(mu_length_map)
+                        .add_strong_arc_source(uv);
+                    for(const auto & [w, w_dist] : algo) {
+                        strong_arcs_map[w].push_back(uv);
+                    }
                 }
             }
         };
@@ -92,10 +96,14 @@ auto compute_constrained_strong_and_useless_arcs(const I & instance_case,
                                 detail::useless_arc_default_traits<GR, double>>
                 algo(graph, lower_length_map, upper_length_map);
             for(const auto & uv : arcs_block) {
-                useless_arcs_map[graph.arc_source(uv)].push_back(uv);
-                algo.reset().add_useless_arc_source(uv);
-                for(const auto & [w, w_dist] : algo) {
-                    useless_arcs_map[w].push_back(uv);
+                for(auto && [mu, mu_length_map] : modified_lower_length_maps) {
+                    useless_arcs_map[graph.arc_source(uv)].push_back(uv);
+                    algo.reset()
+                        .set_lower_length_map(mu_length_map)
+                        .add_useless_arc_source(uv);
+                    for(const auto & [w, w_dist] : algo) {
+                        useless_arcs_map[w].push_back(uv);
+                    }
                 }
             }
         };

@@ -9,6 +9,7 @@
 
 #include <fast-cpp-csv-parser/csv.h>
 #include <nlohmann/json.hpp>
+#include <nlohmann/json-schema.hpp>
 
 #include "melon/utility/static_digraph_builder.hpp"
 

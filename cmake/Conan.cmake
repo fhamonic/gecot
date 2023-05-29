@@ -22,6 +22,7 @@ macro(run_conan)
   conan_cmake_configure(
     REQUIRES
     nlohmann_json/3.10.5
+    json-schema-validator/2.2.0
     fast-cpp-csv-parser/cci.20200830
     tbb/2020.3
     boost/1.78.0

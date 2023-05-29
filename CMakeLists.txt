@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.12)
 
 project(
-    Landscape_Opt
-    VERSION 1.0
-    DESCRIPTION
-        "Library for handling ecological landscape datas and optimize their connectivity according to the PC indicator .. and more incomming"
-    LANGUAGES CXX)
+  Landscape_Opt
+  VERSION 1.0
+  DESCRIPTION
+    "Library for handling ecological landscape datas and optimize their connectivity according to the PC indicator .. and more incomming"
+  LANGUAGES CXX)
 
 # set(CMAKE_VERBOSE_MAKEFILE ON)
 
@@ -25,8 +25,10 @@ include(Conan)
 run_conan()
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}" ${CMAKE_MODULE_PATH})
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/dependencies/melon" ${CMAKE_MODULE_PATH})
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/dependencies/mippp" ${CMAKE_MODULE_PATH})
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/dependencies/melon"
+                      ${CMAKE_MODULE_PATH})
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/dependencies/mippp"
+                      ${CMAKE_MODULE_PATH})
 
 add_subdirectory(dependencies/melon)
 add_subdirectory(dependencies/mippp)
@@ -34,6 +36,7 @@ add_subdirectory(dependencies/mippp)
 # ################### Packages ####################
 find_package(fast-cpp-csv-parser REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(nlohmann_json_schema_validator REQUIRED)
 find_package(phmap REQUIRED)
 find_package(TBB REQUIRED)
 find_package(Boost REQUIRED COMPONENTS program_options)
@@ -42,7 +45,8 @@ find_package(range-v3 REQUIRED)
 
 # ################### LIB target ####################
 add_library(landscape_opt INTERFACE)
-target_include_directories(landscape_opt INTERFACE ${PROJECT_SOURCE_DIR}/include)
+target_include_directories(landscape_opt
+                           INTERFACE ${PROJECT_SOURCE_DIR}/include)
 
 target_link_libraries(landscape_opt INTERFACE TBB::tbb)
 target_link_libraries(landscape_opt INTERFACE Boost::Boost)
@@ -51,22 +55,25 @@ target_link_libraries(landscape_opt INTERFACE range-v3::range-v3)
 
 target_link_libraries(landscape_opt INTERFACE melon)
 target_link_libraries(landscape_opt INTERFACE mippp)
-target_compile_definitions(landscape_opt INTERFACE MIPPP_PREFERED_SOLVER=MIPPP_GUROBI)
+target_compile_definitions(landscape_opt
+                           INTERFACE MIPPP_PREFERED_SOLVER=MIPPP_GUROBI)
 
-# # ################## EXEC target ####################
+# ################### EXEC target ####################
 add_executable(lscp_solve src/solve.cpp)
 target_link_libraries(lscp_solve PUBLIC landscape_opt)
-target_link_libraries(lscp_solve PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser)
+target_link_libraries(lscp_solve
+                      PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser)
 target_link_libraries(lscp_solve PUBLIC nlohmann_json::nlohmann_json)
+target_link_libraries(lscp_solve PUBLIC nlohmann_json_schema_validator::nlohmann_json_schema_validator)
 target_link_libraries(lscp_solve PUBLIC phmap::phmap)
 
 target_compile_options(lscp_solve PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
-
 
 add_executable(lscp_rank src/rank.cpp)
 target_link_libraries(lscp_rank PUBLIC landscape_opt)
 target_link_libraries(lscp_rank PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser)
 target_link_libraries(lscp_rank PUBLIC nlohmann_json::nlohmann_json)
+target_link_libraries(lscp_rank PUBLIC nlohmann_json_schema_validator::nlohmann_json_schema_validator)
 target_link_libraries(lscp_rank PUBLIC phmap::phmap)
 
 target_compile_options(lscp_rank PUBLIC -fconcepts-diagnostics-depth=4 -Wall)

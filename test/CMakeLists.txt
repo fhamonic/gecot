@@ -7,6 +7,7 @@ add_executable(landscape_opt_test main_test.cpp preprocessing_test.cpp)
 target_link_libraries(landscape_opt_test landscape_opt)
 target_link_libraries(landscape_opt_test fast-cpp-csv-parser::fast-cpp-csv-parser)
 target_link_libraries(landscape_opt_test nlohmann_json::nlohmann_json)
+target_link_libraries(landscape_opt_test nlohmann_json_schema_validator::nlohmann_json_schema_validator)
 target_link_libraries(landscape_opt_test phmap::phmap)
 target_link_libraries(landscape_opt_test GTest::gtest)
 

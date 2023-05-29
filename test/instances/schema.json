@@ -1,41 +1,302 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
-
-    "options": {}
+    "type": "object",
+    "properties": {
+        "options": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "csv_file": {
+                            "type": "string"
+                        },
+                        "csv_columns": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "cost": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "cost"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "csv_file",
+                        "csv_columns"
+                    ],
+                    "additionalProperties": false
+                },
+                {
+                    "type": "array",
+                    "contains": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "cost": {
+                                "type": "number",
+                                "minimum": 0
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "cases": {
+            "type": "object",
+            "patternProperties": {
+                "^.*$": {
+                    "type": "object",
+                    "properties": {
+                        "vertices": {
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "csv_file": {
+                                            "type": "string"
+                                        },
+                                        "csv_columns": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "quality": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "quality"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "csv_file",
+                                        "csv_columns"
+                                    ],
+                                    "additionalProperties": false
+                                },
+                                {
+                                    "type": "array",
+                                    "contains": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "string"
+                                            },
+                                            "quality": {
+                                                "type": "number",
+                                                "minimum": 0
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        "arcs": {
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "csv_file": {
+                                            "type": "string"
+                                        },
+                                        "csv_columns": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "from": {
+                                                    "type": "string"
+                                                },
+                                                "to": {
+                                                    "type": "string"
+                                                },
+                                                "probability": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "from",
+                                                "to",
+                                                "probability"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "csv_file",
+                                        "csv_columns"
+                                    ],
+                                    "additionalProperties": false
+                                },
+                                {
+                                    "type": "array",
+                                    "contains": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "string"
+                                            },
+                                            "from": {
+                                                "type": "string"
+                                            },
+                                            "to": {
+                                                "type": "string"
+                                            },
+                                            "probability": {
+                                                "type": "number",
+                                                "minimum": 0,
+                                                "maximum": 1
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        "vertices_improvements": {
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "csv_file": {
+                                            "type": "string"
+                                        },
+                                        "csv_columns": {
+                                            "type": "object",
+                                            "properties": {
+                                                "vertex_id": {
+                                                    "type": "string"
+                                                },
+                                                "option_id": {
+                                                    "type": "string"
+                                                },
+                                                "quality_gain": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "vertex_id",
+                                                "option_id",
+                                                "quality_gain"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "csv_file",
+                                        "csv_columns"
+                                    ],
+                                    "additionalProperties": false
+                                },
+                                {
+                                    "type": "array",
+                                    "contains": {
+                                        "type": "object",
+                                        "properties": {
+                                            "vertex_id": {
+                                                "type": "string"
+                                            },
+                                            "option_id": {
+                                                "type": "string"
+                                            },
+                                            "quality_gain": {
+                                                "type": "number",
+                                                "minimum": 0
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        "arcs_improvements": {
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "csv_file": {
+                                            "type": "string"
+                                        },
+                                        "csv_columns": {
+                                            "type": "object",
+                                            "properties": {
+                                                "arc_id": {
+                                                    "type": "string"
+                                                },
+                                                "option_id": {
+                                                    "type": "string"
+                                                },
+                                                "improved_probability": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "arc_id",
+                                                "option_id",
+                                                "improved_probability"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "csv_file",
+                                        "csv_columns"
+                                    ],
+                                    "additionalProperties": false
+                                },
+                                {
+                                    "type": "array",
+                                    "contains": {
+                                        "type": "object",
+                                        "properties": {
+                                            "arc_id": {
+                                                "type": "string"
+                                            },
+                                            "option_id": {
+                                                "type": "string"
+                                            },
+                                            "improved_probability": {
+                                                "type": "number",
+                                                "minimum": 0,
+                                                "maximum": 1
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "required": [
+                        "vertices",
+                        "arcs"
+                    ],
+                    "anyOf": [
+                        {
+                            "required": [
+                                "vertices_improvements"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "arcs_improvements"
+                            ]
+                        }
+                    ]
+                }
+            },
+            "additionalProperties": false
+        }
+    },
+    "required": [
+        "options",
+        "cases"
+    ]
 }
-    
-//     "options" : {
-//         "file": "Aude/dams.csv",
-//         "columns": {
-//             "option_id": "name",
-//             "cost": "cost"
-//         }
-//     },
-//     "case": {
-//         "name": "",
-//         "vertices": {
-//             "file": "Aude/stretches.csv",
-//             "columns": {
-//                 "id": "id",
-//                 "quality": "length"
-//             }
-//         },
-//         "arcs": {
-//             "file": "Aude/arcs.csv",
-//             "columns": {
-//                 "id": "arc_id",
-//                 "from": "source_id",
-//                 "to": "target_id",
-//                 "probability": "probability"
-//             }
-//         },
-//         "arc_options": {
-//             "file": "Aude/dams_arcs.csv",
-//             "columns": {
-//                 "arc_id": "arc_id",
-//                 "option_id": "dam_id",
-//                 "improved_probability": "improved_prob"
-//             }
-//         }
-//     }
-// }

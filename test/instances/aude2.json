@@ -1,0 +1,37 @@
+{
+    "options": {
+        "csv_file": "Aude/dams.csv",
+        "csv_columns": {
+            "id": "name",
+            "cost": "cost"
+        }
+    },
+    "cases": {
+        "trout": {
+            "vertices": {
+                "csv_file": "Aude/stretches.csv",
+                "csv_columns": {
+                    "id": "id",
+                    "quality": "length"
+                }
+            },
+            "arcs": {
+                "csv_file": "Aude/arcs.csv",
+                "csv_columns": {
+                    "id": "arc_id",
+                    "from": "source_id",
+                    "to": "target_id",
+                    "probability": "probability"
+                }
+            },
+            "arcs_improvements": {
+                "csv_file": "Aude/dams_arcs.csv",
+                "csv_columns": {
+                    "arc_id": "arc_id",
+                    "option_id": "dam_id",
+                    "improved_probability": "improved_prob"
+                }
+            }
+        }
+    }
+}

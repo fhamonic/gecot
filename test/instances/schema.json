@@ -293,6 +293,19 @@
                 }
             },
             "additionalProperties": false
+        },
+        "formula" : {
+            "type" : "array",
+            "contains" : {
+                "type" : "object",
+                "properties": {
+                    "operation" : {
+                        "type": "string",
+                        "enum": ["sum", "min"] },
+                        "terms" : {"type" : "array", "contains" : {"type" : "object", "properties": {}, "required": [""]}}
+                },
+                "required": ["operation", "terms"]
+            }
         }
     },
     "required": [

@@ -347,7 +347,8 @@ void parse_options(T json_object, std::filesystem::path parent_path,
     } else {
         for(auto && option : json_object) {
             if(instance.contains_option(option["id"]))
-                throw std::invalid_argument("Option identifier '" + option["id"] +
+                throw std::invalid_argument("Option identifier '" +
+                                            option["id"] +
                                             "' appears multiple times in ");
             instance.add_option(option["id"], option["cost"]);
         }
@@ -358,54 +359,75 @@ template <typename T>
 StaticLandscape parse_landscape(T json_object,
                                 std::filesystem::path parent_path) {
     std::vector<double> vertex_quality_map;
-
     std::vector<std::string> vertex_names;
     phmap::node_hash_map<std::string, melon::vertex_t<melon::static_digraph>>
         name_to_vertex_map;
     phmap::node_hash_map<std::string, melon::arc_t<melon::static_digraph>>
         name_to_arc_map;
 
-    detail::assert_json_properties(
-        json_object, {{"name", nlohmann::detail::value_t::string},
-                      {"vertices", nlohmann::detail::value_t::object},
-                      {"arcs", nlohmann::detail::value_t::object}});
-
     auto vertices_json = json_object["vertices"];
-    std::filesystem::path vertices_csv_path = vertices_json["file"];
-    if(vertices_csv_path.is_relative())
-        vertices_csv_path = (parent_path / vertices_csv_path);
-    io::CSVReader<2> vertices_csv(vertices_csv_path);
-    detail::configure_csv_reader(vertices_csv, vertices_json, "id", "quality");
 
-    std::string vertex_id;
-    double vertex_quality;
-    while(vertices_csv.read_row(vertex_id, vertex_quality)) {
-        vertex_quality_map.emplace_back(vertex_quality);
-        vertex_names.emplace_back(vertex_id);
-        name_to_vertex_map[vertex_id] =
+    auto add_vertex = [&](auto && id, double quality) {
+        vertex_quality_map.emplace_back(quality);
+        vertex_names.emplace_back(id);
+        name_to_vertex_map[id] =
             static_cast<melon::vertex_t<melon::static_digraph>>(
                 vertex_names.size() - 1);
+    };
+
+    if(vertices_json.is_object()) {
+        std::filesystem::path vertices_csv_path = vertices_json["csv_file"];
+        if(vertices_csv_path.is_relative())
+            vertices_csv_path = (parent_path / vertices_csv_path);
+        io::CSVReader<2> vertices_csv(vertices_csv_path);
+        auto vertices_columns = vertices_json["csv_columns"];
+        vertices_csv.read_header(io::ignore_extra_column,
+                                 vertices_columns["id"],
+                                 vertices_columns["quality"]);
+        std::string vertex_id;
+        double vertex_quality;
+        while(vertices_csv.read_row(vertex_id, vertex_quality)) {
+            add_vertex(vertex_id, vertex_quality);
+        }
+    } else {
+        for(auto && vertex : vertices_json) {
+            add_vertex(vertex["id"], vertex["quality"].get<double>());
+        }
     }
 
     melon::static_digraph_builder<melon::static_digraph, double, std::string>
         builder(vertex_quality_map.size());
 
-    auto arcs_json = json_object["arcs"];
-    std::filesystem::path arcs_csv_path = arcs_json["file"];
-    if(arcs_csv_path.is_relative())
-        arcs_csv_path = (parent_path / arcs_csv_path);
-    io::CSVReader<4> arcs_csv(arcs_csv_path);
-    detail::configure_csv_reader(arcs_csv, arcs_json, "id", "from", "to",
-                                 "probability");
-
-    std::string arc_id, from, to;
-    double arc_probability;
-    while(arcs_csv.read_row(arc_id, from, to, arc_probability)) {
-        if(arc_probability < 0 || arc_probability > 1)
-            throw std::invalid_argument('\'' + std::to_string(arc_probability) +
+    auto add_arc = [&](auto && id, auto && from, auto && to,
+                       double probability) {
+        if(probability < 0 || probability > 1)
+            throw std::invalid_argument('\'' + std::to_string(probability) +
                                         "' is not a valid probability");
         builder.add_arc(name_to_vertex_map[from], name_to_vertex_map[to],
-                        arc_probability, arc_id);
+                        probability, id);
+    };
+
+    auto arcs_json = json_object["arcs"];
+    if(arcs_json.is_object()) {
+        std::filesystem::path arcs_csv_path = arcs_json["file"];
+        if(arcs_csv_path.is_relative())
+            arcs_csv_path = (parent_path / arcs_csv_path);
+        io::CSVReader<4> arcs_csv(arcs_csv_path);
+        auto arcs_columns = arcs_json["csv_columns"];
+        arcs_csv.read_header(io::ignore_extra_column, arcs_columns["id"],
+                             arcs_columns["from"], arcs_columns["to"],
+                             arcs_columns["probability"]);
+
+        std::string arc_id, from, to;
+        double arc_probability;
+        while(arcs_csv.read_row(arc_id, from, to, arc_probability)) {
+            add_arc(arc_id, from, to, arc_probability);
+        }
+    } else {
+        for(auto && arc : arcs_json) {
+            add_arc(arc["id"], arc["from"], arc["to"],
+                    arc["probability"].get<double>());
+        }
     }
 
     auto [graph, arc_probability_map, arc_names] = builder.build();
@@ -589,17 +611,18 @@ Instance parse_instance_json(const nlohmann::json & instance_json) {
     auto options_json = instance_json["options"];
     parse_options(options_json, instance_path.parent_path(), instance);
 
-    auto case_json = instance_json["case"];
-    instance.set_landscape(
-        parse_landscape(case_json, instance_path.parent_path()));
+    for(auto && case_json : instance_json["cases"]) {
+        InstanceCase & instance_case = instance.add_case();
 
-    instance.set_vertex_options(
-        parse_vertex_options_if_exists(case_json, instance_path.parent_path(),
-                                       instance, instance.landscape()));
-
-    instance.set_arc_options(
-        parse_arc_options_if_exists(case_json, instance_path.parent_path(),
-                                    instance, instance.landscape()));
+        instance_case.set_landscape(
+            parse_landscape(case_json, instance_path.parent_path()));
+        instance_case.set_vertex_options(parse_vertex_options_if_exists(
+            case_json, instance_path.parent_path(), instance_case,
+            instance_case.landscape()));
+        instance_case.set_arc_options(
+            parse_arc_options_if_exists(case_json, instance_path.parent_path(),
+                                        instance_case, instance_case.landscape()));
+    }
 
     return instance;
 }

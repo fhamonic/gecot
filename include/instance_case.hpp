@@ -19,14 +19,16 @@
 
 #include <parallel_hashmap/phmap.h>
 
+#include "melon/graph.hpp"
+#include "melon/container/static_digraph.hpp"
+
 #include "landscape_opt/landscape/mutable_landscape.hpp"
 #include "landscape_opt/solvers/concept/restoration_plan.hpp"
 
 using Option = int;
 
 struct InstanceCase {
-    double coef;
-    void * graph;
+    fhamonic::melon::static_digraph graph;
 
     std::vector<double> vertex_quality_map;
     std::vector<double> arc_probability_map;

@@ -14,81 +14,132 @@
 
 namespace fhamonic {
 
-class Instance {
-public:
-    using Landscape = StaticLandscape;
-    using Option = unsigned int;
-    using Solution = std::vector<bool>;
-    using OptionPotentialMap = std::vector<double>;
+class instance_case {
+private:
+    using graph_t = fhamonic::melon::static_digraph;
 
+    std::string _case_name;
+    graph_t _graph;
+
+    std::vector<double> _vertex_quality_map;
+    std::vector<double> _arc_probability_map;
+
+    std::vector<std::string> _vertex_names;
+    phmap::node_hash_map<std::string, melon::vertex_t<graph_t>>
+        _vertex_name_to_id_map;
+    std::vector<std::string> _arc_names;
+    phmap::node_hash_map<std::string, melon::vertex_t<arc_t>>
+        _arc_name_to_id_map;
+
+    melon::vertex_map_t<melon::static_digraph,
+                        std::vector<std::pair<double, Instance::option_t>>>
+        _vertex_options_map;
+    melon::arc_map_t<melon::static_digraph,
+                     std::vector<std::pair<double, Instance::option_t>>>
+        _arc_options_map;
+
+public:
+    [[nodiscard]] auto & graph() const noexcept { return _graph; }
+    [[nodiscard]] auto & vertex_quality_map() const noexcept {
+        return _vertex_quality_map;
+    }
+    [[nodiscard]] auto & arc_probability_map() const noexcept {
+        return _arc_probability_map;
+    }
+    [[nodiscard]] auto & vertex_options_map() const noexcept {
+        return _vertex_options_map;
+    }
+    [[nodiscard]] auto & arc_options_map() const noexcept {
+        return _arc_options_map;
+    }
+
+public:
+    [[nodiscard]] instance_case(
+        std::string && case_name, fhamonic::melon::static_digraph && graph,
+        std::vector<double> && vertex_quality_map,
+        std::vector<double> && arc_probability_map,
+        std::vector<std::string> && vertex_names,
+        phmap::node_hash_map<std::string, melon::vertex_t<graph_t>> &&
+            vertex_name_to_id_map,
+        std::vector<std::string> && arc_names,
+        phmap::node_hash_map<std::string, melon::arc_t<graph_t>> &&
+            arc_name_to_id_map)
+        : _case_name(std::move(_case_name))
+        , _graph(std::move(graph))
+        , _vertex_quality_map(std::move(vertex_quality_map))
+        , _arc_probability_map(std::move(arc_probability_map))
+        , _vertex_names(std::move(vertex_names))
+        , _vertex_name_to_id_map(std::move(vertex_name_to_id_map))
+        , _arc_names(std::move(arc_names))
+        , _arc_name_to_id_map(std::move(arc_name_to_id_map)) {}
+
+    auto option_from_name(const std::string & name) const {
+        if(!contains_option(name))
+            throw std::invalid_argument("in instance case '" + _case_name +
+                                        "': unknwon vertex id '" + name + "'");
+        return _vertex_name_to_id_map.at(name);
+    }
+
+    option_t option_from_name(const std::string & name) const {
+        if(!contains_option(name))
+            throw std::invalid_argument("in instance case '" + _case_name +
+                                        "': unknwon arc id '" + name + "'");
+        return _arc_name_to_id_map.at(name);
+    }
+};
+
+class instance {
 private:
     std::vector<double> _options_costs;
     std::vector<std::string> _options_names;
-    phmap::node_hash_map<std::string, Option> _option_name_to_id_map;
+    phmap::node_hash_map<std::string, option_t> _option_name_to_id_map;
 
-    Landscape _landscape;
-
-    std::vector<std::vector<std::pair<double, Option>>> _vertex_options_map;
-    std::vector<std::vector<std::pair<double, Option>>> _arc_options_map;
+    std::vector<instance_case> _cases;
 
 public:
-    Instance() = default;
-
-    auto options() const noexcept {
-        return std::ranges::iota_view<Option, Option>(
-            Option{0}, static_cast<Option>(nb_options()));
+    [[nodiscard]] auto options() const noexcept {
+        return std::ranges::iota_view<option_t, option_t>(
+            option_t{0}, static_cast<option_t>(nb_options()));
     }
-    double option_cost(Option o) const { return _options_costs[o]; }
-    Solution create_solution() const { return Solution(nb_options(), false); }
-    OptionPotentialMap create_options_potentials_map() const {
-        return OptionPotentialMap(nb_options(), 0.0);
+    [[nodiscard]] double option_cost(option_t o) const {
+        return _options_costs[o];
     }
+    [[nodiscard]] auto create_solution() const {
+        return std::vector<bool>(nb_options(), false);
+    }
+    [[nodiscard]] auto create_options_potentials_map() const {
+        return std::vector<double>(nb_options(), 0.0);
+    }
+    [[nodiscard]] decltype(auto) cases() const noexcept { return _cases; }
 
-    auto & landscape() const noexcept { return _landscape; }
-    auto & vertex_options_map() const noexcept { return _vertex_options_map; }
-    auto & arc_options_map() const noexcept { return _arc_options_map; }
+public:
+    instance() = default;
 
     std::size_t nb_options() const noexcept { return _options_costs.size(); }
-
-    Option add_option(std::string identifier, double c) noexcept {
+    option_t add_option(std::string identifier, double c) noexcept {
         assert(!_option_name_to_id_map.contains(identifier));
-        Option i = static_cast<Option>(nb_options());
+        option_t i = static_cast<option_t>(nb_options());
         _options_names.emplace_back(identifier);
         _options_costs.emplace_back(c);
         _option_name_to_id_map[identifier] = i;
         return i;
     }
-
-    bool contains_option(Option i) const noexcept {
-        return i < static_cast<Option>(nb_options());
+    bool contains_option(option_t i) const noexcept {
+        return i < static_cast<option_t>(nb_options());
     }
     bool contains_option(std::string identifier) const noexcept {
         return _option_name_to_id_map.contains(identifier);
     }
-    void set_option_cost(Option i, double cost) noexcept {
+    void set_option_cost(option_t i, double cost) noexcept {
         _options_costs[i] = cost;
     }
-    const std::string & option_name(Option i) const noexcept {
+    const std::string & option_name(option_t i) const noexcept {
         return _options_names[i];
     }
-    Option option_from_name(const std::string & name) const {
+    option_t option_from_name(const std::string & name) const {
         if(!contains_option(name))
             throw std::invalid_argument("unknwon option id '" + name + "'");
         return _option_name_to_id_map.at(name);
-    }
-
-    void set_landscape(StaticLandscape && l) noexcept {
-        _landscape = std::move(l);
-    }
-    void set_vertex_options(
-        std::vector<std::vector<std::pair<double, Instance::Option>>> &&
-            vertex_options) noexcept {
-        _vertex_options_map = std::move(vertex_options);
-    }
-    void set_arc_options(
-        std::vector<std::vector<std::pair<double, Instance::Option>>> &&
-            arc_options) noexcept {
-        _arc_options_map = std::move(arc_options);
     }
 };
 

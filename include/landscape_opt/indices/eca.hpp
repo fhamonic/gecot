@@ -6,8 +6,6 @@
 
 #include "melon/algorithm/dijkstra.hpp"
 
-#include "landscape_opt/concepts/landscape.hpp"
-
 namespace fhamonic {
 namespace landscape_opt {
 
@@ -53,13 +51,6 @@ double eca(const GR & graph, const QM & quality_map,
     return std::sqrt(eca_sum);
 };
 
-template <concepts::Landscape LS>
-double eca(const LS l) {
-    return eca(l.graph(), l.quality_map(), l.probability_map());
-};
-
-
-
 template <typename GR, typename QM, typename PM>
 double eca_vertex_contribution(const GR & graph, const QM & quality_map,
            const PM & probability_map, const melon::vertex_t<GR> & t) {
@@ -75,12 +66,6 @@ double eca_vertex_contribution(const GR & graph, const QM & quality_map,
     
     return sum;
 };
-
-template <concepts::Landscape LS>
-double eca_vertex_contribution(const LS l, const melon::vertex_t<typename LS::Graph> & t) {
-    return eca_vertex_contribution(l.graph(), l.quality_map(), l.probability_map(), t);
-};
-
 
 }  // namespace landscape_opt
 }  // namespace fhamonic

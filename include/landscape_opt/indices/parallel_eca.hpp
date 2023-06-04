@@ -64,11 +64,6 @@ double parallel_eca(const GR & graph, const QM & quality_map,
     return std::sqrt(eca_sum);
 };
 
-template <concepts::Landscape LS>
-double parallel_eca(const LS l) {
-    return parallel_eca(l.graph(), l.quality_map(), l.probability_map());
-};
-
 }  // namespace landscape_opt
 }  // namespace fhamonic
 

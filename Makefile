@@ -2,6 +2,7 @@ MAKEFLAGS += --no-print-directory
 
 CPUS?=$(shell getconf _NPROCESSORS_ONLN || echo 1)
 
+CC = g++-12
 BUILD_DIR = build
 
 .PHONY: all clean doc
@@ -13,7 +14,7 @@ all: $(BUILD_DIR)
 $(BUILD_DIR):
 	@mkdir $(BUILD_DIR) && \
 	cd $(BUILD_DIR) && \
-	cmake -DCMAKE_BUILD_TYPE=Debug -DWARNINGS=ON -DOPTIMIZE_FOR_NATIVE=ON -DENABLE_TESTING=ON ..
+	cmake -DCMAKE_CXX_COMPILER=$(CC) -DCMAKE_BUILD_TYPE=Debug -DWARNINGS=ON -DOPTIMIZE_FOR_NATIVE=ON -DENABLE_TESTING=ON ..
 
 test: all
 	@cd $(BUILD_DIR) && \

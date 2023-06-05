@@ -519,7 +519,7 @@ InstanceCase parse_instance_case(T json_object, std::string case_name,
 
     auto arcs_json = json_object["arcs"];
     if(arcs_json.is_object()) {
-        std::filesystem::path arcs_csv_path = arcs_json["file"];
+        std::filesystem::path arcs_csv_path = arcs_json["csv_file"];
         if(arcs_csv_path.is_relative())
             arcs_csv_path = (parent_path / arcs_csv_path);
         io::CSVReader<4> arcs_csv(arcs_csv_path);

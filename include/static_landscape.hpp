@@ -64,22 +64,7 @@ public:
     auto & quality_map() const noexcept { return _vertex_quality_map; };
     auto & probability_map() const noexcept { return _arc_probability_map; };
 
-    bool contains_vertex(const std::string & name) const {
-        return _name_to_vertex_map.contains(name);
-    }
-    bool contains_arc(const std::string & name) const {
-        return _name_to_arc_map.contains(name);
-    }
-    [[nodiscard]] auto vertex_from_name(const std::string & name) const {
-        if(!contains_vertex(name))
-            throw std::invalid_argument("unknwon vertex id '" + name + "'");
-        return _name_to_vertex_map.at(name);
-    }
-    [[nodiscard]] auto arc_from_name(const std::string & name) const {
-        if(!contains_arc(name))
-            throw std::invalid_argument("unknwon arc id '" + name + "'");
-        return _name_to_arc_map.at(name);
-    }
+    
 };
 
 }  // namespace fhamonic

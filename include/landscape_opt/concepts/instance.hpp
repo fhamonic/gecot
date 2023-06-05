@@ -37,7 +37,7 @@ concept case_c = requires(_Tp ic) {
 
 template <typename _Tp>
 concept instance_c = requires(_Tp i, option_t o) {
-    { i.options() } -> range_of<option_t>;
+    { i.options() } -> detail::range_of<option_t>;
     { i.option_cost(o) } -> std::convertible_to<double>;
     { i.create_solution() } -> melon::output_value_map_of<option_t, bool>;
     { i.create_options_potentials_map() } 

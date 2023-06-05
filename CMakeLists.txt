@@ -59,29 +59,40 @@ target_compile_definitions(landscape_opt
                            INTERFACE MIPPP_PREFERED_SOLVER=MIPPP_GUROBI)
 
 # ################### EXEC target ####################
-add_executable(lscp_solve src/solve.cpp)
-target_link_libraries(lscp_solve PUBLIC landscape_opt)
-target_link_libraries(lscp_solve
+# add_executable(lscp_solve src/solve.cpp)
+# target_link_libraries(lscp_solve PUBLIC landscape_opt)
+# target_link_libraries(lscp_solve
+#                       PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser)
+# target_link_libraries(lscp_solve PUBLIC nlohmann_json::nlohmann_json)
+# target_link_libraries(lscp_solve PUBLIC nlohmann_json_schema_validator::nlohmann_json_schema_validator)
+# target_link_libraries(lscp_solve PUBLIC phmap::phmap)
+
+# target_compile_options(lscp_solve PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
+
+# add_executable(lscp_rank src/rank.cpp)
+# target_link_libraries(lscp_rank PUBLIC landscape_opt)
+# target_link_libraries(lscp_rank PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser)
+# target_link_libraries(lscp_rank PUBLIC nlohmann_json::nlohmann_json)
+# target_link_libraries(lscp_rank PUBLIC nlohmann_json_schema_validator::nlohmann_json_schema_validator)
+# target_link_libraries(lscp_rank PUBLIC phmap::phmap)
+
+# target_compile_options(lscp_rank PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
+
+
+add_executable(lscp_test src/test.cpp)
+target_link_libraries(lscp_test PUBLIC landscape_opt)
+target_link_libraries(lscp_test
                       PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser)
-target_link_libraries(lscp_solve PUBLIC nlohmann_json::nlohmann_json)
-target_link_libraries(lscp_solve PUBLIC nlohmann_json_schema_validator::nlohmann_json_schema_validator)
-target_link_libraries(lscp_solve PUBLIC phmap::phmap)
+target_link_libraries(lscp_test PUBLIC nlohmann_json::nlohmann_json)
+target_link_libraries(lscp_test PUBLIC nlohmann_json_schema_validator::nlohmann_json_schema_validator)
+target_link_libraries(lscp_test PUBLIC phmap::phmap)
 
-target_compile_options(lscp_solve PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
-
-add_executable(lscp_rank src/rank.cpp)
-target_link_libraries(lscp_rank PUBLIC landscape_opt)
-target_link_libraries(lscp_rank PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser)
-target_link_libraries(lscp_rank PUBLIC nlohmann_json::nlohmann_json)
-target_link_libraries(lscp_rank PUBLIC nlohmann_json_schema_validator::nlohmann_json_schema_validator)
-target_link_libraries(lscp_rank PUBLIC phmap::phmap)
-
-target_compile_options(lscp_rank PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
+target_compile_options(lscp_test PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 
 # ################### TESTS ######################
-if(ENABLE_TESTING)
-  enable_testing()
-  message("Building Tests.")
-  set_project_warnings(landscape_opt)
-  add_subdirectory(test)
-endif()
+# if(ENABLE_TESTING)
+#   enable_testing()
+#   message("Building Tests.")
+#   set_project_warnings(landscape_opt)
+#   add_subdirectory(test)
+# endif()

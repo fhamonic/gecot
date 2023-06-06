@@ -567,7 +567,6 @@ Instance parse_instance(const std::filesystem::path & instance_path) {
     parse_options(options_json, instance_path.parent_path(), instance);
 
     for(auto && [case_name, case_json] : instance_json["cases"].items()) {
-        // InstanceCase & instance_case = instance.cases.emplace_back();
         InstanceCase & instance_case =
             instance.emplace_case(parse_instance_case(
                 case_json, case_name, instance_path.parent_path()));

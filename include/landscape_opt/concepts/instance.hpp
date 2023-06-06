@@ -19,19 +19,19 @@ using case_graph_t = decltype(std::declval<_Tp &>().graph());
 
 // clang-format off
 template <typename _Tp>
-concept case_c = requires(_Tp ic) {
+concept case_c = requires(_Tp && ic) {
     { ic.graph() } -> melon::outward_incidence_graph;
     { ic.vertex_quality_map() } 
-            -> melon::output_value_map_of<melon::vertex_t<case_graph_t<_Tp>>,
+            -> melon::input_value_map_of<melon::vertex_t<case_graph_t<_Tp>>,
                                     double>;
     { ic.arc_probability_map() } 
-            -> melon::output_value_map_of<melon::arc_t<case_graph_t<_Tp>>,
+            -> melon::input_value_map_of<melon::arc_t<case_graph_t<_Tp>>,
                                     double>;
     { ic.vertex_options_map() } 
-            -> melon::output_value_map_of<melon::vertex_t<case_graph_t<_Tp>>, 
+            -> melon::input_value_map_of<melon::vertex_t<case_graph_t<_Tp>>, 
                                     std::vector<std::pair<double, option_t>>>;
     { ic.arc_options_map() } 
-            -> melon::output_value_map_of<melon::arc_t<case_graph_t<_Tp>>, 
+            -> melon::input_value_map_of<melon::arc_t<case_graph_t<_Tp>>, 
                                     std::vector<std::pair<double, option_t>>>;
 };
 

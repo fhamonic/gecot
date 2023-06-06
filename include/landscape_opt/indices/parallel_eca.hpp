@@ -9,8 +9,6 @@
 
 #include "melon/algorithm/dijkstra.hpp"
 
-#include "landscape_opt/concepts/landscape.hpp"
-
 namespace fhamonic {
 namespace landscape_opt {
 

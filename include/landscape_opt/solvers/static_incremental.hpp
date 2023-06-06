@@ -21,7 +21,7 @@ struct StaticIncremental {
     bool verbose = false;
     bool parallel = false;
 
-    template <concepts::Instance I>
+    template <instance_c I>
     typename I::Solution solve(const I & instance, const double budget) const {
         using Landscape = typename I::Landscape;
         using QualityMap = typename Landscape::QualityMap;

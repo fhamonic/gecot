@@ -1,33 +1,46 @@
 {
     "options": {
-        "file": "Quebec_438_RASY/options.csv"
+        "csv_file": "Quebec_438_RASY/options.csv",
+        "csv_columns": {
+            "id": "option_id",
+            "cost": "cost"
+        }
     },
-    "case": {
-        "name": "",
-        "vertices": {
-            "file": "Quebec_438_RASY/vertices.csv",
-            "columns": {
-                "id": "vertex_id"
-            }
-        },
-        "arcs": {
-            "file": "Quebec_438_RASY/arcs.csv",
-            "columns": {
-                "id": "arc_id",
-                "probability": "prob"
-            }
-        },
-        "vertex_options": {
-            "file": "Quebec_438_RASY/vertices_options.csv",
-            "columns": {
-                "node_id": "vertex_id"
-            }
-        },
-        "arc_options": {
-            "file": "Quebec_438_RASY/arcs_options.csv",
-            "columns": {
-                "improved_probability": "restored_prob"
+    "cases": {
+        "frog": {
+            "vertices": {
+                "csv_file": "Quebec_438_RASY/vertices.csv",
+                "csv_columns": {
+                    "id": "vertex_id",
+                    "quality": "quality"
+                }
+            },
+            "arcs": {
+                "csv_file": "Quebec_438_RASY/arcs.csv",
+                "csv_columns": {
+                    "id": "arc_id",
+                    "from": "from",
+                    "to": "to",
+                    "probability": "prob"
+                }
+            },
+            "vertices_improvements": {
+                "csv_file": "Quebec_438_RASY/vertices_options.csv",
+                "csv_columns": {
+                    "vertex_id": "vertex_id",
+                    "option_id": "option_id",
+                    "quality_gain": "quality_gain"
+                }
+            },
+            "arcs_improvements": {
+                "csv_file": "Quebec_438_RASY/arcs_options.csv",
+                "csv_columns": {
+                    "arc_id": "arc_id",
+                    "option_id": "option_id",
+                    "improved_probability": "restored_prob"
+                }
             }
         }
-    }
+    },
+    "optimize": "frog"
 }

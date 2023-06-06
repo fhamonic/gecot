@@ -9,10 +9,12 @@ namespace fhamonic {
 namespace landscape_opt {
 namespace detail {
 template <typename T, typename V>
-concept range_of = std::ranges::range<T> && std::same_as<std::ranges::range_value_t<T>, V>;
+concept range_of =
+    std::ranges::range<T> && std::same_as<std::ranges::range_value_t<T>, V>;
 }  // namespace detail
 
 using option_t = unsigned int;
+using case_id_t = std::size_t;
 
 template <typename _Tp>
 using case_graph_t = decltype(std::declval<_Tp &>().graph());
@@ -35,14 +37,23 @@ concept case_c = requires(_Tp && ic) {
                                     std::vector<std::pair<double, option_t>>>;
 };
 
+template <typename _Tp, typename _V>
+using instance_option_map_t = 
+        decltype(std::declval<_Tp &>().template create_option_map<_V>());
+
+template <typename _Tp, typename _V>
+using instance_case_map_t = 
+        decltype(std::declval<_Tp &>().template create_case_map<_V>());
+
 template <typename _Tp>
 concept instance_c = requires(_Tp i, option_t o) {
     { i.options() } -> detail::range_of<option_t>;
     { i.option_cost(o) } -> std::convertible_to<double>;
-    { i.create_solution() } -> melon::output_value_map_of<option_t, bool>;
-    { i.create_options_potentials_map() } 
-            -> melon::output_value_map_of<option_t, double>;
+    { i.template create_option_map<int>() } 
+            -> melon::output_value_map_of<option_t, int>;
     { i.cases() } -> std::ranges::range;
+    { i.template create_case_map<int>() } 
+            -> melon::output_value_map_of<case_id_t, int>;
 } && case_c<std::ranges::range_value_t<decltype(std::declval<_Tp>().cases())>>;
 // clang-format on
 

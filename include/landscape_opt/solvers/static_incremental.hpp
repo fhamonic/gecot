@@ -6,9 +6,11 @@
 
 #include <range/v3/algorithm/sort.hpp>
 #include <range/v3/range/conversion.hpp>
+#include <range/v3/view/filter.hpp>
 #include <range/v3/view/zip.hpp>
 
-#include "landscape_opt/concepts/instance.hpp"
+#include "melon/container/static_map.hpp"
+
 #include "landscape_opt/helper.hpp"
 #include "landscape_opt/indices/eca.hpp"
 #include "landscape_opt/utils/chronometer.hpp"
@@ -22,35 +24,35 @@ struct StaticIncremental {
     bool parallel = false;
 
     template <instance_c I>
-    typename I::Solution solve(const I & instance, const double budget) const {
-        using Landscape = typename I::Landscape;
-        using QualityMap = typename Landscape::QualityMap;
-        using ProbabilityMap = typename Landscape::ProbabilityMap;
-        using Option = typename I::Option;
-        using Solution = typename I::Solution;
-
-        // int time_ms = 0;
+    instance_option_map_t<I, bool> solve(const I & instance,
+                                         const double budget) const {
         chronometer chrono;
-        Solution solution = instance.create_solution();
+        auto solution = instance.template create_option_map<I, bool>();
 
-        const auto vertexOptions = detail::computeOptionsForVertices(instance);
-        const auto arcOptions = detail::computeOptionsForArcs(instance);
+        std::vector<option_t> options =
+            ranges::to<std::vector>(ranges::views::filter(instance.options(), [&](option_t i) { return instance.option_cost(i) <= budget; }));
 
-        const double base_eca = eca(instance.landscape());
-        if(verbose) {
-            std::cout << "base ECA: " << base_eca << std::endl;
-            std::cout << "total cost: 0" << std::endl;
+        instance_option_map_t<I, instance_case_map_t<I, double>>
+            options_enhanced_eca = instance.template create_option_map<
+                instance_case_map_t<I, double>>(instance.template create_case_map<double>());
+
+        // const double base_score = eca(instance.landscape());
+        // if(verbose) {
+        //     std::cout << "base ECA: " << base_eca << std::endl;
+        //     std::cout << "total cost: 0" << std::endl;
+        // }
+
+
+        for(const auto & instance_case : instance.cases()) {
+            const auto vertexOptions = detail::computeOptionsForVertices(
+                instance_case, instance.nb_options());
+            const auto arcOptions = detail::computeOptionsForArcs(
+                instance_case, instance.nb_options());
         }
 
-        std::vector<Option> options =
-            ranges::to<std::vector>(instance.options());
-        std::vector<double> options_ratios(options.size());
 
-        options.erase(
-            std::remove_if(
-                options.begin(), options.end(),
-                [&](Option i) { return instance.option_cost(i) > budget; }),
-            options.end());
+        
+        auto options_ratios = instance.template create_option_map<I, double>();
 
         auto compute_delta_eca_inc =
             [&instance, &vertexOptions, &arcOptions, base_eca, &options_ratios](

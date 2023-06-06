@@ -21,6 +21,7 @@ class InstanceCase {
 private:
     using graph_t = fhamonic::melon::static_digraph;
 
+    std::size_t _case_id;
     std::string _case_name;
     graph_t _graph;
 
@@ -42,6 +43,7 @@ private:
         _arc_options_map;
 
 public:
+    [[nodiscard]] auto id() const noexcept { return _case_id; }
     [[nodiscard]] auto & graph() const noexcept { return _graph; }
     [[nodiscard]] auto & vertex_quality_map() const noexcept {
         return _vertex_quality_map;
@@ -58,7 +60,8 @@ public:
 
 public:
     [[nodiscard]] InstanceCase(
-        std::string && case_name, fhamonic::melon::static_digraph && graph,
+        std::size_t id, std::string && case_name,
+        fhamonic::melon::static_digraph && graph,
         std::vector<double> && vertex_quality_map,
         std::vector<double> && arc_probability_map,
         std::vector<std::string> && vertex_names,
@@ -67,7 +70,8 @@ public:
         std::vector<std::string> && arc_names,
         phmap::node_hash_map<std::string, melon::arc_t<graph_t>> &&
             arc_name_to_id_map)
-        : _case_name(std::move(case_name))
+        : _case_id(id)
+        , _case_name(std::move(case_name))
         , _graph(std::move(graph))
         , _vertex_quality_map(std::move(vertex_quality_map))
         , _arc_probability_map(std::move(arc_probability_map))
@@ -121,18 +125,22 @@ public:
     [[nodiscard]] double option_cost(landscape_opt::option_t o) const {
         return _options_costs[o];
     }
-    [[nodiscard]] auto create_solution() const {
-        return std::vector<bool>(nb_options(), false);
-    }
-    [[nodiscard]] auto create_options_potentials_map() const {
-        return std::vector<double>(nb_options(), 0.0);
+    template <typename V>
+    [[nodiscard]] auto create_option_map(V v = {}) const {
+        return melon::static_map<landscape_opt::option_t, V>(nb_options(), v);
     }
     [[nodiscard]] decltype(auto) cases() const noexcept { return _cases; }
+    template <typename V>
+    [[nodiscard]] auto create_case_map(V v = {}) const {
+        return melon::static_map<std::size_t, V>(_cases.size(), v);
+    }
 
 public:
     Instance() = default;
 
-    std::size_t nb_options() const noexcept { return _options_costs.size(); }
+    [[nodiscard]] std::size_t nb_options() const noexcept {
+        return _options_costs.size();
+    }
     landscape_opt::option_t add_option(std::string identifier,
                                        double c) noexcept {
         assert(!_option_name_to_id_map.contains(identifier));
@@ -162,7 +170,7 @@ public:
     }
     template <class... T>
     [[nodiscard]] decltype(auto) emplace_case(T &&... args) {
-        return _cases.emplace_back(std::forward<T>(args)...);
+        return _cases.emplace_back(_cases.size(), std::forward<T>(args)...);
     }
 };
 

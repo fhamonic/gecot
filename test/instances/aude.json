@@ -34,5 +34,5 @@
             }
         }
     },
-    "optimize": "trout"
+    "criterion": "trout"
 }

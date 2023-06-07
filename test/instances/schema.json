@@ -294,8 +294,9 @@
             },
             "additionalProperties": false
         },
-        "optimize": {
-            "$defs": {
+        "criterion": {
+            "$ref": "#/properties/criterion/definitions/formula",
+            "definitions": {
                 "variable": {
                     "type": "string"
                 },
@@ -311,7 +312,7 @@
                         "terms": {
                             "type": "array",
                             "contains": {
-                                "$ref": "#/properties/optimize/$defs/term"
+                                "$ref": "#/properties/criterion/definitions/term"
                             }
                         }
                     },
@@ -324,10 +325,10 @@
                 "formula": {
                     "oneOf": [
                         {
-                            "$ref": "#/properties/optimize/$defs/variable"
+                            "$ref": "#/properties/criterion/definitions/variable"
                         },
                         {
-                            "$ref": "#/properties/optimize/$defs/operation"
+                            "$ref": "#/properties/criterion/definitions/operation"
                         }
                     ]
                 },
@@ -339,7 +340,7 @@
                             "minimum": 0
                         },
                         "value": {
-                            "$ref": "#/properties/optimize/$defs/formula"
+                            "$ref": "#/properties/criterion/definitions/formula"
                         }
                     },
                     "required": [
@@ -347,12 +348,12 @@
                     ],
                     "additionalProperties": false
                 }
-            },
-            "$ref": "#/properties/optimize/$defs/formula"
+            }
         }
     },
     "required": [
         "options",
         "cases"
-    ]
+    ],
+    "additionalProperties": false
 }

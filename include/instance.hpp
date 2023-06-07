@@ -134,6 +134,11 @@ public:
     [[nodiscard]] auto create_case_map(V v = {}) const {
         return melon::static_map<std::size_t, V>(_cases.size(), v);
     }
+    template <melon::input_value_map_of<std::size_t, double> M>
+    [[nodiscard]] double eval_criterion(const M & case_values) const noexcept {
+        // TODO structs and std::visit de formula !
+        return 0.0;
+    }
 
 public:
     Instance() = default;

@@ -2,6 +2,8 @@
 #define LANDSCAPE_OPT_CONCEPTS_INSTANCE_CASE_HPP
 
 #include <concepts>
+#include <utility>
+#include <vector>
 
 #include "melon/graph.hpp"
 
@@ -46,7 +48,16 @@ using instance_case_map_t =
         decltype(std::declval<_Tp &>().template create_case_map<_V>());
 
 template <typename _Tp>
-concept instance_c = requires(_Tp i, option_t o) {
+using instance_cases_range_t = decltype(std::declval<_Tp &>().cases());
+
+template <typename _Tp>
+using instance_case_t = std::ranges::range_value_t<instance_cases_range_t<_Tp>>;
+
+template <typename _Tp>
+using instance_graph_t = case_graph_t<instance_case_t<_Tp>>;
+
+template <typename _Tp>
+concept instance_c = requires(_Tp i, option_t o, instance_case_map_t<_Tp, double> case_values) {
     { i.options() } -> detail::range_of<option_t>;
     { i.option_cost(o) } -> std::convertible_to<double>;
     { i.template create_option_map<int>() } 
@@ -54,7 +65,8 @@ concept instance_c = requires(_Tp i, option_t o) {
     { i.cases() } -> std::ranges::range;
     { i.template create_case_map<int>() } 
             -> melon::output_value_map_of<case_id_t, int>;
-} && case_c<std::ranges::range_value_t<decltype(std::declval<_Tp>().cases())>>;
+    { i.eval_criterion(case_values) } -> std::same_as<double>;
+} && case_c<instance_case_t<_Tp>>;
 // clang-format on
 
 }  // namespace landscape_opt

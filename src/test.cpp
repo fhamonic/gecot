@@ -8,6 +8,7 @@
 #include "landscape_opt/indices/parallel_eca.hpp"
 #include "landscape_opt/utils/chronometer.hpp"
 
+#include "landscape_opt/helper.hpp"
 // #include "landscape_opt/solvers/static_incremental.hpp"
 
 #include "instance.hpp"
@@ -17,6 +18,9 @@ using namespace fhamonic;
 
 int main(int argc, const char * argv[]) {
     std::filesystem::path instances_description_json = argv[1];
+
+    static_assert(landscape_opt::instance_c<Instance>);
+    static_assert(landscape_opt::case_c<InstanceCase>);
 
     Instance instance = parse_instance(instances_description_json);
     InstanceCase instance_case = instance.cases().front();

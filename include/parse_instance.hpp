@@ -314,14 +314,70 @@ static nlohmann::json instance_schema = R"(
                 }
             },
             "additionalProperties": false
+        },
+        "criterion": {
+            "$ref": "#/properties/criterion/definitions/formula",
+            "definitions": {
+                "variable": {
+                    "type": "string"
+                },
+                "operation": {
+                    "type": "object",
+                    "properties": {
+                        "operation": {
+                            "enum": [
+                                "sum",
+                                "min"
+                            ]
+                        },
+                        "terms": {
+                            "type": "array",
+                            "contains": {
+                                "$ref": "#/properties/criterion/definitions/term"
+                            }
+                        }
+                    },
+                    "required": [
+                        "operation",
+                        "terms"
+                    ],
+                    "additionalProperties": false
+                },
+                "formula": {
+                    "oneOf": [
+                        {
+                            "$ref": "#/properties/criterion/definitions/variable"
+                        },
+                        {
+                            "$ref": "#/properties/criterion/definitions/operation"
+                        }
+                    ]
+                },
+                "term": {
+                    "type": "object",
+                    "properties": {
+                        "coef": {
+                            "type": "number",
+                            "minimum": 0
+                        },
+                        "value": {
+                            "$ref": "#/properties/criterion/definitions/formula"
+                        }
+                    },
+                    "required": [
+                        "value"
+                    ],
+                    "additionalProperties": false
+                }
+            }
         }
     },
     "required": [
         "options",
         "cases"
-    ]
+    ],
+    "additionalProperties": false
 }
-
 )"_json;
 }
 

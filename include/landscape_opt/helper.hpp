@@ -18,6 +18,12 @@
 namespace fhamonic {
 namespace landscape_opt {
 
+template <case_c C>
+auto compute_case_eca(const C & instance_case) noexcept {
+    return eca(instance_case.graph(), instance_case.vertex_quality_map(),
+               instance_case.arc_probability_map());
+}
+
 template <instance_c I>
 auto compute_cases_vertex_options(const I & instance) noexcept {
     auto cases_vertex_options =

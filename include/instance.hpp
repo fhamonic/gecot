@@ -2,10 +2,12 @@
 #define INSTANCE_HPP
 
 #include <cassert>
+#include <limits>
 #include <memory>
 #include <ranges>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <parallel_hashmap/phmap.h>
@@ -106,6 +108,51 @@ public:
     }
 };
 
+using criterion_constant = double;
+using criterion_var = landscape_opt::case_id_t;
+struct criterion_sum;
+struct criterion_product;
+struct criterion_min;
+
+using criterion_formula =
+    std::variant<criterion_constant, criterion_var, criterion_sum, criterion_product, criterion_min>;
+
+struct criterion_sum {
+    std::vector<criterion_formula> values;
+};
+struct criterion_product {
+     std::vector<criterion_formula> values;
+};
+struct criterion_min {
+    std::vector<criterion_formula> values;
+};
+
+
+template <typename M>
+struct formula_eval_visitor {
+    std::reference_wrapper<const M> value_map;
+
+    formula_eval_visitor(const M & t_value_map) : value_map{t_value_map} {}
+
+    double operator()(const criterion_constant & c) { return c; }
+    double operator()(const criterion_var & v) { return value_map.get()[v]; }
+    double operator()(const criterion_sum & f) {
+        double sum = 0.0;
+        for(auto && e : f.values) sum += std::visit(*this, e);
+        return sum;
+    }
+    double operator()(const criterion_product & f) {
+        double product = 1.0;
+        for(auto && e : f.values) product *= std::visit(*this, e);
+        return product;
+    }
+    double operator()(const criterion_min & f) {
+        double min = std::numeric_limits<double>::max();
+        for(auto && e : f.values) min = std::min(min, std::visit(*this, e));
+        return min;
+    }
+};
+
 class Instance {
 private:
     std::vector<double> _options_costs;
@@ -114,6 +161,7 @@ private:
         _option_name_to_id_map;
 
     std::vector<InstanceCase> _cases;
+    criterion_formula _criterion;
 
 public:
     [[nodiscard]] auto options() const noexcept {
@@ -132,12 +180,11 @@ public:
     [[nodiscard]] decltype(auto) cases() const noexcept { return _cases; }
     template <typename V>
     [[nodiscard]] auto create_case_map(V v = {}) const {
-        return melon::static_map<std::size_t, V>(_cases.size(), v);
+        return melon::static_map<landscape_opt::case_id_t, V>(_cases.size(), v);
     }
-    template <melon::input_value_map_of<std::size_t, double> M>
+    template <melon::input_value_map_of<landscape_opt::case_id_t, double> M>
     [[nodiscard]] double eval_criterion(const M & case_values) const noexcept {
-        // TODO structs and std::visit de formula !
-        return 0.0;
+        return std::visit(formula_eval_visitor{case_values}, _criterion);
     }
 
 public:
@@ -176,6 +223,9 @@ public:
     template <class... T>
     [[nodiscard]] decltype(auto) emplace_case(T &&... args) {
         return _cases.emplace_back(_cases.size(), std::forward<T>(args)...);
+    }
+    void set_criterion(criterion_formula && c) {
+        _criterion = c;
     }
 };
 

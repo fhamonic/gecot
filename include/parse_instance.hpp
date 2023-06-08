@@ -523,7 +523,8 @@ void parse_arcs_options(InstanceCase & instance_case, T json_object,
 
 template <typename T>
 decltype(auto) parse_instance_case(T json_object, std::string case_name,
-                                 const std::filesystem::path & parent_path, Instance & instance) {
+                                   const std::filesystem::path & parent_path,
+                                   Instance & instance) {
     std::vector<double> vertex_quality_map;
     std::vector<std::string> vertex_names;
     phmap::node_hash_map<std::string, melon::vertex_t<melon::static_digraph>>
@@ -601,11 +602,11 @@ decltype(auto) parse_instance_case(T json_object, std::string case_name,
         arc_name_to_id_map[arc_names[a]] = a;
     }
 
-    return instance.emplace_case(std::move(case_name), std::move(graph),
-                        std::move(vertex_quality_map),
-                        std::move(arc_probability_map), std::move(vertex_names),
-                        std::move(vertex_name_to_id_map), std::move(arc_names),
-                        std::move(arc_name_to_id_map));
+    return instance.emplace_case(
+        std::move(case_name), std::move(graph), std::move(vertex_quality_map),
+        std::move(arc_probability_map), std::move(vertex_names),
+        std::move(vertex_name_to_id_map), std::move(arc_names),
+        std::move(arc_name_to_id_map));
 }
 
 Instance parse_instance(const std::filesystem::path & instance_path) {
@@ -624,13 +625,18 @@ Instance parse_instance(const std::filesystem::path & instance_path) {
 
     for(auto && [case_name, case_json] : instance_json["cases"].items()) {
         InstanceCase & instance_case = parse_instance_case(
-                case_json, case_name, instance_path.parent_path(), instance);
+            case_json, case_name, instance_path.parent_path(), instance);
 
         parse_vertices_options(instance_case, case_json,
                                instance_path.parent_path(), instance);
         parse_arcs_options(instance_case, case_json,
                            instance_path.parent_path(), instance);
     }
+
+    criterion_sum s;
+    for(auto instance_case : instance.cases())
+        s.values.emplace_back(instance_case.id());
+    instance.set_criterion(criterion_formula{s});
 
     return instance;
 }

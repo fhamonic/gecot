@@ -297,8 +297,23 @@
         "criterion": {
             "$ref": "#/properties/criterion/definitions/formula",
             "definitions": {
+                "constant": {
+                    "type": "number"
+                },
                 "variable": {
                     "type": "string"
+                },
+                "linear_term": {
+                    "type": "array",
+                    "items": [
+                        {
+                            "$ref": "#/properties/criterion/definitions/constant"
+                        },
+                        {
+                            "$ref": "#/properties/criterion/definitions/formula"
+                        }
+                    ],
+                    "additionalItems": false
                 },
                 "operation": {
                     "type": "object",
@@ -306,47 +321,38 @@
                         "operation": {
                             "enum": [
                                 "sum",
+                                "product",
                                 "min"
                             ]
                         },
-                        "terms": {
+                        "values": {
                             "type": "array",
                             "contains": {
-                                "$ref": "#/properties/criterion/definitions/term"
+                                "$ref": "#/properties/criterion/definitions/formula"
                             }
                         }
                     },
                     "required": [
                         "operation",
-                        "terms"
+                        "values"
                     ],
                     "additionalProperties": false
                 },
                 "formula": {
                     "oneOf": [
                         {
+                            "$ref": "#/properties/criterion/definitions/constant"
+                        },
+                        {
                             "$ref": "#/properties/criterion/definitions/variable"
+                        },
+                        {
+                            "$ref": "#/properties/criterion/definitions/linear_term"
                         },
                         {
                             "$ref": "#/properties/criterion/definitions/operation"
                         }
                     ]
-                },
-                "term": {
-                    "type": "object",
-                    "properties": {
-                        "coef": {
-                            "type": "number",
-                            "minimum": 0
-                        },
-                        "value": {
-                            "$ref": "#/properties/criterion/definitions/formula"
-                        }
-                    },
-                    "required": [
-                        "value"
-                    ],
-                    "additionalProperties": false
                 }
             }
         }

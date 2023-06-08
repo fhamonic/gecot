@@ -9,7 +9,7 @@
 #include "landscape_opt/utils/chronometer.hpp"
 
 #include "landscape_opt/helper.hpp"
-// #include "landscape_opt/solvers/static_incremental.hpp"
+#include "landscape_opt/solvers/static_incremental.hpp"
 
 #include "instance.hpp"
 #include "parse_instance.hpp"

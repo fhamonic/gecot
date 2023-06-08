@@ -39,8 +39,8 @@ int main(int argc, const char * argv[]) {
     std::cout << "par ECA = " << par_eca << " in " << chrono.lap_time_us()
               << " us" << std::endl;
 
-    // landscape_opt::solvers::StaticIncremental static_incr;
-    // static_incr.solve(instance, 0);
+    landscape_opt::solvers::StaticIncremental static_incr;
+    static_incr.solve(instance, 0);
 
     return EXIT_SUCCESS;
 }

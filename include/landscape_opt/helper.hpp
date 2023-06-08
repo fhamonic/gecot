@@ -32,9 +32,8 @@ auto compute_cases_vertex_options(const I & instance) noexcept {
                 std::pair<melon::vertex_t<instance_graph_t<I>>, double>>{}));
 
     for(auto && instance_case : instance.cases()) {
+        const auto & vertex_options_map = instance_case.vertex_options_map();
         for(auto && u : melon::vertices(instance_case.graph())) {
-            const auto & vertex_options_map =
-                instance_case.vertex_options_map();
             for(auto && [quality_gain, option] : vertex_options_map[u]) {
                 cases_vertex_options[instance_case.id()][option].emplace_back(
                     u, quality_gain);
@@ -52,8 +51,8 @@ auto compute_cases_arc_options(const I & instance) noexcept {
                 std::pair<melon::arc_t<instance_graph_t<I>>, double>>{}));
 
     for(auto && instance_case : instance.cases()) {
+        const auto & arc_options_map = instance_case.arc_options_map();
         for(auto && a : melon::arcs(instance_case.graph())) {
-            const auto & arc_options_map = instance_case.arc_options_map()[a];
             for(auto && [enhanced_prob, option] : arc_options_map[a])
                 cases_arc_options[instance_case.id()][option].emplace_back(
                     a, enhanced_prob);

@@ -27,18 +27,20 @@ struct StaticIncremental {
     instance_option_map_t<I, bool> solve(const I & instance,
                                          const double budget) const {
         chronometer chrono;
-        auto solution = instance.template create_option_map<I, bool>();
+        auto solution = instance.create_option_map(false);
 
         const auto & cases = instance.cases();
-        std::vector<option_t> options = ranges::to<std::vector>(
-            ranges::views::filter(instance.options(), [&](option_t i) {
-                return instance.option_cost(i) <= budget;
-            }));
+        std::vector<option_t> options;
+        for(const option_t & o : instance.options()) {
+            if(instance.option_cost(o) > budget) continue;
+            options.emplace_back(o);
+        }
 
         auto cases_base_eca = instance.template create_case_map<double>();
         auto compute_base_eca =
-            [&cases_base_eca](const tbb::blocked_range<decltype(cases.begin())> &
-                   cases_block) {
+            [&cases_base_eca](
+                const tbb::blocked_range<decltype(cases.begin())> &
+                    cases_block) {
                 for(auto instance_case : cases_block)
                     cases_base_eca[instance_case.id()] =
                         eca(instance_case.graph(),
@@ -66,6 +68,9 @@ struct StaticIncremental {
                                            decltype(options.begin())> &
                     cases_options_block) {
                 for(auto instance_case : cases_options_block.rows()) {
+                    auto && options_block = cases_options_block.cols();
+                    if(options_block.begin() == options_block.end()) continue;
+
                     const auto & original_qm =
                         instance_case.vertex_quality_map();
                     const auto & original_pm =
@@ -79,7 +84,6 @@ struct StaticIncremental {
                     const auto & arc_options =
                         cases_arc_options[instance_case.id()];
 
-                    auto && options_block = cases_options_block.cols();
                     for(auto it = options_block.begin();;) {
                         option_t option = *it;
                         for(auto && [u, quality_gain] : vertex_options[option])
@@ -114,7 +118,7 @@ struct StaticIncremental {
         auto options_ratios = instance.create_option_map(0.0);
         for(option_t o : options) {
             options_ratios[o] =
-                (instance.evaluate(options_cases_eca[o]) - base_score) /
+                (instance.eval_criterion(options_cases_eca[o]) - base_score) /
                 instance.option_cost(o);
         }
 

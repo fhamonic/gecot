@@ -1,7 +1,7 @@
 #ifndef LANDSCAPE_OPT_SOLVERS_STATIC_DECREMENTAL_HPP
 #define LANDSCAPE_OPT_SOLVERS_STATIC_DECREMENTAL_HPP
 
-#include <tbb/blocked_range.h>
+#include <tbb/blocked_range2d.h>
 #include <tbb/parallel_for.h>
 
 #include <range/v3/algorithm/sort.hpp>
@@ -22,196 +22,119 @@ struct StaticDecremental {
     bool parallel = false;
     bool only_dec = false;
 
-    template <concepts::Instance I>
-    typename I::Solution solve(const I & instance, const double budget) const {
-        using Landscape = typename I::Landscape;
-        using QualityMap = typename Landscape::QualityMap;
-        using ProbabilityMap = typename Landscape::ProbabilityMap;
-        using Option = typename I::Option;
-        using Solution = typename I::Solution;
-
-        // int time_ms = 0;
+    template <instance_c I>
+    instance_option_map_t<I, bool> solve(const I & instance,
+                                         const double budget) const {
         chronometer chrono;
-        Solution solution = instance.create_solution();
-        double purchaised = 0.0;
+        auto solution = instance.create_option_map(false);
 
-        std::vector<Option> options;
-        std::vector<double> options_ratios(instance.options().size());
-
-        for(auto && option : instance.options()) {
-            const double price = instance.option_cost(option);
-            purchaised += price;
-            solution[option] = 1.0;
-            options.emplace_back(option);
+        const auto & cases = instance.cases();
+        std::vector<option_t> options;
+        double purchased = 0.0;
+        for(const option_t & o : instance.options()) {
+            if(instance.option_cost(o) > budget) continue;
+            options.emplace_back(o);
+            solution[o] = true;
+            purchased += instance.option_cost(o);
         }
 
-        const auto vertexOptions = detail::computeOptionsForVertices(instance);
-        const auto arcOptions = detail::computeOptionsForArcs(instance);
+        const double max_score =
+            compute_solution_score(instance, solution, parallel);
 
-        const QualityMap & original_qm = instance.landscape().quality_map();
-        const ProbabilityMap & original_pm =
-            instance.landscape().probability_map();
+        auto options_cases_eca = instance.create_option_map(
+            instance.template create_case_map<double>());
 
-        QualityMap enhanced_qm = original_qm;
-        ProbabilityMap enhanced_pm = original_pm;
+        const auto cases_vertex_options =
+            compute_cases_vertex_options(instance);
+        const auto cases_arc_options = compute_cases_arc_options(instance);
+
+        auto max_qm = instance_case.vertex_quality_map();
+        auto max_pm = instance_case.arc_probability_map();
         for(auto && option : options) {
-            for(auto && [u, quality_gain] : vertexOptions[option])
-                enhanced_qm[u] += quality_gain;
-            for(auto && [a, enhanced_prob] : arcOptions[option])
-                enhanced_pm[a] = std::max(enhanced_pm[a], enhanced_prob);
+            for(auto && [u, quality_gain] : vertex_options[option])
+                max_qm[u] += quality_gain;
+            for(auto && [a, enhanced_prob] : arc_options[option])
+                max_pm[a] = std::max(enhanced_pm[a], enhanced_prob);
         }
 
-        const double enhanced_eca =
-            eca(instance.landscape().graph(), enhanced_qm, enhanced_pm);
-        if(verbose) {
-            std::cout << "ECA with all possible improvments: " << enhanced_eca
-                      << std::endl;
-        }
+        auto compute_options_enhanced_eca =
+            [&options_cases_eca, &max_qm, &max_pm, &cases_vertex_options, &cases_arc_options](
+                const tbb::blocked_range2d<decltype(cases.begin()),
+                                           decltype(options.begin())> &
+                    cases_options_block) {
+                for(auto instance_case : cases_options_block.rows()) {
+                    auto && options_block = cases_options_block.cols();
+                    if(options_block.begin() == options_block.end()) continue;
 
-        auto compute_delta_eca_dec =
-            [&](const tbb::blocked_range<decltype(options.begin())> &
-                    options_block) {
-                QualityMap qm = enhanced_qm;
-                ProbabilityMap pm = enhanced_pm;
+                    auto ablated_qm = max_qm;
+                    auto ablated_pm = max_pm;
 
-                for(auto it = options_block.begin();;) {
-                    Option option = *it;
-                    for(auto && [u, quality_gain] : vertexOptions[option])
-                        qm[u] -= quality_gain;
-                    for(auto && [a, _] : arcOptions[option]) {
-                        pm[a] = original_pm[a];
-                        for(auto && [enhanced_prob, i] :
-                            instance.arc_options_map()[a]) {
-                            if(option == i) continue;
-                            pm[a] = std::max(pm[a], enhanced_prob);
+                    const auto & vertex_options =
+                        cases_vertex_options[instance_case.id()];
+                    const auto & arc_options =
+                        cases_arc_options[instance_case.id()];
+
+                    for(auto it = options_block.begin();;) {
+                        option_t option = *it;
+                        for(auto && [u, quality_gain] : vertex_options[option])
+                            ablated_qm[u] -= quality_gain;
+                        for(auto && [a, _] : arc_options[option]) {
+                            ablated_pm[a] = original_pm[a];
+                            for(auto && [current_prob, i] :
+                                instance_case.arc_options_map()[a]) {
+                                if(!solution[i] || option == i) continue;
+                                ablated_pm[a] =
+                                    std::max(ablated_pm[a], current_prob);
+                            }
                         }
+
+                        options_cases_eca[option][instance_case.id()] = eca(
+                            instance_case.graph(), ablated_qm, ablated_pm);
+
+                        if(++it == options_block.end()) break;
+
+                        for(auto && [u, _] : vertex_options[option])
+                            ablated_qm[u] = max_qm[u];
+                        for(auto && [a, _] : arc_options[option])
+                            ablated_pm[a] = max_pm[a];
                     }
-
-                    const double decreased_eca =
-                        eca(instance.landscape().graph(), qm, pm);
-
-                    options_ratios[option] = (enhanced_eca - decreased_eca) /
-                                             instance.option_cost(option);
-
-                    if(++it == options_block.end()) break;
-
-                    for(auto && [u, quality_gain] : vertexOptions[option])
-                        qm[u] += quality_gain;
-                    for(auto && [a, _] : arcOptions[option])
-                        pm[a] = enhanced_pm[a];
                 }
             };
 
         if(parallel) {
             tbb::parallel_for(
-                tbb::blocked_range(options.begin(), options.end()),
-                compute_delta_eca_dec);
+                tbb::blocked_range2d(cases.begin(), cases.end(),
+                                     options.begin(), options.end()),
+                compute_options_enhanced_eca);
         } else {
-            compute_delta_eca_dec(
-                tbb::blocked_range(options.begin(), options.end()));
+            compute_options_enhanced_eca(tbb::blocked_range2d(
+                cases.begin(), cases.end(), options.begin(), options.end()));
         }
 
-        auto zipped_view_dec = ranges::view::zip(options_ratios, options);
-        ranges::sort(zipped_view_dec, [](auto && e1, auto && e2) {
-            return e1.first < e2.first;
+        auto options_ratios = instance.create_option_map(0.0);
+        for(option_t o : options) {
+            options_ratios[o] =
+                (max_score - instance.eval_criterion(options_cases_eca[o])) /
+                instance.option_cost(o);
+        }
+
+        std::ranges::sort(options, [&options_ratios](auto && o1, auto && o2) {
+            return options_ratios[o1] < options_ratios[o2];
         });
 
-        std::vector<Option> free_options;
-
-        for(Option option : options) {
-            if(purchaised <= budget) break;
+        
+        for(option_t option : options) {
+            if(purchased <= budget) break;
             const double price = instance.option_cost(option);
-            purchaised -= price;
+            purchased -= price;
             solution[option] = 0.0;
             free_options.emplace_back(option);
             if(verbose) {
                 std::cout << "remove option: " << option
                           << "\n\t costing: " << price
-                          << "\n\t total cost: " << purchaised << std::endl;
+                          << "\n\t total cost: " << purchased << std::endl;
             }
         }
-
-        free_options.erase(
-            std::remove_if(free_options.begin(), free_options.end(),
-                           [&](Option i) {
-                               return purchaised + instance.option_cost(i) >
-                                      budget;
-                           }),
-            free_options.end());
-
-        if(!only_dec && !free_options.empty()) {
-            typename Landscape::QualityMap current_qm = original_qm;
-            typename Landscape::ProbabilityMap current_pm = original_pm;
-
-            for(Option option : options) {
-                if(solution[option] == 0.0) continue;
-                for(auto && [u, quality_gain] : vertexOptions[option])
-                    current_qm[u] += quality_gain;
-                for(auto && [a, enhanced_prob] : arcOptions[option])
-                    current_pm[a] = std::max(current_pm[a], enhanced_prob);
-            }
-
-            const double current_eca =
-                eca(instance.landscape().graph(), current_qm, current_pm);
-
-            auto compute_delta_eca_inc =
-                [&](const tbb::blocked_range<decltype(free_options.begin())> &
-                        options_block) {
-                    QualityMap qm = current_qm;
-                    ProbabilityMap pm = current_pm;
-
-                    for(auto it = options_block.begin();;) {
-                        Option option = *it;
-                        for(auto && [u, quality_gain] : vertexOptions[option])
-                            qm[u] += quality_gain;
-                        for(auto && [a, enhanced_prob] : arcOptions[option])
-                            pm[a] = std::max(pm[a], enhanced_prob);
-
-                        const double increased_eca =
-                            eca(instance.landscape().graph(), qm, pm);
-
-                        options_ratios[option] = (increased_eca - current_eca) /
-                                                 instance.option_cost(option);
-
-                        if(++it == options_block.end()) break;
-
-                        for(auto && [u, quality_gain] : vertexOptions[option])
-                            qm[u] = current_qm[u];
-                        for(auto && [a, enhanced_prob] : arcOptions[option])
-                            pm[a] = current_pm[a];
-                    }
-                };
-
-            options_ratios.resize(free_options.size());
-
-            if(parallel) {
-                tbb::parallel_for(tbb::blocked_range(free_options.begin(),
-                                                     free_options.end()),
-                                  compute_delta_eca_inc);
-            } else {
-                compute_delta_eca_inc(tbb::blocked_range(free_options.begin(),
-                                                         free_options.end()));
-            }
-
-            auto zipped_view_inc =
-                ranges::view::zip(options_ratios, free_options);
-            ranges::sort(zipped_view_inc, [](auto && e1, auto && e2) {
-                return e1.first > e2.first;
-            });
-
-            for(Option option : free_options) {
-                const double price = instance.option_cost(option);
-                if(purchaised + price > budget) continue;
-                purchaised += price;
-                solution[option] = 1.0;
-                if(verbose) {
-                    std::cout << "add option: " << option
-                              << "\n\t costing: " << price
-                              << "\n\t total cost: " << purchaised << std::endl;
-                }
-            }
-        }
-        // time_ms = chrono.time_ms();
 
         return solution;
     }

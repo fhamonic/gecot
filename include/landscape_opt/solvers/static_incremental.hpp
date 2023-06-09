@@ -36,24 +36,7 @@ struct StaticIncremental {
             options.emplace_back(o);
         }
 
-        auto cases_base_eca = instance.template create_case_map<double>();
-        auto compute_base_eca =
-            [&cases_base_eca](
-                const tbb::blocked_range<decltype(cases.begin())> &
-                    cases_block) {
-                for(auto instance_case : cases_block)
-                    cases_base_eca[instance_case.id()] =
-                        eca(instance_case.graph(),
-                            instance_case.vertex_quality_map(),
-                            instance_case.arc_probability_map());
-            };
-        if(parallel) {
-            tbb::parallel_for(tbb::blocked_range(cases.begin(), cases.end()),
-                              compute_base_eca);
-        } else {
-            compute_base_eca(tbb::blocked_range(cases.begin(), cases.end()));
-        }
-        const double base_score = instance.eval_criterion(cases_base_eca);
+        const double base_score = compute_base_score(instance, parallel);
 
         auto options_cases_eca = instance.create_option_map(
             instance.template create_case_map<double>());

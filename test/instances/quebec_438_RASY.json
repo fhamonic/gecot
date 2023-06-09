@@ -42,5 +42,8 @@
             }
         }
     },
-    "criterion": "frog"
+    "criterion": {
+        "operation": "sum",
+        "values": [[0.5,"frog"]]
+    }
 }

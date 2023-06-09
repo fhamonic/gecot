@@ -41,6 +41,9 @@ template <typename _Tp, typename _V>
 using instance_option_map_t =
     decltype(std::declval<_Tp &>().template create_option_map<_V>());
 
+template <typename _Tp>
+using instance_solution_t = instance_option_map_t<_Tp, bool>;
+
 template <typename _Tp, typename _V>
 using instance_case_map_t =
     decltype(std::declval<_Tp &>().template create_case_map<_V>());

@@ -46,6 +46,7 @@ private:
 
 public:
     [[nodiscard]] auto id() const noexcept { return _case_id; }
+    [[nodiscard]] auto name() const noexcept { return _case_name; }
     [[nodiscard]] auto & graph() const noexcept { return _graph; }
     [[nodiscard]] auto & vertex_quality_map() const noexcept {
         return _vertex_quality_map;
@@ -115,18 +116,18 @@ struct criterion_product;
 struct criterion_min;
 
 using criterion_formula =
-    std::variant<criterion_constant, criterion_var, criterion_sum, criterion_product, criterion_min>;
+    std::variant<criterion_constant, criterion_var,
+                 criterion_sum, criterion_product, criterion_min>;
 
 struct criterion_sum {
     std::vector<criterion_formula> values;
 };
 struct criterion_product {
-     std::vector<criterion_formula> values;
+    std::vector<criterion_formula> values;
 };
 struct criterion_min {
     std::vector<criterion_formula> values;
 };
-
 
 template <typename M>
 struct formula_eval_visitor {
@@ -224,8 +225,12 @@ public:
     [[nodiscard]] decltype(auto) emplace_case(T &&... args) {
         return _cases.emplace_back(_cases.size(), std::forward<T>(args)...);
     }
-    void set_criterion(criterion_formula && c) {
-        _criterion = c;
+    void set_criterion(criterion_formula && c) { _criterion = c; }
+    landscape_opt::case_id_t case_id_from_name(const std::string & name) const {
+        for(auto && instance_case : _cases) {
+            if(instance_case.name() == name) return instance_case.id();
+        }
+        throw std::invalid_argument("unknwon case '" + name + "'");
     }
 };
 

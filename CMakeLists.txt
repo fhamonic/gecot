@@ -59,15 +59,15 @@ target_compile_definitions(landscape_opt
                            INTERFACE MIPPP_PREFERED_SOLVER=MIPPP_GUROBI)
 
 # ################### EXEC target ####################
-# add_executable(lscp_solve src/solve.cpp)
-# target_link_libraries(lscp_solve PUBLIC landscape_opt)
-# target_link_libraries(lscp_solve
-#                       PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser)
-# target_link_libraries(lscp_solve PUBLIC nlohmann_json::nlohmann_json)
-# target_link_libraries(lscp_solve PUBLIC nlohmann_json_schema_validator::nlohmann_json_schema_validator)
-# target_link_libraries(lscp_solve PUBLIC phmap::phmap)
+add_executable(lscp_solve src/solve.cpp)
+target_link_libraries(lscp_solve PUBLIC landscape_opt)
+target_link_libraries(lscp_solve
+                      PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser)
+target_link_libraries(lscp_solve PUBLIC nlohmann_json::nlohmann_json)
+target_link_libraries(lscp_solve PUBLIC nlohmann_json_schema_validator::nlohmann_json_schema_validator)
+target_link_libraries(lscp_solve PUBLIC phmap::phmap)
 
-# target_compile_options(lscp_solve PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
+target_compile_options(lscp_solve PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 
 # add_executable(lscp_rank src/rank.cpp)
 # target_link_libraries(lscp_rank PUBLIC landscape_opt)

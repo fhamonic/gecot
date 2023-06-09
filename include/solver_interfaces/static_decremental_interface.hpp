@@ -40,7 +40,7 @@ public:
         solver.only_dec = vm.count("only-dec") > 0;
     }
 
-    typename Instance::Solution solve(const Instance & instance,
+    landscape_opt::instance_solution_t<Instance> solve(const Instance & instance,
                                       const double B) const {
         return solver.solve(instance, B);
     };

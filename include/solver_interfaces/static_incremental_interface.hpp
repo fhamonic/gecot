@@ -5,6 +5,7 @@
 
 #include <boost/program_options.hpp>
 
+#include "landscape_opt/concepts/instance.hpp"
 #include "landscape_opt/solvers/static_incremental.hpp"
 
 #include "instance.hpp"
@@ -36,7 +37,7 @@ public:
         solver.parallel = vm.count("parallel") > 0;
     }
 
-    typename Instance::Solution solve(const Instance & instance,
+    landscape_opt::instance_solution_t<Instance> solve(const Instance & instance,
                                       const double B) const {
         return solver.solve(instance, B);
     };

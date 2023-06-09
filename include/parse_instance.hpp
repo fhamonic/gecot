@@ -318,8 +318,23 @@ static nlohmann::json instance_schema = R"(
         "criterion": {
             "$ref": "#/properties/criterion/definitions/formula",
             "definitions": {
+                "constant": {
+                    "type": "number"
+                },
                 "variable": {
                     "type": "string"
+                },
+                "linear_term": {
+                    "type": "array",
+                    "items": [
+                        {
+                            "$ref": "#/properties/criterion/definitions/constant"
+                        },
+                        {
+                            "$ref": "#/properties/criterion/definitions/formula"
+                        }
+                    ],
+                    "additionalItems": false
                 },
                 "operation": {
                     "type": "object",
@@ -327,47 +342,38 @@ static nlohmann::json instance_schema = R"(
                         "operation": {
                             "enum": [
                                 "sum",
+                                "product",
                                 "min"
                             ]
                         },
-                        "terms": {
+                        "values": {
                             "type": "array",
                             "contains": {
-                                "$ref": "#/properties/criterion/definitions/term"
+                                "$ref": "#/properties/criterion/definitions/formula"
                             }
                         }
                     },
                     "required": [
                         "operation",
-                        "terms"
+                        "values"
                     ],
                     "additionalProperties": false
                 },
                 "formula": {
                     "oneOf": [
                         {
+                            "$ref": "#/properties/criterion/definitions/constant"
+                        },
+                        {
                             "$ref": "#/properties/criterion/definitions/variable"
+                        },
+                        {
+                            "$ref": "#/properties/criterion/definitions/linear_term"
                         },
                         {
                             "$ref": "#/properties/criterion/definitions/operation"
                         }
                     ]
-                },
-                "term": {
-                    "type": "object",
-                    "properties": {
-                        "coef": {
-                            "type": "number",
-                            "minimum": 0
-                        },
-                        "value": {
-                            "$ref": "#/properties/criterion/definitions/formula"
-                        }
-                    },
-                    "required": [
-                        "value"
-                    ],
-                    "additionalProperties": false
                 }
             }
         }
@@ -381,9 +387,9 @@ static nlohmann::json instance_schema = R"(
 )"_json;
 }
 
-template <typename T, typename I>
-void parse_options(T json_object, const std::filesystem::path & parent_path,
-                   I & instance) {
+template <typename T>
+void parse_options(Instance & instance, T json_object,
+                   const std::filesystem::path & parent_path) {
     auto add_option = [&](const std::string & option_id,
                           const double option_cost) {
         if(instance.contains_option(option_id))
@@ -609,6 +615,43 @@ decltype(auto) parse_instance_case(T json_object, std::string case_name,
         std::move(arc_name_to_id_map));
 }
 
+criterion_formula parse_formula(Instance & instance, auto json_object);
+
+std::vector<criterion_formula> parse_formula_array(Instance & instance,
+                                                   auto json_object) {
+    std::vector<criterion_formula> values;
+    for(auto && value_json : json_object) {
+        values.emplace_back(parse_formula(instance, value_json));
+    }
+    return values;
+}
+
+criterion_formula parse_formula(Instance & instance, auto json_object) {
+    if(json_object.is_number()) {
+        return criterion_constant{json_object.template get<double>()};
+    } else if(json_object.is_string()) {
+        return criterion_var{instance.case_id_from_name(
+            json_object.template get<std::string>())};
+    } else if(json_object.is_array()) {
+        return criterion_product{{json_object[0].template get<double>(),
+                                  parse_formula(instance, json_object[1])}};
+    } else if(json_object.is_object()) {
+        auto operation_type =
+            json_object["operation"].template get<std::string>();
+        if(operation_type == "sum")
+            return criterion_sum{
+                parse_formula_array(instance, json_object["values"])};
+        if(operation_type == "product")
+            return criterion_product{
+                parse_formula_array(instance, json_object["values"])};
+        if(operation_type == "min")
+            return criterion_min{
+                parse_formula_array(instance, json_object["values"])};
+    }
+    throw std::invalid_argument(
+        "Unexpected criterion format : Update the JSON schema !");
+}
+
 Instance parse_instance(const std::filesystem::path & instance_path) {
     Instance instance;
 
@@ -621,7 +664,7 @@ Instance parse_instance(const std::filesystem::path & instance_path) {
     validator.validate(instance_json);
 
     auto options_json = instance_json["options"];
-    parse_options(options_json, instance_path.parent_path(), instance);
+    parse_options(instance, options_json, instance_path.parent_path());
 
     for(auto && [case_name, case_json] : instance_json["cases"].items()) {
         InstanceCase & instance_case = parse_instance_case(
@@ -633,10 +676,15 @@ Instance parse_instance(const std::filesystem::path & instance_path) {
                            instance_path.parent_path(), instance);
     }
 
-    criterion_sum s;
-    for(auto instance_case : instance.cases())
-        s.values.emplace_back(instance_case.id());
-    instance.set_criterion(criterion_formula{s});
+    if(instance_json.contains("criterion")) {
+        auto criterion_json = instance_json["criterion"];
+        instance.set_criterion(parse_formula(instance, criterion_json));
+    } else {
+        criterion_sum s;
+        for(auto instance_case : instance.cases())
+            s.values.emplace_back(instance_case.id());
+        instance.set_criterion(criterion_formula{s});
+    }
 
     return instance;
 }

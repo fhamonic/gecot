@@ -21,11 +21,11 @@ namespace logging = boost::log;
 #include "parse_instance.hpp"
 
 #include "solver_interfaces/abstract_solver.hpp"
-#include "solver_interfaces/greedy_decremental_interface.hpp"
-#include "solver_interfaces/greedy_incremental_interface.hpp"
-#include "solver_interfaces/mip_interface.hpp"
-#include "solver_interfaces/preprocessed_mip_interface.hpp"
-#include "solver_interfaces/static_decremental_interface.hpp"
+// #include "solver_interfaces/greedy_decremental_interface.hpp"
+// #include "solver_interfaces/greedy_incremental_interface.hpp"
+// #include "solver_interfaces/mip_interface.hpp"
+// #include "solver_interfaces/preprocessed_mip_interface.hpp"
+// #include "solver_interfaces/static_decremental_interface.hpp"
 #include "solver_interfaces/static_incremental_interface.hpp"
 
 using namespace fhamonic;
@@ -59,12 +59,13 @@ static bool process_command_line(
     std::filesystem::path & instances_description_json_file, double & budget,
     bool & output_in_file, std::filesystem::path & output_csv_file) {
     std::vector<std::shared_ptr<AbstractSolver>> solver_interfaces{
-        std::make_unique<StaticIncrementalInterface>(),
-        std::make_unique<StaticDecrementalInterface>(),
-        std::make_unique<GreedyIncrementalInterface>(),
-        std::make_unique<GreedyDecrementalInterface>(),
-        std::make_unique<MIPInterface>(),
-        std::make_unique<PreprocessedMIPInterface>()};
+        std::make_unique<StaticIncrementalInterface>()//,
+        // std::make_unique<StaticDecrementalInterface>()//,
+        // std::make_unique<GreedyIncrementalInterface>(),
+        // std::make_unique<GreedyDecrementalInterface>(),
+        // std::make_unique<MIPInterface>(),
+        // std::make_unique<PreprocessedMIPInterface>()
+        };
 
     auto print_soft_name = []() { std::cout << "LSCP 0.1\n\n"; };
     auto print_usage = []() {
@@ -197,13 +198,13 @@ int main(int argc, const char * argv[]) {
 
     Instance instance = parse_instance(instances_description_json);
 
-    Instance::Solution solution = solver->solve(instance, budget);
+    auto solution = solver->solve(instance, budget);
 
     if(!output_in_file) {
         std::cout.precision(10);
-        const double eca =
-            landscape_opt::detail::compute_solution_eca(instance, solution);
-        std::cout << "ECA: " << eca << std::endl;
+        const double solution_score =
+            landscape_opt::compute_solution_score(instance, solution);            
+        std::cout << "Score: " << solution_score << std::endl;
         std::cout << "Solution:" << std::endl;
         const std::size_t option_name_max_length = std::ranges::max(
             std::ranges::views::transform(instance.options(), [&](auto && o) {

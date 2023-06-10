@@ -24,8 +24,8 @@ struct StaticIncremental {
     bool parallel = false;
 
     template <instance_c I>
-    instance_option_map_t<I, bool> solve(const I & instance,
-                                         const double budget) const {
+    instance_solution_t<I> solve(const I & instance,
+                                 const double budget) const {
         chronometer chrono;
         auto solution = instance.create_option_map(false);
 
@@ -45,13 +45,14 @@ struct StaticIncremental {
             compute_cases_vertex_options(instance);
         const auto cases_arc_options = compute_cases_arc_options(instance);
 
+        //
         auto compute_options_enhanced_eca =
             [&options_cases_eca, &cases_vertex_options, &cases_arc_options](
                 const tbb::blocked_range2d<decltype(cases.begin()),
                                            decltype(options.begin())> &
                     cases_options_block) {
-                for(auto instance_case : cases_options_block.rows()) {
-                    auto && options_block = cases_options_block.cols();
+                for(const auto & instance_case : cases_options_block.rows()) {
+                    const auto & options_block = cases_options_block.cols();
                     if(options_block.begin() == options_block.end()) continue;
 
                     const auto & original_qm =
@@ -97,6 +98,18 @@ struct StaticIncremental {
             compute_options_enhanced_eca(tbb::blocked_range2d(
                 cases.begin(), cases.end(), options.begin(), options.end()));
         }
+
+        // compute_options_cases_incr_eca(
+        //     instance, melon::views::map([](auto o) { return false; }),
+        //     options, melon::views::map([&instance](auto case_id) ->
+        //     decltype(auto) {
+        //         return instance.cases()[case_id].vertex_quality_map();
+        //     }),
+        //     melon::views::map([&instance](auto case_id) -> decltype(auto) {
+        //         return instance.cases()[case_id].arc_probability_map();
+        //     }),
+        //     cases_vertex_options, cases_arc_options, options_cases_eca,
+        //     parallel);
 
         auto options_ratios = instance.create_option_map(0.0);
         for(option_t o : options) {

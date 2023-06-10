@@ -23,8 +23,8 @@ struct StaticDecremental {
     bool only_dec = false;
 
     template <instance_c I>
-    instance_option_map_t<I, bool> solve(const I & instance,
-                                         const double budget) const {
+    instance_solution_t<I> solve(const I & instance,
+                                 const double budget) const {
         chronometer chrono;
         auto solution = instance.create_option_map(false);
 
@@ -48,27 +48,41 @@ struct StaticDecremental {
             compute_cases_vertex_options(instance);
         const auto cases_arc_options = compute_cases_arc_options(instance);
 
-        auto max_qm = instance_case.vertex_quality_map();
-        auto max_pm = instance_case.arc_probability_map();
-        for(auto && option : options) {
-            for(auto && [u, quality_gain] : vertex_options[option])
-                max_qm[u] += quality_gain;
-            for(auto && [a, enhanced_prob] : arc_options[option])
-                max_pm[a] = std::max(enhanced_pm[a], enhanced_prob);
+        auto cases_max_qm =
+            instance.template create_case_map<instance_quality_map_t<I>>();
+        auto cases_max_pm =
+            instance.template create_case_map<instance_probability_map_t<I>>();
+        for(auto instance_case : cases) {
+            auto & max_qm = (cases_max_qm[instance_case.id()] =
+                                 instance_case.vertex_quality_map());
+            auto & max_pm = (cases_max_pm[instance_case.id()] =
+                                 instance_case.arc_probability_map());
+            const auto & vertex_options =
+                cases_vertex_options[instance_case.id()];
+            const auto & arc_options = cases_arc_options[instance_case.id()];
+            for(auto && option : options) {
+                for(auto && [u, quality_gain] : vertex_options[option])
+                    max_qm[u] += quality_gain;
+                for(auto && [a, enhanced_prob] : arc_options[option])
+                    max_pm[a] = std::max(max_pm[a], enhanced_prob);
+            }
         }
 
         auto compute_options_enhanced_eca =
-            [&options_cases_eca, &max_qm, &max_pm, &cases_vertex_options, &cases_arc_options](
+            [&solution, &options_cases_eca, &cases_max_qm, &cases_max_pm,
+             &cases_vertex_options, &cases_arc_options](
                 const tbb::blocked_range2d<decltype(cases.begin()),
                                            decltype(options.begin())> &
                     cases_options_block) {
                 for(auto instance_case : cases_options_block.rows()) {
                     auto && options_block = cases_options_block.cols();
                     if(options_block.begin() == options_block.end()) continue;
-
+                    const auto & original_pm =
+                        instance_case.arc_probability_map();
+                    const auto & max_qm = cases_max_qm[instance_case.id()];
+                    const auto & max_pm = cases_max_pm[instance_case.id()];
                     auto ablated_qm = max_qm;
                     auto ablated_pm = max_pm;
-
                     const auto & vertex_options =
                         cases_vertex_options[instance_case.id()];
                     const auto & arc_options =
@@ -88,8 +102,8 @@ struct StaticDecremental {
                             }
                         }
 
-                        options_cases_eca[option][instance_case.id()] = eca(
-                            instance_case.graph(), ablated_qm, ablated_pm);
+                        options_cases_eca[option][instance_case.id()] =
+                            eca(instance_case.graph(), ablated_qm, ablated_pm);
 
                         if(++it == options_block.end()) break;
 
@@ -122,12 +136,13 @@ struct StaticDecremental {
             return options_ratios[o1] < options_ratios[o2];
         });
 
-        
+        std::vector<option_t> free_options;
+
         for(option_t option : options) {
             if(purchased <= budget) break;
             const double price = instance.option_cost(option);
             purchased -= price;
-            solution[option] = 0.0;
+            solution[option] = false;
             free_options.emplace_back(option);
             if(verbose) {
                 std::cout << "remove option: " << option

@@ -6,10 +6,12 @@
 #include <vector>
 
 #include <tbb/blocked_range.h>
+#include <tbb/blocked_range2d.h>
 #include <tbb/parallel_for.h>
 
 #include "melon/container/static_map.hpp"
 #include "melon/graph.hpp"
+#include "melon/utility/value_map.hpp"
 
 #include "landscape_opt/concepts/instance.hpp"
 #include "landscape_opt/indices/eca.hpp"
@@ -85,8 +87,7 @@ double compute_solution_score(const I & instance, const S & solution,
     const auto cases_vertex_options = compute_cases_vertex_options(instance);
     const auto cases_arcs_options = compute_cases_arc_options(instance);
     auto compute_base_eca =
-        [&](
-            const tbb::blocked_range<decltype(cases.begin())> & cases_block) {
+        [&](const tbb::blocked_range<decltype(cases.begin())> & cases_block) {
             for(auto instance_case : cases_block) {
                 auto enhanced_qm = instance_case.vertex_quality_map();
                 auto enhanced_pm = instance_case.arc_probability_map();
@@ -114,6 +115,65 @@ double compute_solution_score(const I & instance, const S & solution,
         compute_base_eca(tbb::blocked_range(cases.begin(), cases.end()));
     }
     return instance.eval_criterion(cases_eca);
+}
+
+template <instance_c I, melon::input_value_map_of<option_t, bool> S,
+          detail::range_of<option_t> O>
+void compute_options_cases_incr_eca(
+    const I & instance, const S & current_solution, const O & free_options,
+    auto && cases_current_qm, auto && cases_current_pm,
+    auto && cases_vertex_options, auto && cases_arc_options,
+    auto & options_cases_eca, const bool parallel = false) {
+    const auto & cases = instance.cases();
+    auto compute_options_enhanced_eca =
+        [&](const tbb::blocked_range2d<decltype(cases.begin()),
+                                       decltype(free_options.begin())> &
+                cases_options_block) {
+            for(const auto & instance_case : cases_options_block.rows()) {
+                const auto & options_block = cases_options_block.cols();
+                if(options_block.begin() == options_block.end()) continue;
+
+                const auto & current_qm = cases_current_qm[instance_case.id()];
+                const auto & current_pm = cases_current_pm[instance_case.id()];
+                const auto & vertex_options =
+                    cases_vertex_options[instance_case.id()];
+                const auto & arc_options =
+                    cases_arc_options[instance_case.id()];
+
+                auto enhanced_qm = current_qm;
+                auto enhanced_pm = current_pm;
+
+                for(auto it = options_block.begin();;) {
+                    option_t option = *it;
+                    for(auto && [u, quality_gain] : vertex_options[option])
+                        enhanced_qm[u] += quality_gain;
+                    for(auto && [a, enhanced_prob] : arc_options[option])
+                        enhanced_pm[a] =
+                            std::max(enhanced_pm[a], enhanced_prob);
+
+                    options_cases_eca[option][instance_case.id()] =
+                        eca(instance_case.graph(), enhanced_qm, enhanced_pm);
+
+                    if(++it == options_block.end()) break;
+
+                    for(auto && [u, quality_gain] : vertex_options[option])
+                        enhanced_qm[u] = current_qm[u];
+                    for(auto && [a, enhanced_prob] : arc_options[option])
+                        enhanced_pm[a] = current_pm[a];
+                }
+            }
+        };
+
+    if(parallel) {
+        tbb::parallel_for(
+            tbb::blocked_range2d(cases.begin(), cases.end(),
+                                 free_options.begin(), free_options.end()),
+            compute_options_enhanced_eca);
+    } else {
+        compute_options_enhanced_eca(
+            tbb::blocked_range2d(cases.begin(), cases.end(),
+                                 free_options.begin(), free_options.end()));
+    }
 }
 
 }  // namespace landscape_opt

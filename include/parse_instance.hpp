@@ -615,17 +615,6 @@ decltype(auto) parse_instance_case(T json_object, std::string case_name,
         std::move(arc_name_to_id_map));
 }
 
-criterion_formula parse_formula(Instance & instance, auto json_object);
-
-std::vector<criterion_formula> parse_formula_array(Instance & instance,
-                                                   auto json_object) {
-    std::vector<criterion_formula> values;
-    for(auto && value_json : json_object) {
-        values.emplace_back(parse_formula(instance, value_json));
-    }
-    return values;
-}
-
 criterion_formula parse_formula(Instance & instance, auto json_object) {
     if(json_object.is_number()) {
         return criterion_constant{json_object.template get<double>()};
@@ -638,15 +627,14 @@ criterion_formula parse_formula(Instance & instance, auto json_object) {
     } else if(json_object.is_object()) {
         auto operation_type =
             json_object["operation"].template get<std::string>();
-        if(operation_type == "sum")
-            return criterion_sum{
-                parse_formula_array(instance, json_object["values"])};
+        std::vector<criterion_formula> values;
+        for(auto && value_json : json_object) {
+            values.emplace_back(parse_formula(instance, value_json));
+        }
+        if(operation_type == "sum") return criterion_sum{std::move(values)};
         if(operation_type == "product")
-            return criterion_product{
-                parse_formula_array(instance, json_object["values"])};
-        if(operation_type == "min")
-            return criterion_min{
-                parse_formula_array(instance, json_object["values"])};
+            return criterion_product{std::move(values)};
+        if(operation_type == "min") return criterion_min{std::move(values)};
     }
     throw std::invalid_argument(
         "Unexpected criterion format : Update the JSON schema !");
@@ -677,8 +665,8 @@ Instance parse_instance(const std::filesystem::path & instance_path) {
     }
 
     if(instance_json.contains("criterion")) {
-        auto criterion_json = instance_json["criterion"];
-        instance.set_criterion(parse_formula(instance, criterion_json));
+        instance.set_criterion(
+            parse_formula(instance, instance_json["criterion"]));
     } else {
         criterion_sum s;
         for(auto instance_case : instance.cases())

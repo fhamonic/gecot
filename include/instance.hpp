@@ -48,10 +48,10 @@ public:
     [[nodiscard]] auto id() const noexcept { return _case_id; }
     [[nodiscard]] auto name() const noexcept { return _case_name; }
     [[nodiscard]] auto & graph() const noexcept { return _graph; }
-    [[nodiscard]] auto & vertex_quality_map() const noexcept {
+    [[nodiscard]] const auto & vertex_quality_map() const noexcept {
         return _vertex_quality_map;
     }
-    [[nodiscard]] auto & arc_probability_map() const noexcept {
+    [[nodiscard]] const auto & arc_probability_map() const noexcept {
         return _arc_probability_map;
     }
     [[nodiscard]] auto & vertex_options_map() const noexcept {
@@ -178,7 +178,7 @@ public:
     [[nodiscard]] auto create_option_map(V v = {}) const {
         return melon::static_map<landscape_opt::option_t, V>(nb_options(), v);
     }
-    [[nodiscard]] decltype(auto) cases() const noexcept { return _cases; }
+    [[nodiscard]] auto & cases() const noexcept { return _cases; }
     template <typename V>
     [[nodiscard]] auto create_case_map(V v = {}) const {
         return melon::static_map<landscape_opt::case_id_t, V>(_cases.size(), v);

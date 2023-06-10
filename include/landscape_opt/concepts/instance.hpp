@@ -2,6 +2,7 @@
 #define LANDSCAPE_OPT_CONCEPTS_INSTANCE_CASE_HPP
 
 #include <concepts>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -19,7 +20,14 @@ using option_t = unsigned int;
 using case_id_t = std::size_t;
 
 template <typename _Tp>
-using case_graph_t = decltype(std::declval<_Tp &>().graph());
+using case_graph_t = std::decay_t<decltype(std::declval<_Tp &>().graph())>;
+
+template <typename _Tp>
+using case_quality_map_t = std::decay_t<decltype(std::declval<_Tp &>().vertex_quality_map())>;
+
+template <typename _Tp>
+using case_probability_map_t =
+    std::decay_t<decltype(std::declval<_Tp &>().arc_probability_map())>;
 
 // clang-format off
 template <typename _Tp>
@@ -39,23 +47,29 @@ concept case_c = requires(_Tp && ic) {
 
 template <typename _Tp, typename _V>
 using instance_option_map_t =
-    decltype(std::declval<_Tp &>().template create_option_map<_V>());
+    std::decay_t<decltype(std::declval<_Tp &>().template create_option_map<_V>())>;
 
 template <typename _Tp>
 using instance_solution_t = instance_option_map_t<_Tp, bool>;
 
 template <typename _Tp, typename _V>
 using instance_case_map_t =
-    decltype(std::declval<_Tp &>().template create_case_map<_V>());
+    std::decay_t<decltype(std::declval<_Tp &>().template create_case_map<_V>())>;
 
 template <typename _Tp>
-using instance_cases_range_t = decltype(std::declval<_Tp &>().cases());
+using instance_cases_range_t = std::decay_t<decltype(std::declval<_Tp &>().cases())>;
 
 template <typename _Tp>
 using instance_case_t = std::ranges::range_value_t<instance_cases_range_t<_Tp>>;
 
 template <typename _Tp>
 using instance_graph_t = case_graph_t<instance_case_t<_Tp>>;
+
+template <typename _Tp>
+using instance_quality_map_t = case_quality_map_t<instance_case_t<_Tp>>;
+
+template <typename _Tp>
+using instance_probability_map_t = case_probability_map_t<instance_case_t<_Tp>>;
 
 template <typename _Tp>
 concept instance_c =

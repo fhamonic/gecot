@@ -117,13 +117,14 @@ double compute_solution_score(const I & instance, const S & solution,
     return instance.eval_criterion(cases_eca);
 }
 
-template <instance_c I, melon::input_value_map_of<option_t, bool> S,
-          detail::range_of<option_t> O>
-void compute_options_cases_incr_eca(
-    const I & instance, const S & current_solution, const O & free_options,
-    auto && cases_current_qm, auto && cases_current_pm,
-    auto && cases_vertex_options, auto && cases_arc_options,
-    auto & options_cases_eca, const bool parallel = false) {
+template <instance_c I, detail::range_of<option_t> O>
+void compute_options_cases_incr_eca(const I & instance, const O & free_options,
+                                    auto && cases_current_qm,
+                                    auto && cases_current_pm,
+                                    auto && cases_vertex_options,
+                                    auto && cases_arc_options,
+                                    auto & options_cases_eca,
+                                    const bool parallel = false) {
     const auto & cases = instance.cases();
     auto compute_options_enhanced_eca =
         [&](const tbb::blocked_range2d<decltype(cases.begin()),

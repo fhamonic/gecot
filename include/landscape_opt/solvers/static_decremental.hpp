@@ -145,9 +145,10 @@ struct StaticDecremental {
             solution[option] = false;
             free_options.emplace_back(option);
             if(verbose) {
-                std::cout << "remove option: " << option
+                std::cout << "add option: " << option
+                          << "\n\t ratio: " << options_ratios[option]
                           << "\n\t costing: " << price
-                          << "\n\t total cost: " << purchased << std::endl;
+                          << "\n\t budget left: " << budget - purchased << std::endl;
             }
         }
 

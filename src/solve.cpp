@@ -22,7 +22,7 @@ namespace logging = boost::log;
 
 #include "solver_interfaces/abstract_solver.hpp"
 // #include "solver_interfaces/greedy_decremental_interface.hpp"
-// #include "solver_interfaces/greedy_incremental_interface.hpp"
+#include "solver_interfaces/greedy_incremental_interface.hpp"
 // #include "solver_interfaces/mip_interface.hpp"
 // #include "solver_interfaces/preprocessed_mip_interface.hpp"
 #include "solver_interfaces/static_decremental_interface.hpp"
@@ -59,9 +59,9 @@ static bool process_command_line(
     std::filesystem::path & instances_description_json_file, double & budget,
     bool & output_in_file, std::filesystem::path & output_csv_file) {
     std::vector<std::shared_ptr<AbstractSolver>> solver_interfaces{
-        std::make_unique<StaticIncrementalInterface>()  //,
+        std::make_unique<StaticIncrementalInterface>(),
         // std::make_unique<StaticDecrementalInterface>()//,
-        // std::make_unique<GreedyIncrementalInterface>(),
+        std::make_unique<GreedyIncrementalInterface>()
         // std::make_unique<GreedyDecrementalInterface>(),
         // std::make_unique<MIPInterface>(),
         // std::make_unique<PreprocessedMIPInterface>()
@@ -102,8 +102,8 @@ static bool process_command_line(
     try {
         po::options_description desc("Allowed options");
         desc.add_options()("help,h", "Display this help message")(
-            "list-algorithms", "List the available algorithms")(
-            "list-params", "List the parameters of the chosen algorithm")(
+            "list-algorithms,A", "List the available algorithms")(
+            "list-params,P", "List the parameters of the chosen algorithm")(
             "algorithm,a", po::value<std::string>(&solver_name)->required(),
             "Algorithm to use")(
             "instance,i",
@@ -111,7 +111,7 @@ static bool process_command_line(
                 ->required(),
             "Instance JSON file")(
             "budget,B", po::value<double>(&budget)->required(), "Budget value")(
-            "output,o", po::value<std::filesystem::path>(&output_csv_file),
+            "output-csv", po::value<std::filesystem::path>(&output_csv_file),
             "Output solution in CSV file");
 
         po::positional_options_description p;

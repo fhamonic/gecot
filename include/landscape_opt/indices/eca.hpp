@@ -37,7 +37,7 @@ double eca(const GR & graph, const QM & quality_map,
         graph, probability_map);
 
     double eca_sum = 0.0;
-    for(auto && s : melon::vertices(graph)) {
+    for(const auto & s : melon::vertices(graph)) {
         if(quality_map[s] == 0) continue;
         double sum = 0.0;
         algo.reset();

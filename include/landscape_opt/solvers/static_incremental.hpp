@@ -26,7 +26,6 @@ struct StaticIncremental {
     template <instance_c I>
     instance_solution_t<I> solve(const I & instance,
                                  const double budget) const {
-        chronometer chrono;
         auto solution = instance.create_option_map(false);
 
         const auto & cases = instance.cases();
@@ -45,71 +44,16 @@ struct StaticIncremental {
             compute_cases_vertex_options(instance);
         const auto cases_arc_options = compute_cases_arc_options(instance);
 
-        //
-        auto compute_options_enhanced_eca =
-            [&options_cases_eca, &cases_vertex_options, &cases_arc_options](
-                const tbb::blocked_range2d<decltype(cases.begin()),
-                                           decltype(options.begin())> &
-                    cases_options_block) {
-                for(const auto & instance_case : cases_options_block.rows()) {
-                    const auto & options_block = cases_options_block.cols();
-                    if(options_block.begin() == options_block.end()) continue;
-
-                    const auto & original_qm =
-                        instance_case.vertex_quality_map();
-                    const auto & original_pm =
-                        instance_case.arc_probability_map();
-
-                    auto enhanced_qm = original_qm;
-                    auto enhanced_pm = original_pm;
-
-                    const auto & vertex_options =
-                        cases_vertex_options[instance_case.id()];
-                    const auto & arc_options =
-                        cases_arc_options[instance_case.id()];
-
-                    for(auto it = options_block.begin();;) {
-                        option_t option = *it;
-                        for(auto && [u, quality_gain] : vertex_options[option])
-                            enhanced_qm[u] += quality_gain;
-                        for(auto && [a, enhanced_prob] : arc_options[option])
-                            enhanced_pm[a] =
-                                std::max(enhanced_pm[a], enhanced_prob);
-
-                        options_cases_eca[option][instance_case.id()] = eca(
-                            instance_case.graph(), enhanced_qm, enhanced_pm);
-
-                        if(++it == options_block.end()) break;
-
-                        for(auto && [u, quality_gain] : vertex_options[option])
-                            enhanced_qm[u] = original_qm[u];
-                        for(auto && [a, enhanced_prob] : arc_options[option])
-                            enhanced_pm[a] = original_pm[a];
-                    }
-                }
-            };
-
-        if(parallel) {
-            tbb::parallel_for(
-                tbb::blocked_range2d(cases.begin(), cases.end(),
-                                     options.begin(), options.end()),
-                compute_options_enhanced_eca);
-        } else {
-            compute_options_enhanced_eca(tbb::blocked_range2d(
-                cases.begin(), cases.end(), options.begin(), options.end()));
-        }
-
-        // compute_options_cases_incr_eca(
-        //     instance, melon::views::map([](auto o) { return false; }),
-        //     options, melon::views::map([&instance](auto case_id) ->
-        //     decltype(auto) {
-        //         return instance.cases()[case_id].vertex_quality_map();
-        //     }),
-        //     melon::views::map([&instance](auto case_id) -> decltype(auto) {
-        //         return instance.cases()[case_id].arc_probability_map();
-        //     }),
-        //     cases_vertex_options, cases_arc_options, options_cases_eca,
-        //     parallel);
+        compute_options_cases_incr_eca(
+            instance, options,
+            melon::views::map([&cases](auto case_id) -> decltype(auto) {
+                return cases[case_id].vertex_quality_map();
+            }),
+            melon::views::map([&cases](auto case_id) -> decltype(auto) {
+                return cases[case_id].arc_probability_map();
+            }),
+            cases_vertex_options, cases_arc_options, options_cases_eca,
+            parallel);
 
         auto options_ratios = instance.create_option_map(0.0);
         for(option_t o : options) {
@@ -122,16 +66,17 @@ struct StaticIncremental {
             return options_ratios[o1] > options_ratios[o2];
         });
 
-        double purchaised = 0.0;
+        double purchased = 0.0;
         for(option_t option : options) {
             const double price = instance.option_cost(option);
-            if(purchaised + price > budget) continue;
-            purchaised += price;
+            if(purchased + price > budget) continue;
+            purchased += price;
             solution[option] = true;
             if(verbose) {
                 std::cout << "add option: " << option
+                          << "\n\t ratio: " << options_ratios[option]
                           << "\n\t costing: " << price
-                          << "\n\t total cost: " << purchaised << std::endl;
+                          << "\n\t budget left: " << budget - purchased << std::endl;
             }
         }
 

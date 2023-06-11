@@ -21,112 +21,80 @@ struct GreedyIncremental {
     bool verbose = false;
     bool parallel = false;
 
-    template <concepts::Instance I>
-    typename I::Solution solve(const I & instance, const double budget) const {
-        using Landscape = typename I::Landscape;
-        using QualityMap = typename Landscape::QualityMap;
-        using ProbabilityMap = typename Landscape::ProbabilityMap;
-        using Option = typename I::Option;
-        using Solution = typename I::Solution;
+    template <instance_c I>
+    instance_solution_t<I> solve(const I & instance,
+                                 const double budget) const {
+        auto solution = instance.create_option_map(false);
 
-        // int time_ms = 0;
-        chronometer chrono;
-        Solution solution = instance.create_solution();
-
-        const auto vertexOptions = detail::computeOptionsForVertices(instance);
-        const auto arcOptions = detail::computeOptionsForArcs(instance);
-
-        double prec_eca = eca(instance.landscape());
-        if(verbose) {
-            std::cout << "base ECA: " << prec_eca << std::endl;
-            std::cout << "total cost: 0" << std::endl;
+        const auto & cases = instance.cases();
+        std::vector<option_t> options;
+        for(const option_t & o : instance.options()) {
+            if(instance.option_cost(o) > budget) continue;
+            options.emplace_back(o);
         }
 
-        std::vector<Option> options =
-            ranges::to<std::vector>(instance.options());
+        auto options_cases_eca = instance.create_option_map(
+            instance.template create_case_map<double>());
+        auto cases_current_qm =
+            instance.template create_case_map<instance_quality_map_t<I>>();
+        auto cases_current_pm =
+            instance.template create_case_map<instance_probability_map_t<I>>();
+        for(const auto & instance_case : cases) {
+            cases_current_qm[instance_case.id()] =
+                instance_case.vertex_quality_map();
+            cases_current_pm[instance_case.id()] =
+                instance_case.arc_probability_map();
+        }
+        const auto cases_vertex_options =
+            compute_cases_vertex_options(instance);
+        const auto cases_arc_options = compute_cases_arc_options(instance);
+        auto options_ratios = instance.create_option_map(0.0);
 
-        QualityMap current_qm = instance.landscape().quality_map();
-        ProbabilityMap current_pm = instance.landscape().probability_map();
-
-        auto compute_delta_eca_inc =
-            [&](const tbb::blocked_range<decltype(options.begin())> &
-                    options_block,
-                std::pair<double, Option> init) {
-                QualityMap qm = current_qm;
-                ProbabilityMap pm = current_pm;
-
-                for(auto it = options_block.begin();;) {
-                    Option option = *it;
-                    for(auto && [u, quality_gain] : vertexOptions[option])
-                        qm[u] += quality_gain;
-                    for(auto && [a, enhanced_prob] : arcOptions[option])
-                        pm[a] = std::max(pm[a], enhanced_prob);
-
-                    const double increased_eca =
-                        eca(instance.landscape().graph(), qm, pm);
-
-                    const double ratio = (increased_eca - prec_eca) /
-                                         instance.option_cost(option);
-
-                    if(init.first < ratio) init = std::make_pair(ratio, option);
-
-                    if(++it == options_block.end()) break;
-
-                    for(auto && [u, quality_gain] : vertexOptions[option])
-                        qm[u] = current_qm[u];
-                    for(auto && [a, enhanced_prob] : arcOptions[option])
-                        pm[a] = current_pm[a];
-                }
-
-                return init;
-            };
-
-        double purchaised = 0.0;
-        for(;;) {
-            options.erase(
-                std::remove_if(options.begin(), options.end(),
-                               [&](Option i) {
-                                   return purchaised + instance.option_cost(i) >
-                                          budget;
-                               }),
-                options.end());
-
-            if(options.empty()) break;
-
-            std::pair<double, Option> best_option_p;
-            if(parallel) {
-                best_option_p = tbb::parallel_reduce(
-                    tbb::blocked_range(options.begin(), options.end()),
-                    std::pair<double, Option>(-1.0, -1), compute_delta_eca_inc,
-                    [](auto && p1, auto && p2) {
-                        return p1.first > p2.first ? p1 : p2;
-                    });
-            } else {
-                best_option_p = compute_delta_eca_inc(
-                    tbb::blocked_range(options.begin(), options.end()),
-                    std::pair<double, Option>(-1.0, -1));
+        double previous_score = compute_base_score(instance, parallel);
+        double budget_left = budget;
+        while(options.size() > 0) {
+            compute_options_cases_incr_eca(
+                instance, options, cases_current_qm, cases_current_pm,
+                cases_vertex_options, cases_arc_options, options_cases_eca,
+                parallel);
+            for(const option_t & o : options) {
+                options_ratios[o] =
+                    (instance.eval_criterion(options_cases_eca[o]) -
+                     previous_score) /
+                    instance.option_cost(o);
             }
-
-            Option best_option = best_option_p.second;
-            const double price = instance.option_cost(best_option);
-            purchaised += price;
-            solution[best_option] = 1.0;
-            prec_eca += best_option_p.first * price;
-
-            for(auto && [u, quality_gain] : vertexOptions[best_option])
-                current_qm[u] += quality_gain;
-            for(auto && [a, enhanced_prob] : arcOptions[best_option])
-                current_qm[a] = std::max(current_qm[a], enhanced_prob);
-
-            options.erase(
-                std::remove(options.begin(), options.end(), best_option),
-                options.end());
-
+            auto best_option_it = std::ranges::max_element(
+                options, [&options_ratios](auto && o1, auto && o2) {
+                    return options_ratios[o1] < options_ratios[o2];
+                });
+            option_t best_option = *best_option_it;
+            const double best_option_price = instance.option_cost(best_option);
+            previous_score += options_ratios[best_option] * best_option_price;
+            budget_left -= best_option_price;
+            solution[best_option] = true;
+            for(const auto & instance_case : cases) {
+                auto & current_qm = cases_current_qm[instance_case.id()];
+                auto & current_pm = cases_current_pm[instance_case.id()];
+                for(auto && [u, quality_gain] :
+                    cases_vertex_options[instance_case.id()][best_option])
+                    current_qm[u] += quality_gain;
+                for(auto && [a, enhanced_prob] :
+                    cases_arc_options[instance_case.id()][best_option])
+                    current_pm[a] = std::max(current_pm[a], enhanced_prob);
+            }
             if(verbose) {
                 std::cout << "add option: " << best_option
-                          << "\n\t costing: " << price
-                          << "\n\t total cost: " << purchaised << std::endl;
+                          << "\n\t ratio: " << options_ratios[best_option]
+                          << "\n\t costing: " << best_option_price
+                          << "\n\t budget left: " << budget_left << std::endl;
             }
+
+            options.erase(best_option_it);
+            const auto [first, last] = std::ranges::remove_if(
+                options, [&instance, budget_left](const option_t & o) {
+                    return instance.option_cost(o) > budget_left;
+                });
+            options.erase(first, last);
         }
 
         return solution;

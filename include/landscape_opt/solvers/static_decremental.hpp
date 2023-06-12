@@ -64,8 +64,7 @@ struct StaticDecremental {
         }
 
         const double max_score =
-            compute_solution_score(instance, solution, cases_vertex_options,
-                                   cases_arc_options, parallel);
+            compute_score(instance, cases_current_qm, cases_current_pm);
         compute_options_cases_decr_eca(instance, solution, options,
                                        cases_current_qm, cases_current_pm,
                                        cases_vertex_options, cases_arc_options,
@@ -83,10 +82,12 @@ struct StaticDecremental {
             return options_ratios[o1] < options_ratios[o2];
         });
 
+        std::vector<option_t> free_options;
         for(auto && option : options) {
             const double price = instance.option_cost(option);
             purchased -= price;
             solution[option] = false;
+            free_options.emplace_back(option);
             if(verbose) {
                 std::cout << "removed option: " << option
                           << "\n\t ratio: " << options_ratios[option]
@@ -94,6 +95,56 @@ struct StaticDecremental {
                           << "\n\t purchased: " << purchased << std::endl;
             }
             if(purchased <= budget) break;
+        }
+
+        if(!only_dec) {
+            for(auto instance_case : cases) {
+                auto & current_qm = (cases_current_qm[instance_case.id()] =
+                                         instance_case.vertex_quality_map());
+                auto & current_pm = (cases_current_pm[instance_case.id()] =
+                                         instance_case.arc_probability_map());
+                auto && vertex_options =
+                    cases_vertex_options[instance_case.id()];
+                auto && arc_options = cases_arc_options[instance_case.id()];
+                for(auto && option : options) {
+                    if(!solution[option]) continue;
+                    for(auto && [u, quality_gain] : vertex_options[option])
+                        current_qm[u] += quality_gain;
+                    for(auto && [a, enhanced_prob] : arc_options[option])
+                        current_pm[a] = std::max(current_pm[a], enhanced_prob);
+                }
+            }
+            const double decremental_score =
+                compute_score(instance, cases_current_qm, cases_current_pm);
+            compute_options_cases_incr_eca(
+                instance, free_options, cases_current_qm, cases_current_pm,
+                cases_vertex_options, cases_arc_options, options_cases_eca,
+                parallel);
+
+            for(const option_t & option : free_options) {
+                options_ratios[option] =
+                    (instance.eval_criterion(options_cases_eca[option]) -
+                     decremental_score) /
+                    instance.option_cost(option);
+            }
+            std::ranges::sort(
+                free_options, [&options_ratios](auto && o1, auto && o2) {
+                    return options_ratios[o1] > options_ratios[o2];
+                });
+
+            for(const option_t & option : free_options) {
+                const double price = instance.option_cost(option);
+                if(purchased + price > budget) continue;
+                purchased += price;
+                solution[option] = true;
+                if(verbose) {
+                    std::cout << "add option: " << option
+                              << "\n\t ratio: " << options_ratios[option]
+                              << "\n\t costing: " << price
+                              << "\n\t budget left: " << budget - purchased
+                              << std::endl;
+                }
+            }
         }
 
         return solution;

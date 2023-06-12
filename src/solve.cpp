@@ -21,7 +21,7 @@ namespace logging = boost::log;
 #include "parse_instance.hpp"
 
 #include "solver_interfaces/abstract_solver.hpp"
-// #include "solver_interfaces/greedy_decremental_interface.hpp"
+#include "solver_interfaces/greedy_decremental_interface.hpp"
 #include "solver_interfaces/greedy_incremental_interface.hpp"
 // #include "solver_interfaces/mip_interface.hpp"
 // #include "solver_interfaces/preprocessed_mip_interface.hpp"
@@ -61,8 +61,8 @@ static bool process_command_line(
     std::vector<std::shared_ptr<AbstractSolver>> solver_interfaces{
         std::make_unique<StaticIncrementalInterface>(),
         std::make_unique<StaticDecrementalInterface>(),
-        std::make_unique<GreedyIncrementalInterface>()
-        // std::make_unique<GreedyDecrementalInterface>(),
+        std::make_unique<GreedyIncrementalInterface>(),
+        std::make_unique<GreedyDecrementalInterface>()
         // std::make_unique<MIPInterface>(),
         // std::make_unique<PreprocessedMIPInterface>()
     };
@@ -97,14 +97,15 @@ static bool process_command_line(
         return false;
     };
 
-    std::string solver_name;
+    // path istead of string to silence a warning...
+    std::filesystem::path solver_name;
 
     try {
         po::options_description desc("Allowed options");
         desc.add_options()("help,h", "Display this help message")(
             "list-algorithms,A", "List the available algorithms")(
             "list-params,P", "List the parameters of the chosen algorithm")(
-            "algorithm,a", po::value<std::string>(&solver_name)->required(),
+            "algorithm, a", po::value(&solver_name)->required(),
             "Algorithm to use")(
             "instance,i",
             po::value<std::filesystem::path>(&instances_description_json_file)
@@ -141,7 +142,7 @@ static bool process_command_line(
         }
 
         if(vm.count("algorithm")) {
-            solver_name = vm["algorithm"].as<std::string>();
+            solver_name = vm["algorithm"].as<std::filesystem::path>();
             bool found = false;
             for(auto & s : solver_interfaces) {
                 if(s->name() == solver_name) {

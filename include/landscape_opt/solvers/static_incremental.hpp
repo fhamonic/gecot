@@ -36,10 +36,8 @@ struct StaticIncremental {
         }
 
         const double base_score = compute_base_score(instance, parallel);
-
         auto options_cases_eca = instance.create_option_map(
             instance.template create_case_map<double>());
-
         const auto cases_vertex_options =
             compute_cases_vertex_options(instance);
         const auto cases_arc_options = compute_cases_arc_options(instance);
@@ -61,13 +59,12 @@ struct StaticIncremental {
                 (instance.eval_criterion(options_cases_eca[option]) - base_score) /
                 instance.option_cost(option);
         }
-
         std::ranges::sort(options, [&options_ratios](auto && o1, auto && o2) {
             return options_ratios[o1] > options_ratios[o2];
         });
 
         double purchased = 0.0;
-        for(option_t option : options) {
+        for(const option_t & option : options) {
             const double price = instance.option_cost(option);
             if(purchased + price > budget) continue;
             purchased += price;

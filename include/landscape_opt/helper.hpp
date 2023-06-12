@@ -32,8 +32,7 @@ auto compute_cases_vertex_options(const I & instance) noexcept {
         auto & vertex_options = cases_vertex_options[instance_case.id()];
         for(auto && u : melon::vertices(instance_case.graph())) {
             for(auto && [quality_gain, option] : vertex_options_map[u]) {
-                vertex_options[option].emplace_back(
-                    u, quality_gain);
+                vertex_options[option].emplace_back(u, quality_gain);
             }
         }
     }
@@ -52,60 +51,24 @@ auto compute_cases_arc_options(const I & instance) noexcept {
         auto & arc_options = cases_arc_options[instance_case.id()];
         for(auto && a : melon::arcs(instance_case.graph())) {
             for(auto && [enhanced_prob, option] : arc_options_map[a])
-                arc_options[option].emplace_back(
-                    a, enhanced_prob);
+                arc_options[option].emplace_back(a, enhanced_prob);
         }
     }
     return cases_arc_options;
 }
 
 template <instance_c I>
-double compute_base_score(const I & instance,
-                          const bool parallel = false) noexcept {
-    const auto & cases = instance.cases();
-    auto cases_base_eca = instance.template create_case_map<double>();
-    auto compute_base_eca =
-        [&cases_base_eca](
-            const tbb::blocked_range<decltype(cases.begin())> & cases_block) {
-            for(auto instance_case : cases_block)
-                cases_base_eca[instance_case.id()] = eca(
-                    instance_case.graph(), instance_case.vertex_quality_map(),
-                    instance_case.arc_probability_map());
-        };
-    if(parallel) {
-        tbb::parallel_for(tbb::blocked_range(cases.begin(), cases.end()),
-                          compute_base_eca);
-    } else {
-        compute_base_eca(tbb::blocked_range(cases.begin(), cases.end()));
-    }
-    return instance.eval_criterion(cases_base_eca);
-}
-
-template <instance_c I, melon::input_value_map_of<option_t, bool> S>
-double compute_solution_score(const I & instance, const S & solution,
-                              const auto & cases_vertex_options, const auto & cases_arc_options, const bool parallel = false) noexcept {
+double compute_score(const I & instance, const auto & cases_current_qm,
+                     const auto & cases_current_pm,
+                     const bool parallel = false) noexcept {
     const auto & cases = instance.cases();
     auto cases_eca = instance.template create_case_map<double>();
     auto compute_base_eca =
         [&](const tbb::blocked_range<decltype(cases.begin())> & cases_block) {
             for(auto instance_case : cases_block) {
-                auto enhanced_qm = instance_case.vertex_quality_map();
-                auto enhanced_pm = instance_case.arc_probability_map();
-
-                auto && vertex_options =
-                    cases_vertex_options[instance_case.id()];
-                auto && arc_options = cases_arc_options[instance_case.id()];
-                for(auto && option : instance.options()) {
-                    if(!solution[option]) continue;
-                    for(auto && [u, quality_gain] : vertex_options[option])
-                        enhanced_qm[u] += quality_gain;
-                    for(auto && [a, enhanced_prob] : arc_options[option])
-                        enhanced_pm[a] =
-                            std::max(enhanced_pm[a], enhanced_prob);
-                }
-
-                cases_eca[instance_case.id()] =
-                    eca(instance_case.graph(), enhanced_qm, enhanced_pm);
+                cases_eca[instance_case.id()] = eca(
+                    instance_case.graph(), cases_current_qm[instance_case.id()],
+                    cases_current_pm[instance_case.id()]);
             }
         };
     if(parallel) {
@@ -117,13 +80,55 @@ double compute_solution_score(const I & instance, const S & solution,
     return instance.eval_criterion(cases_eca);
 }
 
+template <instance_c I>
+double compute_base_score(const I & instance,
+                          const bool parallel = false) noexcept {
+    return compute_score(
+        instance, melon::views::map([&](auto && case_id) {
+            return instance.cases()[case_id].vertex_quality_map();
+        }),
+        melon::views::map([&](auto && case_id) {
+            return instance.cases()[case_id].arc_probability_map();
+        }),
+        parallel);
+}
+
+template <instance_c I, melon::input_value_map_of<option_t, bool> S>
+double compute_solution_score(const I & instance, const S & solution,
+                              const auto & cases_vertex_options,
+                              const auto & cases_arc_options,
+                              const bool parallel = false) noexcept {
+    return compute_score(
+        instance, melon::views::map([&](auto && case_id) {
+            auto enhanced_qm = instance.cases()[case_id].vertex_quality_map();
+            auto && vertex_options = cases_vertex_options[case_id];
+            for(auto && option : instance.options()) {
+                if(!solution[option]) continue;
+                for(auto && [u, quality_gain] : vertex_options[option])
+                    enhanced_qm[u] += quality_gain;
+            }
+            return enhanced_qm;
+        }),
+        melon::views::map([&](auto && case_id) {
+            auto enhanced_pm = instance.cases()[case_id].arc_probability_map();
+            auto && arc_options = cases_arc_options[case_id];
+            for(auto && option : instance.options()) {
+                if(!solution[option]) continue;
+                for(auto && [a, enhanced_prob] : arc_options[option])
+                    enhanced_pm[a] = std::max(enhanced_pm[a], enhanced_prob);
+            }
+            return enhanced_pm;
+        }),
+        parallel);
+}
 
 template <instance_c I, melon::input_value_map_of<option_t, bool> S>
 double compute_solution_score(const I & instance, const S & solution,
                               const bool parallel = false) noexcept {
     const auto cases_vertex_options = compute_cases_vertex_options(instance);
     const auto cases_arcs_options = compute_cases_arc_options(instance);
-    return compute_solution_score(instance, solution, cases_vertex_options, cases_arcs_options, parallel);
+    return compute_solution_score(instance, solution, cases_vertex_options,
+                                  cases_arcs_options, parallel);
 }
 
 template <instance_c I, detail::range_of<option_t> O>
@@ -204,8 +209,7 @@ void compute_options_cases_decr_eca(
 
                 const auto & current_qm = cases_current_qm[instance_case.id()];
                 const auto & current_pm = cases_current_pm[instance_case.id()];
-                const auto & original_pm =
-                    instance_case.arc_probability_map();
+                const auto & original_pm = instance_case.arc_probability_map();
                 const auto & vertex_options =
                     cases_vertex_options[instance_case.id()];
                 const auto & arc_options =

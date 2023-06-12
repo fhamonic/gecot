@@ -30,9 +30,9 @@ struct StaticIncremental {
 
         const auto & cases = instance.cases();
         std::vector<option_t> options;
-        for(const option_t & o : instance.options()) {
-            if(instance.option_cost(o) > budget) continue;
-            options.emplace_back(o);
+        for(const option_t & option : instance.options()) {
+            if(instance.option_cost(option) > budget) continue;
+            options.emplace_back(option);
         }
 
         const double base_score = compute_base_score(instance, parallel);
@@ -56,10 +56,10 @@ struct StaticIncremental {
             parallel);
 
         auto options_ratios = instance.create_option_map(0.0);
-        for(option_t o : options) {
-            options_ratios[o] =
-                (instance.eval_criterion(options_cases_eca[o]) - base_score) /
-                instance.option_cost(o);
+        for(const option_t & option : options) {
+            options_ratios[option] =
+                (instance.eval_criterion(options_cases_eca[option]) - base_score) /
+                instance.option_cost(option);
         }
 
         std::ranges::sort(options, [&options_ratios](auto && o1, auto && o2) {

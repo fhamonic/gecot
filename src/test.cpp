@@ -35,13 +35,13 @@ int main(int argc, const char * argv[]) {
         instance_case.graph(), instance_case.vertex_quality_map(),
         instance_case.arc_probability_map());
     std::cout << "seq ECA = " << seq_eca << " in "
-              << chrono.lap_time_us() / 1000.0 << " ms" << std::endl;
+              << static_cast<double>(chrono.lap_time_us()) / 1000.0 << " ms" << std::endl;
 
     const double par_eca = fhamonic::landscape_opt::parallel_eca(
         instance_case.graph(), instance_case.vertex_quality_map(),
         instance_case.arc_probability_map());
     std::cout << "par ECA = " << par_eca << " in "
-              << chrono.lap_time_us() / 1000.0 << " ms" << std::endl;
+              << static_cast<double>(chrono.lap_time_us()) / 1000.0 << " ms" << std::endl;
 
     std::cout << "number of options " << instance.options().size() << std::endl;
 

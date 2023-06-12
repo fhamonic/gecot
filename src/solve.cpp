@@ -60,7 +60,7 @@ static bool process_command_line(
     bool & output_in_file, std::filesystem::path & output_csv_file) {
     std::vector<std::shared_ptr<AbstractSolver>> solver_interfaces{
         std::make_unique<StaticIncrementalInterface>(),
-        // std::make_unique<StaticDecrementalInterface>()//,
+        std::make_unique<StaticDecrementalInterface>(),
         std::make_unique<GreedyIncrementalInterface>()
         // std::make_unique<GreedyDecrementalInterface>(),
         // std::make_unique<MIPInterface>(),
@@ -212,19 +212,19 @@ int main(int argc, const char * argv[]) {
             std::ranges::views::transform(instance.options(), [&](auto && o) {
                 return instance.option_name(o).size();
             }));
-        for(auto && o : instance.options()) {
-            std::cout << "  " << instance.option_name(o)
+        for(auto && option : instance.options()) {
+            std::cout << "  " << instance.option_name(option)
                       << std::string(option_name_max_length + 1 -
-                                         instance.option_name(o).size(),
+                                         instance.option_name(option).size(),
                                      ' ')
-                      << solution[o] << '\n';
+                      << solution[option] << '\n';
         }
         std::cout << std::endl << "in " << time_ms << " ms" << std::endl;
     } else {
         std::ofstream output_file(output_csv);
         output_file << "option_id,value\n";
-        for(auto && o : instance.options()) {
-            output_file << instance.option_name(o) << ',' << solution[o]
+        for(auto && option : instance.options()) {
+            output_file << instance.option_name(option) << ',' << solution[option]
                         << '\n';
         }
     }

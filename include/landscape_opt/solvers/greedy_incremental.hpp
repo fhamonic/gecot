@@ -28,9 +28,9 @@ struct GreedyIncremental {
 
         const auto & cases = instance.cases();
         std::vector<option_t> options;
-        for(const option_t & o : instance.options()) {
-            if(instance.option_cost(o) > budget) continue;
-            options.emplace_back(o);
+        for(const option_t & option : instance.options()) {
+            if(instance.option_cost(option) > budget) continue;
+            options.emplace_back(option);
         }
 
         auto options_cases_eca = instance.create_option_map(
@@ -57,11 +57,11 @@ struct GreedyIncremental {
                 instance, options, cases_current_qm, cases_current_pm,
                 cases_vertex_options, cases_arc_options, options_cases_eca,
                 parallel);
-            for(const option_t & o : options) {
-                options_ratios[o] =
-                    (instance.eval_criterion(options_cases_eca[o]) -
+            for(const option_t & option : options) {
+                options_ratios[option] =
+                    (instance.eval_criterion(options_cases_eca[option]) -
                      previous_score) /
-                    instance.option_cost(o);
+                    instance.option_cost(option);
             }
             auto best_option_it = std::ranges::max_element(
                 options, [&options_ratios](auto && o1, auto && o2) {

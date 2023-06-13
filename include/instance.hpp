@@ -187,6 +187,9 @@ public:
     [[nodiscard]] double eval_criterion(const M & case_values) const noexcept {
         return std::visit(formula_eval_visitor{case_values}, _criterion);
     }
+   [[nodiscard]] auto & criterion() const noexcept {
+        return _criterion;
+    }
 
 public:
     Instance() = default;

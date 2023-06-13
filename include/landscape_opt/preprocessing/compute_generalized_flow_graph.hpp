@@ -7,24 +7,18 @@
 #include "melon/graph.hpp"
 #include "melon/utility/static_digraph_builder.hpp"
 
-#include "landscape_opt/concepts/instance_case.hpp"
+#include "landscape_opt/concepts/instance.hpp"
 
 namespace fhamonic {
 namespace landscape_opt {
 
-template <concepts::InstanceCase I>
-auto compute_generalized_flow_graph(const I & instance_case) {
-    using Landscape = typename I::Landscape;
-    using Graph = typename Landscape::Graph;
-    using ProbabilityMap = typename Landscape::ProbabilityMap;
-    using Option = typename I::Option;
-
-    const Graph & original_graph = instance_case.landscape().graph();
-    const ProbabilityMap & original_probability_map =
-        instance_case.landscape().probability_map();
+template <case_c C>
+auto compute_generalized_flow_graph(const C & instance_case) {
+    const auto & original_graph = instance_case.graph();
+    const auto & original_probability_map = instance_case.arc_probability_map();
 
     melon::static_digraph_builder<melon::static_digraph, double,
-                                  std::optional<Option>>
+                                  std::optional<option_t>>
         builder(original_graph.nb_vertices());
 
     for(auto && a : melon::arcs(original_graph)) {
@@ -41,7 +35,7 @@ auto compute_generalized_flow_graph(const I & instance_case) {
 
     auto [graph, probability_map, arc_options_map] = builder.build();
 
-    return std::make_tuple(graph, instance_case.landscape().quality_map(),
+    return std::make_tuple(graph, instance_case.vertex_quality_map(),
                            instance_case.vertex_options_map(), probability_map,
                            arc_options_map);
 }

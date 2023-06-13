@@ -5,7 +5,7 @@
 #include "melon/graph.hpp"
 #include "melon/views/reverse.hpp"
 
-#include "landscape_opt/concepts/instance_case.hpp"
+#include "landscape_opt/concepts/instance.hpp"
 #include "landscape_opt/indices/parallel_eca.hpp"
 
 namespace fhamonic {

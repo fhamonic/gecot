@@ -56,7 +56,7 @@ target_link_libraries(landscape_opt INTERFACE range-v3::range-v3)
 target_link_libraries(landscape_opt INTERFACE melon)
 target_link_libraries(landscape_opt INTERFACE mippp)
 target_compile_definitions(landscape_opt
-                           INTERFACE MIPPP_PREFERED_SOLVER=MIPPP_GUROBI)
+                           INTERFACE MIPPP_PREFERED_SOLVER=MIPPP_COIN)
 
 # ################### EXEC target ####################
 add_executable(lscp_solve src/solve.cpp)

@@ -28,6 +28,7 @@ namespace solvers {
 struct MIP {
     bool verbose = false;
     bool parallel = false;
+    bool print_model = false;
 
     template <typename M, typename V>
     struct formula_variable_visitor {
@@ -43,10 +44,10 @@ struct MIP {
         auto operator()(const criterion_var & v) { return C_vars.get()(v); }
         auto operator()(const criterion_sum & f) {
             auto var = model.get().add_var();
-            model.get().add_constraint(var <=
-                                       mippp::xsum(f.values, [this](const auto & e) {
-                                           return std::visit(*this, e);
-                                       }));
+            model.get().add_constraint(
+                var <= mippp::xsum(f.values, [this](const auto & e) {
+                    return std::visit(*this, e);
+                }));
             return var;
         }
         auto operator()(const criterion_product & f) {
@@ -85,7 +86,8 @@ struct MIP {
             instance.cases().size(), [](const case_id_t & id) { return id; });
 
         // model.add_obj(C_vars);
-        model.add_obj(std::visit(formula_variable_visitor{model, C_vars}, instance.criterion()));
+        model.add_obj(std::visit(formula_variable_visitor{model, C_vars},
+                                 instance.criterion()));
 
         const auto X_vars = model.add_vars(
             instance.options().size(), [](const option_t & i) { return i; },
@@ -167,7 +169,14 @@ struct MIP {
                         [](const auto & p) { return p.second; }));
         }
 
-        if(verbose) std::cout << model << std::endl;
+        if(verbose) {
+            std::cout << "MIP Model with:"
+                      << "\n\tvariables:      " << model.nb_variables()
+                      << "\n\tconstraints:    " << model.nb_constraints()
+                      << "\n\tentries:        " << model.nb_entries()
+                      << std::endl;
+        }
+        if(print_model) std::cout << model << std::endl;
 
         auto solver = model.build();
         solver.set_loglevel(verbose ? 1 : 0);

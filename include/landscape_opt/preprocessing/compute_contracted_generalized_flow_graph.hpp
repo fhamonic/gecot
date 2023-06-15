@@ -8,36 +8,31 @@
 #include "melon/container/mutable_digraph.hpp"
 #include "melon/graph.hpp"
 
-#include "landscape_opt/concepts/instance_case.hpp"
+#include "landscape_opt/concepts/instance.hpp"
 
 namespace fhamonic {
 namespace landscape_opt {
 
-template <concepts::InstanceCase I>
-auto compute_contracted_generalized_flow_graph(const I & instance_case,
-                                               const auto & strong_arcs_map,
-                                               const auto & useless_arcs_map,
+template <case_c C>
+auto compute_contracted_generalized_flow_graph(const C & instance_case,
+                                               const auto & strong_arcs,
+                                               const auto & useless_arcs,
                                                const auto & original_t) {
-    using Landscape = typename I::Landscape;
-    using OrigGraph = typename Landscape::Graph;
-    using Option = typename I::Option;
-    using Graph = melon::mutable_digraph;
-
-    const OrigGraph & original_graph = instance_case.landscape().graph();
-    const auto & original_quality_map = instance_case.landscape().quality_map();
+    const auto & original_graph = instance_case.graph();
+    const auto & original_quality_map = instance_case.vertex_quality_map();
     const auto & original_vertex_options_map =
         instance_case.vertex_options_map();
 
-    Graph graph;
+    melon::mutable_digraph graph;
     auto original_to_new_vertex_map =
-        melon::create_vertex_map<melon::vertex_t<Graph>>(original_graph);
+        melon::create_vertex_map<melon::vertex_t<melon::mutable_digraph>>(original_graph);
     for(const auto & v : melon::vertices(original_graph)) {
         auto new_vertex = graph.create_vertex();
         original_to_new_vertex_map[v] = new_vertex;
     }
     auto quality_map = melon::create_vertex_map<double>(graph);
     auto vertex_options_map =
-        melon::create_vertex_map<std::vector<std::pair<double, Option>>>(graph);
+        melon::create_vertex_map<std::vector<std::pair<double, option_t>>>(graph);
     for(const auto & v : melon::vertices(original_graph)) {
         quality_map[original_to_new_vertex_map[v]] = original_quality_map[v];
         vertex_options_map[original_to_new_vertex_map[v]] =
@@ -45,15 +40,15 @@ auto compute_contracted_generalized_flow_graph(const I & instance_case,
     }
 
     auto original_to_new_arc_map =
-        melon::create_arc_map<melon::arc_t<Graph>>(original_graph);
-    std::vector<std::tuple<melon::arc_t<Graph>, double, std::optional<Option>>>
+        melon::create_arc_map<melon::arc_t<melon::mutable_digraph>>(original_graph);
+    std::vector<std::tuple<melon::arc_t<melon::mutable_digraph>, double, std::optional<option_t>>>
         added_arcs;
     const auto & original_probability_map =
-        instance_case.landscape().probability_map();
+        instance_case.arc_probability_map();
 
-    // trasnform the useless arcs map
+    // transform the useless arcs map
     auto arc_uselessness_map = melon::create_arc_map<bool>(original_graph, false);
-    for(const auto & a : useless_arcs_map[original_t])
+    for(const auto & a : useless_arcs)
         arc_uselessness_map[a] = true;
 
     for(const auto & a : melon::arcs(original_graph)) {
@@ -74,7 +69,7 @@ auto compute_contracted_generalized_flow_graph(const I & instance_case,
         }
     }
     auto probability_map = melon::create_arc_map<double>(graph);
-    auto arc_option_map = melon::create_arc_map<std::optional<Option>>(graph);
+    auto arc_option_map = melon::create_arc_map<std::optional<option_t>>(graph);
     for(auto && [a, prob, option] : added_arcs) {
         probability_map[a] = prob;
         arc_option_map[a] = option;
@@ -82,7 +77,7 @@ auto compute_contracted_generalized_flow_graph(const I & instance_case,
 
     // contract strong arcs
     std::vector<melon::arc_t<melon::mutable_digraph>> in_arcs_tmp;
-    for(const auto & original_uv : strong_arcs_map[original_t]) {
+    for(const auto & original_uv : strong_arcs) {
         if(!instance_case.arc_options_map()[original_uv].empty()) continue;
         const auto uv = original_to_new_arc_map[original_uv];
         if(!graph.is_valid_arc(uv)) continue;

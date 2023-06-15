@@ -27,7 +27,6 @@ int main(int argc, const char * argv[]) {
 
     chronometer chrono;
 
-
     std::cout << "number of vertices " << melon::nb_vertices(instance_case.graph()) << std::endl;
     std::cout << "number of arcs " << melon::nb_arcs(instance_case.graph()) << std::endl;
 

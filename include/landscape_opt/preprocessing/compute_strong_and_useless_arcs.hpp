@@ -37,16 +37,15 @@ struct useless_arc_default_traits {
 
 }  // namespace detail
 
-template <concepts::InstanceCase I>
-auto compute_strong_and_useless_arcs(const I & instance_case,
-                                     const bool parallel = false) {
-    using LS = typename I::Landscape;
-    using GR = typename LS::Graph;
-    using PM = typename LS::ProbabilityMap;
-    using arc_t = melon::arc_t<GR>;
+template <case_c C>
+auto compute_strong_and_useless_arcs(
+    const C & instance_case, const bool parallel = false,
+    const auto & option_predicate = [](const option_t & o) { return true; }) {
+    using graph_t = case_graph_t<C>;
+    using probability_map_t = case_probability_map_t<C>;
+    using arc_t = melon::arc_t<graph_t>;
 
-    const LS & landscape = instance_case.landscape();
-    const GR & graph = landscape.graph();
+    const auto & graph = instance_case.graph();
 
     auto strong_arcs_map =
         melon::create_vertex_map<tbb::concurrent_vector<arc_t>>(graph);
@@ -54,28 +53,29 @@ auto compute_strong_and_useless_arcs(const I & instance_case,
         melon::create_vertex_map<tbb::concurrent_vector<arc_t>>(graph);
 
     auto arcs_range = melon::arcs(graph);
-    const PM & upper_length_map = landscape.probability_map();
-    PM lower_length_map = upper_length_map;
+    const auto & base_probability_map = instance_case.arc_probability_map();
+    auto improved_probability_map = base_probability_map;
     const auto & arc_options_map = instance_case.arc_options_map();
     for(const arc_t & a : arcs_range) {
         for(const auto & [improved_prob, option] : arc_options_map[a]) {
-            lower_length_map[a] = std::max(lower_length_map[a], improved_prob);
+            if(!option_predicate(option)) continue;
+            improved_probability_map[a] =
+                std::max(improved_probability_map[a], improved_prob);
         }
     }
 
-    auto compute_strong_arcs =
-        [&](const tbb::blocked_range<decltype(arcs_range.begin())> &
-                arcs_block) {
-            melon::strong_fiber<GR, PM, PM,
-                                detail::strong_arc_default_traits<GR, double>>
-                algo(graph, lower_length_map, upper_length_map);
-            for(const auto & uv : arcs_block) {
-                algo.reset().add_strong_arc_source(uv);
-                for(const auto & [w, w_dist] : algo) {
-                    strong_arcs_map[w].push_back(uv);
-                }
+    auto compute_strong_arcs = [&](const tbb::blocked_range<
+                                   decltype(arcs_range.begin())> & arcs_block) {
+        melon::strong_fiber<graph_t, probability_map_t, probability_map_t,
+                            detail::strong_arc_default_traits<graph_t, double>>
+            algo(graph, improved_probability_map, base_probability_map);
+        for(const auto & uv : arcs_block) {
+            algo.reset().add_strong_arc_source(uv);
+            for(const auto & [w, w_dist] : algo) {
+                strong_arcs_map[w].push_back(uv);
             }
-        };
+        }
+    };
     if(parallel) {
         tbb::parallel_for(
             tbb::blocked_range(arcs_range.begin(), arcs_range.end()),
@@ -85,20 +85,20 @@ auto compute_strong_and_useless_arcs(const I & instance_case,
             tbb::blocked_range(arcs_range.begin(), arcs_range.end()));
     }
 
-    auto compute_useless_arcs =
-        [&](const tbb::blocked_range<decltype(arcs_range.begin())> &
-                arcs_block) {
-            melon::strong_fiber<GR, PM, PM,
-                                detail::useless_arc_default_traits<GR, double>>
-                algo(graph, lower_length_map, upper_length_map);
-            for(const auto & uv : arcs_block) {
-                useless_arcs_map[graph.arc_source(uv)].push_back(uv);
-                algo.reset().add_useless_arc_source(uv);
-                for(const auto & [w, w_dist] : algo) {
-                    useless_arcs_map[w].push_back(uv);
-                }
+    auto compute_useless_arcs = [&](const tbb::blocked_range<
+                                    decltype(arcs_range.begin())> &
+                                        arcs_block) {
+        melon::strong_fiber<graph_t, probability_map_t, probability_map_t,
+                            detail::useless_arc_default_traits<graph_t, double>>
+            algo(graph, improved_probability_map, base_probability_map);
+        for(const auto & uv : arcs_block) {
+            useless_arcs_map[graph.arc_source(uv)].push_back(uv);
+            algo.reset().add_useless_arc_source(uv);
+            for(const auto & [w, w_dist] : algo) {
+                useless_arcs_map[w].push_back(uv);
             }
-        };
+        }
+    };
     if(parallel) {
         tbb::parallel_for(
             tbb::blocked_range(arcs_range.begin(), arcs_range.end()),

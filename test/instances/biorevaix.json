@@ -1,22 +1,22 @@
 {
     "options": {
-        "csv_file": "Aude/dams.csv",
+        "csv_file": "Aix/stretches.csv",
         "csv_columns": {
-            "id": "name",
-            "cost": "cost"
+            "id": "stretch_id",
+            "cost": "stretch_cost"
         }
     },
     "cases": {
-        "trout": {
+        "squirell": {
             "vertices": {
-                "csv_file": "Aude/stretches.csv",
+                "csv_file": "Aix/vertices.csv",
                 "csv_columns": {
-                    "id": "id",
-                    "quality": "length"
+                    "id": "hexagon_id",
+                    "quality": "quality"
                 }
             },
             "arcs": {
-                "csv_file": "Aude/arcs.csv",
+                "csv_file": "Aix/arcs.csv",
                 "csv_columns": {
                     "id": "arc_id",
                     "from": "source_id",
@@ -25,13 +25,14 @@
                 }
             },
             "arcs_improvements": {
-                "csv_file": "Aude/dams_arcs.csv",
+                "csv_file": "Aix/arc_options.csv",
                 "csv_columns": {
                     "arc_id": "arc_id",
-                    "option_id": "dam_id",
+                    "option_id": "stretch_id",
                     "improved_probability": "improved_prob"
                 }
             }
         }
-    }
+    },
+    "criterion": "squirell"
 }

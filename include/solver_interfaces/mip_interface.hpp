@@ -54,7 +54,7 @@ public:
         s << desc;
         return s.str();
     }
-    std::string string() const { return "mip"; }
+    std::string string() const { return name(); }
 };
 
 }  // namespace fhamonic

@@ -41,7 +41,7 @@ public:
         return solver.solve(instance, B);
     };
 
-    std::string name() const { return "greedy_incremental"; }
+    std::string name() const { return "greedy_incr"; }
     std::string description() const {
         return "From the base landscape, iteratively add the option with the "
                "best gain/cost ratio.";
@@ -51,7 +51,7 @@ public:
         s << desc;
         return s.str();
     }
-    std::string string() const { return "greedy_incremental"; }
+    std::string string() const { return name(); }
 };
 
 }  // namespace fhamonic

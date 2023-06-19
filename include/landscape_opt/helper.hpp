@@ -41,7 +41,7 @@ auto compute_cases_vertex_options(const I & instance) noexcept {
 
 template <case_c C>
 void compute_case_arc_options(const C & instance_case,
-                              auto arc_options) noexcept {
+                              auto & arc_options) noexcept {
     const auto & arc_options_map = instance_case.arc_options_map();
     for(auto && a : melon::arcs(instance_case.graph())) {
         for(auto && [enhanced_prob, option] : arc_options_map[a])
@@ -120,8 +120,9 @@ double compute_solution_score(const I & instance, const S & solution,
             auto && arc_options = cases_arc_options[case_id];
             for(auto && option : instance.options()) {
                 if(!solution[option]) continue;
-                for(auto && [a, enhanced_prob] : arc_options[option])
+                for(auto && [a, enhanced_prob] : arc_options[option]) {
                     enhanced_pm[a] = std::max(enhanced_pm[a], enhanced_prob);
+                }
             }
             return enhanced_pm;
         }),
@@ -132,9 +133,9 @@ template <instance_c I, melon::input_value_map_of<option_t, bool> S>
 double compute_solution_score(const I & instance, const S & solution,
                               const bool parallel = false) noexcept {
     const auto cases_vertex_options = compute_cases_vertex_options(instance);
-    const auto cases_arcs_options = compute_cases_arc_options(instance);
+    const auto cases_arc_options = compute_cases_arc_options(instance);
     return compute_solution_score(instance, solution, cases_vertex_options,
-                                  cases_arcs_options, parallel);
+                                  cases_arc_options, parallel);
 }
 
 template <instance_c I, detail::range_of<option_t> O>

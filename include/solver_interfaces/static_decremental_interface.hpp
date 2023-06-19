@@ -45,7 +45,7 @@ public:
         return solver.solve(instance, B);
     };
 
-    std::string name() const { return "static_decremental"; }
+    std::string name() const { return "static_decr"; }
     std::string description() const {
         return "From the improved landscape, remove the options with the worst "
                "gain/cost ratio.";
@@ -55,7 +55,7 @@ public:
         s << desc;
         return s.str();
     }
-    std::string string() const { return "static_decremental"; }
+    std::string string() const { return name(); }
 };
 
 }  // namespace fhamonic

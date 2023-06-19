@@ -70,7 +70,10 @@ auto compute_strong_and_useless_arcs(
                             detail::strong_arc_default_traits<graph_t, double>>
             algo(graph, improved_probability_map, base_probability_map);
         for(const auto & uv : arcs_block) {
-            algo.reset().add_strong_arc_source(uv);
+            auto u = melon::arc_source(graph, uv);
+            algo.reset().add_source(
+                u, melon::views::map(
+                       [&uv](const arc_t & a) -> bool { return a == uv; }));
             for(const auto & [w, w_dist] : algo) {
                 strong_arcs_map[w].push_back(uv);
             }
@@ -92,8 +95,11 @@ auto compute_strong_and_useless_arcs(
                             detail::useless_arc_default_traits<graph_t, double>>
             algo(graph, improved_probability_map, base_probability_map);
         for(const auto & uv : arcs_block) {
-            useless_arcs_map[graph.arc_source(uv)].push_back(uv);
-            algo.reset().add_useless_arc_source(uv);
+            auto u = melon::arc_source(graph, uv);
+            useless_arcs_map[u].push_back(uv);
+            algo.reset().add_source(
+                u, melon::views::map(
+                       [&uv](const arc_t & a) -> bool { return a != uv; }));
             for(const auto & [w, w_dist] : algo) {
                 useless_arcs_map[w].push_back(uv);
             }

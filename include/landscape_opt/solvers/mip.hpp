@@ -194,6 +194,11 @@ struct MIP {
                 solver_solution[static_cast<std::size_t>(X_vars(i).id())];
         }
 
+        if(verbose) {
+            std::cout << "Solution found with value: with: "
+                      << solver.get_objective() << std::endl;
+        }
+
         return solution;
     }
 };

@@ -114,12 +114,12 @@ struct preprocessed_MIP {
                 F_prime_additional_terms;
 
             /*
-                        const auto [strong_arcs_map, useless_arcs_map] =
-                            compute_constrained_strong_and_useless_arcs(
-                                instance, instance_case, budget, parallel,
-                                [&instance, budget](const option_t & o) {
-                                    return instance.option_cost(o) <= budget;
-                                });
+            const auto [strong_arcs_map, useless_arcs_map] =
+                compute_constrained_strong_and_useless_arcs(
+                    instance, instance_case, budget, parallel,
+                    [&instance, budget](const option_t & o) {
+                        return instance.option_cost(o) <= budget;
+                    });
             /*/
             const auto [strong_arcs_map, useless_arcs_map] =
                 compute_strong_and_useless_arcs(
@@ -167,12 +167,6 @@ struct preprocessed_MIP {
                                 [](const auto & p) { return p.first; }));
                 }
 
-                if(verbose) {
-                    std::cout << "Il y a des arcs sortant de t ? : "
-                              << std::ranges::distance(graph.out_arcs(t))
-                              << std::endl;
-                }
-
                 model.add_constraint(
                     F_vars(original_t) + xsum(graph.out_arcs(t), Phi_t_vars) <=
                     xsum(graph.in_arcs(t), Phi_t_vars, probability_map) +
@@ -193,7 +187,7 @@ struct preprocessed_MIP {
                 }
                 model.add_constraint(
                     C_vars(instance_case.id()) <=
-                    xsum(melon::vertices(graph), F_vars, quality_map) +
+                    xsum(melon::vertices(original_graph), F_vars, original_quality_map) +
                         xsum(
                             F_prime_additional_terms,
                             [](const auto & p) { return p.first; },
@@ -221,6 +215,10 @@ struct preprocessed_MIP {
                 solver_solution[static_cast<std::size_t>(X_vars(i).id())];
         }
 
+        if(verbose) {
+            std::cout << "Solution found with value: with: "
+                      << solver.get_objective() << std::endl;
+        }
         return solution;
     }
 };

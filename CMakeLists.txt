@@ -93,5 +93,9 @@ target_link_libraries(lscp_test PUBLIC phmap::phmap)
 target_compile_options(lscp_test PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 
 # ################### TESTS ######################
-# if(ENABLE_TESTING) enable_testing() message("Building Tests.")
-# set_project_warnings(landscape_opt) add_subdirectory(test) endif()
+if(ENABLE_TESTING)
+enable_testing()
+message("Building Tests.")
+set_project_warnings(landscape_opt)
+add_subdirectory(test) 
+endif()

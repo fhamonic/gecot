@@ -41,7 +41,7 @@ public:
         return solver.solve(instance, B);
     };
 
-    std::string name() const { return "preprocessed_mip"; }
+    std::string name() const { return "prep_mip"; }
     std::string description() const {
         return "MIP formulation with preprocessing, from 'Optimizing the "
                "ecological connectivity of landscapes', François Hamonic, "
@@ -52,7 +52,7 @@ public:
         s << desc;
         return s.str();
     }
-    std::string string() const { return "mip"; }
+    std::string string() const { return name(); }
 };
 
 }  // namespace fhamonic

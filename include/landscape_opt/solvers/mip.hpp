@@ -196,7 +196,7 @@ struct MIP {
 
         if(verbose) {
             std::cout << "Solution found with value: with: "
-                      << solver.get_objective() << std::endl;
+                      << solver.get_objective_value() << std::endl;
         }
 
         return solution;

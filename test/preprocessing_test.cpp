@@ -42,8 +42,8 @@ double compute_original_contribution(auto && graph, auto quality_map,
 GTEST_TEST(preprocessing, fuzzy_test) {
     std::string instance_path = PROJECT_SOURCE_DIR;
     // instance_path.append("/test/instances/aude.json");
-    instance_path.append("/test/instances/quebec_438_RASY.json");
-    // instance_path.append("/test/instances/biorevaix.json");
+    // instance_path.append("/test/instances/quebec_438_RASY.json");
+    instance_path.append("/test/instances/biorevaix.json");
     Instance instance = parse_instance(instance_path);
     double budget = 0;
     for(auto && o : instance.options()) budget += instance.option_cost(o);

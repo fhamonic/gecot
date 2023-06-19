@@ -40,6 +40,7 @@ stretches = {}
 
 for hexagon in hexagons_csv:
     if hexagon['area2'] != "1": continue
+    if hexagon['area3'] != "1": continue
     hexagon_id = hexagon['N2_id']
     hexagon_cost = int(hexagon['cost_mode'])
     hexagons[hexagon_id] = hexagon_cost

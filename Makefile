@@ -21,8 +21,10 @@ test: all
 	ctest --output-on-failure
 
 test_preprocessing: all
-	@cd $(BUILD_DIR) && \
-	ctest -R preprocessing --output-on-failure
+	./build/test/landscape_opt_test --gtest_filter=preprocessing.fuzzy_test
+
+# @cd $(BUILD_DIR) && \
+# ctest -R preprocessing --output-on-failure
 
 clean:
 	@rm -rf $(BUILD_DIR)

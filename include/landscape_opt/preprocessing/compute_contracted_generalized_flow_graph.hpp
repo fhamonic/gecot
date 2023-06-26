@@ -85,17 +85,18 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
         const auto v = melon::arc_target(graph, uv);
         const auto uv_prob = probability_map[uv];
 
-        in_arcs_tmp.clear();
+        in_arcs_tmp.resize(0);
         std::ranges::copy(graph.in_arcs(u), std::back_inserter(in_arcs_tmp));
-        for(const auto & wu : in_arcs_tmp) {
-            probability_map[wu] *= uv_prob;
-            graph.change_arc_target(wu, v);
-        }
+        // for(const auto & wu : in_arcs_tmp) {
+        //     probability_map[wu] *= uv_prob;
+        //     graph.change_arc_target(wu, v);
+        // }
 
         quality_map[v] += uv_prob * quality_map[u];
+        quality_map[u] = 0;
         for(const auto & [quality_gain, option] : vertex_options_map[u])
             vertex_options_map[v].emplace_back(uv_prob * quality_gain, option);
-        graph.remove_vertex(u);
+        // graph.remove_vertex(u);
     }
 
     // remove vertices that cannot be traversed by flow

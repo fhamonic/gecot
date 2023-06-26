@@ -48,7 +48,7 @@ GTEST_TEST(preprocessing, fuzzy_test) {
     double budget = 0;
     for(auto && o : instance.options()) budget += instance.option_cost(o);
     budget /= 10;
-    const bool parallel = true;
+    const bool parallel = false;
 
     int cpt = 0;
     int cpt_ok = 0;

@@ -25,14 +25,16 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
 
     melon::mutable_digraph graph;
     auto original_to_new_vertex_map =
-        melon::create_vertex_map<melon::vertex_t<melon::mutable_digraph>>(original_graph);
+        melon::create_vertex_map<melon::vertex_t<melon::mutable_digraph>>(
+            original_graph);
     for(const auto & v : melon::vertices(original_graph)) {
         auto new_vertex = graph.create_vertex();
         original_to_new_vertex_map[v] = new_vertex;
     }
     auto quality_map = melon::create_vertex_map<double>(graph);
     auto vertex_options_map =
-        melon::create_vertex_map<std::vector<std::pair<double, option_t>>>(graph);
+        melon::create_vertex_map<std::vector<std::pair<double, option_t>>>(
+            graph);
     for(const auto & v : melon::vertices(original_graph)) {
         quality_map[original_to_new_vertex_map[v]] = original_quality_map[v];
         vertex_options_map[original_to_new_vertex_map[v]] =
@@ -40,19 +42,20 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
     }
 
     auto original_to_new_arc_map =
-        melon::create_arc_map<melon::arc_t<melon::mutable_digraph>>(original_graph);
-    std::vector<std::tuple<melon::arc_t<melon::mutable_digraph>, double, std::optional<option_t>>>
+        melon::create_arc_map<melon::arc_t<melon::mutable_digraph>>(
+            original_graph);
+    std::vector<std::tuple<melon::arc_t<melon::mutable_digraph>, double,
+                           std::optional<option_t>>>
         added_arcs;
-    const auto & original_probability_map =
-        instance_case.arc_probability_map();
+    const auto & original_probability_map = instance_case.arc_probability_map();
 
     // transform the useless arcs map
-    auto arc_uselessness_map = melon::create_arc_map<bool>(original_graph, false);
-    for(const auto & a : useless_arcs)
-        arc_uselessness_map[a] = true;
+    auto arc_uselessness_map =
+        melon::create_arc_map<bool>(original_graph, false);
+    for(const auto & a : useless_arcs) arc_uselessness_map[a] = true;
 
     for(const auto & a : melon::arcs(original_graph)) {
-        if(arc_uselessness_map[a]) continue; // filter the useless arcs
+        if(arc_uselessness_map[a]) continue;  // filter the useless arcs
         auto new_arc_source =
             original_to_new_vertex_map[melon::arc_source(original_graph, a)];
         auto new_arc_target =
@@ -87,16 +90,16 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
 
         in_arcs_tmp.resize(0);
         std::ranges::copy(graph.in_arcs(u), std::back_inserter(in_arcs_tmp));
-        // for(const auto & wu : in_arcs_tmp) {
-        //     probability_map[wu] *= uv_prob;
-        //     graph.change_arc_target(wu, v);
-        // }
+        for(const auto & wu : in_arcs_tmp) {
+            probability_map[wu] *= uv_prob;
+            graph.change_arc_target(wu, v);
+        }
 
         quality_map[v] += uv_prob * quality_map[u];
-        quality_map[u] = 0;
         for(const auto & [quality_gain, option] : vertex_options_map[u])
-            vertex_options_map[v].emplace_back(uv_prob * quality_gain, option);
-        // graph.remove_vertex(u);
+            vertex_options_map[v].emplace_back(uv_prob * quality_gain,
+            option);
+        graph.remove_vertex(u);
     }
 
     // remove vertices that cannot be traversed by flow
@@ -114,7 +117,6 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
     for(const auto & v : vertices_to_delete_tmp) {
         graph.remove_vertex(v);
     }
-
 
     auto arc_no_map = melon::create_arc_map<std::size_t>(graph);
     std::size_t arc_no = 0;

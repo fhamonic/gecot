@@ -43,30 +43,36 @@ auto compute_constrained_strong_and_useless_arcs(
     compute_case_arc_options(instance_case, arcs_options);
 
     auto cost_map = melon::create_arc_map<double>(graph);
-    const int nb_mus = 5;
-    double max_mu = 2/budget;
+    const int nb_mus = 10;
+    double max_mu = 5000 / budget;
     // double max_mu = 0;
-    //     std::cout << "budget: " << budget << std::endl;
+    // std::cout << "budget: " << budget << std::endl;
     // for(auto && i : instance.options()) {
     //     const double arc_cost = instance.option_cost(i) /
     //                             static_cast<double>(arcs_options[i].size());
     //     for(auto && [a, enhanced_prob] : arcs_options[i]) {
-    //     std::cout << (std::log(enhanced_prob /
-    //                              std::max(base_probability_map[a], 0.5)) /
-    //                         arc_cost) << std::endl;
-    //         max_mu = std::max(
-    //             max_mu, std::log(enhanced_prob /
-    //                              std::max(base_probability_map[a], 0.6)) /
-    //                         arc_cost);
+    //         // std::cout << (std::log(enhanced_prob /
+    //         //                        std::max(base_probability_map[a],
+    //         0.05)) /
+    //         //               arc_cost)
+    //         //           << std::endl;
+    //         max_mu = std::max(max_mu,
+    //                           std::log(enhanced_prob /
+    //                                    std::max(base_probability_map[a],
+    //                                    0.05)) /
+    //                               arc_cost);
     //     }
     // }
 
-    // std::cout << "max_mu: " << max_mu << std::endl;
+    std::cout << "max_mu: " << max_mu
+              << "\tbudget modifier: " << get_modifier(max_mu, budget)
+              << std::endl;
 
     std::vector<std::pair<double, probability_map_t>>
         lagrange_improved_probability_maps;
     for(double mu = 0; mu <= max_mu;
         mu += max_mu / static_cast<double>(nb_mus - 1)) {
+        std::cout << "mu: " << mu << std::endl;
         auto mu_length_map = base_probability_map;
         for(auto && i : instance.options()) {
             const double arc_cost = instance.option_cost(i) /
@@ -93,32 +99,35 @@ auto compute_constrained_strong_and_useless_arcs(
 
     auto compute_strong_arcs = [&](const tbb::blocked_range<
                                    decltype(arcs_range.begin())> & arcs_block) {
-        melon::strong_fiber<graph_t, probability_map_t, probability_map_t,
-                            detail::strong_arc_default_traits<graph_t, double>>
-            algo(graph, base_probability_map, base_probability_map);
-        for(const auto & uv : arcs_block) {
+        arc_t uv;
+        auto fiber_map = melon::create_arc_map<bool>(graph, false);
+        auto sgraph = melon::views::subgraph(
+            graph, {}, melon::views::map([&](const arc_t & a) -> bool {
+                return !fiber_map[melon::arc_target(graph, a)] && a != uv;
+            }));
+        melon::strong_fiber<decltype(sgraph), probability_map_t,
+                            probability_map_t,
+                            detail::useless_arc_default_traits<graph_t, double>>
+            algo(sgraph, base_probability_map, base_probability_map);
+        for(const auto & a : arcs_block) {
+            uv = a;
+            fiber_map.fill(false);
+            auto && u = melon::arc_source(graph, uv);
+            auto && v = melon::arc_target(graph, uv);
             std::vector<std::pair<vertex_t, double>> mu_fiber;
             for(auto && [mu, mu_length_map] :
                 lagrange_improved_probability_maps) {
                 const double budget_modifier = get_modifier(mu, budget);
-                std::cout << mu << " " << budget_modifier << std::endl;
-                auto u = melon::arc_source(graph, uv);
-                algo.reset()
-                    .set_lower_length_map(mu_length_map)
-                    .add_source(
-                        u, melon::views::map([&uv](const arc_t & a) -> bool {
-                            return a == uv;
-                        }),
-                        1.0, mu_length_map,
-                        melon::views::map([&](const arc_t & a) {
-                            return base_probability_map[a] * budget_modifier;
-                        }));
+                algo.reset();
+                algo.set_reduced_length_map(mu_length_map);
+                algo.relax_useless_vertex(u);
+                algo.relax_strong_vertex(
+                    v, base_probability_map[uv] * budget_modifier);
                 for(auto && [w, w_prob] : mu_fiber)
-                    algo.add_source(w, melon::views::map([](auto && v) -> bool {
-                                        return true;
-                                    }),
-                                    w_prob * budget_modifier);
+                    algo.relax_strong_vertex(w, w_prob * budget_modifier);
                 for(const auto & [w, w_prob] : algo) {
+                    if(fiber_map[w]) continue;
+                    fiber_map[w] = true;
                     strong_arcs_map[w].push_back(uv);
                     mu_fiber.emplace_back(w, w_prob / budget_modifier);
                 }
@@ -134,41 +143,44 @@ auto compute_constrained_strong_and_useless_arcs(
             tbb::blocked_range(arcs_range.begin(), arcs_range.end()));
     }
 
-    auto compute_useless_arcs = [&](const tbb::blocked_range<
-                                    decltype(arcs_range.begin())> &
-                                        arcs_block) {
-        melon::strong_fiber<graph_t, probability_map_t, probability_map_t,
-                            detail::useless_arc_default_traits<graph_t, double>>
-            algo(graph, base_probability_map, base_probability_map);
-        for(const auto & uv : arcs_block) {
-            std::vector<std::pair<vertex_t, double>> mu_fiber;
-            for(auto && [mu, mu_length_map] :
-                lagrange_improved_probability_maps) {
-                const double budget_modifier = get_modifier(mu, budget);
-                auto u = melon::arc_source(graph, uv);
+    auto compute_useless_arcs =
+        [&](const tbb::blocked_range<decltype(arcs_range.begin())> &
+                arcs_block) {
+            arc_t uv;
+            auto fiber_map = melon::create_arc_map<bool>(graph, false);
+            auto sgraph = melon::views::subgraph(
+                graph, {}, melon::views::map([&](const arc_t & a) -> bool {
+                    return !fiber_map[melon::arc_target(graph, a)] && a != uv;
+                }));
+            melon::strong_fiber<
+                decltype(sgraph), probability_map_t, probability_map_t,
+                detail::useless_arc_default_traits<graph_t, double>>
+                algo(sgraph, base_probability_map, base_probability_map);
+            for(const auto & a : arcs_block) {
+                uv = a;
+                fiber_map.fill(false);
+                auto && u = melon::arc_source(graph, uv);
+                auto && v = melon::arc_target(graph, uv);
                 useless_arcs_map[u].push_back(uv);
-                algo.reset()
-                    .set_lower_length_map(mu_length_map)
-                    .add_source(
-                        u, melon::views::map([&uv](const arc_t & a) -> bool {
-                            return a != uv;
-                        }),
-                        1.0, mu_length_map,
-                        melon::views::map([&](const arc_t & a) {
-                            return base_probability_map[a] * budget_modifier;
-                        }));
-                for(auto && [w, w_prob] : mu_fiber)
-                    algo.add_source(w, melon::views::map([](auto && v) -> bool {
-                                        return true;
-                                    }),
-                                    w_prob * budget_modifier);
-                for(const auto & [w, w_prob] : algo) {
-                    useless_arcs_map[w].push_back(uv);
-                    mu_fiber.emplace_back(w, w_prob / budget_modifier);
+                std::vector<std::pair<vertex_t, double>> mu_fiber;
+                for(auto && [mu, mu_length_map] :
+                    lagrange_improved_probability_maps) {
+                    const double budget_modifier = get_modifier(mu, budget);
+                    algo.reset();
+                    algo.set_reduced_length_map(mu_length_map);
+                    algo.relax_strong_vertex(u, budget_modifier);
+                    algo.relax_useless_vertex(v, mu_length_map[uv]);
+                    for(auto && [w, w_prob] : mu_fiber)
+                        algo.relax_strong_vertex(w, w_prob * budget_modifier);
+                    for(const auto & [w, w_prob] : algo) {
+                        if(fiber_map[w]) continue;
+                        fiber_map[w] = true;
+                        useless_arcs_map[w].push_back(uv);
+                        mu_fiber.emplace_back(w, w_prob / budget_modifier);
+                    }
                 }
             }
-        }
-    };
+        };
     if(parallel) {
         tbb::parallel_for(
             tbb::blocked_range(arcs_range.begin(), arcs_range.end()),

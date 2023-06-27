@@ -72,21 +72,14 @@ auto compute_strong_and_useless_arcs(
             graph, {}, melon::views::map([&uv](const arc_t & a) -> bool {
                 return a != uv;
             }));
-        // melon::strong_fiber<graph_t, probability_map_t, probability_map_t,
-        //                     detail::strong_arc_default_traits<graph_t,
-        //                     double>>
-        //     algo(graph, improved_probability_map, base_probability_map);
         melon::strong_fiber<decltype(sgraph), probability_map_t,
                             probability_map_t,
-                            detail::strong_arc_default_traits<graph_t, double>>
+                            detail::useless_arc_default_traits<graph_t, double>>
             algo(sgraph, improved_probability_map, base_probability_map);
         for(const auto & a : arcs_block) {
             uv = a;
             auto && u = melon::arc_source(graph, uv);
             auto && v = melon::arc_target(graph, uv);
-            // algo.reset().add_source(
-            //     u, melon::views::map(
-            //            [&uv](const arc_t & a) -> bool { return a == uv; }));
             algo.reset();
             algo.relax_useless_vertex(u);
             algo.relax_strong_vertex(v, base_probability_map[uv]);
@@ -112,11 +105,6 @@ auto compute_strong_and_useless_arcs(
                 graph, {}, melon::views::map([&uv](const arc_t & a) -> bool {
                     return a != uv;
                 }));
-            // melon::strong_fiber<graph_t, probability_map_t,
-            // probability_map_t,
-            //                     detail::useless_arc_default_traits<graph_t,
-            //                     double>>
-            //     algo(graph, improved_probability_map, base_probability_map);
             melon::strong_fiber<
                 decltype(sgraph), probability_map_t, probability_map_t,
                 detail::useless_arc_default_traits<graph_t, double>>
@@ -125,11 +113,6 @@ auto compute_strong_and_useless_arcs(
                 uv = a;
                 auto && u = melon::arc_source(graph, uv);
                 auto && v = melon::arc_target(graph, uv);
-                // useless_arcs_map[u].push_back(uv);
-                // algo.reset().add_source(
-                //     u, melon::views::map(
-                //            [&uv](const arc_t & a) -> bool { return a != uv;
-                //            }));
                 algo.reset();
                 algo.relax_strong_vertex(u);
                 algo.relax_useless_vertex(v, improved_probability_map[uv]);

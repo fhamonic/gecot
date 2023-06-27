@@ -48,10 +48,12 @@ GTEST_TEST(preprocessing, fuzzy_test) {
     double budget = 0;
     for(auto && o : instance.options()) budget += instance.option_cost(o);
     budget /= 10;
-    const bool parallel = false;
+    const bool parallel = true;
 
     int cpt = 0;
     int cpt_ok = 0;
+    std::size_t nb_variables = 0;
+    std::size_t nb_constraints = 0;
 
     for(auto && instance_case : instance.cases()) {
         const auto & original_graph = instance_case.graph();
@@ -63,7 +65,7 @@ GTEST_TEST(preprocessing, fuzzy_test) {
                     arc_option_map] =
             landscape_opt::compute_generalized_flow_graph(instance_case);
 
-        /*
+        //*
         const auto [strong_arcs_map, useless_arcs_map] =
             landscape_opt::compute_constrained_strong_and_useless_arcs(
                 instance, instance_case, budget, parallel,
@@ -97,18 +99,24 @@ GTEST_TEST(preprocessing, fuzzy_test) {
                     melon::views::reverse(contracted_graph),
                     contracted_quality_map, contracted_probability_map, t);
 
-            std::cout << melon::nb_vertices(graph) << "\t"
-                      << melon::nb_arcs(graph) << "\t" << contribution
-                      << "\t" << melon::nb_vertices(contracted_graph) << "\t"
-                      << melon::nb_arcs(contracted_graph) << "\t"
-                      << contracted_contribution << std::endl;
-
             cpt += 1;
-            if(std::abs(contribution - contracted_contribution) <= 1e-6)
+            if(std::abs(contribution - contracted_contribution) <= 1e-6) {
                 cpt_ok += 1;
+            } else {
+                std::cout << original_t << "\t" << melon::nb_vertices(graph)
+                          << "\t" << melon::nb_arcs(graph) << "\t"
+                          << contribution << "\t"
+                          << melon::nb_vertices(contracted_graph) << "\t"
+                          << melon::nb_arcs(contracted_graph) << "\t"
+                          << contracted_contribution << std::endl;
+            }
 
-            if(std::ranges::distance(melon::out_arcs(contracted_graph, t)) == 0)
-                continue;
+            nb_variables += melon::nb_arcs(contracted_graph);
+            nb_constraints += melon::nb_vertices(contracted_graph);
+
+            // if(std::ranges::distance(melon::out_arcs(contracted_graph, t)) ==
+            // 0)
+            //     continue;
 
             // melon::graphviz_printer printer(original_graph);
             // auto lower_length_map = original_probability_map;
@@ -161,6 +169,8 @@ GTEST_TEST(preprocessing, fuzzy_test) {
     }
 
     std::cout << "all ok ? : " << cpt << " vs " << cpt_ok << std::endl;
+    std::cout << "nb_variables: " << nb_variables << std::endl;
+    std::cout << "nb_constraints: " << nb_constraints << std::endl;
     ASSERT_TRUE(false);
     ASSERT_EQ(cpt, cpt_ok);
 }

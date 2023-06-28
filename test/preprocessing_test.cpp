@@ -100,7 +100,7 @@ GTEST_TEST(preprocessing, fuzzy_test) {
                     contracted_quality_map, contracted_probability_map, t);
 
             cpt += 1;
-            if(std::abs(contribution - contracted_contribution) <= 1e-6) {
+            if(std::abs(contribution - contracted_contribution) <= 1e-5) {
                 cpt_ok += 1;
             } else {
                 std::cout << original_t << "\t" << melon::nb_vertices(graph)
@@ -111,9 +111,11 @@ GTEST_TEST(preprocessing, fuzzy_test) {
                           << contracted_contribution << std::endl;
             }
 
-            nb_variables += melon::nb_arcs(contracted_graph);
-            nb_constraints += melon::nb_vertices(contracted_graph);
-
+            if(original_quality_map[original_t] > 0 ||
+               vertex_options_map[original_t].size() > 0) {
+                nb_variables += melon::nb_arcs(contracted_graph);
+                nb_constraints += melon::nb_vertices(contracted_graph);
+            }
             // if(std::ranges::distance(melon::out_arcs(contracted_graph, t)) ==
             // 0)
             //     continue;

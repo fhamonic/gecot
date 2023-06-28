@@ -44,25 +44,20 @@ auto compute_constrained_strong_and_useless_arcs(
 
     auto cost_map = melon::create_arc_map<double>(graph);
     const int nb_mus = 10;
-    double max_mu = 5000 / budget;
-    // double max_mu = 0;
-    // std::cout << "budget: " << budget << std::endl;
-    // for(auto && i : instance.options()) {
-    //     const double arc_cost = instance.option_cost(i) /
-    //                             static_cast<double>(arcs_options[i].size());
-    //     for(auto && [a, enhanced_prob] : arcs_options[i]) {
-    //         // std::cout << (std::log(enhanced_prob /
-    //         //                        std::max(base_probability_map[a],
-    //         0.05)) /
-    //         //               arc_cost)
-    //         //           << std::endl;
-    //         max_mu = std::max(max_mu,
-    //                           std::log(enhanced_prob /
-    //                                    std::max(base_probability_map[a],
-    //                                    0.05)) /
-    //                               arc_cost);
-    //     }
-    // }
+    // double max_mu = 30 / budget;
+    double max_mu = 0;
+    std::cout << "budget: " << budget << std::endl;
+    for(auto && i : instance.options()) {
+        const double arc_cost = instance.option_cost(i) /
+                                static_cast<double>(arcs_options[i].size());
+        for(auto && [a, enhanced_prob] : arcs_options[i]) {
+            max_mu = std::max(max_mu,
+                              std::log(enhanced_prob /
+                                       std::max(base_probability_map[a],
+                                       0.01)) /
+                                  arc_cost);
+        }
+    }
 
     std::cout << "max_mu: " << max_mu
               << "\tbudget modifier: " << get_modifier(max_mu, budget)
@@ -72,7 +67,7 @@ auto compute_constrained_strong_and_useless_arcs(
         lagrange_improved_probability_maps;
     for(double mu = 0; mu <= max_mu;
         mu += max_mu / static_cast<double>(nb_mus - 1)) {
-        std::cout << "mu: " << mu << std::endl;
+        // std::cout << "mu: " << mu << std::endl;
         auto mu_length_map = base_probability_map;
         for(auto && i : instance.options()) {
             const double arc_cost = instance.option_cost(i) /
@@ -86,6 +81,23 @@ auto compute_constrained_strong_and_useless_arcs(
         lagrange_improved_probability_maps.emplace_back(
             mu, std::move(mu_length_map));
     }
+    // for(double mu = max_mu;;) {
+    //     mu -= max_mu / static_cast<double>(nb_mus - 1);
+    //     if(mu <= 0) break;
+    //     std::cout << "mu: " << mu << std::endl;
+    //     auto mu_length_map = base_probability_map;
+    //     for(auto && i : instance.options()) {
+    //         const double arc_cost = instance.option_cost(i) /
+    //                                 static_cast<double>(arcs_options[i].size());
+    //         const double modifier = get_modifier(mu, arc_cost);
+    //         for(auto && [a, enhanced_prob] : arcs_options[i]) {
+    //             mu_length_map[a] =
+    //                 std::max(mu_length_map[a], modifier * enhanced_prob);
+    //         }
+    //     }
+    //     lagrange_improved_probability_maps.emplace_back(
+    //         mu, std::move(mu_length_map));
+    // }
 
     // for(const auto & a : arcs_range) {
     //     auto && mu = lagrange_improved_probability_maps[90].first;
@@ -127,6 +139,8 @@ auto compute_constrained_strong_and_useless_arcs(
                     algo.relax_strong_vertex(w, w_prob * budget_modifier);
                 for(const auto & [w, w_prob] : algo) {
                     if(fiber_map[w]) continue;
+                    if(mu > 0)
+                        std::cout << mu << "\t" << budget_modifier << "\n";
                     fiber_map[w] = true;
                     strong_arcs_map[w].push_back(uv);
                     mu_fiber.emplace_back(w, w_prob / budget_modifier);
@@ -174,6 +188,8 @@ auto compute_constrained_strong_and_useless_arcs(
                         algo.relax_strong_vertex(w, w_prob * budget_modifier);
                     for(const auto & [w, w_prob] : algo) {
                         if(fiber_map[w]) continue;
+                        if(mu > 0)
+                            std::cout << mu << "\t" << budget_modifier << "\n";
                         fiber_map[w] = true;
                         useless_arcs_map[w].push_back(uv);
                         mu_fiber.emplace_back(w, w_prob / budget_modifier);

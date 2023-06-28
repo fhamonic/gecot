@@ -113,6 +113,7 @@ auto compute_strong_and_useless_arcs(
                 uv = a;
                 auto && u = melon::arc_source(graph, uv);
                 auto && v = melon::arc_target(graph, uv);
+                useless_arcs_map[u].push_back(uv);
                 algo.reset();
                 algo.relax_strong_vertex(u);
                 algo.relax_useless_vertex(v, improved_probability_map[uv]);

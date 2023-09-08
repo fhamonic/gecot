@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.20)
 
 project(
   Landscape_Opt
@@ -21,8 +21,6 @@ set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 include(GNUInstallDirs)
 include(CompilerWarnings)
 include(CompilerOptimizations)
-include(Conan)
-run_conan()
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}" ${CMAKE_MODULE_PATH})
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/dependencies/melon"
@@ -39,7 +37,7 @@ find_package(nlohmann_json REQUIRED)
 find_package(nlohmann_json_schema_validator REQUIRED)
 find_package(phmap REQUIRED)
 find_package(TBB REQUIRED)
-find_package(Boost REQUIRED COMPONENTS program_options)
+find_package(Boost REQUIRED COMPONENTS program_options log log_setup)
 find_package(Eigen3 REQUIRED)
 find_package(range-v3 REQUIRED)
 
@@ -49,8 +47,8 @@ target_include_directories(landscape_opt
                            INTERFACE ${PROJECT_SOURCE_DIR}/include)
 
 target_link_libraries(landscape_opt INTERFACE TBB::tbb)
-target_link_libraries(landscape_opt INTERFACE Boost::Boost)
-target_link_libraries(landscape_opt INTERFACE Eigen3::Eigen3)
+target_link_libraries(landscape_opt INTERFACE Boost::program_options Boost::log Boost::log_setup)
+target_link_libraries(landscape_opt INTERFACE Eigen3::Eigen)
 target_link_libraries(landscape_opt INTERFACE range-v3::range-v3)
 
 target_link_libraries(landscape_opt INTERFACE melon)
@@ -67,8 +65,8 @@ target_link_libraries(lscp_solve
 target_link_libraries(lscp_solve PUBLIC nlohmann_json::nlohmann_json)
 target_link_libraries(
   lscp_solve
-  PUBLIC nlohmann_json_schema_validator::nlohmann_json_schema_validator)
-target_link_libraries(lscp_solve PUBLIC phmap::phmap)
+  PUBLIC nlohmann_json_schema_validator)
+target_link_libraries(lscp_solve PUBLIC phmap)
 
 target_compile_options(lscp_solve PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 
@@ -76,8 +74,8 @@ target_compile_options(lscp_solve PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 # landscape_opt) target_link_libraries(lscp_rank PUBLIC
 # fast-cpp-csv-parser::fast-cpp-csv-parser) target_link_libraries(lscp_rank
 # PUBLIC nlohmann_json::nlohmann_json) target_link_libraries(lscp_rank PUBLIC
-# nlohmann_json_schema_validator::nlohmann_json_schema_validator)
-# target_link_libraries(lscp_rank PUBLIC phmap::phmap)
+# nlohmann_json_schema_validator)
+# target_link_libraries(lscp_rank PUBLIC phmap)
 
 # target_compile_options(lscp_rank PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 
@@ -87,8 +85,8 @@ target_link_libraries(lscp_test PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser)
 target_link_libraries(lscp_test PUBLIC nlohmann_json::nlohmann_json)
 target_link_libraries(
   lscp_test
-  PUBLIC nlohmann_json_schema_validator::nlohmann_json_schema_validator)
-target_link_libraries(lscp_test PUBLIC phmap::phmap)
+  PUBLIC nlohmann_json_schema_validator)
+target_link_libraries(lscp_test PUBLIC phmap)
 
 target_compile_options(lscp_test PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 

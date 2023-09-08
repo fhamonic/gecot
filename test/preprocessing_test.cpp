@@ -52,6 +52,8 @@ GTEST_TEST(preprocessing, fuzzy_test) {
 
     int cpt = 0;
     int cpt_ok = 0;
+    std::size_t contracted_nb_variables = 0;
+    std::size_t contracted_nb_constraints = 0;
     std::size_t nb_variables = 0;
     std::size_t nb_constraints = 0;
 
@@ -113,8 +115,11 @@ GTEST_TEST(preprocessing, fuzzy_test) {
 
             if(original_quality_map[original_t] > 0 ||
                vertex_options_map[original_t].size() > 0) {
-                nb_variables += melon::nb_arcs(contracted_graph);
-                nb_constraints += melon::nb_vertices(contracted_graph);
+                nb_variables += melon::nb_arcs(graph);
+                nb_constraints += melon::nb_vertices(graph);
+                contracted_nb_variables += melon::nb_arcs(contracted_graph);
+                contracted_nb_constraints +=
+                    melon::nb_vertices(contracted_graph);
             }
             // if(std::ranges::distance(melon::out_arcs(contracted_graph, t)) ==
             // 0)
@@ -173,6 +178,10 @@ GTEST_TEST(preprocessing, fuzzy_test) {
     std::cout << "all ok ? : " << cpt << " vs " << cpt_ok << std::endl;
     std::cout << "nb_variables: " << nb_variables << std::endl;
     std::cout << "nb_constraints: " << nb_constraints << std::endl;
+    std::cout << "contracted_nb_variables: " << contracted_nb_variables
+              << std::endl;
+    std::cout << "contracted_nb_constraints: " << contracted_nb_constraints
+              << std::endl;
     ASSERT_TRUE(false);
     ASSERT_EQ(cpt, cpt_ok);
 }

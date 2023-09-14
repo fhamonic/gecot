@@ -23,6 +23,14 @@ class CompressorRecipe(ConanFile):
         self.tool_requires("cmake/3.27.1")
         # self.build_requires("gcc/12.2.0")
         
+    def generate(self):
+        print("conanfile.py: IDE include dirs:")
+        for lib, dep in self.dependencies.items():
+            if not lib.headers:
+                continue
+            for inc in dep.cpp_info.includedirs:
+                print("\t" + inc)
+
     def build(self):
         cmake = CMake(self)
         cmake.configure()

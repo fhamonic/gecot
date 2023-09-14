@@ -189,11 +189,11 @@ int main(int argc, const char * argv[]) {
 
     Instance instance = parse_instance(instances_description_json);
 
-    Instance::OptionPotentialMap option_potentials =
+    landscape_opt::instance_options_rank_t<Instance> option_ranks =
         ranker->rank_options(instance);
 
     if(!output_in_file) {
-        std::cout << "option_potentials:" << std::endl;
+        std::cout << "option_ranks:" << std::endl;
         const std::size_t option_name_max_length = std::ranges::max(
             std::ranges::views::transform(instance.options(), [&](auto && o) {
                 return instance.option_name(o).size();
@@ -203,15 +203,15 @@ int main(int argc, const char * argv[]) {
                       << std::string(option_name_max_length + 1 -
                                          instance.option_name(o).size(),
                                      ' ')
-                      << option_potentials[o] << '\n';
+                      << option_ranks[o] << '\n';
         }
         std::cout << std::endl;
     } else {
         std::ofstream output_file(output_csv);
         output_file << "option_id,potential\n";
         for(auto && o : instance.options()) {
-            output_file << instance.option_name(o) << ','
-                        << option_potentials[o] << '\n';
+            output_file << instance.option_name(o) << ',' << option_ranks[o]
+                        << '\n';
         }
     }
 

@@ -102,7 +102,7 @@ struct GreedyDecremental {
                     current_pm[a] = original_pm[a];
                     for(auto && [current_prob, i] :
                         instance_case.arc_options_map()[a]) {
-                        if(solution[i] == 0.0 || worst_option == i) continue;
+                        if(!solution[i] || worst_option == i) continue;
                         current_pm[a] = std::max(current_pm[a], current_prob);
                     }
                 }

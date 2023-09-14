@@ -36,7 +36,7 @@ public:
         ranker.parallel = vm.count("parallel") > 0;
     }
 
-    typename Instance::OptionPotentialMap rank_options(
+    typename landscape_opt::instance_option_map_t<Instance, double> rank_options(
         const Instance & instance) const {
         return ranker.rank_options(instance);
     };

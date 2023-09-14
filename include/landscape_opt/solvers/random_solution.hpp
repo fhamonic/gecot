@@ -13,7 +13,7 @@ struct RandomSolution {
     int seed = 314159265;
     int time_ms = 0;
 
-    template <concepts::Instance I>
+    template <instance_c I>
     typename I::Solution solve(const I & instance, const double budget) const {
         using Option = typename I::Option;
         using Solution = typename I::Solution;

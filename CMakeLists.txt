@@ -70,14 +70,14 @@ target_link_libraries(lscp_solve PUBLIC phmap)
 
 target_compile_options(lscp_solve PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 
-# add_executable(lscp_rank src/rank.cpp) target_link_libraries(lscp_rank PUBLIC
-# landscape_opt) target_link_libraries(lscp_rank PUBLIC
-# fast-cpp-csv-parser::fast-cpp-csv-parser) target_link_libraries(lscp_rank
-# PUBLIC nlohmann_json::nlohmann_json) target_link_libraries(lscp_rank PUBLIC
-# nlohmann_json_schema_validator)
-# target_link_libraries(lscp_rank PUBLIC phmap)
+add_executable(lscp_rank src/rank.cpp)
+target_link_libraries(lscp_rank PUBLIC landscape_opt) 
+target_link_libraries(lscp_rank PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser) 
+target_link_libraries(lscp_rank PUBLIC nlohmann_json::nlohmann_json) 
+target_link_libraries(lscp_rank PUBLIC nlohmann_json_schema_validator)
+target_link_libraries(lscp_rank PUBLIC phmap)
 
-# target_compile_options(lscp_rank PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
+target_compile_options(lscp_rank PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 
 add_executable(lscp_test src/test.cpp)
 target_link_libraries(lscp_test PUBLIC landscape_opt)

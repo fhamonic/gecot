@@ -52,6 +52,9 @@ using instance_option_map_t =
 template <typename _Tp>
 using instance_solution_t = instance_option_map_t<_Tp, bool>;
 
+template <typename _Tp>
+using instance_options_rank_t = instance_option_map_t<_Tp, unsigned int>;
+
 template <typename _Tp, typename _V>
 using instance_case_map_t =
     std::decay_t<decltype(std::declval<_Tp &>().template create_case_map<_V>())>;

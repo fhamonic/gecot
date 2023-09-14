@@ -25,8 +25,8 @@ struct MIP {
     bool verbose = false;
     bool parallel = false;
 
-    template <concepts::Instance I>
-    typename I::OptionPotentialMap rank_options(const I & instance) const {
+    template <instance_c I>
+    instance_options_rank_t<I> rank_options(const I & instance) const {
         using Landscape = typename I::Landscape;
         using Graph = typename I::Landscape::Graph;
         using QualityMap = typename Landscape::QualityMap;

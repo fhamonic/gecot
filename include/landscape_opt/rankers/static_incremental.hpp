@@ -21,69 +21,58 @@ struct StaticIncremental {
     bool verbose = false;
     bool parallel = false;
 
-    template <concepts::Instance I>
-    typename I::OptionPotentialMap rank_options(const I & instance) const {
-        using Landscape = typename I::Landscape;
-        using QualityMap = typename Landscape::QualityMap;
-        using ProbabilityMap = typename Landscape::ProbabilityMap;
-        using Option = typename I::Option;
-        using OptionPotentialMap = typename I::OptionPotentialMap;
+    template <instance_c I>
+    instance_options_rank_t<I> rank_options(const I & instance) const {
+        auto options_rank = instance.create_option_map(0u);
 
-        std::vector<Option> options =
-            ranges::to<std::vector>(instance.options());
-        OptionPotentialMap options_potentials =
-            instance.create_options_potentials_map();
-
-        const auto vertexOptions = detail::computeOptionsForVertices(instance);
-        const auto arcOptions = detail::computeOptionsForArcs(instance);
-
-        const double base_eca = eca(instance.landscape());
-        if(verbose) {
-            std::cout << "base ECA: " << base_eca << std::endl;
+        const auto & cases = instance.cases();
+        std::vector<option_t> options;
+        for(const option_t & option : instance.options()) {
+            options.emplace_back(option);
         }
 
-        const QualityMap & original_qm = instance.landscape().quality_map();
-        const ProbabilityMap & original_pm =
-            instance.landscape().probability_map();
+        const double base_score = compute_base_score(instance, parallel);
+        auto options_cases_eca = instance.create_option_map(
+            instance.template create_case_map<double>());
+        const auto cases_vertex_options =
+            compute_cases_vertex_options(instance);
+        const auto cases_arc_options = compute_cases_arc_options(instance);
 
-        auto compute_delta_eca_inc =
-            [&](const tbb::blocked_range<decltype(options.begin())> &
-                    options_block) {
-                QualityMap qm = original_qm;
-                ProbabilityMap pm = original_pm;
+        compute_options_cases_incr_eca(
+            instance, options,
+            melon::views::map([&cases](auto case_id) -> decltype(auto) {
+                return cases[case_id].vertex_quality_map();
+            }),
+            melon::views::map([&cases](auto case_id) -> decltype(auto) {
+                return cases[case_id].arc_probability_map();
+            }),
+            cases_vertex_options, cases_arc_options, options_cases_eca,
+            parallel);
 
-                for(auto it = options_block.begin();;) {
-                    Option option = *it;
-                    for(auto && [u, quality_gain] : vertexOptions[option])
-                        qm[u] += quality_gain;
-                    for(auto && [a, enhanced_prob] : arcOptions[option])
-                        pm[a] = std::max(pm[a], enhanced_prob);
+        auto options_ratios = instance.create_option_map(0.0);
+        for(const option_t & option : options) {
+            options_ratios[option] =
+                (instance.eval_criterion(options_cases_eca[option]) -
+                 base_score) /
+                instance.option_cost(option);
+        }
+        std::ranges::sort(options, [&options_ratios](auto && o1, auto && o2) {
+            return options_ratios[o1] > options_ratios[o2];
+        });
 
-                    const double increased_eca =
-                        eca(instance.landscape().graph(), qm, pm);
-
-                    options_potentials[option] = (increased_eca - base_eca) /
-                                                 instance.option_cost(option);
-
-                    if(++it == options_block.end()) break;
-
-                    for(auto && [u, quality_gain] : vertexOptions[option])
-                        qm[u] = original_qm[u];
-                    for(auto && [a, enhanced_prob] : arcOptions[option])
-                        pm[a] = original_pm[a];
-                }
-            };
-
-        if(parallel) {
-            tbb::parallel_for(
-                tbb::blocked_range(options.begin(), options.end()),
-                compute_delta_eca_inc);
-        } else {
-            compute_delta_eca_inc(
-                tbb::blocked_range(options.begin(), options.end()));
+        unsigned int rank = 0;
+        for(const option_t & option : options) {
+            options_rank[option] = rank;
+            if(verbose) {
+                std::cout << "ranked option: " << option
+                          << "\n\t rank: " << rank
+                          << "\n\t ratio: " << options_ratios[option]
+                          << std::endl;
+            }
+            ++rank;
         }
 
-        return options_potentials;
+        return options_rank;
     }
 };
 

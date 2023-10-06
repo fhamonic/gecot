@@ -1,0 +1,160 @@
+
+Log started (V22.1.1.0) Fri Sep 29 17:07:30 2023
+
+Warning, line 310292: Name 'Bounds' does not exist.
+Warning, line 310293: Name '<=' does not exist.
+Warning, line 310293: '1' not valid identifier.
+Warning, line 310294: Name '<=' does not exist.
+Warning, line 310294: '1' not valid identifier.
+Warning, line 310295: Name '<=' does not exist.
+Warning, line 310295: '1' not valid identifier.
+Warning, line 310296: Name '<=' does not exist.
+Warning, line 310296: '1' not valid identifier.
+Warning, line 310297: Name '<=' does not exist.
+Warning, line 310297: '1' not valid identifier.
+Warning, line 310298: Name '<=' does not exist.
+Warning, line 310298: '1' not valid identifier.
+Warning, line 310299: Name '<=' does not exist.
+Warning, line 310299: '1' not valid identifier.
+Warning, line 310300: Name '<=' does not exist.
+Warning, line 310300: '1' not valid identifier.
+Warning, line 310301: Name '<=' does not exist.
+Warning, line 310301: '1' not valid identifier.
+Warning, line 310302: Name '<=' does not exist.
+501 name warnings not printed.
+
+Problem 'model.lp' read.
+Read time = 0.94 sec. (67.33 ticks)
+Version identifier: 22.1.1.0 | 2022-11-28 | 9160aff4d
+Found incumbent of value 0.000000 after 0.03 sec. (24.49 ticks)
+Tried aggregator 2 times.
+MIP Presolve eliminated 3119 rows and 51903 columns.
+MIP Presolve modified 1558 coefficients.
+Aggregator did 42732 substitutions.
+Reduced MIP has 264435 rows, 887496 columns, and 2090801 nonzeros.
+Reduced MIP has 255 binaries, 0 generals, 0 SOSs, and 0 indicators.
+Presolve time = 3.40 sec. (1834.96 ticks)
+Probing time = 0.27 sec. (35.51 ticks)
+Tried aggregator 1 time.
+Detecting symmetries...
+MIP Presolve eliminated 41310 rows and 138672 columns.
+MIP Presolve modified 520 coefficients.
+Reduced MIP has 223125 rows, 748824 columns, and 1764047 nonzeros.
+Reduced MIP has 255 binaries, 0 generals, 0 SOSs, and 0 indicators.
+Presolve time = 1.94 sec. (1536.47 ticks)
+Probing time = 0.18 sec. (30.07 ticks)
+Clique table members: 64.
+MIP emphasis: balance optimality and feasibility.
+MIP search method: dynamic search.
+Parallel mode: deterministic, using up to 16 threads.
+Root relaxation solution time = 15.05 sec. (7127.73 ticks)
+
+        Nodes                                         Cuts/
+   Node  Left     Objective  IInf  Best Integer    Best Bound    ItCnt     Gap
+
+*     0+    0                            0.0000                           0.00%
+*     0+    0                       1.17176e+11                           0.00%
+      0     0   1.21355e+11     6   1.17176e+11   1.21355e+11    17539    3.57%
+
+Clique cuts applied:  3
+Cover cuts applied:  1
+Flow cuts applied:  402
+Mixed integer rounding cuts applied:  9
+
+Root node processing (before b&c):
+  Real time             =  142.43 sec. (159340.92 ticks)
+Parallel b&c, 16 threads:
+  Real time             =    0.00 sec. (0.00 ticks)
+  Sync time (average)   =    0.00 sec.
+  Wait time (average)   =    0.00 sec.
+                          ------------
+Total (root+branch&cut) =  142.43 sec. (159340.92 ticks)
+
+Solution pool: 3 solutions saved.
+
+MIP - Aborted, integer feasible:  Objective =  1.1717630835e+11
+Current MIP best bound =  1.2122442515e+11 (gap = 4.04812e+09, 3.45%)
+Solution time =  142.51 sec.  Iterations = 71489  Nodes = 0 (1)
+Deterministic time = 159343.73 ticks  (1118.16 ticks/sec)
+
+
+Log started (V22.1.1.0) Fri Sep 29 17:12:16 2023
+
+Warning, line 3383: Name 'Bounds' does not exist.
+Warning, line 3384: Name '<=' does not exist.
+Warning, line 3384: '1' not valid identifier.
+Warning, line 3385: Name '<=' does not exist.
+Warning, line 3385: '1' not valid identifier.
+Warning, line 3386: Name '<=' does not exist.
+Warning, line 3386: '1' not valid identifier.
+Warning, line 3387: Name '<=' does not exist.
+Warning, line 3387: '1' not valid identifier.
+Warning, line 3388: Name '<=' does not exist.
+Warning, line 3388: '1' not valid identifier.
+Warning, line 3389: Name '<=' does not exist.
+Warning, line 3389: '1' not valid identifier.
+Warning, line 3390: Name '<=' does not exist.
+Warning, line 3390: '1' not valid identifier.
+Warning, line 3391: Name '<=' does not exist.
+Warning, line 3391: '1' not valid identifier.
+Warning, line 3392: Name '<=' does not exist.
+Warning, line 3392: '1' not valid identifier.
+Warning, line 3393: Name '<=' does not exist.
+11 name warnings not printed.
+
+Problem 'model.lp' read.
+Read time = 0.01 sec. (0.41 ticks)
+Version identifier: 22.1.1.0 | 2022-11-28 | 9160aff4d
+Found incumbent of value 0.000000 after 0.00 sec. (0.14 ticks)
+Tried aggregator 2 times.
+MIP Presolve eliminated 1 rows and 1626 columns.
+Aggregator did 441 substitutions.
+Reduced MIP has 2935 rows, 3304 columns, and 9082 nonzeros.
+Reduced MIP has 15 binaries, 0 generals, 0 SOSs, and 0 indicators.
+Presolve time = 0.01 sec. (6.62 ticks)
+Probing time = 0.00 sec. (0.30 ticks)
+Tried aggregator 1 time.
+Detecting symmetries...
+MIP Presolve eliminated 130 rows and 144 columns.
+MIP Presolve modified 44 coefficients.
+Reduced MIP has 2805 rows, 3160 columns, and 8682 nonzeros.
+Reduced MIP has 15 binaries, 0 generals, 0 SOSs, and 0 indicators.
+Presolve time = 0.01 sec. (5.85 ticks)
+Probing time = 0.00 sec. (0.26 ticks)
+MIP emphasis: balance optimality and feasibility.
+MIP search method: dynamic search.
+Parallel mode: deterministic, using up to 16 threads.
+Root relaxation solution time = 0.02 sec. (14.28 ticks)
+
+        Nodes                                         Cuts/
+   Node  Left     Objective  IInf  Best Integer    Best Bound    ItCnt     Gap
+
+*     0+    0                            0.0000                           0.00%
+*     0+    0                      1406828.4569                           0.00%
+      0     0  1700346.7617    15  1406828.4569  1700346.7617     1050   20.86%
+*     0+    0                      1558939.5575  1700346.7617             9.07%
+      0     0  1614842.0004    12  1558939.5575     Cuts: 801     1628    3.59%
+      0     0  1588085.3530    12  1558939.5575     Cuts: 545     1950    1.87%
+      0     0        cutoff        1558939.5575  1558939.5575     2352    0.00%
+Elapsed time = 0.32 sec. (217.88 ticks, tree = 0.01 MB, solutions = 2)
+
+Implied bound cuts applied:  92
+Flow cuts applied:  523
+Mixed integer rounding cuts applied:  709
+Gomory fractional cuts applied:  8
+
+Root node processing (before b&c):
+  Real time             =    0.32 sec. (218.19 ticks)
+Parallel b&c, 16 threads:
+  Real time             =    0.00 sec. (0.00 ticks)
+  Sync time (average)   =    0.00 sec.
+  Wait time (average)   =    0.00 sec.
+                          ------------
+Total (root+branch&cut) =    0.32 sec. (218.19 ticks)
+
+Solution pool: 3 solutions saved.
+
+MIP - Integer optimal solution:  Objective =  1.5589395575e+06
+Solution time =    0.34 sec.  Iterations = 2352  Nodes = 0
+Deterministic time = 218.20 ticks  (649.87 ticks/sec)
+

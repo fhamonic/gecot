@@ -99,6 +99,13 @@ public:
             throw std::invalid_argument("unknwon arc id '" + name + "'");
         return _arc_name_to_id_map.at(name);
     }
+
+    [[nodiscard]] auto vertex_name(const melon::vertex_t<graph_t> & v) const {
+        return _vertex_names.at(v);
+    }
+    [[nodiscard]] auto arc_name(const melon::arc_t<graph_t> & a) const {
+        return _arc_names.at(a);
+    }
     template <typename T>
     void set_vertex_options_map(T && t) {
         _vertex_options_map = std::forward<T>(t);

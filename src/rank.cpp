@@ -19,6 +19,7 @@ namespace logging = boost::log;
 
 #include "instance.hpp"
 #include "parse_instance.hpp"
+#include "trivial_reformulate.hpp"
 
 #include "ranker_interfaces/abstract_ranker.hpp"
 #include "ranker_interfaces/greedy_decremental_interface.hpp"
@@ -187,7 +188,8 @@ int main(int argc, const char * argv[]) {
     if(!valid_command) return EXIT_FAILURE;
     init_logging();
 
-    Instance instance = parse_instance(instances_description_json);
+    Instance raw_instance = parse_instance(instances_description_json);
+    Instance instance = trivial_reformulate_instance(raw_instance);
 
     landscape_opt::instance_options_rank_t<Instance> option_ranks =
         ranker->rank_options(instance);

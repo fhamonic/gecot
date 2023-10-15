@@ -19,6 +19,7 @@ namespace logging = boost::log;
 
 #include "instance.hpp"
 #include "parse_instance.hpp"
+#include "trivial_reformulate.hpp"
 
 #include "solver_interfaces/abstract_solver.hpp"
 #include "solver_interfaces/greedy_decremental_interface.hpp"
@@ -197,7 +198,8 @@ int main(int argc, const char * argv[]) {
     if(!valid_command) return EXIT_FAILURE;
     init_logging();
 
-    Instance instance = parse_instance(instances_description_json);
+    Instance raw_instance = parse_instance(instances_description_json);
+    Instance instance = trivial_reformulate_instance(raw_instance, budget);
 
     chronometer chrono;
     auto solution = solver->solve(instance, budget);

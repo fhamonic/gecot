@@ -236,6 +236,7 @@ public:
         return _cases.emplace_back(_cases.size(), std::forward<T>(args)...);
     }
     void set_criterion(criterion_formula && c) { _criterion = c; }
+    void set_criterion(const criterion_formula & c) { _criterion = c; }
     landscape_opt::case_id_t case_id_from_name(const std::string & name) const {
         for(auto && instance_case : _cases) {
             if(instance_case.name() == name) return instance_case.id();

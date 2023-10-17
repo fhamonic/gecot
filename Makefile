@@ -5,7 +5,7 @@ BUILD_DIR = build
 all: test
 
 $(BUILD_DIR):
-	conan build . -of=${BUILD_DIR} -b=missing
+	conan build . -of=${BUILD_DIR} -b=missing -pr=debug
 
 test: $(BUILD_DIR)
 	@cd $(BUILD_DIR) && \

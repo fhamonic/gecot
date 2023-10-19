@@ -28,7 +28,6 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/dependencies/melon"
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/dependencies/mippp"
                       ${CMAKE_MODULE_PATH})
 
-add_subdirectory(dependencies/melon)
 add_subdirectory(dependencies/mippp)
 
 # ################### Packages ####################
@@ -39,7 +38,9 @@ find_package(phmap REQUIRED)
 find_package(TBB REQUIRED)
 find_package(Boost REQUIRED COMPONENTS program_options log log_setup)
 find_package(Eigen3 REQUIRED)
-find_package(range-v3 REQUIRED)
+# find_package(range-v3 REQUIRED)
+
+find_package(melon REQUIRED)
 
 # ################### LIB target ####################
 add_library(landscape_opt INTERFACE)
@@ -49,9 +50,9 @@ target_include_directories(landscape_opt
 target_link_libraries(landscape_opt INTERFACE TBB::tbb)
 target_link_libraries(landscape_opt INTERFACE Boost::program_options Boost::log Boost::log_setup)
 target_link_libraries(landscape_opt INTERFACE Eigen3::Eigen)
-target_link_libraries(landscape_opt INTERFACE range-v3::range-v3)
+# target_link_libraries(landscape_opt INTERFACE range-v3::range-v3)
 
-target_link_libraries(landscape_opt INTERFACE melon)
+target_link_libraries(landscape_opt INTERFACE melon::melon)
 target_link_libraries(landscape_opt INTERFACE mippp)
 target_compile_definitions(landscape_opt INTERFACE)
 target_compile_definitions(landscape_opt INTERFACE MIPPP_PREFERED_SOLVER=MIPPP_SCIP)

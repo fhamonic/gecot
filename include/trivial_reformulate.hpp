@@ -58,10 +58,13 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
     auto component_num_map =
         melon::create_vertex_map<std::size_t>(original_graph);
 
+    std::cout << melon::nb_arcs(original_graph) << std::endl;
+
     for(auto component :
         melon::strongly_connected_components(melon::views::subgraph(
             original_graph, melon::views::true_map{},
-            melon::views::map([&original_probability_map](const arc_t & a) {
+            melon::views::map([&, &original_probability_map](const arc_t & a) {
+                std::cout << a << " " << melon::arc_source(original_graph, a) << std::endl;
                 return original_probability_map[a] == 1.0;
             })))) {
         vertex_quality_map.push_back(0.0);

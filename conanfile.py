@@ -16,11 +16,13 @@ class CompressorRecipe(ConanFile):
         self.requires("parallel-hashmap/1.37")
         self.requires("eigen/3.4.0")
         self.requires("fmt/10.1.1")
-        self.requires("range-v3/0.12.0")
-        self.requires("gtest/1.14.0")
+
+        self.requires("melon/0.5")
+        # self.requires("mippp/0.9")
 
     def build_requirements(self):
         self.tool_requires("cmake/3.27.1")
+        self.requires("gtest/1.14.0")
         # self.build_requires("gcc/12.2.0")
         
     def generate(self):

@@ -1,6 +1,3 @@
-[submodule "dependencies/melon"]
-	path = dependencies/melon
-	url = https://github.com/fhamonic/melon
 [submodule "dependencies/mippp"]
 	path = dependencies/mippp
 	url = https://github.com/fhamonic/mippp

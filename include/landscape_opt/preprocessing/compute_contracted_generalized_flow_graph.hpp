@@ -97,13 +97,12 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
 
         quality_map[v] += uv_prob * quality_map[u];
         for(const auto & [quality_gain, option] : vertex_options_map[u])
-            vertex_options_map[v].emplace_back(uv_prob * quality_gain,
-            option);
+            vertex_options_map[v].emplace_back(uv_prob * quality_gain, option);
         graph.remove_vertex(u);
     }
 
     // remove vertices that cannot be traversed by flow
-    melon::breadth_first_search bfs(graph);
+    auto bfs = melon::breadth_first_search(graph);
     for(const auto & v : melon::vertices(graph)) {
         if(quality_map[v] == 0 && vertex_options_map[v].empty()) continue;
         if(bfs.reached(v)) continue;

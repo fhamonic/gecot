@@ -41,9 +41,9 @@ double parallel_eca(const GR & graph, const QM & quality_map,
     double eca_sum = tbb::parallel_reduce(
         tbb::blocked_range(vertices_range.begin(), vertices_range.end()), 0.0,
         [&](auto && vertices_subrange, double init) {
-            melon::dijkstra<GR, PM,
-                            detail::parallel_eca_dijkstra_traits<GR, PM>>
-                algo(graph, probability_map);
+            auto algo =
+                melon::dijkstra(detail::parallel_eca_dijkstra_traits<GR, PM>{},
+                                graph, probability_map);
 
             for(auto && s : vertices_subrange) {
                 if(quality_map[s] == 0) continue;

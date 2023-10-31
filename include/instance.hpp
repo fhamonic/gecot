@@ -123,8 +123,8 @@ struct criterion_product;
 struct criterion_min;
 
 using criterion_formula =
-    std::variant<criterion_constant, criterion_var,
-                 criterion_sum, criterion_product, criterion_min>;
+    std::variant<criterion_constant, criterion_var, criterion_sum,
+                 criterion_product, criterion_min>;
 
 struct criterion_sum {
     std::vector<criterion_formula> values;
@@ -190,13 +190,13 @@ public:
     [[nodiscard]] auto create_case_map(V v = {}) const {
         return melon::static_map<landscape_opt::case_id_t, V>(_cases.size(), v);
     }
-    template <melon::input_value_map_of<landscape_opt::case_id_t, double> M>
+    template <melon::input_mapping<landscape_opt::case_id_t> M>
+        requires std::convertible_to<
+            melon::mapped_value_t<M, landscape_opt::case_id_t>, double>
     [[nodiscard]] double eval_criterion(const M & case_values) const noexcept {
         return std::visit(formula_eval_visitor{case_values}, _criterion);
     }
-   [[nodiscard]] auto & criterion() const noexcept {
-        return _criterion;
-    }
+    [[nodiscard]] auto & criterion() const noexcept { return _criterion; }
 
 public:
     Instance() = default;

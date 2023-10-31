@@ -11,7 +11,7 @@
 
 #include "melon/container/static_map.hpp"
 #include "melon/graph.hpp"
-#include "melon/utility/value_map.hpp"
+#include "melon/mapping.hpp"
 
 #include "landscape_opt/concepts/instance.hpp"
 #include "landscape_opt/indices/eca.hpp"
@@ -99,7 +99,8 @@ double compute_base_score(const I & instance,
         parallel);
 }
 
-template <instance_c I, melon::input_value_map_of<option_t, bool> S>
+template <instance_c I, melon::input_mapping<option_t> S>
+    requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
 double compute_solution_score(const I & instance, const S & solution,
                               const auto & cases_vertex_options,
                               const auto & cases_arc_options,
@@ -129,7 +130,8 @@ double compute_solution_score(const I & instance, const S & solution,
         parallel);
 }
 
-template <instance_c I, melon::input_value_map_of<option_t, bool> S>
+template <instance_c I, melon::input_mapping<option_t> S>
+    requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
 double compute_solution_score(const I & instance, const S & solution,
                               const bool parallel = false) noexcept {
     const auto cases_vertex_options = compute_cases_vertex_options(instance);
@@ -198,8 +200,9 @@ void compute_options_cases_incr_eca(const I & instance, const O & free_options,
     }
 }
 
-template <instance_c I, melon::input_value_map_of<option_t, bool> S,
+template <instance_c I, melon::input_mapping<option_t> S,
           detail::range_of<option_t> O>
+    requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
 void compute_options_cases_decr_eca(
     const I & instance, const S & current_solution, const O & taken_options,
     auto && cases_current_qm, auto && cases_current_pm,

@@ -23,27 +23,38 @@ template <typename _Tp>
 using case_graph_t = std::decay_t<decltype(std::declval<_Tp &>().graph())>;
 
 template <typename _Tp>
-using case_quality_map_t = std::decay_t<decltype(std::declval<_Tp &>().vertex_quality_map())>;
+using case_quality_map_t =
+    std::decay_t<decltype(std::declval<_Tp &>().vertex_quality_map())>;
+
+template <typename _Tp>
+using case_quality_t =
+    std::decay_t<melon::mapped_value_t<case_quality_map_t<_Tp>,
+                                       melon::vertex_t<case_graph_t<_Tp>>>>;
 
 template <typename _Tp>
 using case_probability_map_t =
     std::decay_t<decltype(std::declval<_Tp &>().arc_probability_map())>;
+
+template <typename _Tp>
+using case_probability_t =
+    std::decay_t<melon::mapped_value_t<case_probability_map_t<_Tp>,
+                                       melon::arc_t<case_graph_t<_Tp>>>>;
 
 // clang-format off
 template <typename _Tp>
 concept case_c = requires(_Tp && ic) {
     { ic.graph() } -> melon::outward_incidence_graph;
     { ic.vertex_quality_map() } 
-    -> melon::input_value_map_of<melon::vertex_t<case_graph_t<_Tp>>, double>;
+    -> melon::input_mapping<melon::vertex_t<case_graph_t<_Tp>>>;
     { ic.arc_probability_map() } 
-    -> melon::input_value_map_of<melon::arc_t<case_graph_t<_Tp>>, double>;
+    -> melon::input_mapping<melon::arc_t<case_graph_t<_Tp>>>;
     { ic.vertex_options_map() } 
-    -> melon::input_value_map_of<melon::vertex_t<case_graph_t<_Tp>>,
-                                   std::vector<std::pair<double, option_t>>>;
+    -> melon::input_mapping<melon::vertex_t<case_graph_t<_Tp>>>;
     { ic.arc_options_map() } 
-    -> melon::input_value_map_of<melon::arc_t<case_graph_t<_Tp>>,
-                                   std::vector<std::pair<double, option_t>>>;
-};
+    -> melon::input_mapping<melon::arc_t<case_graph_t<_Tp>>>;
+} && std::same_as<case_quality_t<_Tp>, double> 
+  && std::same_as<case_probability_t<_Tp>, double>;
+  // , std::vector<std::pair<double, option_t>>
 
 template <typename _Tp, typename _V>
 using instance_option_map_t =
@@ -80,10 +91,10 @@ concept instance_c =
         { i.options() } -> detail::range_of<option_t>;
         { i.option_cost(o) } -> std::convertible_to<double>;
         { i.template create_option_map<int>() } 
-        -> melon::output_value_map_of<option_t, int>;
+        -> melon::output_mapping<option_t>;
         { i.cases() } -> std::ranges::range;
         { i.template create_case_map<int>() } 
-        -> melon::output_value_map_of<case_id_t, int>;
+        -> melon::output_mapping<case_id_t>;
         { i.eval_criterion(case_values) } -> std::same_as<double>;
     } && case_c<instance_case_t<_Tp>>;
 // clang-format on

@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 #include <string>
 
+#include "melon/mapping.hpp"
 #include "melon/utility/graphviz_printer.hpp"
-#include "melon/utility/value_map.hpp"
 #include "melon/views/reverse.hpp"
 
 #include "landscape_opt/concepts/instance.hpp"

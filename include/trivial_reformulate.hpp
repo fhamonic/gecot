@@ -60,19 +60,26 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
 
     std::cout << original_probability_map.size() << std::endl;
     std::cout << melon::nb_arcs(original_graph) << std::endl;
+    for(auto && [a, p] : melon::arcs_entries(original_graph)) {
+        std::cout << a << '\t' << p.first << '\t' << p.second << '\t'
+                  << original_probability_map[a] << std::endl;
+    }
+    std::cout << "ok" << std::endl;
 
-    for(auto component :
-        melon::strongly_connected_components(melon::views::subgraph(
-            original_graph, {}, [&, original_probability_map](const arc_t & a) {
-                for(auto && _a : melon::arcs(original_graph))
-                    std::cout << _a << " : " << original_probability_map[_a]
-                              << std::endl;
-                return original_probability_map[a] == 1.0;
-            }))) {
+    auto lambda_filter = [&original_probability_map](const arc_t & a) {
+        std::cout << a << " " << original_probability_map[a] << std::endl;
+        return original_probability_map[a] >= 0.8;
+    };
+    auto sgraph = melon::views::subgraph(original_graph, {}, lambda_filter);
+    auto scc = melon::strongly_connected_components(sgraph);
+
+    for(auto component : scc) {
+        std::cout << "new component:" << std::endl;
         vertex_quality_map.push_back(0.0);
         vertex_names_map.emplace_back();
         components.emplace_back();
         for(const vertex_t & v : component) {
+            std::cout << "vertex " << v << std::endl;
             vertex_quality_map.back() += original_quality_map[v];
             if(!vertex_names_map.back().empty())
                 vertex_names_map.back().append("+");

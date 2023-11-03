@@ -65,6 +65,7 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
             }))) {
         vertex_quality_map.push_back(0.0);
         vertex_names_map.emplace_back();
+        const std::size_t component_num = components.size();
         components.emplace_back();
         for(const vertex_t & v : component) {
             vertex_quality_map.back() += original_quality_map[v];
@@ -72,18 +73,19 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
                 vertex_names_map.back().append("+");
             vertex_names_map.back().append(instance_case.vertex_name(v));
             components.back().push_back(v);
-            component_num_map[v] = components.size() - 1;
+            component_num_map[v] = component_num;
         }
     }
 
+    std::size_t nb_components = components.size();
     melon::static_digraph_builder<melon::static_digraph, double, std::string,
                                   arc_t>
-        builder(components.size());
-
-    for(std::size_t i = 0; i < components.size(); ++i) {
+        builder(nb_components);
+    for(std::size_t i = 0; i < nb_components; ++i) {
         for(const vertex_t & v : components[i]) {
             for(const arc_t & a : melon::out_arcs(original_graph, v)) {
                 const vertex_t & w = melon::arc_target(original_graph, a);
+                if(i == component_num_map[w]) continue;
                 builder.add_arc(i, component_num_map[w],
                                 original_probability_map[a],
                                 instance_case.arc_name(a), a);

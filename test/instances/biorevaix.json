@@ -7,7 +7,7 @@
         }
     },
     "cases": {
-        "squirell": {
+        "squirrel": {
             "vertices": {
                 "csv_file": "Aix/vertices.csv",
                 "csv_columns": {
@@ -34,5 +34,5 @@
             }
         }
     },
-    "criterion": "squirell"
+    "criterion": "squirrel"
 }

@@ -1,11 +1,12 @@
 BUILD_DIR = build
+BUILD_TYPE = default
 
 .PHONY: all test clean
 
 all: test
 
 $(BUILD_DIR):
-	conan build . -of=${BUILD_DIR} -b=missing -pr=debug
+	conan build . -of=${BUILD_DIR} -b=missing -pr=${BUILD_TYPE}
 
 init-submodules:
 	git submodule update --init --recursive

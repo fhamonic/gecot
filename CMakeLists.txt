@@ -71,6 +71,9 @@ target_link_libraries(lscp_solve PUBLIC phmap)
 
 target_compile_options(lscp_solve PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 
+# target_compile_options(lscp_solve PRIVATE -fsanitize=address)
+# target_link_options(lscp_solve PRIVATE -fsanitize=address -lpthread -static-libasan)
+
 add_executable(lscp_rank src/rank.cpp)
 target_link_libraries(lscp_rank PUBLIC landscape_opt) 
 target_link_libraries(lscp_rank PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser) 

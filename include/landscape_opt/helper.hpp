@@ -101,6 +101,16 @@ double compute_base_score(const I & instance,
 
 template <instance_c I, melon::input_mapping<option_t> S>
     requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
+double compute_solution_cost(const I & instance, const S & solution) noexcept {
+    double sum = 0;
+    for(auto && option : instance.options())
+        sum += static_cast<double>(solution[option]) *
+               instance.option_cost(option);
+    return sum;
+}
+
+template <instance_c I, melon::input_mapping<option_t> S>
+    requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
 double compute_solution_score(const I & instance, const S & solution,
                               const auto & cases_vertex_options,
                               const auto & cases_arc_options,

@@ -65,8 +65,7 @@ static bool process_command_line(
         std::make_unique<GreedyIncrementalInterface>(),
         std::make_unique<GreedyDecrementalInterface>(),
         std::make_unique<MIPInterface>(),
-        std::make_unique<PreprocessedMIPInterface>()
-    };
+        std::make_unique<PreprocessedMIPInterface>()};
 
     auto print_soft_name = []() { std::cout << "LSCP 0.1\n\n"; };
     auto print_usage = []() {
@@ -199,7 +198,8 @@ int main(int argc, const char * argv[]) {
     init_logging();
 
     Instance raw_instance = parse_instance(instances_description_json);
-    Instance instance = trivial_reformulate_instance(raw_instance, budget);
+    // Instance instance = trivial_reformulate_instance(raw_instance, budget);
+    Instance & instance = raw_instance;
 
     chronometer chrono;
     auto solution = solver->solve(instance, budget);
@@ -210,25 +210,37 @@ int main(int argc, const char * argv[]) {
         const double solution_score =
             landscape_opt::compute_solution_score(instance, solution);
         std::cout << "Score: " << solution_score << std::endl;
+        std::cout << "Cost: "
+                  << fhamonic::landscape_opt::compute_solution_cost(instance,
+                                                                    solution)
+                  << std::endl;
         std::cout << "Solution:" << std::endl;
-        const std::size_t option_name_max_length = std::ranges::max(
-            std::ranges::views::transform(instance.options(), [&](auto && o) {
-                return instance.option_name(o).size();
-            }));
-        for(auto && option : instance.options()) {
-            std::cout << "  " << instance.option_name(option)
-                      << std::string(option_name_max_length + 1 -
-                                         instance.option_name(option).size(),
-                                     ' ')
-                      << solution[option] << '\n';
+        const std::size_t option_name_max_length =
+            std::ranges::max(std::ranges::views::transform(
+                raw_instance.options(),
+                [&](auto && o) { return raw_instance.option_name(o).size(); }));
+        for(auto && option : raw_instance.options()) {
+            auto option_name = raw_instance.option_name(option);
+            bool value = instance.contains_option(option_name)
+                             ? solution[instance.option_from_name(option_name)]
+                             : false;
+            std::cout << "  " << option_name
+                      << std::string(
+                             option_name_max_length + 1 -
+                                 raw_instance.option_name(option).size(),
+                             ' ')
+                      << value << '\n';
         }
         std::cout << std::endl << "in " << time_ms << " ms" << std::endl;
     } else {
         std::ofstream output_file(output_csv);
         output_file << "option_id,value\n";
-        for(auto && option : instance.options()) {
-            output_file << instance.option_name(option) << ',' << solution[option]
-                        << '\n';
+        for(auto && option : raw_instance.options()) {
+            auto option_name = raw_instance.option_name(option);
+            bool value = instance.contains_option(option_name)
+                             ? solution[instance.option_from_name(option_name)]
+                             : false;
+            output_file << option_name << ',' << value << '\n';
         }
     }
 

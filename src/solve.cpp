@@ -198,8 +198,7 @@ int main(int argc, const char * argv[]) {
     init_logging();
 
     Instance raw_instance = parse_instance(instances_description_json);
-    // Instance instance = trivial_reformulate_instance(raw_instance, budget);
-    Instance & instance = raw_instance; //31.03901804
+    Instance instance = trivial_reformulate_instance(raw_instance, budget);
 
     chronometer chrono;
     auto solution = solver->solve(instance, budget);

@@ -129,6 +129,10 @@ struct preprocessed_MIP {
                     });
             //*/
             for(const auto & original_t : melon::vertices(original_graph)) {
+                if(original_quality_map[original_t] == 0 &&
+                   instance_case.vertex_options_map()[original_t].empty())
+                    continue;
+
                 const auto [graph, quality_map, vertex_options_map, arc_no_map,
                             probability_map, arc_option_map, t] =
                     compute_contracted_generalized_flow_graph(
@@ -187,7 +191,8 @@ struct preprocessed_MIP {
                 }
                 model.add_constraint(
                     C_vars(instance_case.id()) <=
-                    xsum(melon::vertices(original_graph), F_vars, original_quality_map) +
+                    xsum(melon::vertices(original_graph), F_vars,
+                         original_quality_map) +
                         xsum(
                             F_prime_additional_terms,
                             [](const auto & p) { return p.first; },

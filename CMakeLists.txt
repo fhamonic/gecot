@@ -55,7 +55,7 @@ target_link_libraries(landscape_opt INTERFACE Eigen3::Eigen)
 target_link_libraries(landscape_opt INTERFACE melon::melon)
 target_link_libraries(landscape_opt INTERFACE mippp)
 target_compile_definitions(landscape_opt INTERFACE)
-target_compile_definitions(landscape_opt INTERFACE MIPPP_PREFERED_SOLVER=MIPPP_SCIP)
+target_compile_definitions(landscape_opt INTERFACE MIPPP_PREFERED_SOLVER=MIPPP_GUROBI)
 # target_compile_definitions(landscape_opt INTERFACE MIPPP_PREFERED_SOLVER=MIPPP_COINOR)
 
 # ################### EXEC target ####################

@@ -23,8 +23,6 @@ struct StaticDecremental {
 
     template <instance_c I>
     instance_options_rank_t<I> rank_options(const I & instance) const {
-        auto options_rank = instance.create_option_map(0u);
-
         const auto & cases = instance.cases();
         std::vector<option_t> options;
         for(const option_t & option : instance.options()) {
@@ -72,23 +70,7 @@ struct StaticDecremental {
                 instance.option_cost(option);
         }
 
-        std::ranges::sort(options, [&options_ratios](auto && o1, auto && o2) {
-            return options_ratios[o1] < options_ratios[o2];
-        });
-
-        unsigned int rank = options.size();
-        for(auto && option : options) {
-            options_rank[option] = rank;
-            if(verbose) {
-                std::cout << "ranked option: " << option
-                          << "\n\t rank: " << rank
-                          << "\n\t ratio: " << options_ratios[option]
-                          << std::endl;
-            }
-            --rank;
-        }
-
-        return options_rank;
+        return options_ratios;
     }
 };
 

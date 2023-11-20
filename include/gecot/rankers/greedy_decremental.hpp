@@ -24,7 +24,7 @@ struct GreedyDecremental {
 
     template <instance_c I>
     instance_options_rank_t<I> rank_options(const I & instance) const {
-        auto options_rank = instance.create_option_map(0u);
+        auto options_rank = instance.create_option_map(0.0);
         auto solution = instance.create_option_map(false);
 
         const auto & cases = instance.cases();

@@ -1,6 +1,6 @@
 {
     "options": {
-        "csv_file": "Aix/stretches.csv",
+        "csv_file": "Aix/N2/stretches.csv",
         "csv_columns": {
             "id": "stretch_id",
             "cost": "stretch_cost"
@@ -9,14 +9,14 @@
     "cases": {
         "squirrel": {
             "vertices": {
-                "csv_file": "Aix/vertices.csv",
+                "csv_file": "Aix/N2/vertices.csv",
                 "csv_columns": {
                     "id": "hexagon_id",
                     "quality": "quality"
                 }
             },
             "arcs": {
-                "csv_file": "Aix/arcs.csv",
+                "csv_file": "Aix/N2/arcs.csv",
                 "csv_columns": {
                     "id": "arc_id",
                     "from": "source_id",
@@ -25,7 +25,7 @@
                 }
             },
             "arcs_improvements": {
-                "csv_file": "Aix/arc_options.csv",
+                "csv_file": "Aix/N2/arc_options.csv",
                 "csv_columns": {
                     "arc_id": "arc_id",
                     "option_id": "stretch_id",

@@ -4,6 +4,6 @@
         "conan": {}
     },
     "include": [
-        "/home/plaiseek/Projects/landscape_opt/build/CMakePresets.json"
+        "/home/plaiseek/Projects/gecot/build/CMakePresets.json"
     ]
 }

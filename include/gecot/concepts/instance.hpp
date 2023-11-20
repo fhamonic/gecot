@@ -64,7 +64,7 @@ template <typename _Tp>
 using instance_solution_t = instance_option_map_t<_Tp, bool>;
 
 template <typename _Tp>
-using instance_options_rank_t = instance_option_map_t<_Tp, unsigned int>;
+using instance_options_rank_t = instance_option_map_t<_Tp, double>;
 
 template <typename _Tp, typename _V>
 using instance_case_map_t =

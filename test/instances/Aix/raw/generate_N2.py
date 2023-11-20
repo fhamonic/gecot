@@ -23,11 +23,11 @@ def probability(cost):
 
 vegetalized_probability = probability(10)
 
-vertices_csv = open("test/instances/Aix/vertices.csv", "w")
-arcs_csv = open("test/instances/Aix/arcs.csv", "w")
-stretches_csv = open("test/instances/Aix/stretches.csv", "w")
-vertex_options_csv = open("test/instances/Aix/vertex_options.csv", "w")
-arc_options_csv = open("test/instances/Aix/arc_options.csv", "w")
+vertices_csv = open("test/instances/Aix/N2/vertices.csv", "w")
+arcs_csv = open("test/instances/Aix/N2/arcs.csv", "w")
+stretches_csv = open("test/instances/Aix/N2/stretches.csv", "w")
+vertex_options_csv = open("test/instances/Aix/N2/vertex_options.csv", "w")
+arc_options_csv = open("test/instances/Aix/N2/arc_options.csv", "w")
 
 vertices_csv.write("hexagon_id,quality,x,y\n")
 arcs_csv.write("arc_id,source_id,target_id,probability\n")
@@ -39,7 +39,7 @@ hexagons = {}
 stretches = {}
 
 for hexagon in hexagons_csv:
-    if hexagon['area2'] != "1": continue
+    # if hexagon['area2'] != "1": continue
     # if hexagon['area3'] != "1": continue
     # if hexagon['area4'] != "1": continue
     hexagon_id = hexagon['N2_id']

@@ -1,11 +1,11 @@
-#ifndef LSCP_STATIC_INCREMENTAL_INTERFACE_HPP
-#define LSCP_STATIC_INCREMENTAL_INTERFACE_HPP
+#ifndef GECOT_STATIC_INCREMENTAL_INTERFACE_HPP
+#define GECOT_STATIC_INCREMENTAL_INTERFACE_HPP
 
 #include <sstream>
 
 #include <boost/program_options.hpp>
 
-#include "landscape_opt/solvers/static_incremental.hpp"
+#include "gecot/solvers/static_incremental.hpp"
 
 #include "instance.hpp"
 #include "solver_interfaces/abstract_solver.hpp"
@@ -14,7 +14,7 @@ namespace fhamonic {
 
 class StaticIncrementalInterface : public AbstractSolver {
 private:
-    landscape_opt::solvers::StaticIncremental solver;
+    gecot::solvers::StaticIncremental solver;
     boost::program_options::options_description desc;
 
 public:
@@ -56,4 +56,4 @@ public:
 
 }  // namespace fhamonic
 
-#endif  // LSCP_STATIC_INCREMENTAL_INTERFACE_HPP
+#endif  // GECOT_STATIC_INCREMENTAL_INTERFACE_HPP

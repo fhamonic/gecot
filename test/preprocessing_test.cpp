@@ -5,12 +5,12 @@
 #include "melon/utility/graphviz_printer.hpp"
 #include "melon/views/reverse.hpp"
 
-#include "landscape_opt/concepts/instance.hpp"
-#include "landscape_opt/indices/eca.hpp"
-#include "landscape_opt/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
-#include "landscape_opt/preprocessing/compute_contracted_generalized_flow_graph.hpp"
-#include "landscape_opt/preprocessing/compute_generalized_flow_graph.hpp"
-#include "landscape_opt/preprocessing/compute_strong_and_useless_arcs.hpp"
+#include "gecot/concepts/instance.hpp"
+#include "gecot/indices/eca.hpp"
+#include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
+#include "gecot/preprocessing/compute_contracted_generalized_flow_graph.hpp"
+#include "gecot/preprocessing/compute_generalized_flow_graph.hpp"
+#include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 
 #include "instance.hpp"
 #include "parse_instance.hpp"
@@ -35,7 +35,7 @@ double compute_original_contribution(auto && graph, auto quality_map,
         }
     }
 
-    return landscape_opt::eca_vertex_contribution(
+    return gecot::eca_vertex_contribution(
         melon::views::reverse(graph), quality_map, probability_map, original_t);
 }
 
@@ -65,26 +65,26 @@ GTEST_TEST(preprocessing, fuzzy_test) {
 
         const auto [graph, quality_map, vertex_options_map, probability_map,
                     arc_option_map] =
-            landscape_opt::compute_generalized_flow_graph(instance_case);
+            gecot::compute_generalized_flow_graph(instance_case);
 
         //*
         const auto [strong_arcs_map, useless_arcs_map] =
-            landscape_opt::compute_constrained_strong_and_useless_arcs(
+            gecot::compute_constrained_strong_and_useless_arcs(
                 instance, instance_case, budget, parallel,
-                [&instance, budget](const landscape_opt::option_t & o) {
+                [&instance, budget](const gecot::option_t & o) {
                     return instance.option_cost(o) <= budget;
                 });
         /*/
         const auto [strong_arcs_map, useless_arcs_map] =
-            landscape_opt::compute_strong_and_useless_arcs(
+            gecot::compute_strong_and_useless_arcs(
                 instance_case, parallel,
-                [&instance, budget](const landscape_opt::option_t & o) {
+                [&instance, budget](const gecot::option_t & o) {
                     return instance.option_cost(o) <= budget;
                 });
         //*/
 
         for(const auto & original_t : melon::vertices(original_graph)) {
-            const double contribution = landscape_opt::eca_vertex_contribution(
+            const double contribution = gecot::eca_vertex_contribution(
                 melon::views::reverse(graph), quality_map, probability_map,
                 original_t);
 
@@ -92,12 +92,12 @@ GTEST_TEST(preprocessing, fuzzy_test) {
                         contracted_vertex_options_map, contracted_arc_no_map,
                         contracted_probability_map, contracted_arc_option_map,
                         t] =
-                landscape_opt::compute_contracted_generalized_flow_graph(
+                gecot::compute_contracted_generalized_flow_graph(
                     instance_case, strong_arcs_map[original_t],
                     useless_arcs_map[original_t], original_t);
 
             const double contracted_contribution =
-                landscape_opt::eca_vertex_contribution(
+                gecot::eca_vertex_contribution(
                     melon::views::reverse(contracted_graph),
                     contracted_quality_map, contracted_probability_map, t);
 

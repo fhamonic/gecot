@@ -15,7 +15,7 @@
 #include "melon/container/static_digraph.hpp"
 #include "melon/graph.hpp"
 
-#include "landscape_opt/concepts/instance.hpp"
+#include "gecot/concepts/instance.hpp"
 
 namespace fhamonic {
 
@@ -38,10 +38,10 @@ private:
         _arc_name_to_id_map;
 
     melon::vertex_map_t<melon::static_digraph,
-                        std::vector<std::pair<double, landscape_opt::option_t>>>
+                        std::vector<std::pair<double, gecot::option_t>>>
         _vertex_options_map;
     melon::arc_map_t<melon::static_digraph,
-                     std::vector<std::pair<double, landscape_opt::option_t>>>
+                     std::vector<std::pair<double, gecot::option_t>>>
         _arc_options_map;
 
 public:
@@ -117,7 +117,7 @@ public:
 };
 
 using criterion_constant = double;
-using criterion_var = landscape_opt::case_id_t;
+using criterion_var = gecot::case_id_t;
 struct criterion_sum;
 struct criterion_product;
 struct criterion_min;
@@ -165,7 +165,7 @@ class Instance {
 private:
     std::vector<double> _options_costs;
     std::vector<std::string> _options_names;
-    phmap::node_hash_map<std::string, landscape_opt::option_t>
+    phmap::node_hash_map<std::string, gecot::option_t>
         _option_name_to_id_map;
 
     std::vector<InstanceCase> _cases;
@@ -173,26 +173,26 @@ private:
 
 public:
     [[nodiscard]] auto options() const noexcept {
-        return std::ranges::iota_view<landscape_opt::option_t,
-                                      landscape_opt::option_t>(
-            landscape_opt::option_t{0},
-            static_cast<landscape_opt::option_t>(nb_options()));
+        return std::ranges::iota_view<gecot::option_t,
+                                      gecot::option_t>(
+            gecot::option_t{0},
+            static_cast<gecot::option_t>(nb_options()));
     }
-    [[nodiscard]] double option_cost(landscape_opt::option_t o) const {
+    [[nodiscard]] double option_cost(gecot::option_t o) const {
         return _options_costs[o];
     }
     template <typename V>
     [[nodiscard]] auto create_option_map(V v = {}) const {
-        return melon::static_map<landscape_opt::option_t, V>(nb_options(), v);
+        return melon::static_map<gecot::option_t, V>(nb_options(), v);
     }
     [[nodiscard]] auto & cases() const noexcept { return _cases; }
     template <typename V>
     [[nodiscard]] auto create_case_map(V v = {}) const {
-        return melon::static_map<landscape_opt::case_id_t, V>(_cases.size(), v);
+        return melon::static_map<gecot::case_id_t, V>(_cases.size(), v);
     }
-    template <melon::input_mapping<landscape_opt::case_id_t> M>
+    template <melon::input_mapping<gecot::case_id_t> M>
         requires std::convertible_to<
-            melon::mapped_value_t<M, landscape_opt::case_id_t>, double>
+            melon::mapped_value_t<M, gecot::case_id_t>, double>
     [[nodiscard]] double eval_criterion(const M & case_values) const noexcept {
         return std::visit(formula_eval_visitor{case_values}, _criterion);
     }
@@ -204,29 +204,29 @@ public:
     [[nodiscard]] std::size_t nb_options() const noexcept {
         return _options_costs.size();
     }
-    landscape_opt::option_t add_option(std::string identifier,
+    gecot::option_t add_option(std::string identifier,
                                        double c) noexcept {
         assert(!_option_name_to_id_map.contains(identifier));
-        landscape_opt::option_t i =
-            static_cast<landscape_opt::option_t>(nb_options());
+        gecot::option_t i =
+            static_cast<gecot::option_t>(nb_options());
         _options_names.emplace_back(identifier);
         _options_costs.emplace_back(c);
         _option_name_to_id_map[identifier] = i;
         return i;
     }
-    bool contains_option(landscape_opt::option_t i) const noexcept {
-        return i < static_cast<landscape_opt::option_t>(nb_options());
+    bool contains_option(gecot::option_t i) const noexcept {
+        return i < static_cast<gecot::option_t>(nb_options());
     }
     bool contains_option(std::string identifier) const noexcept {
         return _option_name_to_id_map.contains(identifier);
     }
-    void set_option_cost(landscape_opt::option_t i, double cost) noexcept {
+    void set_option_cost(gecot::option_t i, double cost) noexcept {
         _options_costs[i] = cost;
     }
-    const std::string & option_name(landscape_opt::option_t i) const noexcept {
+    const std::string & option_name(gecot::option_t i) const noexcept {
         return _options_names[i];
     }
-    landscape_opt::option_t option_from_name(const std::string & name) const {
+    gecot::option_t option_from_name(const std::string & name) const {
         if(!contains_option(name))
             throw std::invalid_argument("unknwon option id '" + name + "'");
         return _option_name_to_id_map.at(name);
@@ -237,7 +237,7 @@ public:
     }
     void set_criterion(criterion_formula && c) { _criterion = c; }
     void set_criterion(const criterion_formula & c) { _criterion = c; }
-    landscape_opt::case_id_t case_id_from_name(const std::string & name) const {
+    gecot::case_id_t case_id_from_name(const std::string & name) const {
         for(auto && instance_case : _cases) {
             if(instance_case.name() == name) return instance_case.id();
         }

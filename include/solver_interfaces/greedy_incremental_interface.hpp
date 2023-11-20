@@ -1,11 +1,11 @@
-#ifndef LSCP_GREEDY_INCREMENTAL_INTERFACE_HPP
-#define LSCP_GREEDY_INCREMENTAL_INTERFACE_HPP
+#ifndef GECOT_GREEDY_INCREMENTAL_INTERFACE_HPP
+#define GECOT_GREEDY_INCREMENTAL_INTERFACE_HPP
 
 #include <sstream>
 
 #include <boost/program_options.hpp>
 
-#include "landscape_opt/solvers/greedy_incremental.hpp"
+#include "gecot/solvers/greedy_incremental.hpp"
 
 #include "instance.hpp"
 #include "solver_interfaces/abstract_solver.hpp"
@@ -14,7 +14,7 @@ namespace fhamonic {
 
 class GreedyIncrementalInterface : public AbstractSolver {
 private:
-    landscape_opt::solvers::GreedyIncremental solver;
+    gecot::solvers::GreedyIncremental solver;
     boost::program_options::options_description desc;
 
 public:
@@ -36,7 +36,7 @@ public:
         solver.parallel = vm.count("parallel") > 0;
     }
 
-    landscape_opt::instance_solution_t<Instance> solve(const Instance & instance,
+    gecot::instance_solution_t<Instance> solve(const Instance & instance,
                                       const double B) const {
         return solver.solve(instance, B);
     };
@@ -56,4 +56,4 @@ public:
 
 }  // namespace fhamonic
 
-#endif  // LSCP_GREEDY_INCREMENTAL_INTERFACE_HPP
+#endif  // GECOT_GREEDY_INCREMENTAL_INTERFACE_HPP

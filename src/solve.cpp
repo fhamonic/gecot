@@ -12,10 +12,10 @@ namespace po = boost::program_options;
 #include <boost/log/trivial.hpp>
 namespace logging = boost::log;
 
-// #include "landscape_opt/solvers/mip_xue.hpp"
-// #include "landscape_opt/solvers/randomized_rounding.hpp"
+// #include "gecot/solvers/mip_xue.hpp"
+// #include "gecot/solvers/randomized_rounding.hpp"
 
-#include "landscape_opt/helper.hpp"
+#include "gecot/helper.hpp"
 
 #include "instance.hpp"
 #include "parse_instance.hpp"
@@ -67,13 +67,13 @@ static bool process_command_line(
         std::make_unique<MIPInterface>(),
         std::make_unique<PreprocessedMIPInterface>()};
 
-    auto print_soft_name = []() { std::cout << "LSCP 0.1\n\n"; };
+    auto print_soft_name = []() { std::cout << "GECOT 0.1\n\n"; };
     auto print_usage = []() {
         std::cout << R"(Usage:
-  lcsp_solve --help
-  lcsp_solve --list-algorithms
-  lcsp_solve <algorithm> --list-params
-  lcsp_solve <algorithm> <instance> <budget> [<params> ...]
+  gecot_solve --help
+  gecot_solve --list-algorithms
+  gecot_solve <algorithm> --list-params
+  gecot_solve <algorithm> <instance> <budget> [<params> ...]
 
 )";
     };
@@ -208,10 +208,10 @@ int main(int argc, const char * argv[]) {
     if(!output_in_file) {
         std::cout.precision(10);
         const double solution_score =
-            landscape_opt::compute_solution_score(instance, solution);
+            gecot::compute_solution_score(instance, solution);
         std::cout << "Score: " << solution_score << std::endl;
         std::cout << "Cost: "
-                  << fhamonic::landscape_opt::compute_solution_cost(instance,
+                  << fhamonic::gecot::compute_solution_cost(instance,
                                                                     solution)
                   << std::endl;
         std::cout << "Solution:" << std::endl;

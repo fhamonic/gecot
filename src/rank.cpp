@@ -12,10 +12,10 @@ namespace po = boost::program_options;
 #include <boost/log/trivial.hpp>
 namespace logging = boost::log;
 
-// #include "landscape_opt/rankers/mip_xue.hpp"
-// #include "landscape_opt/rankers/mip_eca.hpp"
-// #include "landscape_opt/rankers/mip_eca_preprocessed.hpp"
-// #include "landscape_opt/rankers/randomized_rounding.hpp"
+// #include "gecot/rankers/mip_xue.hpp"
+// #include "gecot/rankers/mip_eca.hpp"
+// #include "gecot/rankers/mip_eca_preprocessed.hpp"
+// #include "gecot/rankers/randomized_rounding.hpp"
 
 #include "instance.hpp"
 #include "parse_instance.hpp"
@@ -63,13 +63,13 @@ static bool process_command_line(
         std::make_unique<GreedyIncrementalInterface>(),
         std::make_unique<GreedyDecrementalInterface>()};
 
-    auto print_soft_name = []() { std::cout << "LSCP 0.1\n\n"; };
+    auto print_soft_name = []() { std::cout << "GECOT 0.1\n\n"; };
     auto print_usage = []() {
         std::cout << R"(Usage:
-  lcsp_rank --help
-  lcsp_rank --list-algorithms
-  lcsp_rank <algorithm> --list-params
-  lcsp_rank <algorithm> <instance> [<params> ...]
+  gecot_rank --help
+  gecot_rank --list-algorithms
+  gecot_rank <algorithm> --list-params
+  gecot_rank <algorithm> <instance> [<params> ...]
 
 )";
     };
@@ -191,7 +191,7 @@ int main(int argc, const char * argv[]) {
     Instance raw_instance = parse_instance(instances_description_json);
     Instance instance = trivial_reformulate_instance(raw_instance);
 
-    landscape_opt::instance_options_rank_t<Instance> option_ranks =
+    gecot::instance_options_rank_t<Instance> option_ranks =
         ranker->rank_options(instance);
 
     if(!output_in_file) {

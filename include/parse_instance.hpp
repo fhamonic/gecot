@@ -424,7 +424,7 @@ void parse_vertices_options(InstanceCase & instance_case, T json_object,
                             const std::filesystem::path & parent_path,
                             const Instance & instance) {
     auto vertex_options = melon::create_vertex_map<
-        std::vector<std::pair<double, landscape_opt::option_t>>>(
+        std::vector<std::pair<double, gecot::option_t>>>(
         instance_case.graph(), {});
 
     auto add_vertex_option = [&](const std::string & option_id,
@@ -479,7 +479,7 @@ void parse_arcs_options(InstanceCase & instance_case, T json_object,
                         const std::filesystem::path & parent_path,
                         const Instance & instance) {
     auto arc_options = melon::create_arc_map<
-        std::vector<std::pair<double, landscape_opt::option_t>>>(
+        std::vector<std::pair<double, gecot::option_t>>>(
         instance_case.graph(), {});
 
     auto add_arc_option = [&](const std::string & option_id,

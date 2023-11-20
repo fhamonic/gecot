@@ -13,7 +13,7 @@ public:
     virtual ~AbstractSolver() {}
 
     virtual void parse(const std::vector<std::string> & args) = 0;
-    virtual landscape_opt::instance_solution_t<Instance> solve(const Instance & instance,
+    virtual gecot::instance_solution_t<Instance> solve(const Instance & instance,
                                               const double B) const = 0;
 
     virtual std::string name() const = 0;

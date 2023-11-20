@@ -4,7 +4,7 @@
 #include <optional>
 #include <utility>
 
-#include "landscape_opt/concepts/instance.hpp"
+#include "gecot/concepts/instance.hpp"
 #include "melon/algorithm/strongly_connected_components.hpp"
 #include "melon/utility/static_digraph_builder.hpp"
 #include "melon/views/subgraph.hpp"
@@ -13,14 +13,14 @@
 
 namespace fhamonic {
 
-template <landscape_opt::instance_c I>
+template <gecot::instance_c I>
 auto trivial_reformulate_instance(
     const I & instance, double budget = std::numeric_limits<double>::max()) {
     Instance reformulated_instance;
     reformulated_instance.set_criterion(instance.criterion());
 
     auto reformulated_option_map = instance.template create_option_map<
-        std::optional<landscape_opt::option_t>>();
+        std::optional<gecot::option_t>>();
     for(auto && original_option : instance.options()) {
         const double cost = instance.option_cost(original_option);
         if(cost > budget) continue;
@@ -37,10 +37,10 @@ auto trivial_reformulate_instance(
     return reformulated_instance;
 }
 
-template <landscape_opt::case_c C>
+template <gecot::case_c C>
 void trivial_reformulate_case(const C & instance_case, Instance & instance,
                               auto && reformulated_option_map) {
-    using graph_t = landscape_opt::case_graph_t<C>;
+    using graph_t = gecot::case_graph_t<C>;
     using vertex_t = melon::vertex_t<graph_t>;
     using arc_t = melon::arc_t<graph_t>;
 
@@ -112,7 +112,7 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
         std::move(arc_names), std::move(arc_name_to_id_map));
 
     auto vertex_options = melon::create_vertex_map<
-        std::vector<std::pair<double, landscape_opt::option_t>>>(graph, {});
+        std::vector<std::pair<double, gecot::option_t>>>(graph, {});
     for(vertex_t v : melon::vertices(graph)) {
         for(vertex_t original_v : components[v]) {
             for(const auto & [quality_gain, original_option] :
@@ -128,7 +128,7 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
     reformulated_case.set_vertex_options_map(std::move(vertex_options));
 
     auto arc_options = melon::create_arc_map<
-        std::vector<std::pair<double, landscape_opt::option_t>>>(graph, {});
+        std::vector<std::pair<double, gecot::option_t>>>(graph, {});
     for(arc_t a : melon::arcs(graph)) {
         for(const auto & [improved_prob, original_option] :
             original_arc_options_map[original_arc_map[a]]) {

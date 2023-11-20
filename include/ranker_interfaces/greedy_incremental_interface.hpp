@@ -1,11 +1,11 @@
-#ifndef LSCP_GREEDY_INCREMENTAL_INTERFACE_HPP
-#define LSCP_GREEDY_INCREMENTAL_INTERFACE_HPP
+#ifndef GECOT_GREEDY_INCREMENTAL_INTERFACE_HPP
+#define GECOT_GREEDY_INCREMENTAL_INTERFACE_HPP
 
 #include <sstream>
 
 #include <boost/program_options.hpp>
 
-#include "landscape_opt/rankers/greedy_incremental.hpp"
+#include "gecot/rankers/greedy_incremental.hpp"
 
 #include "instance.hpp"
 #include "ranker_interfaces/abstract_ranker.hpp"
@@ -14,7 +14,7 @@ namespace fhamonic {
 
 class GreedyIncrementalInterface : public AbstractRanker {
 private:
-    landscape_opt::rankers::GreedyIncremental ranker;
+    gecot::rankers::GreedyIncremental ranker;
     boost::program_options::options_description desc;
 
 public:
@@ -36,7 +36,7 @@ public:
         ranker.parallel = vm.count("parallel") > 0;
     }
 
-    typename landscape_opt::instance_options_rank_t<Instance> rank_options(
+    typename gecot::instance_options_rank_t<Instance> rank_options(
         const Instance & instance) const {
         return ranker.rank_options(instance);
     };
@@ -56,4 +56,4 @@ public:
 
 }  // namespace fhamonic
 
-#endif  // LSCP_GREEDY_INCREMENTAL_INTERFACE_HPP
+#endif  // GECOT_GREEDY_INCREMENTAL_INTERFACE_HPP

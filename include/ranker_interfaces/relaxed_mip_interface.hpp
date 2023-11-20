@@ -1,11 +1,11 @@
-#ifndef LSCP_MIP_INTERFACE_HPP
-#define LSCP_MIP_INTERFACE_HPP
+#ifndef GECOT_MIP_INTERFACE_HPP
+#define GECOT_MIP_INTERFACE_HPP
 
 #include <sstream>
 
 #include <boost/program_options.hpp>
 
-#include "landscape_opt/rankers/mip.hpp"
+#include "gecot/rankers/mip.hpp"
 
 #include "instance.hpp"
 #include "ranker_interfaces/abstract_ranker.hpp"
@@ -14,7 +14,7 @@ namespace fhamonic {
 
 class RelaxedMIPInterface : public AbstractRanker {
 private:
-    landscape_opt::rankers::MIP ranker;
+    gecot::rankers::MIP ranker;
     boost::program_options::options_description desc;
 
 public:
@@ -36,7 +36,7 @@ public:
         ranker.parallel = vm.count("parallel") > 0;
     }
 
-    typename landscape_opt::instance_option_map_t<Instance, double> rank_options(
+    typename gecot::instance_option_map_t<Instance, double> rank_options(
         const Instance & instance) const {
         return ranker.rank_options(instance);
     };
@@ -58,4 +58,4 @@ public:
 
 }  // namespace fhamonic
 
-#endif  // LSCP_MIP_INTERFACE_HPP
+#endif  // GECOT_MIP_INTERFACE_HPP

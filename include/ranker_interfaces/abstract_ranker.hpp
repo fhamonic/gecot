@@ -13,7 +13,7 @@ public:
     virtual ~AbstractRanker() {}
 
     virtual void parse(const std::vector<std::string> & args) = 0;
-    virtual typename landscape_opt::instance_options_rank_t<Instance> rank_options(
+    virtual typename gecot::instance_options_rank_t<Instance> rank_options(
         const Instance & instance) const = 0;
 
     virtual std::string name() const = 0;

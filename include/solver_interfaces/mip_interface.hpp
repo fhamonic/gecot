@@ -1,11 +1,11 @@
-#ifndef LSCP_MIP_INTERFACE_HPP
-#define LSCP_MIP_INTERFACE_HPP
+#ifndef GECOT_MIP_INTERFACE_HPP
+#define GECOT_MIP_INTERFACE_HPP
 
 #include <sstream>
 
 #include <boost/program_options.hpp>
 
-#include "landscape_opt/solvers/mip.hpp"
+#include "gecot/solvers/mip.hpp"
 
 #include "instance.hpp"
 #include "solver_interfaces/abstract_solver.hpp"
@@ -14,7 +14,7 @@ namespace fhamonic {
 
 class MIPInterface : public AbstractSolver {
 private:
-    landscape_opt::solvers::MIP solver;
+    gecot::solvers::MIP solver;
     boost::program_options::options_description desc;
 
 public:
@@ -38,7 +38,7 @@ public:
         solver.print_model = vm.count("print-model") > 0;
     }
 
-    landscape_opt::instance_solution_t<Instance> solve(const Instance & instance,
+    gecot::instance_solution_t<Instance> solve(const Instance & instance,
                                       const double B) const {
         return solver.solve(instance, B);
     };
@@ -59,4 +59,4 @@ public:
 
 }  // namespace fhamonic
 
-#endif  // LSCP_MIP_INTERFACE_HPP
+#endif  // GECOT_MIP_INTERFACE_HPP

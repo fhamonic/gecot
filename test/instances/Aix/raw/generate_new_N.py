@@ -63,7 +63,7 @@ N2_hexagons = {}
 
 new_N1_hexagons_csv = open("test/instances/Aix/raw/new_N1.csv", "w")
 new_N1_hexagons_csv.write(
-    "id,X,Y,area1,area2,area3,area4,cost,init_quality\n"
+    "id,N2,X,Y,area1,area2,area3,area4,route,init_prob,init_quality\n"
 )
 
 for hexagon in N1_hexagons_csv:
@@ -72,14 +72,16 @@ for hexagon in N1_hexagons_csv:
         N2_hexagons[hexagon_id] = []
     N2_hexagons[hexagon_id].append(hexagon)
     new_N1_hexagons_csv.write(
-        "{id},{x},{y},{a1},{a2},{a3},{a4},{prob},{qual}\n".format(
+        "{id},{n2},{x},{y},{a1},{a2},{a3},{a4},{route},{prob},{qual}\n".format(
             id=hexagon["id"],
+            n2=hexagon["N2_id"],
             x=hexagon["X"],
             y=hexagon["Y"],
             a1=hexagon["area1"],
             a2=hexagon["area2"],
             a3=hexagon["area3"],
             a4=hexagon["area4"],
+            route=int(int(hexagon["import_rou"]) > 0),
             prob=cost_to_prob(int(hexagon["cost"]), int(hexagon["import_rou"])),
             qual=cost_to_quality(int(hexagon["cost"]))
         )
@@ -87,7 +89,7 @@ for hexagon in N1_hexagons_csv:
 
 new_N2_hexagons_csv = open("test/instances/Aix/raw/new_N2.csv", "w")
 new_N2_hexagons_csv.write(
-    "id,X,Y,area1,area2,area3,area4,cost,init_quality\n"
+    "id,X,Y,area1,area2,area3,area4,route,init_prob,init_quality\n"
 )
 
 for id, hexagons in N2_hexagons.items():
@@ -97,6 +99,7 @@ for id, hexagons in N2_hexagons.items():
     area2 = max([int(row["area2"]) for row in hexagons])
     area3 = max([int(row["area3"]) for row in hexagons])
     area4 = max([int(row["area4"]) for row in hexagons])
+    route = int(max([int(row["import_rou"]) for row in hexagons]) > 0)
     init_prob = product(
         [
             cost_to_prob(int(row["cost"]), int(row["import_rou"]))
@@ -120,7 +123,7 @@ for id, hexagons in N2_hexagons.items():
     init_quality = mean([cost_to_quality(int(row["cost"])) for row in hexagons])
 
     new_N2_hexagons_csv.write(
-        "{id},{x},{y},{a1},{a2},{a3},{a4},{p},{q}\n".format(
+        "{id},{x},{y},{a1},{a2},{a3},{a4},{r},{p},{q}\n".format(
             id=id,
             x=x,
             y=y,
@@ -128,6 +131,7 @@ for id, hexagons in N2_hexagons.items():
             a2=area2,
             a3=area3,
             a4=area4,
+            r=route,
             p=init_prob,
             q=init_quality
         )

@@ -206,7 +206,7 @@ int main(int argc, const char * argv[]) {
     const auto time_ms = chrono.time_ms();
 
     if(!output_in_file) {
-        std::cout.precision(10);
+        std::cout.precision(20);
         const double solution_score =
             gecot::compute_solution_score(instance, solution);
         std::cout << "Score: " << solution_score << std::endl;

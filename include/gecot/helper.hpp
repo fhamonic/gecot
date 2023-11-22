@@ -1,6 +1,7 @@
 #ifndef GECOT_HELPER_HPP
 #define GECOT_HELPER_HPP
 
+#include <atomic>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -150,15 +151,17 @@ double compute_solution_score(const I & instance, const S & solution,
                                   cases_arc_options, parallel);
 }
 
-template <instance_c I, detail::range_of<option_t> O>
-void compute_options_cases_incr_eca(const I & instance, const O & free_options,
-                                    auto && cases_current_qm,
-                                    auto && cases_current_pm,
-                                    auto && cases_vertex_options,
-                                    auto && cases_arc_options,
-                                    auto & options_cases_eca,
-                                    const bool parallel = false) {
+namespace detail {
+template <bool parallel = false>
+void _compute_options_cases_incr_eca(
+    const auto & instance, const auto & free_options, auto && cases_current_qm,
+    auto && cases_current_pm, auto && cases_vertex_options,
+    auto && cases_arc_options, auto & options_cases_eca) {
     const auto & cases = instance.cases();
+
+    std::atomic<int> cpt = 0;
+    int nb_pass = free_options.size() * cases.size();
+
     auto compute_options_enhanced_eca =
         [&](const tbb::blocked_range2d<decltype(cases.begin()),
                                        decltype(free_options.begin())> &
@@ -167,6 +170,7 @@ void compute_options_cases_incr_eca(const I & instance, const O & free_options,
                 const auto & options_block = cases_options_block.cols();
                 if(options_block.begin() == options_block.end()) continue;
 
+                const auto & graph = instance_case.graph();
                 const auto & current_qm = cases_current_qm[instance_case.id()];
                 const auto & current_pm = cases_current_pm[instance_case.id()];
                 const auto & vertex_options =
@@ -185,8 +189,17 @@ void compute_options_cases_incr_eca(const I & instance, const O & free_options,
                         enhanced_pm[a] =
                             std::max(enhanced_pm[a], enhanced_prob);
 
-                    options_cases_eca[option][instance_case.id()] =
-                        eca(instance_case.graph(), enhanced_qm, enhanced_pm);
+                    // if constexpr(parallel) {
+                        options_cases_eca[option][instance_case.id()] =
+                            parallel_eca(graph, enhanced_qm, enhanced_pm);
+
+                    // } else {
+                    //     options_cases_eca[option][instance_case.id()] =
+                    //         eca(graph, enhanced_qm, enhanced_pm);
+                    // }
+
+                    std::cout << 100.0 * (++cpt) / nb_pass << "%        "
+                              << '\r'<< std::flush;
 
                     if(++it == options_block.end()) break;
 
@@ -198,7 +211,7 @@ void compute_options_cases_incr_eca(const I & instance, const O & free_options,
             }
         };
 
-    if(parallel) {
+    if constexpr(parallel) {
         tbb::parallel_for(
             tbb::blocked_range2d(cases.begin(), cases.end(),
                                  free_options.begin(), free_options.end()),
@@ -207,6 +220,26 @@ void compute_options_cases_incr_eca(const I & instance, const O & free_options,
         compute_options_enhanced_eca(
             tbb::blocked_range2d(cases.begin(), cases.end(),
                                  free_options.begin(), free_options.end()));
+    }
+}
+}  // namespace detail
+
+template <instance_c I, detail::range_of<option_t> O>
+void compute_options_cases_incr_eca(const I & instance, const O & free_options,
+                                    auto && cases_current_qm,
+                                    auto && cases_current_pm,
+                                    auto && cases_vertex_options,
+                                    auto && cases_arc_options,
+                                    auto & options_cases_eca,
+                                    bool parallel = false) {
+    if(parallel) {
+        detail::_compute_options_cases_incr_eca<true>(
+            instance, free_options, cases_current_qm, cases_current_pm,
+            cases_vertex_options, cases_arc_options, options_cases_eca);
+    } else {
+        detail::_compute_options_cases_incr_eca<false>(
+            instance, free_options, cases_current_qm, cases_current_pm,
+            cases_vertex_options, cases_arc_options, options_cases_eca);
     }
 }
 

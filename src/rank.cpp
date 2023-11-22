@@ -210,11 +210,15 @@ int main(int argc, const char * argv[]) {
         std::cout << std::endl;
     } else {
         std::ofstream output_file(output_csv);
-        output_file << "option_id,potential\n";
-        for(auto && o : instance.options()) {
-            output_file << instance.option_name(o) << ',' << option_ranks[o]
-                        << '\n';
-        }
+        if(output_file.is_open()) {
+            output_file << "option_id,potential\n";
+            for(auto && o : instance.options()) {
+                output_file << instance.option_name(o) << ',' << option_ranks[o]
+                            << '\n';
+            }
+            output_file << std::endl;
+        } else
+            std::cerr << "ERR: '" << output_csv << "' not opened" << std::endl;
     }
 
     return EXIT_SUCCESS;

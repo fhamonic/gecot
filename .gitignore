@@ -1,6 +1,8 @@
 .vscode
 /build
 /output
+/test/instances/Aix/N1
+/test/instances/Aix/N2
 *.lp
 *.mps.gz
 *.dot

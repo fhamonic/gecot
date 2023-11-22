@@ -211,8 +211,7 @@ int main(int argc, const char * argv[]) {
             gecot::compute_solution_score(instance, solution);
         std::cout << "Score: " << solution_score << std::endl;
         std::cout << "Cost: "
-                  << fhamonic::gecot::compute_solution_cost(instance,
-                                                                    solution)
+                  << fhamonic::gecot::compute_solution_cost(instance, solution)
                   << std::endl;
         std::cout << "Solution:" << std::endl;
         const std::size_t option_name_max_length =
@@ -234,14 +233,18 @@ int main(int argc, const char * argv[]) {
         std::cout << std::endl << "in " << time_ms << " ms" << std::endl;
     } else {
         std::ofstream output_file(output_csv);
-        output_file << "option_id,value\n";
-        for(auto && option : raw_instance.options()) {
-            auto option_name = raw_instance.option_name(option);
-            bool value = instance.contains_option(option_name)
-                             ? solution[instance.option_from_name(option_name)]
-                             : false;
-            output_file << option_name << ',' << value << '\n';
-        }
+        if(output_file.is_open()) {
+            output_file << "option_id,value\n";
+            for(auto && option : raw_instance.options()) {
+                auto option_name = raw_instance.option_name(option);
+                bool value =
+                    instance.contains_option(option_name)
+                        ? solution[instance.option_from_name(option_name)]
+                        : false;
+                output_file << option_name << ',' << value << '\n';
+            }
+        } else
+            std::cerr << "ERR: '" << output_csv << "' not opened" << std::endl;
     }
 
     return EXIT_SUCCESS;

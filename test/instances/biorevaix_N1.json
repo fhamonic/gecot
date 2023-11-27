@@ -11,7 +11,7 @@
             "vertices": {
                 "csv_file": "Aix/N1/vertices.csv",
                 "csv_columns": {
-                    "id": "hexagon_id",
+                    "id": "hex_id",
                     "quality": "quality"
                 }
             },

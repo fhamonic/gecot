@@ -31,8 +31,8 @@ for hexagon in hexagons_csv:
     # if hexagon['area1'] != "1": continue
     # if hexagon['area2'] != "1": continue
     # if hexagon['area3'] != "1": continue
-    if hexagon['area4'] != "1": continue
-    id = hexagon["id"]
+    # if hexagon['area4'] != "1": continue
+    id = hexagon["hex_id"]
     hexagons[id] = hexagon
     hexagons[id]["adj_route"] = int(hexagon["route"])
     vertices_csv.write(
@@ -84,7 +84,7 @@ for crossref in crossref_stretches_csv:
 
         arc_options_csv.write(
             "{id}_in_arc,{stretch_id},{p}\n".format(
-                id=hexagon["id"], stretch_id=stretch_id, p=vegetalized_probability
+                id=hexagon["hex_id"], stretch_id=stretch_id, p=vegetalized_probability
             )
         )
 

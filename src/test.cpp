@@ -4,8 +4,8 @@
 #include <iostream>
 #include <optional>
 
-#include "gecot/indices/eca.hpp"
-#include "gecot/indices/parallel_eca.hpp"
+#include "gecot/indices/pc_num.hpp"
+#include "gecot/indices/parallel_pc_num.hpp"
 #include "gecot/utils/chronometer.hpp"
 
 #include "gecot/helper.hpp"
@@ -30,16 +30,16 @@ int main(int argc, const char * argv[]) {
     std::cout << "number of vertices " << melon::nb_vertices(instance_case.graph()) << std::endl;
     std::cout << "number of arcs " << melon::nb_arcs(instance_case.graph()) << std::endl;
 
-    const double seq_eca = fhamonic::gecot::eca(
+    const double seq_pc_num = fhamonic::gecot::pc_num(
         instance_case.graph(), instance_case.vertex_quality_map(),
         instance_case.arc_probability_map());
-    std::cout << "seq ECA = " << seq_eca << " in "
+    std::cout << "seq PC_NUM = " << seq_pc_num << " in "
               << static_cast<double>(chrono.lap_time_us()) / 1000.0 << " ms" << std::endl;
 
-    const double par_eca = fhamonic::gecot::parallel_eca(
+    const double par_pc_num = fhamonic::gecot::parallel_pc_num(
         instance_case.graph(), instance_case.vertex_quality_map(),
         instance_case.arc_probability_map());
-    std::cout << "par ECA = " << par_eca << " in "
+    std::cout << "par PC_NUM = " << par_pc_num << " in "
               << static_cast<double>(chrono.lap_time_us()) / 1000.0 << " ms" << std::endl;
 
     std::cout << "number of options " << instance.options().size() << std::endl;

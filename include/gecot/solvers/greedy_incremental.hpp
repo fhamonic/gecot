@@ -10,7 +10,7 @@
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
-#include "gecot/indices/eca.hpp"
+#include "gecot/indices/pc_num.hpp"
 #include "gecot/utils/chronometer.hpp"
 
 namespace fhamonic {
@@ -33,7 +33,7 @@ struct GreedyIncremental {
             options.emplace_back(option);
         }
 
-        auto options_cases_eca = instance.create_option_map(
+        auto options_cases_pc_num = instance.create_option_map(
             instance.template create_case_map<double>());
         auto cases_current_qm =
             instance.template create_case_map<instance_quality_map_t<I>>();
@@ -53,13 +53,13 @@ struct GreedyIncremental {
         double previous_score = compute_base_score(instance, parallel);
         double budget_left = budget;
         while(options.size() > 0) {
-            compute_options_cases_incr_eca(
+            compute_options_cases_incr_pc_num(
                 instance, options, cases_current_qm, cases_current_pm,
-                cases_vertex_options, cases_arc_options, options_cases_eca,
+                cases_vertex_options, cases_arc_options, options_cases_pc_num,
                 parallel);
             for(const option_t & option : options) {
                 options_ratios[option] =
-                    (instance.eval_criterion(options_cases_eca[option]) -
+                    (instance.eval_criterion(options_cases_pc_num[option]) -
                      previous_score) /
                     instance.option_cost(option);
             }

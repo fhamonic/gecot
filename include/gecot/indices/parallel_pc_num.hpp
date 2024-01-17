@@ -1,5 +1,5 @@
-#ifndef GECOT_INDICES_PARALLEL_ECA_HPP
-#define GECOT_INDICES_PARALLEL_ECA_HPP
+#ifndef GECOT_INDICES_PARALLEL_PC_NUM_HPP
+#define GECOT_INDICES_PARALLEL_PC_NUM_HPP
 
 #include <cmath>
 #include <concepts>
@@ -14,7 +14,7 @@ namespace gecot {
 
 namespace detail {
 template <typename GR, typename PM>
-struct parallel_eca_dijkstra_traits {
+struct parallel_pc_num_dijkstra_traits {
     using semiring = melon::most_reliable_path_semiring<
         melon::mapped_value_t<PM, melon::arc_t<GR>>>;
     struct entry_cmp {
@@ -34,15 +34,15 @@ struct parallel_eca_dijkstra_traits {
 }  // namespace detail
 
 template <typename GR, typename QM, typename PM>
-double parallel_eca(const GR & graph, const QM & quality_map,
+double parallel_pc_num(const GR & graph, const QM & quality_map,
                     const PM & probability_map) {
     auto vertices_range = melon::vertices(graph);
 
-    double eca_sum = tbb::parallel_reduce(
+    double pc_num_sum = tbb::parallel_reduce(
         tbb::blocked_range(vertices_range.begin(), vertices_range.end()), 0.0,
         [&](auto && vertices_subrange, double init) {
             auto algo =
-                melon::dijkstra(detail::parallel_eca_dijkstra_traits<GR, PM>{},
+                melon::dijkstra(detail::parallel_pc_num_dijkstra_traits<GR, PM>{},
                                 graph, probability_map);
 
             for(auto && s : vertices_subrange) {
@@ -59,10 +59,10 @@ double parallel_eca(const GR & graph, const QM & quality_map,
         },
         std::plus<double>());
 
-    return std::sqrt(eca_sum);
+    return pc_num_sum;
 };
 
 }  // namespace gecot
 }  // namespace fhamonic
 
-#endif  // GECOT_INDICES_PARALLEL_ECA_HPP
+#endif  // GECOT_INDICES_PARALLEL_PC_NUM_HPP

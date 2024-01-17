@@ -6,7 +6,7 @@
 #include "melon/views/reverse.hpp"
 
 #include "gecot/concepts/instance.hpp"
-#include "gecot/indices/parallel_eca.hpp"
+#include "gecot/indices/parallel_pc_num.hpp"
 
 namespace fhamonic {
 namespace gecot {
@@ -26,7 +26,7 @@ auto compute_big_M_map(const GR & graph, const QM & quality_map,
     auto compute_big_Ms = [&](auto && vertices_subrange) {
         auto reversed_graph = melon::views::reverse(graph);
         auto algo = melon::dijkstra(
-            detail::parallel_eca_dijkstra_traits<melon::views::reverse<GR>,
+            detail::parallel_pc_num_dijkstra_traits<melon::views::reverse<GR>,
                                                  PM>{},
             reversed_graph, probability_map);
 

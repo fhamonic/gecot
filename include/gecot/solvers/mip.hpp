@@ -15,8 +15,8 @@
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
-#include "gecot/indices/eca.hpp"
-#include "gecot/indices/parallel_eca.hpp"
+#include "gecot/indices/pc_num.hpp"
+#include "gecot/indices/parallel_pc_num.hpp"
 #include "gecot/preprocessing/compute_big_M_map.hpp"
 #include "gecot/preprocessing/compute_generalized_flow_graph.hpp"
 #include "gecot/utils/chronometer.hpp"

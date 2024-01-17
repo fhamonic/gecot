@@ -15,8 +15,8 @@
 #include "melon/mapping.hpp"
 
 #include "gecot/concepts/instance.hpp"
-#include "gecot/indices/eca.hpp"
-#include "gecot/indices/parallel_eca.hpp"
+#include "gecot/indices/pc_num.hpp"
+#include "gecot/indices/parallel_pc_num.hpp"
 
 namespace fhamonic {
 namespace gecot {
@@ -69,22 +69,22 @@ double compute_score(const I & instance, const auto & cases_current_qm,
                      const auto & cases_current_pm,
                      const bool parallel = false) noexcept {
     const auto & cases = instance.cases();
-    auto cases_eca = instance.template create_case_map<double>();
-    auto compute_base_eca =
+    auto cases_pc_num = instance.template create_case_map<double>();
+    auto compute_base_pc_num =
         [&](const tbb::blocked_range<decltype(cases.begin())> & cases_block) {
             for(auto instance_case : cases_block) {
-                cases_eca[instance_case.id()] = eca(
+                cases_pc_num[instance_case.id()] = pc_num(
                     instance_case.graph(), cases_current_qm[instance_case.id()],
                     cases_current_pm[instance_case.id()]);
             }
         };
     if(parallel) {
         tbb::parallel_for(tbb::blocked_range(cases.begin(), cases.end()),
-                          compute_base_eca);
+                          compute_base_pc_num);
     } else {
-        compute_base_eca(tbb::blocked_range(cases.begin(), cases.end()));
+        compute_base_pc_num(tbb::blocked_range(cases.begin(), cases.end()));
     }
-    return instance.eval_criterion(cases_eca);
+    return instance.eval_criterion(cases_pc_num);
 }
 
 template <instance_c I>
@@ -153,16 +153,16 @@ double compute_solution_score(const I & instance, const S & solution,
 
 namespace detail {
 template <bool parallel = false>
-void _compute_options_cases_incr_eca(
+void _compute_options_cases_incr_pc_num(
     const auto & instance, const auto & free_options, auto && cases_current_qm,
     auto && cases_current_pm, auto && cases_vertex_options,
-    auto && cases_arc_options, auto & options_cases_eca) {
+    auto && cases_arc_options, auto & options_cases_pc_num) {
     const auto & cases = instance.cases();
 
     std::atomic<int> cpt = 0;
     int nb_pass = free_options.size() * cases.size();
 
-    auto compute_options_enhanced_eca =
+    auto compute_options_enhanced_pc_num =
         [&](const tbb::blocked_range2d<decltype(cases.begin()),
                                        decltype(free_options.begin())> &
                 cases_options_block) {
@@ -190,12 +190,12 @@ void _compute_options_cases_incr_eca(
                             std::max(enhanced_pm[a], enhanced_prob);
 
                     // if constexpr(parallel) {
-                        options_cases_eca[option][instance_case.id()] =
-                            parallel_eca(graph, enhanced_qm, enhanced_pm);
+                        options_cases_pc_num[option][instance_case.id()] =
+                            parallel_pc_num(graph, enhanced_qm, enhanced_pm);
 
                     // } else {
-                    //     options_cases_eca[option][instance_case.id()] =
-                    //         eca(graph, enhanced_qm, enhanced_pm);
+                    //     options_cases_pc_num[option][instance_case.id()] =
+                    //         pc_num(graph, enhanced_qm, enhanced_pm);
                     // }
 
                     std::cout << 100.0 * (++cpt) / nb_pass << "%        "
@@ -215,9 +215,9 @@ void _compute_options_cases_incr_eca(
         tbb::parallel_for(
             tbb::blocked_range2d(cases.begin(), cases.end(),
                                  free_options.begin(), free_options.end()),
-            compute_options_enhanced_eca);
+            compute_options_enhanced_pc_num);
     } else {
-        compute_options_enhanced_eca(
+        compute_options_enhanced_pc_num(
             tbb::blocked_range2d(cases.begin(), cases.end(),
                                  free_options.begin(), free_options.end()));
     }
@@ -225,34 +225,34 @@ void _compute_options_cases_incr_eca(
 }  // namespace detail
 
 template <instance_c I, detail::range_of<option_t> O>
-void compute_options_cases_incr_eca(const I & instance, const O & free_options,
+void compute_options_cases_incr_pc_num(const I & instance, const O & free_options,
                                     auto && cases_current_qm,
                                     auto && cases_current_pm,
                                     auto && cases_vertex_options,
                                     auto && cases_arc_options,
-                                    auto & options_cases_eca,
+                                    auto & options_cases_pc_num,
                                     bool parallel = false) {
     if(parallel) {
-        detail::_compute_options_cases_incr_eca<true>(
+        detail::_compute_options_cases_incr_pc_num<true>(
             instance, free_options, cases_current_qm, cases_current_pm,
-            cases_vertex_options, cases_arc_options, options_cases_eca);
+            cases_vertex_options, cases_arc_options, options_cases_pc_num);
     } else {
-        detail::_compute_options_cases_incr_eca<false>(
+        detail::_compute_options_cases_incr_pc_num<false>(
             instance, free_options, cases_current_qm, cases_current_pm,
-            cases_vertex_options, cases_arc_options, options_cases_eca);
+            cases_vertex_options, cases_arc_options, options_cases_pc_num);
     }
 }
 
 template <instance_c I, melon::input_mapping<option_t> S,
           detail::range_of<option_t> O>
     requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
-void compute_options_cases_decr_eca(
+void compute_options_cases_decr_pc_num(
     const I & instance, const S & current_solution, const O & taken_options,
     auto && cases_current_qm, auto && cases_current_pm,
     auto && cases_vertex_options, auto && cases_arc_options,
-    auto & options_cases_eca, const bool parallel = false) {
+    auto & options_cases_pc_num, const bool parallel = false) {
     const auto & cases = instance.cases();
-    auto compute_options_enhanced_eca =
+    auto compute_options_enhanced_pc_num =
         [&](const tbb::blocked_range2d<decltype(cases.begin()),
                                        decltype(taken_options.begin())> &
                 cases_options_block) {
@@ -286,8 +286,8 @@ void compute_options_cases_decr_eca(
                         }
                     }
 
-                    options_cases_eca[option][instance_case.id()] =
-                        eca(instance_case.graph(), enhanced_qm, enhanced_pm);
+                    options_cases_pc_num[option][instance_case.id()] =
+                        pc_num(instance_case.graph(), enhanced_qm, enhanced_pm);
 
                     if(++it == options_block.end()) break;
 
@@ -303,9 +303,9 @@ void compute_options_cases_decr_eca(
         tbb::parallel_for(
             tbb::blocked_range2d(cases.begin(), cases.end(),
                                  taken_options.begin(), taken_options.end()),
-            compute_options_enhanced_eca);
+            compute_options_enhanced_pc_num);
     } else {
-        compute_options_enhanced_eca(
+        compute_options_enhanced_pc_num(
             tbb::blocked_range2d(cases.begin(), cases.end(),
                                  taken_options.begin(), taken_options.end()));
     }

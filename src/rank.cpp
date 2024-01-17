@@ -13,8 +13,8 @@ namespace po = boost::program_options;
 namespace logging = boost::log;
 
 // #include "gecot/rankers/mip_xue.hpp"
-// #include "gecot/rankers/mip_eca.hpp"
-// #include "gecot/rankers/mip_eca_preprocessed.hpp"
+// #include "gecot/rankers/mip_pc_num.hpp"
+// #include "gecot/rankers/mip_pc_num_preprocessed.hpp"
 // #include "gecot/rankers/randomized_rounding.hpp"
 
 #include "instance.hpp"

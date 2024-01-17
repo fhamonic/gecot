@@ -6,7 +6,7 @@
 #include "melon/views/reverse.hpp"
 
 #include "gecot/concepts/instance.hpp"
-#include "gecot/indices/eca.hpp"
+#include "gecot/indices/pc_num.hpp"
 #include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
 #include "gecot/preprocessing/compute_contracted_generalized_flow_graph.hpp"
 #include "gecot/preprocessing/compute_generalized_flow_graph.hpp"
@@ -35,7 +35,7 @@ double compute_original_contribution(auto && graph, auto quality_map,
         }
     }
 
-    return gecot::eca_vertex_contribution(
+    return gecot::pc_num_vertex_contribution(
         melon::views::reverse(graph), quality_map, probability_map, original_t);
 }
 
@@ -84,7 +84,7 @@ GTEST_TEST(preprocessing, fuzzy_test) {
         //*/
 
         for(const auto & original_t : melon::vertices(original_graph)) {
-            const double contribution = gecot::eca_vertex_contribution(
+            const double contribution = gecot::pc_num_vertex_contribution(
                 melon::views::reverse(graph), quality_map, probability_map,
                 original_t);
 
@@ -97,7 +97,7 @@ GTEST_TEST(preprocessing, fuzzy_test) {
                     useless_arcs_map[original_t], original_t);
 
             const double contracted_contribution =
-                gecot::eca_vertex_contribution(
+                gecot::pc_num_vertex_contribution(
                     melon::views::reverse(contracted_graph),
                     contracted_quality_map, contracted_probability_map, t);
 

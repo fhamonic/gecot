@@ -14,7 +14,7 @@
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
-#include "gecot/indices/eca.hpp"
+#include "gecot/indices/pc_num.hpp"
 #include "gecot/utils/chronometer.hpp"
 
 namespace fhamonic {
@@ -98,7 +98,7 @@ struct MIP {
 
 #endif  // GECOT_SOLVERS_MIP_HPP
 
-// Solution Solvers::PL_ECA_2::solve(
+// Solution Solvers::PL_PC_NUM_2::solve(
 //     const MutableLandscape & landscape,
 //     const RestorationPlan<MutableLandscape> & plan, const double B) const {
 //     Solution solution(landscape, plan);
@@ -127,9 +127,9 @@ struct MIP {
 //             OsiClpSolverInterface * solver_clp =
 //                 solver_builder.buildSolver<OsiClpSolverInterface>(
 //                     OSI_Builder::MAX);
-//             solver_clp->writeLp("pl_eca_2");
+//             solver_clp->writeLp("pl_pc_num_2");
 //             delete solver_clp;
-//             std::cout << name() << ": LP printed to 'pl_eca_2.lp'" <<
+//             std::cout << name() << ": LP printed to 'pl_pc_num_2.lp'" <<
 //             std::endl;
 //         }
 //         std::cout << name() << ": Complete filling solver : "
@@ -167,8 +167,6 @@ struct MIP {
 //         std::cout << name()
 //                   << ": Complete solving : " << solution.getComputeTimeMs()
 //                   << " ms" << std::endl;
-//         std::cout << name() << ": ECA from obj : " << std::sqrt(solution.obj)
-//                   << std::endl;
 //     }
 //     delete solver;
 

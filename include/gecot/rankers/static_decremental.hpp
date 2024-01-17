@@ -10,7 +10,7 @@
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
-#include "gecot/indices/eca.hpp"
+#include "gecot/indices/pc_num.hpp"
 #include "gecot/utils/chronometer.hpp"
 
 namespace fhamonic {
@@ -29,7 +29,7 @@ struct StaticDecremental {
             options.emplace_back(option);
         }
 
-        auto options_cases_eca = instance.create_option_map(
+        auto options_cases_pc_num = instance.create_option_map(
             instance.template create_case_map<double>());
         auto cases_current_qm =
             instance.template create_case_map<instance_quality_map_t<I>>();
@@ -57,16 +57,16 @@ struct StaticDecremental {
 
         const double max_score =
             compute_score(instance, cases_current_qm, cases_current_pm);
-        compute_options_cases_decr_eca(
+        compute_options_cases_decr_pc_num(
             instance, melon::views::map([](option_t o) { return true; }),
             options, cases_current_qm, cases_current_pm, cases_vertex_options,
-            cases_arc_options, options_cases_eca, parallel);
+            cases_arc_options, options_cases_pc_num, parallel);
 
         auto options_ratios = instance.create_option_map(0.0);
         for(auto && option : options) {
             options_ratios[option] =
                 (max_score -
-                 instance.eval_criterion(options_cases_eca[option])) /
+                 instance.eval_criterion(options_cases_pc_num[option])) /
                 instance.option_cost(option);
         }
 

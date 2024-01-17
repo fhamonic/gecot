@@ -15,8 +15,8 @@
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
-#include "gecot/indices/eca.hpp"
-#include "gecot/indices/parallel_eca.hpp"
+#include "gecot/indices/pc_num.hpp"
+#include "gecot/indices/parallel_pc_num.hpp"
 #include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
 #include "gecot/preprocessing/compute_contracted_generalized_flow_graph.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"

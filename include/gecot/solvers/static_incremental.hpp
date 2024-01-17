@@ -12,7 +12,7 @@
 #include "melon/container/static_map.hpp"
 
 #include "gecot/helper.hpp"
-#include "gecot/indices/eca.hpp"
+#include "gecot/indices/pc_num.hpp"
 #include "gecot/utils/chronometer.hpp"
 
 namespace fhamonic {
@@ -36,13 +36,13 @@ struct StaticIncremental {
         }
 
         const double base_score = compute_base_score(instance, parallel);
-        auto options_cases_eca = instance.create_option_map(
+        auto options_cases_pc_num = instance.create_option_map(
             instance.template create_case_map<double>());
         const auto cases_vertex_options =
             compute_cases_vertex_options(instance);
         const auto cases_arc_options = compute_cases_arc_options(instance);
 
-        compute_options_cases_incr_eca(
+        compute_options_cases_incr_pc_num(
             instance, options,
             melon::views::map([&cases](auto case_id) -> decltype(auto) {
                 return cases[case_id].vertex_quality_map();
@@ -50,13 +50,13 @@ struct StaticIncremental {
             melon::views::map([&cases](auto case_id) -> decltype(auto) {
                 return cases[case_id].arc_probability_map();
             }),
-            cases_vertex_options, cases_arc_options, options_cases_eca,
+            cases_vertex_options, cases_arc_options, options_cases_pc_num,
             parallel);
 
         auto options_ratios = instance.create_option_map(0.0);
         for(const option_t & option : options) {
             options_ratios[option] =
-                (instance.eval_criterion(options_cases_eca[option]) - base_score) /
+                (instance.eval_criterion(options_cases_pc_num[option]) - base_score) /
                 instance.option_cost(option);
         }
         std::ranges::sort(options, [&options_ratios](auto && o1, auto && o2) {

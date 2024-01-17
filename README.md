@@ -12,15 +12,83 @@ GECOT, for Graph-based Ecological Connectivity Optimization Tool, is a C++ libra
 ## Usage
 making the project will produce a static library "lgecot.a" and an executable "solve"
 
-    gecot_solve <landscape_file> <problem_file> <budget_value> <solver_name> [<option>=<value>]
+    gecot_solve <algorithm_name> <instance_file> <budget_value> [<option>=<value>]
 
-A wrong call of "solve" will output the available solvers names if the provided one doesn't exist and available the available options for the selected solver otherwise.
+### Algorithm selection
 
-"<landscape_file>" is the path to a csv file with columns "patches_file" and "links_file" giving paths to the csv files describing the set of patches and of links of the landscape.
+"<algorithm_name>" is the name of the algorithm to use for solving the input problem.
+The list of available algorithm can be displayed with the command :
 
-"<problem_file>" is the path to a file describing the available options to improve elements of the landscape.
+    gecot_solve --list-algorithms
 
-See the data repertory for examples.
+Typical output :
+```
+GECOT 0.1
+
+Available solving algorithms:
+  static_incr           From the base landscape, add the options with the best
+                        gain/cost ratio.
+  static_decr           From the improved landscape, remove the options with the
+                        worst gain/cost ratio.
+  greedy_incr           From the base landscape, iteratively add the option with
+                        the best gain/cost ratio.
+  greedy_decr           From the improved landscape, iteratively remove the
+                        option with the worst gain/cost ratio (Zonation
+                        Algorithm).
+  mip                   MIP formulation without preprocessing, from 'Optimizing
+                        the ecological connectivity of landscapes', François
+                        Hamonic, Cécile Albert, Basile Couëtoux, Yann Vaxès
+  prep_mip              MIP formulation with preprocessing, from 'Optimizing the
+                        ecological connectivity of landscapes', François
+                        Hamonic, Cécile Albert, Basile Couëtoux, Yann Vaxès
+```
+
+### Instance file
+
+"<instance_file>" is the path to a json file describing problem to solve.
+Some examples of instance are available in the folder `test/instances`.
+Lets take a look the the file `test/instances/Aude.json` :
+ ```json
+{
+    "options": {
+        "csv_file": "Aude/dams.csv",
+        "csv_columns": {
+            "id": "name",
+            "cost": "cost"
+        }
+    },
+    "cases": {
+        "trout": {
+            "vertices": {
+                "csv_file": "Aude/stretches.csv",
+                "csv_columns": {
+                    "id": "id",
+                    "quality": "length"
+                }
+            },
+            "arcs": {
+                "csv_file": "Aude/arcs.csv",
+                "csv_columns": {
+                    "id": "arc_id",
+                    "from": "source_id",
+                    "to": "target_id",
+                    "probability": "probability"
+                }
+            },
+            "arcs_improvements": {
+                "csv_file": "Aude/dams_arcs.csv",
+                "csv_columns": {
+                    "arc_id": "arc_id",
+                    "option_id": "dam_id",
+                    "improved_probability": "improved_prob"
+                }
+            }
+        }
+    },
+    "criterion": "trout"
+}
+```
 
 ## Acknowledgments
-This work is part of the PhD thesis of François Hamonic which is funded by Region Sud (https://www.maregionsud.fr/) and Natural Solutions (https://www.natural-solutions.eu/)
+This work is part of the PhD thesis of François Hamonic which is funded by Region Sud (https://www.maregionsud.fr/) and Natural Solutions (https://www.natural-solutions.eu/).
+

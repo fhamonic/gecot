@@ -15,8 +15,8 @@
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
-#include "gecot/indices/pc_num.hpp"
 #include "gecot/indices/parallel_pc_num.hpp"
+#include "gecot/indices/pc_num.hpp"
 #include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
 #include "gecot/preprocessing/compute_contracted_generalized_flow_graph.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
@@ -40,7 +40,8 @@ struct preprocessed_MIP {
             : model{t_model}, C_vars{t_C_vars} {}
 
         auto operator()(const criterion_constant & c) {
-            return model.get().add_variable({.lower_bound = c, .upper_bound = c});
+            return model.get().add_variable(
+                {.lower_bound = c, .upper_bound = c});
         }
         auto operator()(const criterion_var & v) { return C_vars.get()(v); }
         auto operator()(const criterion_sum & f) {
@@ -84,14 +85,16 @@ struct preprocessed_MIP {
         mip model;
 
         const auto C_vars = model.add_variables(
-            instance.cases().size(), [](const case_id_t & id) { return id; });
+            instance.cases().size(), [](const case_id_t & id) { return id; },
+            [](const case_id_t & id) { return "C_" + std::to_string(id); });
 
         // model.add_to_objective(C_vars);
-        model.add_to_objective(std::visit(formula_variable_visitor{model, C_vars},
-                                 instance.criterion()));
+        model.add_to_objective(std::visit(
+            formula_variable_visitor{model, C_vars}, instance.criterion()));
 
         const auto X_vars = model.add_variables(
             instance.options().size(), [](const option_t & i) { return i; },
+            [](const option_t & i) { return "Y_" + std::to_string(i); },
             {.upper_bound = 1, .type = mip::var_category::binary});
         model.add_constraint(
             xsum(instance.options(), X_vars, [&instance](const auto & o) {
@@ -109,6 +112,8 @@ struct preprocessed_MIP {
                 original_graph.nb_vertices(),
                 [](const melon::vertex_t<instance_graph_t<I>> & v) {
                     return v;
+                },[case_id = instance_case.id()](const melon::vertex_t<instance_graph_t<I>> & v) {
+                    return "F_"+std::to_string(v)+"("+std::to_string(case_id)+")";
                 });
             std::vector<std::pair<variable<int, double>, double>>
                 F_prime_additional_terms;
@@ -156,7 +161,9 @@ struct preprocessed_MIP {
                     graph.nb_arcs(),
                     [&arc_no_map](const melon::arc_t<Graph> & a) {
                         return arc_no_map[a];
-                    });
+                    },[original_t, case_id = instance_case.id()](const melon::arc_t<Graph> & a) {
+                    return "Φ^"+std::to_string(original_t)+"_"+std::to_string(a)+"("+std::to_string(case_id)+")";
+                });
                 for(const auto & u : melon::vertices(graph)) {
                     if(u == t) continue;
                     model.add_constraint(

@@ -150,7 +150,7 @@ struct preprocessed_MIP {
 
                 for(const auto & [quality_gain, option] :
                     original_vertex_options_map[original_t]) {
-                    const auto F_prime_t_var = model.add_variable();
+                    const auto F_prime_t_var = model.add_variable({},"F'_"+std::to_string(original_t)+"("+std::to_string(instance_case.id())+")");
                     model.add_constraint(F_prime_t_var <= F_vars(original_t));
                     model.add_constraint(F_prime_t_var <=
                                          big_M_map[t] * X_vars(option));

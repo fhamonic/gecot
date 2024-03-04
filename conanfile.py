@@ -18,7 +18,7 @@ class CompressorRecipe(ConanFile):
         self.requires("fmt/10.1.1")
 
         self.requires("melon/0.5")
-        # self.requires("mippp/0.9")
+        self.requires("mippp/0.1")
 
     def build_requirements(self):
         self.tool_requires("cmake/3.27.1")

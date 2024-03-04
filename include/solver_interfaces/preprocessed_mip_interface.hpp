@@ -20,7 +20,7 @@ private:
 public:
     PreprocessedMIPInterface() : desc(name() + " options") {
         desc.add_options()("verbose,v", "Log the algorithm steps")(
-            "parallel,p", "Use multithreaded version");
+            "parallel,p", "Use multithreaded version")("print-model,m", "Print the mixed integer program");
     }
 
     void parse(const std::vector<std::string> & args) {
@@ -34,6 +34,7 @@ public:
 
         solver.verbose = vm.count("verbose") > 0;
         solver.parallel = vm.count("parallel") > 0;
+        solver.print_model = vm.count("print-model") > 0;
     }
 
     gecot::instance_solution_t<Instance> solve(

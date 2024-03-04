@@ -28,8 +28,6 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/dependencies/melon"
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/dependencies/mippp"
                       ${CMAKE_MODULE_PATH})
 
-add_subdirectory(dependencies/mippp)
-
 # ################### Packages ####################
 find_package(fast-cpp-csv-parser REQUIRED)
 find_package(nlohmann_json REQUIRED)
@@ -41,6 +39,7 @@ find_package(Eigen3 REQUIRED)
 # find_package(range-v3 REQUIRED)
 
 find_package(melon REQUIRED)
+find_package(mippp REQUIRED)
 
 # ################### LIB target ####################
 add_library(gecot INTERFACE)
@@ -53,11 +52,18 @@ target_link_libraries(gecot INTERFACE Eigen3::Eigen)
 # target_link_libraries(gecot INTERFACE range-v3::range-v3)
 
 target_link_libraries(gecot INTERFACE melon::melon)
-target_link_libraries(gecot INTERFACE mippp)
-target_compile_definitions(gecot INTERFACE)
-target_compile_definitions(gecot INTERFACE MIPPP_PREFERED_SOLVER=MIPPP_GUROBI)
-# target_compile_definitions(gecot INTERFACE MIPPP_PREFERED_SOLVER=MIPPP_SCIP)
-# target_compile_definitions(gecot INTERFACE MIPPP_PREFERED_SOLVER=MIPPP_COINOR)
+target_link_libraries(gecot INTERFACE mippp::mippp)
+
+# ################### MIP solver ####################
+find_package(SCIP REQUIRED)
+target_compile_definitions(gecot INTERFACE MIPPP_USE_SCIP=1)
+target_include_directories(gecot INTERFACE ${SCIP_INCLUDE_DIR})
+target_link_libraries(gecot INTERFACE ${SCIP_LIBRARIES})
+
+# find_package(GUROBI REQUIRED)
+# target_compile_definitions(gecot INTERFACE MIPPP_USE_GUROBI=1)
+# target_include_directories(gecot INTERFACE ${GUROBI_INCLUDE_DIR})
+# target_link_libraries(gecot INTERFACE ${GUROBI_LIBRARIES})
 
 # ################### EXEC target ####################
 add_executable(gecot_solve src/solve.cpp)

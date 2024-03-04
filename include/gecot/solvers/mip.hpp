@@ -39,11 +39,11 @@ struct MIP {
             : model{t_model}, C_vars{t_C_vars} {}
 
         auto operator()(const criterion_constant & c) {
-            return model.get().add_var({.lower_bound = c, .upper_bound = c});
+            return model.get().add_variable({.lower_bound = c, .upper_bound = c});
         }
         auto operator()(const criterion_var & v) { return C_vars.get()(v); }
         auto operator()(const criterion_sum & f) {
-            auto var = model.get().add_var();
+            auto var = model.get().add_variable();
             std::cout << 'R' << model.get().nb_constraints() << '\n';
             model.get().add_constraint(
                 var <= mippp::xsum(f.values, [this](const auto & e) {
@@ -59,7 +59,7 @@ struct MIP {
                     "criterion "
                     "!");
 
-            auto var = model.get().add_var();
+            auto var = model.get().add_variable();
             std::cout << 'R' << model.get().nb_constraints() << '\n';
             model.get().add_constraint(
                 var <= std::get<criterion_constant>(f.values[0]) *
@@ -67,7 +67,7 @@ struct MIP {
             return var;
         }
         auto operator()(const criterion_min & f) {
-            auto var = model.get().add_var();
+            auto var = model.get().add_variable();
             for(auto && e : f.values) {
                 std::cout << 'R' << model.get().nb_constraints() << '\n';
                 model.get().add_constraint(var <= std::visit(*this, e));
@@ -86,15 +86,15 @@ struct MIP {
         using mip = mip_model<default_solver_traits>;
         mip model;
 
-        const auto C_vars = model.add_vars(
+        const auto C_vars = model.add_variables(
             instance.cases().size(), [](const case_id_t & id) { return id; });
 
-        // model.add_obj(C_vars);
+        // model.add_to_objective(C_vars);
         if(print_model) std::cout << "PRESOLVED\n0\nMASTERCONSS\n";
-        model.add_obj(std::visit(formula_variable_visitor{model, C_vars},
+        model.add_to_objective(std::visit(formula_variable_visitor{model, C_vars},
                                  instance.criterion()));
 
-        const auto X_vars = model.add_vars(
+        const auto X_vars = model.add_variables(
             instance.options().size(), [](const option_t & i) { return i; },
             {.upper_bound = 1, .type = mip::var_category::binary});
 
@@ -114,7 +114,7 @@ struct MIP {
                 compute_big_M_map(graph, quality_map, vertex_options_map,
                                   probability_map, parallel);
 
-            const auto F_vars = model.add_vars(
+            const auto F_vars = model.add_variables(
                 graph.nb_vertices(),
                 [](const melon::vertex_t<instance_graph_t<I>> & v) {
                     return v;
@@ -126,7 +126,7 @@ struct MIP {
                 if(print_model) std::cout << "BLOCK " << ++nb_blocks << "\n";
                 for(const auto & [quality_gain, option] :
                     vertex_options_map[t]) {
-                    const auto F_prime_t_var = model.add_var();
+                    const auto F_prime_t_var = model.add_variable();
 
                     if(print_model)
                         std::cout << 'R' << model.nb_constraints() << '\n';
@@ -138,7 +138,7 @@ struct MIP {
                     F_prime_additional_terms.emplace_back(F_prime_t_var,
                                                           quality_gain);
                 }
-                const auto Phi_t_vars = model.add_vars(
+                const auto Phi_t_vars = model.add_variables(
                     graph.nb_arcs(),
                     [](const melon::arc_t<instance_graph_t<I>> & a) {
                         return a;

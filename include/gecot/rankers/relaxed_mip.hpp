@@ -46,18 +46,18 @@ struct MIP {
         using Model = Model<GrbTraits>;
         Model model;
 
-        auto F_vars = model.add_vars(graph.nb_vertices(),
+        auto F_vars = model.add_variables(graph.nb_vertices(),
                                      [](const melon::vertex_t<Graph> v) { return v; });
-        auto Phi_vars = model.add_vars(
+        auto Phi_vars = model.add_variables(
             graph.nb_vertices() * graph.nb_arcs(),
             [n = graph.nb_vertices()](const melon::vertex_t<Graph> v, const melon::arc_t<Graph> a) {
                 return v * n + a;
             });
-        auto X_vars = model.add_vars(instance.options().size(),
+        auto X_vars = model.add_variables(instance.options().size(),
                                      [](const Option i) { return i; },
                                      {.type = Model::ColType::BINARY});
 
-        model.add_obj(xsum(melon::vertices(graph), F_vars, quality));
+        model.add_to_objective(xsum(melon::vertices(graph), F_vars, quality));
         for(auto && t : melon::vertices(graph)) {
             auto Phi_t_var = [&Phi_vars, t](melon::arc_t<Graph> a) {
                 return Phi_vars(t, a);

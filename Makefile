@@ -3,7 +3,7 @@ BUILD_TYPE = default
 
 .PHONY: all test clean
 
-all: test
+all: test package
 
 $(BUILD_DIR):
 	conan build . -of=${BUILD_DIR} -b=missing -pr=${BUILD_TYPE}
@@ -17,6 +17,10 @@ update-submodules:
 test: $(BUILD_DIR)
 	@cd $(BUILD_DIR) && \
 	ctest --output-on-failure
+
+package: $(BUILD_DIR)
+	@cd $(BUILD_DIR) && \
+	cpack
 
 clean:
 	@rm -rf CMakeUserPresets.json

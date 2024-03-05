@@ -156,7 +156,7 @@ struct MIP {
                         return a;
                     },
                     [t, case_id](const melon::arc_t<instance_graph_t<I>> & a) {
-                        return "Φ_" + std::to_string(t) + "_" +
+                        return "P_" + std::to_string(t) + "_" +
                                std::to_string(a) + "(" +
                                std::to_string(case_id) + ")";
                     });

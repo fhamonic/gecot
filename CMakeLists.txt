@@ -23,10 +23,9 @@ include(CompilerWarnings)
 include(CompilerOptimizations)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}" ${CMAKE_MODULE_PATH})
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/dependencies/melon"
-                      ${CMAKE_MODULE_PATH})
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/dependencies/mippp"
-                      ${CMAKE_MODULE_PATH})
+
+set(CMAKE_INSTALL_RPATH "\$ORIGIN/../lib")
+set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
 
 # ################### Packages ####################
 find_package(fast-cpp-csv-parser REQUIRED)
@@ -108,3 +107,29 @@ message("Building Tests.")
 set_project_warnings(gecot)
 add_subdirectory(test) 
 endif()
+
+# ################## INSTALL #####################
+install(TARGETS gecot_solve gecot_rank RUNTIME DESTINATION bin LIBRARY DESTINATION lib
+ARCHIVE DESTINATION lib)
+
+install(CODE [[
+  file(GET_RUNTIME_DEPENDENCIES
+    EXECUTABLES $<TARGET_FILE:gecot_solve>
+    RESOLVED_DEPENDENCIES_VAR _r_deps
+    UNRESOLVED_DEPENDENCIES_VAR _u_deps
+    DIRECTORIES bin
+  )
+  foreach(_file ${_r_deps})
+    file(INSTALL
+      DESTINATION "${CMAKE_INSTALL_PREFIX}/lib"
+      TYPE SHARED_LIBRARY
+      FILES "${_file}" FOLLOW_SYMLINK_CHAIN
+    )
+  endforeach()
+  list(LENGTH _u_deps _u_length)
+  if("${_u_length}" GREATER 0)
+    message(WARNING "Unresolved dependencies detected! (" ${_u_deps} ")")
+  endif()
+]])
+
+include(CPack)

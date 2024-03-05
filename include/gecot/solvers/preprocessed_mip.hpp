@@ -82,7 +82,7 @@ struct preprocessed_MIP {
 
         using namespace mippp;
         // using mip = mip_model<default_solver_traits>;
-        using mip = mip_model<cli_scip_traits>;
+        using mip = mip_model<cli_cbc_traits>;
         mip model;
 
         const auto C_vars = model.add_variables(
@@ -170,7 +170,7 @@ struct preprocessed_MIP {
                         return arc_no_map[a];
                     },
                     [original_t, case_id](const melon::arc_t<Graph> & a) {
-                        return "Φ_" + std::to_string(original_t) + "_" +
+                        return "Pconan_" + std::to_string(original_t) + "_" +
                                std::to_string(a) + "(" +
                                std::to_string(case_id) + ")";
                     });

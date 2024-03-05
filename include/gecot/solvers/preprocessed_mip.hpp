@@ -81,7 +81,8 @@ struct preprocessed_MIP {
         auto solution = instance.create_option_map(false);
 
         using namespace mippp;
-        using mip = mip_model<default_solver_traits>;
+        // using mip = mip_model<default_solver_traits>;
+        using mip = mip_model<cli_scip_traits>;
         mip model;
 
         const auto C_vars = model.add_variables(
@@ -102,6 +103,7 @@ struct preprocessed_MIP {
             }) <= budget);
 
         for(auto && instance_case : instance.cases()) {
+            const auto case_id = instance_case.id();
             const auto & original_graph = instance_case.graph();
             const auto & original_quality_map =
                 instance_case.vertex_quality_map();
@@ -112,8 +114,10 @@ struct preprocessed_MIP {
                 original_graph.nb_vertices(),
                 [](const melon::vertex_t<instance_graph_t<I>> & v) {
                     return v;
-                },[case_id = instance_case.id()](const melon::vertex_t<instance_graph_t<I>> & v) {
-                    return "F_"+std::to_string(v)+"("+std::to_string(case_id)+")";
+                },
+                [case_id](const melon::vertex_t<instance_graph_t<I>> & v) {
+                    return "F_" + std::to_string(v) + "(" +
+                           std::to_string(case_id) + ")";
                 });
             std::vector<std::pair<variable<int, double>, double>>
                 F_prime_additional_terms;
@@ -150,7 +154,10 @@ struct preprocessed_MIP {
 
                 for(const auto & [quality_gain, option] :
                     original_vertex_options_map[original_t]) {
-                    const auto F_prime_t_var = model.add_variable({},"F'_"+std::to_string(original_t)+"("+std::to_string(instance_case.id())+")");
+                    const auto F_prime_t_var =
+                        model.add_variable("F'_" + std::to_string(original_t) +
+                                           "_"+ std::to_string(option) +
+                                           "(" + std::to_string(case_id) + ")");
                     model.add_constraint(F_prime_t_var <= F_vars(original_t));
                     model.add_constraint(F_prime_t_var <=
                                          big_M_map[t] * X_vars(option));
@@ -161,9 +168,12 @@ struct preprocessed_MIP {
                     graph.nb_arcs(),
                     [&arc_no_map](const melon::arc_t<Graph> & a) {
                         return arc_no_map[a];
-                    },[original_t, case_id = instance_case.id()](const melon::arc_t<Graph> & a) {
-                    return "Φ^"+std::to_string(original_t)+"_"+std::to_string(a)+"("+std::to_string(case_id)+")";
-                });
+                    },
+                    [original_t, case_id](const melon::arc_t<Graph> & a) {
+                        return "Φ_" + std::to_string(original_t) + "_" +
+                               std::to_string(a) + "(" +
+                               std::to_string(case_id) + ")";
+                    });
                 for(const auto & u : melon::vertices(graph)) {
                     if(u == t) continue;
                     model.add_constraint(

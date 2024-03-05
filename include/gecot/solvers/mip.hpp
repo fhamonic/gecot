@@ -15,8 +15,8 @@
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
-#include "gecot/indices/pc_num.hpp"
 #include "gecot/indices/parallel_pc_num.hpp"
+#include "gecot/indices/pc_num.hpp"
 #include "gecot/preprocessing/compute_big_M_map.hpp"
 #include "gecot/preprocessing/compute_generalized_flow_graph.hpp"
 #include "gecot/utils/chronometer.hpp"
@@ -39,7 +39,8 @@ struct MIP {
             : model{t_model}, C_vars{t_C_vars} {}
 
         auto operator()(const criterion_constant & c) {
-            return model.get().add_variable({.lower_bound = c, .upper_bound = c});
+            return model.get().add_variable(
+                {.lower_bound = c, .upper_bound = c});
         }
         auto operator()(const criterion_var & v) { return C_vars.get()(v); }
         auto operator()(const criterion_sum & f) {
@@ -83,19 +84,22 @@ struct MIP {
         auto solution = instance.create_option_map(false);
 
         using namespace mippp;
-        using mip = mip_model<default_solver_traits>;
+        // using mip = mip_model<default_solver_traits>;
+        using mip = mip_model<cli_cbc_traits>;
         mip model;
 
         const auto C_vars = model.add_variables(
-            instance.cases().size(), [](const case_id_t & id) { return id; });
+            instance.cases().size(), [](const case_id_t & id) { return id; },
+            [](const case_id_t & id) { return "C_" + std::to_string(id); });
 
         // model.add_to_objective(C_vars);
         if(print_model) std::cout << "PRESOLVED\n0\nMASTERCONSS\n";
-        model.add_to_objective(std::visit(formula_variable_visitor{model, C_vars},
-                                 instance.criterion()));
+        model.add_to_objective(std::visit(
+            formula_variable_visitor{model, C_vars}, instance.criterion()));
 
         const auto X_vars = model.add_variables(
             instance.options().size(), [](const option_t & i) { return i; },
+            [](const option_t & i) { return "Y_" + std::to_string(i); },
             {.upper_bound = 1, .type = mip::var_category::binary});
 
         if(print_model) std::cout << 'R' << model.nb_constraints() << '\n';
@@ -107,6 +111,7 @@ struct MIP {
         int nb_blocks = 0;
 
         for(auto && instance_case : instance.cases()) {
+            const auto case_id = instance_case.id();
             const auto [graph, quality_map, vertex_options_map, probability_map,
                         arc_option_map] =
                 compute_generalized_flow_graph(instance_case);
@@ -118,6 +123,10 @@ struct MIP {
                 graph.nb_vertices(),
                 [](const melon::vertex_t<instance_graph_t<I>> & v) {
                     return v;
+                },
+                [case_id](const melon::vertex_t<instance_graph_t<I>> & v) {
+                    return "F_" + std::to_string(v) + "(" +
+                           std::to_string(case_id) + ")";
                 });
             std::vector<std::pair<variable<int, double>, double>>
                 F_prime_additional_terms;
@@ -126,7 +135,10 @@ struct MIP {
                 if(print_model) std::cout << "BLOCK " << ++nb_blocks << "\n";
                 for(const auto & [quality_gain, option] :
                     vertex_options_map[t]) {
-                    const auto F_prime_t_var = model.add_variable();
+                    const auto F_prime_t_var =
+                        model.add_variable("F'_" + std::to_string(t) + "_" +
+                                           std::to_string(option) + "(" +
+                                           std::to_string(case_id) + ")");
 
                     if(print_model)
                         std::cout << 'R' << model.nb_constraints() << '\n';
@@ -142,6 +154,11 @@ struct MIP {
                     graph.nb_arcs(),
                     [](const melon::arc_t<instance_graph_t<I>> & a) {
                         return a;
+                    },
+                    [t, case_id](const melon::arc_t<instance_graph_t<I>> & a) {
+                        return "Φ_" + std::to_string(t) + "_" +
+                               std::to_string(a) + "(" +
+                               std::to_string(case_id) + ")";
                     });
                 for(const auto & u : melon::vertices(graph)) {
                     if(u == t) continue;

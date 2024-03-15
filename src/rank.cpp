@@ -63,7 +63,7 @@ static bool process_command_line(
         std::make_unique<GreedyIncrementalInterface>(),
         std::make_unique<GreedyDecrementalInterface>()};
 
-    auto print_soft_name = []() { std::cout << "GECOT 0.1\n\n"; };
+    auto print_soft_name = []() { std::cout << "GECOT — Graph-based Ecological Connectivity Optimization Tool\nVersion: " << PROJECT_VERSION << " (built on " << __DATE__ << ")\n\n"; };
     auto print_usage = []() {
         std::cout << R"(Usage:
   gecot_rank --help
@@ -98,16 +98,16 @@ static bool process_command_line(
     try {
         po::options_description desc("Allowed options");
         desc.add_options()("help,h", "Display this help message")(
-            "list-algorithms", "List the available algorithms")(
-            "list-params", "List the parameters of the chosen algorithm")(
-            "algorithm,a", po::value<std::string>(&ranker_name)->required(),
+            "list-algorithms,A", "List the available algorithms")(
+            "list-params,P", "List the parameters of the chosen algorithm")(
+            "algorithm,a", po::value(&ranker_name)->required(),
             "Algorithm to use")(
             "instance,i",
             po::value<std::filesystem::path>(&instances_description_json_file)
                 ->required(),
             "Instance JSON file")(
-            "output,o", po::value<std::filesystem::path>(&output_csv_file),
-            "Output option potentials in CSV file");
+            "output-csv,o", po::value<std::filesystem::path>(&output_csv_file),
+            "Output solution in CSV file");
 
         po::positional_options_description p;
         p.add("algorithm", 1);
@@ -120,11 +120,11 @@ static bool process_command_line(
                                         .run();
         po::store(parsed, vm);
 
-        if(vm.count("help")) {
+        if(vm.count("help") || args.empty()) {
             print_soft_name();
             print_usage();
-
             std::cout << desc << std::endl;
+            print_available_algorithms();
             return false;
         }
 
@@ -135,7 +135,7 @@ static bool process_command_line(
         }
 
         if(vm.count("algorithm")) {
-            ranker_name = vm["algorithm"].as<std::string>();
+            ranker_name = vm["algorithm"].as<std::filesystem::path>();
             bool found = false;
             for(auto & s : ranker_interfaces) {
                 if(s->name() == ranker_name) {

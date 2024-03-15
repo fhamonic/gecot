@@ -8,13 +8,13 @@ class CompressorRecipe(ConanFile):
     build_policy = "missing"
 
     def requirements(self):
-        self.requires("nlohmann_json/3.11.2")
-        self.requires("json-schema-validator/2.2.0")
+        self.requires("json-schema-validator/[>=2.0.0]")
         self.requires("fast-cpp-csv-parser/cci.20211104")
-        self.requires("onetbb/2021.10.0")
-        self.requires("boost/1.83.0")
+        if self.settings.os != "Windows":
+            self.requires("onetbb/2021.9.0")
+        self.requires("boost/[1.82.0]")
         self.requires("parallel-hashmap/1.37")
-        self.requires("eigen/3.4.0")
+        self.requires("eigen/[>=3.4.0]")
         self.requires("fmt/10.1.1")
 
         self.requires("melon/0.5")

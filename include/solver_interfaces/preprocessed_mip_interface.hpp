@@ -45,8 +45,8 @@ public:
     std::string name() const { return "prep_mip"; }
     std::string description() const {
         return "MIP formulation with preprocessing, from 'Optimizing the "
-               "ecological connectivity of landscapes', François Hamonic, "
-               "Cécile Albert, Basile Couëtoux, Yann Vaxès";
+               "ecological connectivity of landscapes', F.\u00A0Hamonic, "
+               "C.\u00A0H.\u00A0Albert, B.\u00A0Couëtoux, Y.\u00A0Vaxès";
     }
     std::string options_description() const {
         std::ostringstream s;

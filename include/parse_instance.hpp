@@ -402,7 +402,7 @@ void parse_options(Instance & instance, T json_object,
         std::filesystem::path options_csv_path = json_object["csv_file"];
         if(options_csv_path.is_relative())
             options_csv_path = (parent_path / options_csv_path);
-        io::CSVReader<2> options_csv(options_csv_path);
+        io::CSVReader<2> options_csv(options_csv_path.string());
         auto columns = json_object["csv_columns"];
         options_csv.read_header(io::ignore_extra_column, columns["id"],
                                 columns["cost"]);
@@ -442,7 +442,7 @@ void parse_vertices_options(InstanceCase & instance_case, T json_object,
             if(vertex_options_csv_path.is_relative())
                 vertex_options_csv_path =
                     (parent_path / vertex_options_csv_path);
-            io::CSVReader<3> vertex_options_csv(vertex_options_csv_path);
+            io::CSVReader<3> vertex_options_csv(vertex_options_csv_path.string());
 
             auto columns = vertex_options_json["csv_columns"];
             vertex_options_csv.read_header(
@@ -496,7 +496,7 @@ void parse_arcs_options(InstanceCase & instance_case, T json_object,
                 arc_options_json["csv_file"];
             if(arc_options_csv_path.is_relative())
                 arc_options_csv_path = (parent_path / arc_options_csv_path);
-            io::CSVReader<3> arc_options_csv(arc_options_csv_path);
+            io::CSVReader<3> arc_options_csv(arc_options_csv_path.string());
 
             auto columns = arc_options_json["csv_columns"];
             arc_options_csv.read_header(io::ignore_extra_column,
@@ -552,7 +552,7 @@ decltype(auto) parse_instance_case(T json_object, std::string case_name,
         std::filesystem::path vertices_csv_path = vertices_json["csv_file"];
         if(vertices_csv_path.is_relative())
             vertices_csv_path = (parent_path / vertices_csv_path);
-        io::CSVReader<2> vertices_csv(vertices_csv_path);
+        io::CSVReader<2> vertices_csv(vertices_csv_path.string());
         auto vertices_columns = vertices_json["csv_columns"];
         vertices_csv.read_header(io::ignore_extra_column,
                                  vertices_columns["id"],
@@ -585,7 +585,7 @@ decltype(auto) parse_instance_case(T json_object, std::string case_name,
         std::filesystem::path arcs_csv_path = arcs_json["csv_file"];
         if(arcs_csv_path.is_relative())
             arcs_csv_path = (parent_path / arcs_csv_path);
-        io::CSVReader<4> arcs_csv(arcs_csv_path);
+        io::CSVReader<4> arcs_csv(arcs_csv_path.string());
         auto arcs_columns = arcs_json["csv_columns"];
         arcs_csv.read_header(io::ignore_extra_column, arcs_columns["id"],
                              arcs_columns["from"], arcs_columns["to"],

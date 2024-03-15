@@ -24,28 +24,37 @@ include(CompilerOptimizations)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}" ${CMAKE_MODULE_PATH})
 
-set(CMAKE_INSTALL_RPATH "\$ORIGIN/../lib")
-set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
+if(NOT WIN32)
+  set(CMAKE_INSTALL_RPATH "\$ORIGIN/../lib")
+  set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
+endif()
 
 # ################### Packages ####################
 find_package(fast-cpp-csv-parser REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(nlohmann_json_schema_validator REQUIRED)
 find_package(phmap REQUIRED)
-find_package(TBB REQUIRED)
+if(NOT WIN32)
+  find_package(TBB REQUIRED)
+endif()
 find_package(Boost REQUIRED COMPONENTS program_options log log_setup)
 find_package(Eigen3 REQUIRED)
-# find_package(range-v3 REQUIRED)
 
 find_package(melon REQUIRED)
 find_package(mippp REQUIRED)
 
 # ################### LIB target ####################
 add_library(gecot INTERFACE)
+target_compile_definitions(gecot INTERFACE PROJECT_VERSION="${CMAKE_PROJECT_VERSION_MAJOR}.${CMAKE_PROJECT_VERSION_MINOR}")
 target_include_directories(gecot
                            INTERFACE ${PROJECT_SOURCE_DIR}/include)
 
-target_link_libraries(gecot INTERFACE TBB::tbb)
+if(WIN32)
+  target_include_directories(gecot INTERFACE "C:/Users/Plaiseek/.conan2/p/b/onetb4e7bf2dd4d1ab/p/include")
+  target_link_libraries(gecot INTERFACE "C:/Users/Plaiseek/.conan2/p/b/onetb4e7bf2dd4d1ab/p/lib/libtbb12.dll")
+else()
+  target_link_libraries(gecot INTERFACE TBB::tbb)
+endif()
 target_link_libraries(gecot INTERFACE Boost::program_options Boost::log Boost::log_setup)
 target_link_libraries(gecot INTERFACE Eigen3::Eigen)
 # target_link_libraries(gecot INTERFACE range-v3::range-v3)
@@ -54,10 +63,10 @@ target_link_libraries(gecot INTERFACE melon::melon)
 target_link_libraries(gecot INTERFACE mippp::mippp)
 
 # ################### MIP solver ####################
-find_package(SCIP REQUIRED)
-target_compile_definitions(gecot INTERFACE MIPPP_USE_SCIP=1)
-target_include_directories(gecot INTERFACE ${SCIP_INCLUDE_DIR})
-target_link_libraries(gecot INTERFACE ${SCIP_LIBRARIES})
+# find_package(SCIP REQUIRED)
+# target_compile_definitions(gecot INTERFACE MIPPP_USE_SCIP=1)
+# target_include_directories(gecot INTERFACE ${SCIP_INCLUDE_DIR})
+# target_link_libraries(gecot INTERFACE ${SCIP_LIBRARIES})
 
 # find_package(GUROBI REQUIRED)
 # target_compile_definitions(gecot INTERFACE MIPPP_USE_GUROBI=1)
@@ -74,6 +83,10 @@ target_link_libraries(
   gecot_solve
   PUBLIC nlohmann_json_schema_validator)
 target_link_libraries(gecot_solve PUBLIC phmap)
+
+if(WIN32)
+  target_link_libraries(gecot_solve PUBLIC "C:/Users/Plaiseek/.conan2/p/b/onetb4e7bf2dd4d1ab/p/lib/libtbb12.dll.a")
+endif()
 
 target_compile_options(gecot_solve PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 
@@ -112,24 +125,46 @@ endif()
 install(TARGETS gecot_solve gecot_rank RUNTIME DESTINATION bin LIBRARY DESTINATION lib
 ARCHIVE DESTINATION lib)
 
-install(CODE [[
-  file(GET_RUNTIME_DEPENDENCIES
-    EXECUTABLES $<TARGET_FILE:gecot_solve>
-    RESOLVED_DEPENDENCIES_VAR _r_deps
-    UNRESOLVED_DEPENDENCIES_VAR _u_deps
-    DIRECTORIES bin
-  )
-  foreach(_file ${_r_deps})
-    file(INSTALL
-      DESTINATION "${CMAKE_INSTALL_PREFIX}/lib"
-      TYPE SHARED_LIBRARY
-      FILES "${_file}" FOLLOW_SYMLINK_CHAIN
+if(NOT WIN32)
+  install(CODE [[
+    file(GET_RUNTIME_DEPENDENCIES
+      EXECUTABLES $<TARGET_FILE:gecot_solve> $<TARGET_FILE:gecot_rank>
+      RESOLVED_DEPENDENCIES_VAR _r_deps
+      UNRESOLVED_DEPENDENCIES_VAR _u_deps
+      DIRECTORIES bin
     )
-  endforeach()
-  list(LENGTH _u_deps _u_length)
-  if("${_u_length}" GREATER 0)
-    message(WARNING "Unresolved dependencies detected! (" ${_u_deps} ")")
-  endif()
-]])
+    foreach(_file ${_r_deps})
+      file(INSTALL
+        DESTINATION "${CMAKE_INSTALL_PREFIX}/lib"
+        TYPE SHARED_LIBRARY
+        FILES "${_file}" FOLLOW_SYMLINK_CHAIN
+      )
+    endforeach()
+    list(LENGTH _u_deps _u_length)
+    if("${_u_length}" GREATER 0)
+      message(WARNING "Unresolved dependencies detected! (" ${_u_deps} ")")
+    endif()
+  ]])
+else()
+install(FILES 
+  "C:/Users/Plaiseek/.conan2/p/b/onetb4e7bf2dd4d1ab/p/bin/libtbb12.dll" 
+  "C:/Users/Plaiseek/.conan2/p/mingw69dfc08609d40/p/x86_64-w64-mingw32/lib/libgcc_s_seh-1.dll" 
+  "C:/Users/Plaiseek/.conan2/p/mingw69dfc08609d40/p/x86_64-w64-mingw32/lib/libwinpthread-1.dll" 
+  "C:/Users/Plaiseek/.conan2/p/mingw69dfc08609d40/p/x86_64-w64-mingw32/lib/libstdc++-6.dll" 
+  DESTINATION bin)
+  set(CPACK_NSIS_MODIFY_PATH ON)
+  set(CPACK_NSIS_DISPLAY_NAME Gecot)
+  set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+  set(CPACK_NSIS_MUI_ICON "${PROJECT_SOURCE_DIR}/cmake/misc/gecot.ico")
+  set(CPACK_NSIS_INSTALLED_ICON_NAME "${PROJECT_SOURCE_DIR}/cmake/misc/gecot.ico")
+endif()
+set(CPACK_PACKAGE_ICON "${PROJECT_SOURCE_DIR}/cmake/misc/gecot.ico") 
+if(WIN32)
+  set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/misc/windows_copyrights.txt")
+else()
+  set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/misc/linux_copyrights.txt")
+endif()
+
+
 
 include(CPack)

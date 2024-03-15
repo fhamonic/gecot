@@ -67,7 +67,7 @@ static bool process_command_line(
         std::make_unique<MIPInterface>(),
         std::make_unique<PreprocessedMIPInterface>()};
 
-    auto print_soft_name = []() { std::cout << "GECOT 0.1\n\n"; };
+    auto print_soft_name = []() { std::cout << "GECOT — Graph-based Ecological Connectivity Optimization Tool\nVersion: " << PROJECT_VERSION << " (built on " << __DATE__ << ")\n\n"; };
     auto print_usage = []() {
         std::cout << R"(Usage:
   gecot_solve --help
@@ -79,14 +79,12 @@ static bool process_command_line(
     };
 
     auto print_available_algorithms = [&solver_interfaces]() {
-        std::cout << "Available solving algorithms:\n";
+        std::cout << "Available algorithms:\n";
         const std::size_t algorithm_name_max_length = std::ranges::max(
             std::ranges::views::transform(solver_interfaces, [&](auto && s) {
                 return s->name().size();
             }));
-
-        const std::size_t offset =
-            std::max(algorithm_name_max_length + 1, std::size_t(24));
+        const std::size_t offset = algorithm_name_max_length + 8;
 
         for(auto & s : solver_interfaces) {
             std::cout << "  " << s->name()
@@ -105,14 +103,14 @@ static bool process_command_line(
         desc.add_options()("help,h", "Display this help message")(
             "list-algorithms,A", "List the available algorithms")(
             "list-params,P", "List the parameters of the chosen algorithm")(
-            "algorithm, a", po::value(&solver_name)->required(),
+            "algorithm,a", po::value(&solver_name)->required(),
             "Algorithm to use")(
             "instance,i",
             po::value<std::filesystem::path>(&instances_description_json_file)
                 ->required(),
             "Instance JSON file")(
             "budget,B", po::value<double>(&budget)->required(), "Budget value")(
-            "output-csv", po::value<std::filesystem::path>(&output_csv_file),
+            "output-csv,o", po::value<std::filesystem::path>(&output_csv_file),
             "Output solution in CSV file");
 
         po::positional_options_description p;
@@ -127,11 +125,11 @@ static bool process_command_line(
                                         .run();
         po::store(parsed, vm);
 
-        if(vm.count("help")) {
+        if(vm.count("help") || args.empty()) {
             print_soft_name();
             print_usage();
-
             std::cout << desc << std::endl;
+            print_available_algorithms();
             return false;
         }
 

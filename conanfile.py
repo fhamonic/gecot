@@ -1,6 +1,7 @@
 from conan import ConanFile
 from conan.tools.cmake import CMake
 
+
 class CompressorRecipe(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     generators = "CMakeToolchain", "CMakeDeps"
@@ -23,6 +24,8 @@ class CompressorRecipe(ConanFile):
         self.tool_requires("cmake/3.27.1")
         self.requires("gtest/1.14.0")
         # self.build_requires("gcc/12.2.0")
+        if self.settings.os == "Windows":
+            self.requires("mingw-builds/12.2.0")
 
     def generate(self):
         print("conanfile.py: IDE include dirs:")
@@ -32,7 +35,18 @@ class CompressorRecipe(ConanFile):
             for inc in dep.cpp_info.includedirs:
                 print("\t" + inc)
 
+    def cmake_variables(self):
+        vars = {}
+        if self.settings.os == "Windows":
+            for lib, dep in self.dependencies.items():
+                if lib.ref.name == "onetbb":
+                    vars["CONAN_TBB_INCLUDE_DIR"] =  dep.cpp_info.components["libtbb"].includedirs[0]
+                    vars["CONAN_TBB_LIB_DIR"] =  dep.cpp_info.components["libtbb"].libdirs[0]
+                if lib.ref.name == "mingw-builds":
+                    print("mingw-builds is here: ",dep.cpp_info.components["libtbb"].libdirs[0])
+        return vars
+
     def build(self):
         cmake = CMake(self)
-        cmake.configure()
+        cmake.configure(variables=self.cmake_variables())
         cmake.build()

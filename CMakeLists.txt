@@ -50,8 +50,9 @@ target_include_directories(gecot
                            INTERFACE ${PROJECT_SOURCE_DIR}/include)
 
 if(WIN32)
-  target_include_directories(gecot INTERFACE "C:/Users/Plaiseek/.conan2/p/b/onetb4e7bf2dd4d1ab/p/include")
-  target_link_libraries(gecot INTERFACE "C:/Users/Plaiseek/.conan2/p/b/onetb4e7bf2dd4d1ab/p/lib/libtbb12.dll")
+  target_include_directories(gecot INTERFACE ${CONAN_TBB_INCLUDE_DIR})
+  target_link_directories(gecot INTERFACE ${CONAN_TBB_LIB_DIR})
+  target_link_libraries(gecot INTERFACE tbb)
 else()
   target_link_libraries(gecot INTERFACE TBB::tbb)
 endif()

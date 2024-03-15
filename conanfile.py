@@ -1,6 +1,5 @@
 from conan import ConanFile
 from conan.tools.cmake import CMake
-from conan.tools.files import copy
 
 class CompressorRecipe(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
@@ -24,7 +23,7 @@ class CompressorRecipe(ConanFile):
         self.tool_requires("cmake/3.27.1")
         self.requires("gtest/1.14.0")
         # self.build_requires("gcc/12.2.0")
-        
+
     def generate(self):
         print("conanfile.py: IDE include dirs:")
         for lib, dep in self.dependencies.items():

@@ -63,7 +63,11 @@ static bool process_command_line(
         std::make_unique<GreedyIncrementalInterface>(),
         std::make_unique<GreedyDecrementalInterface>()};
 
-    auto print_soft_name = []() { std::cout << "GECOT — Graph-based Ecological Connectivity Optimization Tool\nVersion: " << PROJECT_VERSION << " (built on " << __DATE__ << ")\n\n"; };
+    auto print_soft_name = []() {
+        std::cout << "GECOT — Graph-based Ecological Connectivity Optimization "
+                     "Tool\nVersion: "
+                  << PROJECT_VERSION << " (built on " << __DATE__ << ")\n\n";
+    };
     auto print_usage = []() {
         std::cout << R"(Usage:
   gecot_rank --help

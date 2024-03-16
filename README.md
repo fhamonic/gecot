@@ -24,24 +24,25 @@ The list of available algorithm can be displayed with the command :
 
 Typical output :
 ```
-GECOT 0.1
+GECOT — Graph-based Ecological Connectivity Optimization Tool
+Version: 1.0 (built on Mar 16 2024)
 
-Available solving algorithms:
-  static_incr           From the base landscape, add the options with the best
-                        gain/cost ratio.
-  static_decr           From the improved landscape, remove the options with the
-                        worst gain/cost ratio.
-  greedy_incr           From the base landscape, iteratively add the option with
-                        the best gain/cost ratio.
-  greedy_decr           From the improved landscape, iteratively remove the
-                        option with the worst gain/cost ratio (Zonation
-                        Algorithm).
-  mip                   MIP formulation without preprocessing, from 'Optimizing
-                        the ecological connectivity of landscapes', François
-                        Hamonic, Cécile Albert, Basile Couëtoux, Yann Vaxès
-  prep_mip              MIP formulation with preprocessing, from 'Optimizing the
-                        ecological connectivity of landscapes', François
-                        Hamonic, Cécile Albert, Basile Couëtoux, Yann Vaxès
+Available algorithms:
+  static_incr      From the base landscape, add the options with the best
+                   gain/cost ratio.
+  static_decr      From the improved landscape, remove the options with the
+                   worst gain/cost ratio.
+  greedy_incr      From the base landscape, iteratively add the option with the
+                   best gain/cost ratio.
+  greedy_decr      From the improved landscape, iteratively remove the option
+                   with the worst gain/cost ratio (Zonation Algorithm).
+  mip              MIP formulation without preprocessing, from 'Optimizing the
+                   ecological connectivity of landscapes', F. Hamonic,
+                   C. H. Albert, B. Couëtoux, Y. Vaxès
+  prep_mip         MIP formulation with preprocessing, from 'Optimizing the
+                   ecological connectivity of landscapes', F. Hamonic,
+                   C. H. Albert, B. Couëtoux, Y. Vaxès
+
 ```
 
 ### Instance file

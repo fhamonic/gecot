@@ -81,8 +81,7 @@ struct preprocessed_MIP {
         auto solution = instance.create_option_map(false);
 
         using namespace mippp;
-        // using mip = mip_model<default_solver_traits>;
-        using mip = mip_model<cli_cbc_traits>;
+        using mip = mip_model<shared_cbc_traits>;
         mip model;
 
         const auto C_vars = model.add_variables(
@@ -156,8 +155,8 @@ struct preprocessed_MIP {
                     original_vertex_options_map[original_t]) {
                     const auto F_prime_t_var =
                         model.add_variable("F'_" + std::to_string(original_t) +
-                                           "_"+ std::to_string(option) +
-                                           "(" + std::to_string(case_id) + ")");
+                                           "_" + std::to_string(option) + "(" +
+                                           std::to_string(case_id) + ")");
                     model.add_constraint(F_prime_t_var <= F_vars(original_t));
                     model.add_constraint(F_prime_t_var <=
                                          big_M_map[t] * X_vars(option));
@@ -170,7 +169,7 @@ struct preprocessed_MIP {
                         return arc_no_map[a];
                     },
                     [original_t, case_id](const melon::arc_t<Graph> & a) {
-                        return "Pconan_" + std::to_string(original_t) + "_" +
+                        return "P_" + std::to_string(original_t) + "_" +
                                std::to_string(a) + "(" +
                                std::to_string(case_id) + ")";
                     });

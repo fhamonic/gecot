@@ -68,15 +68,10 @@ target_link_libraries(gecot INTERFACE melon::melon)
 target_link_libraries(gecot INTERFACE mippp::mippp)
 
 # ################### MIP solver ####################
-# find_package(SCIP REQUIRED)
-# target_compile_definitions(gecot INTERFACE MIPPP_USE_SCIP=1)
-# target_include_directories(gecot INTERFACE ${SCIP_INCLUDE_DIR})
-# target_link_libraries(gecot INTERFACE ${SCIP_LIBRARIES})
-
-# find_package(GUROBI REQUIRED)
-# target_compile_definitions(gecot INTERFACE MIPPP_USE_GUROBI=1)
-# target_include_directories(gecot INTERFACE ${GUROBI_INCLUDE_DIR})
-# target_link_libraries(gecot INTERFACE ${GUROBI_LIBRARIES})
+find_package(COINOR REQUIRED)
+target_compile_definitions(gecot INTERFACE MIPPP_FOUND_SHARED_COINOR)
+target_include_directories(gecot INTERFACE ${COINOR_INCLUDE_DIR})
+target_link_libraries(gecot INTERFACE ${COINOR_LIBRARIES})
 
 # ################### EXEC target ####################
 add_executable(gecot_solve src/solve.cpp)

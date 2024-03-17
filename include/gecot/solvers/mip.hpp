@@ -84,8 +84,7 @@ struct MIP {
         auto solution = instance.create_option_map(false);
 
         using namespace mippp;
-        // using mip = mip_model<default_solver_traits>;
-        using mip = mip_model<cli_cbc_traits>;
+        using mip = mip_model<shared_cbc_traits>;
         mip model;
 
         const auto C_vars = model.add_variables(

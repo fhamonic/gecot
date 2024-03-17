@@ -1,6 +1,6 @@
 
 
-# <img src="/misc/gecot.ico" width="50"> Gecot
+# ![Gecot](misc/gecot_title.png)
 
 GECOT, for Graph-based Ecological Connectivity Optimization Tool, is a C++ library with a command line interface for optimizing the connectivity of an ecological landscape under budget constraint. Landscapes are described with graph theory, which can efficiently describe both habitat patches networks and land cover raster, while connectivity is measure with the Probability of Connectivity indicator (PC).
 

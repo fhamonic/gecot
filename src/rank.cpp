@@ -181,6 +181,9 @@ static bool process_command_line(
 }
 
 int main(int argc, const char * argv[]) {
+#if defined(WIN32)
+    std::system("chcp 65001");
+#endif
     std::shared_ptr<AbstractRanker> ranker;
     std::filesystem::path instances_description_json;
     bool output_in_file;

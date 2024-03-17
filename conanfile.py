@@ -10,8 +10,8 @@ class CompressorRecipe(ConanFile):
     def requirements(self):
         self.requires("json-schema-validator/[>=2.0.0]")
         self.requires("fast-cpp-csv-parser/cci.20211104")
-        if self.settings.os != "Windows":
-            self.requires("onetbb/2021.9.0")
+        #if self.settings.os != "Windows":
+        self.requires("onetbb/2021.9.0")
         self.requires("boost/[1.82.0]")
         self.requires("parallel-hashmap/1.37")
         self.requires("eigen/[>=3.4.0]")
@@ -40,10 +40,11 @@ class CompressorRecipe(ConanFile):
         if self.settings.os == "Windows":
             for lib, dep in self.dependencies.items():
                 if lib.ref.name == "onetbb":
-                    vars["CONAN_TBB_INCLUDE_DIR"] =  dep.cpp_info.components["libtbb"].includedirs[0]
-                    vars["CONAN_TBB_LIB_DIR"] =  dep.cpp_info.components["libtbb"].libdirs[0]
+                    vars["CONAN_TBB_INCLUDE_DIR"] =  ";".join(dep.cpp_info.components["libtbb"].includedirs)
+                    vars["CONAN_TBB_LIB_DIR"] =  ";".join(dep.cpp_info.components["libtbb"].libdirs)
                 if lib.ref.name == "mingw-builds":
-                    print("mingw-builds is here: ",dep.cpp_info.components["libtbb"].libdirs[0])
+                    vars["CONAN_MINGW_LIB_DIR"] = ";".join(dep.cpp_info.libdirs)
+        print("variables ", vars)
         return vars
 
     def build(self):

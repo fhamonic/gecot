@@ -13,5 +13,6 @@
 *.patches
 *.links
 
+CMakeUserPresets.json
 /doc/html
 /doc/latex

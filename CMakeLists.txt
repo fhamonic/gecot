@@ -24,6 +24,11 @@ include(CompilerOptimizations)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}" ${CMAKE_MODULE_PATH})
 
+if(WIN32)
+  file(TO_CMAKE_PATH "${CONAN_TBB_INCLUDE_DIR}" CONAN_TBB_INCLUDE_DIR)
+  file(TO_CMAKE_PATH "${CONAN_TBB_LIB_DIR}" CONAN_TBB_LIB_DIR)
+  file(TO_CMAKE_PATH "${CONAN_MINGW_LIB_DIR}" CONAN_MINGW_LIB_DIR)
+endif()
 if(NOT WIN32)
   set(CMAKE_INSTALL_RPATH "\$ORIGIN/../lib")
   set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
@@ -51,14 +56,13 @@ target_include_directories(gecot
 
 if(WIN32)
   target_include_directories(gecot INTERFACE ${CONAN_TBB_INCLUDE_DIR})
-  target_link_directories(gecot INTERFACE ${CONAN_TBB_LIB_DIR})
-  target_link_libraries(gecot INTERFACE tbb)
+  target_link_directories(gecot INTERFACE ${CONAN_TBB_LIB_DIR} "${CONAN_TBB_LIB_DIR}\\..\\bin")
+  target_link_libraries(gecot INTERFACE "${CONAN_TBB_LIB_DIR}/../bin/libtbb12.dll")
 else()
   target_link_libraries(gecot INTERFACE TBB::tbb)
 endif()
 target_link_libraries(gecot INTERFACE Boost::program_options Boost::log Boost::log_setup)
 target_link_libraries(gecot INTERFACE Eigen3::Eigen)
-# target_link_libraries(gecot INTERFACE range-v3::range-v3)
 
 target_link_libraries(gecot INTERFACE melon::melon)
 target_link_libraries(gecot INTERFACE mippp::mippp)
@@ -86,7 +90,7 @@ target_link_libraries(
 target_link_libraries(gecot_solve PUBLIC phmap)
 
 if(WIN32)
-  target_link_libraries(gecot_solve PUBLIC "C:/Users/Plaiseek/.conan2/p/b/onetb4e7bf2dd4d1ab/p/lib/libtbb12.dll.a")
+  target_link_libraries(gecot_solve PUBLIC "${CONAN_TBB_LIB_DIR}/../bin/libtbb12.dll")
 endif()
 
 target_compile_options(gecot_solve PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
@@ -148,24 +152,28 @@ if(NOT WIN32)
   ]])
 else()
 install(FILES 
-  "C:/Users/Plaiseek/.conan2/p/b/onetb4e7bf2dd4d1ab/p/bin/libtbb12.dll" 
-  "C:/Users/Plaiseek/.conan2/p/mingw69dfc08609d40/p/x86_64-w64-mingw32/lib/libgcc_s_seh-1.dll" 
-  "C:/Users/Plaiseek/.conan2/p/mingw69dfc08609d40/p/x86_64-w64-mingw32/lib/libwinpthread-1.dll" 
-  "C:/Users/Plaiseek/.conan2/p/mingw69dfc08609d40/p/x86_64-w64-mingw32/lib/libstdc++-6.dll" 
+  "${CONAN_TBB_LIB_DIR}/../bin/libtbb12.dll" 
+  "${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libgcc_s_seh-1.dll" 
+  "${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libwinpthread-1.dll" 
+  "${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libstdc++-6.dll" 
   DESTINATION bin)
   set(CPACK_NSIS_MODIFY_PATH ON)
   set(CPACK_NSIS_DISPLAY_NAME Gecot)
+  set(CPACK_NSIS_URL_INFO_ABOUT "https://github.com/fhamonic/gecot")
   set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
-  set(CPACK_NSIS_MUI_ICON "${PROJECT_SOURCE_DIR}/cmake/misc/gecot.ico")
-  set(CPACK_NSIS_INSTALLED_ICON_NAME "${PROJECT_SOURCE_DIR}/cmake/misc/gecot.ico")
+  set(CPACK_NSIS_INSTALLED_ICON_NAME "${PROJECT_SOURCE_DIR}/misc/gecot.ico")
+  set(CPACK_NSIS_MUI_ICON "${PROJECT_SOURCE_DIR}/misc/gecot.ico")
+  set(CPACK_NSIS_MUI_HEADERIMAGE "${PROJECT_SOURCE_DIR}/misc\\gecot_header.bmp") # must contain a backslash because fuck
+  #set(CPACK_NSIS_EXTRA_PREINSTALL_COMMANDS "
+  #WriteINIStr \\\"C:\\\\Users\\\\Plaiseek\\\\Documents\\\\Softwares\\\\gecot\\\\build\\\\_CPack_Packages\\\\win64\\\\NSIS\\\\NSIS.InstallOptions.ini\\\" \\\"Field 2\\\" \\\"Text\\\" \\\"Pouet\\\"
+  #FlushINI \\\"C:\\\\Users\\\\Plaiseek\\\\Documents\\\\Softwares\\\\gecot\\\\build\\\\_CPack_Packages\\\\win64\\\\NSIS\\\\NSIS.InstallOptions.ini\\\"")
 endif()
-set(CPACK_PACKAGE_ICON "${PROJECT_SOURCE_DIR}/cmake/misc/gecot.ico") 
+set(CPACK_PACKAGE_ICON "${PROJECT_SOURCE_DIR}/misc/gecot.ico")
+set(CPACK_PACKAGE_VENDOR "F. HAMONIC")
 if(WIN32)
-  set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/misc/windows_copyrights.txt")
+  set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/misc/windows_licenses.txt")
 else()
-  set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/misc/linux_copyrights.txt")
+  set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/misc/linux_licenses.txt")
 endif()
-
-
 
 include(CPack)

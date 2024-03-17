@@ -68,8 +68,8 @@ static bool process_command_line(
         std::make_unique<PreprocessedMIPInterface>()};
 
     auto print_soft_name = []() {
-        std::cout << "GECOT — Graph-based Ecological Connectivity Optimization "
-                     "Tool\nVersion: "
+        std::cout << "GECOT \u2014 Graph-based Ecological Connectivity "
+                     "Optimization Tool\nVersion: "
                   << PROJECT_VERSION << " (built on " << __DATE__ << ")\n\n";
     };
     auto print_usage = []() {
@@ -186,6 +186,9 @@ static bool process_command_line(
 }
 
 int main(int argc, const char * argv[]) {
+#if defined(WIN32)
+    std::system("chcp 65001");
+#endif
     std::shared_ptr<AbstractSolver> solver;
     std::filesystem::path instances_description_json;
     double budget;

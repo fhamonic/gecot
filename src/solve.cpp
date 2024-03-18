@@ -136,7 +136,6 @@ static bool process_command_line(
             print_soft_name();
             print_usage();
             std::cout << desc << std::endl;
-            print_available_algorithms();
             return false;
         }
 
@@ -189,8 +188,8 @@ static bool process_command_line(
 }
 
 int main(int argc, const char * argv[]) {
-#if defined(WIN32)
-    std::system("chcp 65001");
+#ifdef WIN32
+    std::system("chcp 65001 > NUL");
 #endif
     std::shared_ptr<AbstractSolver> solver;
     std::filesystem::path instances_description_json;

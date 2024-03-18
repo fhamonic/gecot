@@ -20,6 +20,7 @@
 #include "gecot/preprocessing/compute_big_M_map.hpp"
 #include "gecot/preprocessing/compute_generalized_flow_graph.hpp"
 #include "gecot/utils/chronometer.hpp"
+#include "gecot/utils/mip_solver_traits.hpp"
 
 namespace fhamonic {
 namespace gecot {
@@ -84,7 +85,7 @@ struct MIP {
         auto solution = instance.create_option_map(false);
 
         using namespace mippp;
-        using mip = mip_model<cli_cbc_traits>;
+        using mip = mip_model<mip_solver_traits>;
         mip model;
 
         const auto C_vars = model.add_variables(

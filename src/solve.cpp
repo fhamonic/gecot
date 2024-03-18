@@ -54,6 +54,9 @@ void print_paragraph(std::ostream & os, std::size_t offset,
     os << str.substr(line_start) << '\n';
 }
 
+#include "mippp/solver_traits/all.hpp" 
+
+
 static bool process_command_line(
     const std::vector<std::string> & args,
     std::shared_ptr<AbstractSolver> & solver,
@@ -68,7 +71,7 @@ static bool process_command_line(
         std::make_unique<PreprocessedMIPInterface>()};
 
     auto print_soft_name = []() {
-        std::cout << "GECOT \u2014 Graph-based Ecological Connectivity "
+        std::cout << "GECOT — Graph-based Ecological Connectivity "
                      "Optimization Tool\nVersion: "
                   << PROJECT_VERSION << " (built on " << __DATE__ << ")\n\n";
     };

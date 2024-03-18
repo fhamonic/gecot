@@ -139,7 +139,7 @@ static bool process_command_line(
         }
 
         if(vm.count("algorithm")) {
-            ranker_name = vm["algorithm"].as<std::filesystem::path>();
+            ranker_name = vm["algorithm"].as<std::string>();
             bool found = false;
             for(auto & s : ranker_interfaces) {
                 if(s->name() == ranker_name) {

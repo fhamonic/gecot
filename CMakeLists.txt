@@ -4,7 +4,7 @@ project(
   Gecot
   VERSION 1.0
   DESCRIPTION
-    "Library for handling ecological landscape datas and optimize their connectivity according to the PC indicator .. and more incomming"
+    "Graph-based Ecological Connectivity Optimization Tool"
   LANGUAGES CXX)
 
 # set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -68,10 +68,23 @@ target_link_libraries(gecot INTERFACE melon::melon)
 target_link_libraries(gecot INTERFACE mippp::mippp)
 
 # ################### MIP solver ####################
-find_package(COINOR REQUIRED)
-target_compile_definitions(gecot INTERFACE MIPPP_FOUND_SHARED_COINOR)
-target_include_directories(gecot INTERFACE ${COINOR_INCLUDE_DIR})
-target_link_libraries(gecot INTERFACE ${COINOR_LIBRARIES})
+#target_compile_definitions(gecot INTERFACE MIPPP_FOUND_SHARED_COINOR)
+#if(WIN32)
+#  find_package(ZLIB REQUIRED)
+#  target_include_directories(gecot INTERFACE "c:/libs/cbc/include" ${ZLIB_INCLUDE_DIRS})
+#  target_link_libraries(gecot INTERFACE 
+#    "c:/libs/cbc/lib/libCbc.a" 
+#    "c:/libs/cbc/lib/libCbcSolver.a"
+#    "c:/libs/cbc/lib/libCgl.a"
+#    "c:/libs/cbc/lib/libClp.a" 
+#    "c:/libs/cbc/lib/libClpSolver.a"
+#    "c:/libs/cbc/lib/libCoinUtils.a"
+#    "c:/libs/cbc/lib/libOsi.a" 
+#    "c:/libs/cbc/lib/libOsiCbc.a"
+#    "c:/libs/cbc/lib/libOsiClp.a" 
+#    "c:/libs/cbc/lib/libOsiCommonTests.a"
+#    ${ZLIB_LIBRARIES})
+#endif()
 
 # ################### EXEC target ####################
 add_executable(gecot_solve src/solve.cpp)
@@ -84,9 +97,6 @@ target_link_libraries(
   PUBLIC nlohmann_json_schema_validator)
 target_link_libraries(gecot_solve PUBLIC phmap)
 
-if(WIN32)
-  target_link_libraries(gecot_solve PUBLIC "${CONAN_TBB_LIB_DIR}/../bin/libtbb12.dll")
-endif()
 
 target_compile_options(gecot_solve PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 
@@ -147,6 +157,7 @@ if(NOT WIN32)
   ]])
 else()
 install(FILES 
+  "c:/libs/cbc/bin/cbc.exe" 
   "${CONAN_TBB_LIB_DIR}/../bin/libtbb12.dll" 
   "${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libgcc_s_seh-1.dll" 
   "${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libwinpthread-1.dll" 
@@ -162,6 +173,7 @@ install(FILES
   #set(CPACK_NSIS_EXTRA_PREINSTALL_COMMANDS "
   #WriteINIStr \\\"C:\\\\Users\\\\Plaiseek\\\\Documents\\\\Softwares\\\\gecot\\\\build\\\\_CPack_Packages\\\\win64\\\\NSIS\\\\NSIS.InstallOptions.ini\\\" \\\"Field 2\\\" \\\"Text\\\" \\\"Pouet\\\"
   #FlushINI \\\"C:\\\\Users\\\\Plaiseek\\\\Documents\\\\Softwares\\\\gecot\\\\build\\\\_CPack_Packages\\\\win64\\\\NSIS\\\\NSIS.InstallOptions.ini\\\"")
+  #set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "crAASSSSHHHH")
 endif()
 set(CPACK_PACKAGE_ICON "${PROJECT_SOURCE_DIR}/misc/gecot.ico")
 set(CPACK_PACKAGE_VENDOR "F. HAMONIC")

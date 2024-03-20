@@ -1,0 +1,436 @@
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Wed Mar 20 18:54:44 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Wed Mar 20 18:54:44 2024
+
+Set parameter LogToConsole to value 0
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Read LP format model from file /tmp/mippp/126785533105984/model.lp
+Reading time = 0.00 seconds
+: 3377 rows, 5371 columns, 12065 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 3377 rows, 5371 columns and 12065 nonzeros
+Model fingerprint: 0xe5149ea6
+Variable types: 5356 continuous, 15 integer (15 binary)
+Coefficient statistics:
+  Matrix range     [4e-01, 7e+02]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+01, 2e+02]
+Found heuristic solution: objective -0.0000000
+Presolve removed 1264 rows and 3107 columns
+Presolve time: 0.01s
+Presolved: 2113 rows, 2264 columns, 6680 nonzeros
+Found heuristic solution: objective 802724.38078
+Variable types: 2249 continuous, 15 integer (15 binary)
+
+Root relaxation: objective 1.639263e+06, 1036 iterations, 0.01 seconds (0.02 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1639262.67    0   13 802724.381 1639262.67   104%     -    0s
+H    0     0                    1436486.3669 1639262.67  14.1%     -    0s
+H    0     0                    1463884.6421 1636320.50  11.8%     -    0s
+H    0     0                    1558939.5575 1596267.30  2.39%     -    0s
+     0     0 1596267.30    0   12 1558939.56 1596267.30  2.39%     -    0s
+     0     0 1574509.05    0    8 1558939.56 1574509.05  1.00%     -    0s
+     0     0 1572675.13    0    8 1558939.56 1572675.13  0.88%     -    0s
+     0     0 1571229.08    0    8 1558939.56 1571229.08  0.79%     -    0s
+     0     0 1569308.07    0    9 1558939.56 1569308.07  0.67%     -    0s
+     0     0 1558939.56    0    6 1558939.56 1558939.56  0.00%     -    0s
+
+Cutting planes:
+  Gomory: 4
+  Implied bound: 102
+  MIR: 137
+  Flow cover: 215
+  Relax-and-lift: 31
+
+Explored 1 nodes (1588 simplex iterations) in 0.09 seconds (0.13 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 5: 1.55894e+06 1.46388e+06 1.43649e+06 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Best objective 1.558939557454e+06, best bound 1.558939557454e+06, gap 0.0000%
+
+Wrote result file '/tmp/mippp/126785533105984/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Wed Mar 20 18:55:19 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Wed Mar 20 18:55:50 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Wed Mar 20 18:56:36 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Wed Mar 20 18:56:36 2024
+
+Set parameter LogToConsole to value 0
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Read LP format model from file /tmp/mippp/139465228441408/model.lp
+Reading time = 0.00 seconds
+: 3377 rows, 5371 columns, 12065 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 3377 rows, 5371 columns and 12065 nonzeros
+Model fingerprint: 0xe5149ea6
+Variable types: 5356 continuous, 15 integer (15 binary)
+Coefficient statistics:
+  Matrix range     [4e-01, 7e+02]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+01, 2e+02]
+Found heuristic solution: objective -0.0000000
+Presolve removed 1264 rows and 3107 columns
+Presolve time: 0.01s
+Presolved: 2113 rows, 2264 columns, 6680 nonzeros
+Found heuristic solution: objective 802724.38078
+Variable types: 2249 continuous, 15 integer (15 binary)
+
+Root relaxation: objective 1.639263e+06, 1036 iterations, 0.01 seconds (0.02 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1639262.67    0   13 802724.381 1639262.67   104%     -    0s
+H    0     0                    1436486.3669 1639262.67  14.1%     -    0s
+H    0     0                    1463884.6421 1636320.50  11.8%     -    0s
+H    0     0                    1558939.5575 1596267.30  2.39%     -    0s
+     0     0 1596267.30    0   12 1558939.56 1596267.30  2.39%     -    0s
+     0     0 1574509.05    0    8 1558939.56 1574509.05  1.00%     -    0s
+     0     0 1572675.13    0    8 1558939.56 1572675.13  0.88%     -    0s
+     0     0 1571229.08    0    8 1558939.56 1571229.08  0.79%     -    0s
+     0     0 1569308.07    0    9 1558939.56 1569308.07  0.67%     -    0s
+     0     0 1558939.56    0    6 1558939.56 1558939.56  0.00%     -    0s
+
+Cutting planes:
+  Gomory: 4
+  Implied bound: 102
+  MIR: 137
+  Flow cover: 215
+  Relax-and-lift: 31
+
+Explored 1 nodes (1588 simplex iterations) in 0.08 seconds (0.13 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 5: 1.55894e+06 1.46388e+06 1.43649e+06 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Best objective 1.558939557454e+06, best bound 1.558939557454e+06, gap 0.0000%
+
+Wrote result file '/tmp/mippp/139465228441408/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Wed Mar 20 18:58:17 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Wed Mar 20 19:04:54 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Wed Mar 20 19:04:54 2024
+
+Set parameter LogToConsole to value 0
+Set parameter Username
+Set parameter TimeLimit to value 3600
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Read LP format model from file /tmp/mippp/124747382298432/model.lp
+Reading time = 0.00 seconds
+: 1089 rows, 1070 columns, 3789 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 1089 rows, 1070 columns and 3789 nonzeros
+Model fingerprint: 0x4a31c44b
+Variable types: 1055 continuous, 15 integer (15 binary)
+Coefficient statistics:
+  Matrix range     [2e-01, 6e+02]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+01, 5e+02]
+Found heuristic solution: objective -0.0000000
+Presolve removed 448 rows and 735 columns
+Presolve time: 0.00s
+Presolved: 641 rows, 335 columns, 1741 nonzeros
+Found heuristic solution: objective 984595.84475
+Variable types: 320 continuous, 15 integer (15 binary)
+
+Root relaxation: objective 1.558976e+06, 410 iterations, 0.00 seconds (0.00 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1558976.37    0    3 984595.845 1558976.37  58.3%     -    0s
+H    0     0                    1382175.0789 1558976.37  12.8%     -    0s
+H    0     0                    1558939.2163 1558976.37  0.00%     -    0s
+
+Explored 1 nodes (410 simplex iterations) in 0.01 seconds (0.01 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 4: 1.55894e+06 1.38218e+06 984596 -0 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 1.558939216291e+06, best bound 1.558976374847e+06, gap 0.0024%
+
+Wrote result file '/tmp/mippp/124747382298432/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Wed Mar 20 19:08:44 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Wed Mar 20 19:08:44 2024
+
+Set parameter LogToConsole to value 0
+Set parameter Username
+Set parameter TimeLimit to value 3600
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Read LP format model from file /tmp/mippp/129941358856000/model.lp
+Reading time = 0.00 seconds
+: 1089 rows, 1070 columns, 3789 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 1089 rows, 1070 columns and 3789 nonzeros
+Model fingerprint: 0x4a31c44b
+Variable types: 1055 continuous, 15 integer (15 binary)
+Coefficient statistics:
+  Matrix range     [2e-01, 6e+02]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+01, 5e+02]
+Found heuristic solution: objective -0.0000000
+Presolve removed 448 rows and 735 columns
+Presolve time: 0.00s
+Presolved: 641 rows, 335 columns, 1741 nonzeros
+Found heuristic solution: objective 984595.84475
+Variable types: 320 continuous, 15 integer (15 binary)
+
+Root relaxation: objective 1.558976e+06, 410 iterations, 0.00 seconds (0.00 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1558976.37    0    3 984595.845 1558976.37  58.3%     -    0s
+H    0     0                    1382175.0789 1558976.37  12.8%     -    0s
+H    0     0                    1558939.2163 1558976.37  0.00%     -    0s
+
+Explored 1 nodes (410 simplex iterations) in 0.01 seconds (0.01 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 4: 1.55894e+06 1.38218e+06 984596 -0 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 1.558939216291e+06, best bound 1.558976374847e+06, gap 0.0024%
+
+Wrote result file '/tmp/mippp/129941358856000/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Wed Mar 20 19:08:50 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Wed Mar 20 19:08:50 2024
+
+Set parameter LogToConsole to value 0
+Set parameter Username
+Set parameter TimeLimit to value 3600
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Read LP format model from file /tmp/mippp/137537012762432/model.lp
+Reading time = 0.00 seconds
+: 1089 rows, 1070 columns, 3789 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 1089 rows, 1070 columns and 3789 nonzeros
+Model fingerprint: 0x4a31c44b
+Variable types: 1055 continuous, 15 integer (15 binary)
+Coefficient statistics:
+  Matrix range     [2e-01, 6e+02]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+01, 5e+02]
+Found heuristic solution: objective -0.0000000
+Presolve removed 448 rows and 735 columns
+Presolve time: 0.00s
+Presolved: 641 rows, 335 columns, 1741 nonzeros
+Found heuristic solution: objective 984595.84475
+Variable types: 320 continuous, 15 integer (15 binary)
+
+Root relaxation: objective 1.558976e+06, 410 iterations, 0.00 seconds (0.00 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1558976.37    0    3 984595.845 1558976.37  58.3%     -    0s
+H    0     0                    1382175.0789 1558976.37  12.8%     -    0s
+H    0     0                    1558939.2163 1558976.37  0.00%     -    0s
+
+Explored 1 nodes (410 simplex iterations) in 0.01 seconds (0.01 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 4: 1.55894e+06 1.38218e+06 984596 -0 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 1.558939216291e+06, best bound 1.558976374847e+06, gap 0.0024%
+
+Wrote result file '/tmp/mippp/137537012762432/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Wed Mar 20 19:10:18 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Wed Mar 20 19:12:43 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Wed Mar 20 19:12:48 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Wed Mar 20 19:12:48 2024
+
+Set parameter LogToConsole to value 0
+Set parameter Username
+Set parameter TimeLimit to value 3600
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Read LP format model from file /tmp/mippp/132037350905664/model.lp
+Reading time = 0.00 seconds
+: 1089 rows, 1070 columns, 3789 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 1089 rows, 1070 columns and 3789 nonzeros
+Model fingerprint: 0x4a31c44b
+Variable types: 1055 continuous, 15 integer (15 binary)
+Coefficient statistics:
+  Matrix range     [2e-01, 6e+02]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+01, 5e+02]
+Found heuristic solution: objective -0.0000000
+Presolve removed 448 rows and 735 columns
+Presolve time: 0.00s
+Presolved: 641 rows, 335 columns, 1741 nonzeros
+Found heuristic solution: objective 984595.84475
+Variable types: 320 continuous, 15 integer (15 binary)
+
+Root relaxation: objective 1.558976e+06, 410 iterations, 0.00 seconds (0.00 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1558976.37    0    3 984595.845 1558976.37  58.3%     -    0s
+H    0     0                    1382175.0789 1558976.37  12.8%     -    0s
+H    0     0                    1558939.2163 1558976.37  0.00%     -    0s
+
+Explored 1 nodes (410 simplex iterations) in 0.01 seconds (0.01 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 4: 1.55894e+06 1.38218e+06 984596 -0 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 1.558939216291e+06, best bound 1.558976374847e+06, gap 0.0024%
+
+Wrote result file '/tmp/mippp/132037350905664/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Wed Mar 20 19:13:03 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic

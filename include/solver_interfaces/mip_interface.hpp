@@ -6,6 +6,7 @@
 #include <boost/program_options.hpp>
 
 #include "gecot/solvers/mip.hpp"
+#include "gecot/utils/mip_solver_traits.hpp"
 
 #include "instance.hpp"
 #include "solver_interfaces/abstract_solver.hpp"
@@ -20,8 +21,27 @@ private:
 public:
     MIPInterface() : desc(name() + " options") {
         desc.add_options()("verbose,v", "Log the algorithm steps")(
-            "parallel,p", "Use multithreaded version")(
-            "print-model,m", "Print the MIP model");
+            "parallel,p", "Use multithreaded version")("print-model,m",
+                                                       "Print the MIP model")(
+            "use-cbc",
+            "Prioritizes cbc for soplving MIPs (default if gurobi_cl and scip "
+            "are not available)")("use-grb",
+                                  "Prioritizes cbc for soplving MIPs (default "
+                                  "if gurobi_cl is available)")(
+            "use-scip",
+            "Prioritizes scip for soplving MIPs (warning: scip is for academic "
+            "use only)")(
+            "cbc-path",
+            po::value<std::filesystem::path>(&mippp::cli_cbc_traits::exec_path)
+                ->default_value(get_exec_path().parent_path() / "cbc"),
+            "Sets path to cbc executable")(
+            "grb-path",
+            po::value<std::filesystem::path>(&mippp::cli_grb_traits::exec_path),
+            "Sets path to gurobi_cl executable")(
+            "scip-path",
+            po::value<std::filesystem::path>(
+                &mippp::cli_scip_traits::exec_path),
+            "Sets path to scip executable");
     }
 
     void parse(const std::vector<std::string> & args) {
@@ -36,10 +56,25 @@ public:
         solver.verbose = vm.count("verbose") > 0;
         solver.parallel = vm.count("parallel") > 0;
         solver.print_model = vm.count("print-model") > 0;
+        if(vm.count("use-cbc") + vm.count("use-gurobi") + vm.count("use-scip") >
+           1) {
+            throw std::logic_error(
+                "Chose only one solver between 'use-cbc', 'use-gurobi' and "
+                "'use-scip'");
+        }
+        if(vm.count("use-cbc"))
+            gecot::mip_solver_traits::prefered_solver =
+                gecot::mip_solver_traits::solvers::cbc;
+        if(vm.count("use-gurobi"))
+            gecot::mip_solver_traits::prefered_solver =
+                gecot::mip_solver_traits::solvers::grb;
+        if(vm.count("use-scip"))
+            gecot::mip_solver_traits::prefered_solver =
+                gecot::mip_solver_traits::solvers::scip;
     }
 
     gecot::instance_solution_t<Instance> solve(const Instance & instance,
-                                      const double B) const {
+                                               const double B) const {
         return solver.solve(instance, B);
     };
 

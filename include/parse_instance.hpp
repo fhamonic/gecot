@@ -18,7 +18,7 @@
 namespace fhamonic {
 namespace detail {
 
-static nlohmann::json instance_schema = R"(
+static const nlohmann::json instance_schema = R"(
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
@@ -424,8 +424,8 @@ void parse_vertices_options(InstanceCase & instance_case, T json_object,
                             const std::filesystem::path & parent_path,
                             const Instance & instance) {
     auto vertex_options = melon::create_vertex_map<
-        std::vector<std::pair<double, gecot::option_t>>>(
-        instance_case.graph(), {});
+        std::vector<std::pair<double, gecot::option_t>>>(instance_case.graph(),
+                                                         {});
 
     auto add_vertex_option = [&](const std::string & option_id,
                                  const std::string & vertex_id,
@@ -442,7 +442,8 @@ void parse_vertices_options(InstanceCase & instance_case, T json_object,
             if(vertex_options_csv_path.is_relative())
                 vertex_options_csv_path =
                     (parent_path / vertex_options_csv_path);
-            io::CSVReader<3> vertex_options_csv(vertex_options_csv_path.string());
+            io::CSVReader<3> vertex_options_csv(
+                vertex_options_csv_path.string());
 
             auto columns = vertex_options_json["csv_columns"];
             vertex_options_csv.read_header(
@@ -478,9 +479,9 @@ template <typename T>
 void parse_arcs_options(InstanceCase & instance_case, T json_object,
                         const std::filesystem::path & parent_path,
                         const Instance & instance) {
-    auto arc_options = melon::create_arc_map<
-        std::vector<std::pair<double, gecot::option_t>>>(
-        instance_case.graph(), {});
+    auto arc_options =
+        melon::create_arc_map<std::vector<std::pair<double, gecot::option_t>>>(
+            instance_case.graph(), {});
 
     auto add_arc_option = [&](const std::string & option_id,
                               const std::string & arc_id,
@@ -642,6 +643,13 @@ criterion_formula parse_formula(Instance & instance, auto json_object) {
 
 Instance parse_instance(const std::filesystem::path & instance_path) {
     Instance instance;
+
+    if(!std::filesystem::exists(instance_path))
+        throw std::invalid_argument("File '" + instance_path.string() +
+                                    "' does not exists");
+    if(std::filesystem::is_directory(instance_path))
+        throw std::invalid_argument("'" + instance_path.string() +
+                                    "' is a directory");
 
     std::ifstream instance_stream(instance_path);
     nlohmann::json instance_json;

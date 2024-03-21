@@ -34,6 +34,15 @@ if(NOT WIN32)
   set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
 endif()
 
+if(WIN32)
+set(WINDRES_ICON_O "misc/gecot_icon.o")
+execute_process(COMMAND "${CONAN_MINGW_LIB_DIR}/../bin/windres" "misc/gecot_icon.rc" -o ${WINDRES_ICON_O}
+  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+  RESULT_VARIABLE WINDRES_RESULT
+  OUTPUT_VARIABLE WINDRES_OUTPUT)
+message(STATUS "WINDRES [${WINDRES_RESULT}]: ${WINDRES_OUTPUT}")
+endif()
+
 # ################### Packages ####################
 find_package(fast-cpp-csv-parser REQUIRED)
 find_package(nlohmann_json REQUIRED)
@@ -87,7 +96,7 @@ target_link_libraries(gecot INTERFACE mippp::mippp)
 #endif()
 
 # ################### EXEC target ####################
-add_executable(gecot_solve src/solve.cpp)
+add_executable(gecot_solve src/solve.cpp $<IF:${WIN32},${WINDRES_ICON_O},>)
 target_link_libraries(gecot_solve PUBLIC gecot)
 target_link_libraries(gecot_solve
                       PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser)
@@ -103,7 +112,7 @@ target_compile_options(gecot_solve PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 # target_compile_options(gecot_solve PRIVATE -fsanitize=address)
 # target_link_options(gecot_solve PRIVATE -fsanitize=address -lpthread -static-libasan)
 
-add_executable(gecot_rank src/rank.cpp)
+add_executable(gecot_rank src/rank.cpp $<IF:${WIN32},${WINDRES_ICON_O},>)
 target_link_libraries(gecot_rank PUBLIC gecot) 
 target_link_libraries(gecot_rank PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser) 
 target_link_libraries(gecot_rank PUBLIC nlohmann_json::nlohmann_json) 
@@ -167,7 +176,7 @@ install(FILES
   set(CPACK_NSIS_DISPLAY_NAME Gecot)
   set(CPACK_NSIS_URL_INFO_ABOUT "https://github.com/fhamonic/gecot")
   set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
-  set(CPACK_NSIS_INSTALLED_ICON_NAME "${PROJECT_SOURCE_DIR}/misc/gecot.ico")
+  set(CPACK_NSIS_INSTALLED_ICON_NAME "bin/gecot_solve.exe")
   set(CPACK_NSIS_MUI_ICON "${PROJECT_SOURCE_DIR}/misc/gecot.ico")
   set(CPACK_NSIS_MUI_HEADERIMAGE "${PROJECT_SOURCE_DIR}/misc\\gecot_header.bmp") # must contain a backslash because fuck
   #set(CPACK_NSIS_EXTRA_PREINSTALL_COMMANDS "
@@ -175,7 +184,7 @@ install(FILES
   #FlushINI \\\"C:\\\\Users\\\\Plaiseek\\\\Documents\\\\Softwares\\\\gecot\\\\build\\\\_CPack_Packages\\\\win64\\\\NSIS\\\\NSIS.InstallOptions.ini\\\"")
   #set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "crAASSSSHHHH")
 endif()
-set(CPACK_PACKAGE_ICON "${PROJECT_SOURCE_DIR}/misc/gecot.ico")
+#set(CPACK_PACKAGE_ICON "${PROJECT_SOURCE_DIR}/misc/gecot.ico")
 set(CPACK_PACKAGE_VENDOR "F. HAMONIC")
 if(WIN32)
   set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/misc/windows_licenses.txt")

@@ -12,6 +12,7 @@
 *.index
 *.patches
 *.links
+*.o
 
 CMakeUserPresets.json
 /doc/html

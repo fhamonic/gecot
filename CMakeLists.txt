@@ -35,12 +35,12 @@ if(NOT WIN32)
 endif()
 
 if(WIN32)
-set(WINDRES_ICON_O "misc/gecot_icon.o")
-execute_process(COMMAND "${CONAN_MINGW_LIB_DIR}/../bin/windres" "misc/gecot_icon.rc" -o ${WINDRES_ICON_O}
-  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-  RESULT_VARIABLE WINDRES_RESULT
-  OUTPUT_VARIABLE WINDRES_OUTPUT)
-message(STATUS "WINDRES [${WINDRES_RESULT}]: ${WINDRES_OUTPUT}")
+  set(WINDRES_ICON_O "misc/gecot_icon.o")
+  execute_process(COMMAND "${CONAN_MINGW_LIB_DIR}/../bin/windres" "misc/gecot_icon.rc" -o ${WINDRES_ICON_O}
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    RESULT_VARIABLE WINDRES_RESULT
+    OUTPUT_VARIABLE WINDRES_OUTPUT)
+  message(STATUS "WINDRES [${WINDRES_RESULT}]: ${WINDRES_OUTPUT}")
 endif()
 
 # ################### Packages ####################
@@ -76,27 +76,8 @@ target_link_libraries(gecot INTERFACE Eigen3::Eigen)
 target_link_libraries(gecot INTERFACE melon::melon)
 target_link_libraries(gecot INTERFACE mippp::mippp)
 
-# ################### MIP solver ####################
-#target_compile_definitions(gecot INTERFACE MIPPP_FOUND_SHARED_COINOR)
-#if(WIN32)
-#  find_package(ZLIB REQUIRED)
-#  target_include_directories(gecot INTERFACE "c:/libs/cbc/include" ${ZLIB_INCLUDE_DIRS})
-#  target_link_libraries(gecot INTERFACE 
-#    "c:/libs/cbc/lib/libCbc.a" 
-#    "c:/libs/cbc/lib/libCbcSolver.a"
-#    "c:/libs/cbc/lib/libCgl.a"
-#    "c:/libs/cbc/lib/libClp.a" 
-#    "c:/libs/cbc/lib/libClpSolver.a"
-#    "c:/libs/cbc/lib/libCoinUtils.a"
-#    "c:/libs/cbc/lib/libOsi.a" 
-#    "c:/libs/cbc/lib/libOsiCbc.a"
-#    "c:/libs/cbc/lib/libOsiClp.a" 
-#    "c:/libs/cbc/lib/libOsiCommonTests.a"
-#    ${ZLIB_LIBRARIES})
-#endif()
-
 # ################### EXEC target ####################
-add_executable(gecot_solve src/solve.cpp $<IF:${WIN32},${WINDRES_ICON_O},>)
+add_executable(gecot_solve src/solve.cpp ${WINDRES_ICON_O})
 target_link_libraries(gecot_solve PUBLIC gecot)
 target_link_libraries(gecot_solve
                       PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser)
@@ -106,13 +87,11 @@ target_link_libraries(
   PUBLIC nlohmann_json_schema_validator)
 target_link_libraries(gecot_solve PUBLIC phmap)
 
-
 target_compile_options(gecot_solve PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
-
 # target_compile_options(gecot_solve PRIVATE -fsanitize=address)
 # target_link_options(gecot_solve PRIVATE -fsanitize=address -lpthread -static-libasan)
 
-add_executable(gecot_rank src/rank.cpp $<IF:${WIN32},${WINDRES_ICON_O},>)
+add_executable(gecot_rank src/rank.cpp ${WINDRES_ICON_O})
 target_link_libraries(gecot_rank PUBLIC gecot) 
 target_link_libraries(gecot_rank PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser) 
 target_link_libraries(gecot_rank PUBLIC nlohmann_json::nlohmann_json) 

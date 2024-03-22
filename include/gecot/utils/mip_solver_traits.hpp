@@ -4,6 +4,8 @@
 #include <filesystem>
 #include <memory>
 
+#include "mippp/solver_traits/all.hpp"
+
 #ifdef WIN32
 #include <windows.h>
 #endif
@@ -16,8 +18,6 @@ std::filesystem::path get_exec_path() {
     return std::filesystem::canonical("/proc/self/exe");
 #endif
 }
-
-#include "mippp/solver_traits/all.hpp"
 
 namespace fhamonic {
 namespace gecot {

@@ -17,6 +17,7 @@ class PreprocessedMIPInterface : public AbstractSolver {
 private:
     gecot::solvers::preprocessed_MIP solver;
     boost::program_options::options_description desc;
+    std::filesystem::path cbc_default_path;
 
 public:
     PreprocessedMIPInterface() : desc(name() + " options") {
@@ -24,17 +25,19 @@ public:
             "parallel,p", "Use multithreaded version")(
             "print-model,m", "Print the mixed integer program")(
             "use-cbc",
-            "Prioritizes cbc for soplving MIPs (default if gurobi_cl and scip "
-            "are not available)")("use-grb",
-                                  "Prioritizes cbc for soplving MIPs (default "
-                                  "if gurobi_cl is available)")(
+            "Prioritizes cbc for soplving MIPs\n(default if gurobi_cl and scip "
+            "are not found)")("use-grb",
+                              "Prioritizes cbc for soplving MIPs\n(default "
+                              "if gurobi_cl is found)")(
             "use-scip",
-            "Prioritizes scip for soplving MIPs (warning: scip is for academic "
+            "Prioritizes scip for soplving MIPs\n(warning: scip is for "
+            "academic "
             "use only)")(
             "cbc-path",
-            po::value<std::filesystem::path>(&mippp::cli_cbc_traits::exec_path)
-                ->default_value(get_exec_path().parent_path() / "cbc"),
-            "Sets path to cbc executable")(
+            po::value<std::filesystem::path>(&mippp::cli_cbc_traits::exec_path),
+            (std::string("Sets path to cbc executable\n(default: '") +
+             cbc_default_path.string() + "')")
+                .c_str())(
             "grb-path",
             po::value<std::filesystem::path>(&mippp::cli_grb_traits::exec_path),
             "Sets path to gurobi_cl executable")(
@@ -62,6 +65,8 @@ public:
                 "Chose only one solver between 'use-cbc', 'use-gurobi' and "
                 "'use-scip'");
         }
+        if(!vm.count("cbc-path"))
+            mippp::cli_cbc_traits::exec_path = cbc_default_path;
         if(vm.count("use-cbc"))
             gecot::mip_solver_traits::prefered_solver =
                 gecot::mip_solver_traits::solvers::cbc;

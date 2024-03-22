@@ -151,7 +151,7 @@ install(FILES
   "${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libwinpthread-1.dll" 
   "${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libstdc++-6.dll" 
   DESTINATION bin)
-  set(CPACK_NSIS_MODIFY_PATH ON)
+  set(CPACK_NSIS_MODIFY_PATH 2)
   set(CPACK_NSIS_DISPLAY_NAME Gecot)
   set(CPACK_NSIS_URL_INFO_ABOUT "https://github.com/fhamonic/gecot")
   set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)

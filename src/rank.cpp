@@ -56,7 +56,7 @@ static bool process_command_line(
     const std::vector<std::string> & args,
     std::shared_ptr<AbstractRanker> & ranker,
     std::filesystem::path & instances_description_json_file,
-    bool & output_in_file, std::filesystem::path & output_csv_file) {
+    std::optional<std::filesystem::path> & opt_output_csv_file) {
     std::vector<std::shared_ptr<AbstractRanker>> ranker_interfaces{
         std::make_unique<StaticIncrementalInterface>(),
         std::make_unique<StaticDecrementalInterface>(),
@@ -64,29 +64,27 @@ static bool process_command_line(
         std::make_unique<GreedyDecrementalInterface>()};
 
     auto print_soft_name = []() {
-        std::cout << "GECOT — Graph-based Ecological Connectivity Optimization "
-                     "Tool\nVersion: "
+        std::cout << "GECOT — Graph-based Ecological Connectivity "
+                     "Optimization Tool\nVersion: "
                   << PROJECT_VERSION << " (built on " << __DATE__ << ")\n\n";
     };
     auto print_usage = []() {
         std::cout << R"(Usage:
-  gecot_rank --help
-  gecot_rank --list-algorithms
-  gecot_rank <algorithm> --list-params
-  gecot_rank <algorithm> <instance> [<params> ...]
+  gecot_solve --help
+  gecot_solve --list-algorithms
+  gecot_solve <algorithm> --list-params
+  gecot_solve <algorithm> <instance> [<params> ...]
 
 )";
     };
 
     auto print_available_algorithms = [&ranker_interfaces]() {
-        std::cout << "Available ranking algorithms:\n";
+        std::cout << "Available algorithms:\n";
         const std::size_t algorithm_name_max_length = std::ranges::max(
             std::ranges::views::transform(ranker_interfaces, [&](auto && s) {
                 return s->name().size();
             }));
-
-        const std::size_t offset =
-            std::max(algorithm_name_max_length + 1, std::size_t(24));
+        const std::size_t offset = algorithm_name_max_length + 8;
 
         for(auto & s : ranker_interfaces) {
             std::cout << "  " << s->name()
@@ -97,21 +95,22 @@ static bool process_command_line(
         return false;
     };
 
-    std::string ranker_name;
+    // path istead of string to silence a warning...
+    std::filesystem::path output_csv_file;
 
     try {
         po::options_description desc("Allowed options");
         desc.add_options()("help,h", "Display this help message")(
             "list-algorithms,A", "List the available algorithms")(
             "list-params,P", "List the parameters of the chosen algorithm")(
-            "algorithm,a", po::value(&ranker_name)->required(),
+            "algorithm,a", po::value<std::string>()->required(),
             "Algorithm to use")(
             "instance,i",
             po::value<std::filesystem::path>(&instances_description_json_file)
                 ->required(),
             "Instance JSON file")(
             "output-csv,o", po::value<std::filesystem::path>(&output_csv_file),
-            "Output solution in CSV file");
+            "Output ranks in CSV file");
 
         po::positional_options_description p;
         p.add("algorithm", 1);
@@ -138,7 +137,7 @@ static bool process_command_line(
         }
 
         if(vm.count("algorithm")) {
-            ranker_name = vm["algorithm"].as<std::string>();
+            auto ranker_name = vm["algorithm"].as<std::string>();
             bool found = false;
             for(auto & s : ranker_interfaces) {
                 if(s->name() == ranker_name) {
@@ -167,11 +166,12 @@ static bool process_command_line(
         }
 
         po::notify(vm);
+        if(vm.count("output-csv")) {
+            opt_output_csv_file.emplace(std::move(output_csv_file));
+        }
         std::vector<std::string> opts =
             po::collect_unrecognized(parsed.options, po::exclude_positional);
-
         ranker->parse(opts);
-        output_in_file = vm.count("output");
     } catch(std::exception & e) {
         std::cerr << "Error: " << e.what() << "\n";
         return false;
@@ -183,14 +183,15 @@ int main(int argc, const char * argv[]) {
 #ifdef WIN32
     std::system("chcp 65001 > NUL");
 #endif
+    std::cout.precision(20);
+
     std::shared_ptr<AbstractRanker> ranker;
     std::filesystem::path instances_description_json;
-    bool output_in_file;
-    std::filesystem::path output_csv;
+    std::optional<std::filesystem::path> opt_output_csv_file;
 
     std::vector<std::string> args(argv + 1, argv + argc);
     bool valid_command = process_command_line(
-        args, ranker, instances_description_json, output_in_file, output_csv);
+        args, ranker, instances_description_json, opt_output_csv_file);
     if(!valid_command) return EXIT_FAILURE;
     init_logging();
 
@@ -198,24 +199,24 @@ int main(int argc, const char * argv[]) {
     Instance instance = trivial_reformulate_instance(raw_instance);
 
     gecot::instance_options_rank_t<Instance> option_ranks =
-        ranker->rank_options(instance);
+    ranker->rank_options(instance);
 
-    if(!output_in_file) {
-        std::cout << "option_ranks:" << std::endl;
-        const std::size_t option_name_max_length = std::ranges::max(
-            std::ranges::views::transform(instance.options(), [&](auto && o) {
-                return instance.option_name(o).size();
-            }));
-        for(auto && o : instance.options()) {
-            std::cout << "  " << instance.option_name(o)
-                      << std::string(option_name_max_length + 1 -
-                                         instance.option_name(o).size(),
-                                     ' ')
-                      << option_ranks[o] << '\n';
-        }
-        std::cout << std::endl;
-    } else {
-        std::ofstream output_file(output_csv);
+    std::cout << "option_ranks:" << std::endl;
+    const std::size_t option_name_max_length = std::ranges::max(
+        std::ranges::views::transform(instance.options(), [&](auto && o) {
+            return instance.option_name(o).size();
+        }));
+    for(auto && o : instance.options()) {
+        std::cout << "  " << instance.option_name(o)
+                    << std::string(option_name_max_length + 1 -
+                                        instance.option_name(o).size(),
+                                    ' ')
+                    << option_ranks[o] << '\n';
+    }
+    std::cout << std::endl;
+    
+    if(opt_output_csv_file.has_value()) {
+        std::ofstream output_file(opt_output_csv_file.value());
         if(output_file.is_open()) {
             output_file << "option_id,potential\n";
             for(auto && o : instance.options()) {
@@ -224,7 +225,7 @@ int main(int argc, const char * argv[]) {
             }
             output_file << std::endl;
         } else
-            std::cerr << "ERR: '" << output_csv << "' not opened" << std::endl;
+            std::cerr << "ERR: '" << opt_output_csv_file.value() << "' not opened" << std::endl;
     }
 
     return EXIT_SUCCESS;

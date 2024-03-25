@@ -61,7 +61,7 @@ static bool process_command_line(
     const std::vector<std::string> & args,
     std::shared_ptr<AbstractSolver> & solver,
     std::filesystem::path & instances_description_json_file, double & budget,
-    bool & output_in_file, std::filesystem::path & output_csv_file) {
+    std::optional<std::filesystem::path> & opt_output_csv_file) {
     std::vector<std::shared_ptr<AbstractSolver>> solver_interfaces{
         std::make_unique<StaticIncrementalInterface>(),
         std::make_unique<StaticDecrementalInterface>(),
@@ -103,14 +103,14 @@ static bool process_command_line(
     };
 
     // path istead of string to silence a warning...
-    std::filesystem::path solver_name;
+    std::filesystem::path output_csv_file;
 
     try {
         po::options_description desc("Allowed options");
         desc.add_options()("help,h", "Display this help message")(
             "list-algorithms,A", "List the available algorithms")(
             "list-params,P", "List the parameters of the chosen algorithm")(
-            "algorithm,a", po::value(&solver_name)->required(),
+            "algorithm,a", po::value<std::string>()->required(),
             "Algorithm to use")(
             "instance,i",
             po::value<std::filesystem::path>(&instances_description_json_file)
@@ -146,7 +146,7 @@ static bool process_command_line(
         }
 
         if(vm.count("algorithm")) {
-            solver_name = vm["algorithm"].as<std::filesystem::path>();
+            auto solver_name = vm["algorithm"].as<std::string>();
             bool found = false;
             for(auto & s : solver_interfaces) {
                 if(s->name() == solver_name) {
@@ -175,11 +175,12 @@ static bool process_command_line(
         }
 
         po::notify(vm);
+        if(vm.count("output-csv")) {
+            opt_output_csv_file.emplace(std::move(output_csv_file));
+        }
         std::vector<std::string> opts =
             po::collect_unrecognized(parsed.options, po::exclude_positional);
-
         solver->parse(opts);
-        output_in_file = vm.count("output");
     } catch(std::exception & e) {
         std::cerr << "Error: " << e.what() << "\n";
         return false;
@@ -191,16 +192,17 @@ int main(int argc, const char * argv[]) {
 #ifdef WIN32
     std::system("chcp 65001 > NUL");
 #endif
+    std::cout.precision(20);
+    
     std::shared_ptr<AbstractSolver> solver;
     std::filesystem::path instances_description_json;
     double budget;
-    bool output_in_file;
-    std::filesystem::path output_csv;
+    std::optional<std::filesystem::path> opt_output_csv_file;
 
     std::vector<std::string> args(argv + 1, argv + argc);
     bool valid_command =
         process_command_line(args, solver, instances_description_json, budget,
-                             output_in_file, output_csv);
+                             opt_output_csv_file);
     if(!valid_command) return EXIT_FAILURE;
     init_logging();
 
@@ -212,34 +214,33 @@ int main(int argc, const char * argv[]) {
     auto solution = solver->solve(instance, budget);
     const auto time_ms = chrono.time_ms();
 
-    if(!output_in_file) {
-        std::cout.precision(20);
-        const double solution_score =
-            gecot::compute_solution_score(instance, solution);
-        std::cout << "Score: " << solution_score << std::endl;
-        std::cout << "Cost: "
-                  << fhamonic::gecot::compute_solution_cost(instance, solution)
-                  << std::endl;
-        std::cout << "Solution:" << std::endl;
-        const std::size_t option_name_max_length =
-            std::ranges::max(std::ranges::views::transform(
-                raw_instance.options(),
-                [&](auto && o) { return raw_instance.option_name(o).size(); }));
-        for(auto && option : raw_instance.options()) {
-            auto option_name = raw_instance.option_name(option);
-            bool value = instance.contains_option(option_name)
-                             ? solution[instance.option_from_name(option_name)]
-                             : false;
-            std::cout << "  " << option_name
-                      << std::string(
-                             option_name_max_length + 1 -
-                                 raw_instance.option_name(option).size(),
-                             ' ')
-                      << value << '\n';
-        }
-        std::cout << std::endl << "in " << time_ms << " ms" << std::endl;
-    } else {
-        std::ofstream output_file(output_csv);
+    const double solution_score =
+        gecot::compute_solution_score(instance, solution);
+    std::cout << "Score: " << solution_score << std::endl;
+    std::cout << "Cost: "
+                << fhamonic::gecot::compute_solution_cost(instance, solution)
+                << std::endl;
+    std::cout << "Solution:" << std::endl;
+    const std::size_t option_name_max_length =
+        std::ranges::max(std::ranges::views::transform(
+            raw_instance.options(),
+            [&](auto && o) { return raw_instance.option_name(o).size(); }));
+    for(auto && option : raw_instance.options()) {
+        auto option_name = raw_instance.option_name(option);
+        bool value = instance.contains_option(option_name)
+                            ? solution[instance.option_from_name(option_name)]
+                            : false;
+        std::cout << "  " << option_name
+                    << std::string(
+                            option_name_max_length + 1 -
+                                raw_instance.option_name(option).size(),
+                            ' ')
+                    << value << '\n';
+    }
+    std::cout << std::endl << "in " << time_ms << " ms" << std::endl;
+    
+    if(opt_output_csv_file.has_value()){
+        std::ofstream output_file(opt_output_csv_file.value());
         if(output_file.is_open()) {
             output_file << "option_id,value\n";
             for(auto && option : raw_instance.options()) {
@@ -251,7 +252,7 @@ int main(int argc, const char * argv[]) {
                 output_file << option_name << ',' << value << '\n';
             }
         } else
-            std::cerr << "ERR: '" << output_csv << "' not opened" << std::endl;
+            std::cerr << "ERR: '" << opt_output_csv_file.value() << "' not opened" << std::endl;
     }
 
     return EXIT_SUCCESS;

@@ -59,7 +59,7 @@ static bool process_command_line(
     };
 
     auto print_available_algorithms = [&solver_interfaces]() {
-        spdlog::info("Available algorithms:");
+        fmt::println("Available algorithms:");
         const std::size_t algorithm_name_max_length = std::ranges::max(
             std::ranges::views::transform(solver_interfaces, [&](auto && s) {
                 return s->name().size();
@@ -68,7 +68,7 @@ static bool process_command_line(
 
         for(auto & s : solver_interfaces) {
             fmt::print("  {:<{}}", s->name(), offset - 2);
-            print_paragraph(std::cout, offset, 80 - offset, s->description());
+            print_paragraph(offset, 80 - offset, s->description());
         }
         fmt::println("");
         return false;

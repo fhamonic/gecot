@@ -5,6 +5,8 @@
 #include <ostream>
 #include <string>
 
+#include <fmt/os.h>
+
 #include <spdlog/spdlog.h>
 
 namespace fhamonic {
@@ -24,22 +26,19 @@ void print_instance_size(auto && instance, const std::string & instance_name  = 
     }
 }
 
-void print_paragraph(std::ostream & os, std::size_t offset,
-                     std::size_t column_width, const std::string & str) {
+void print_paragraph(std::size_t offset, std::size_t column_width, const std::string & str) {
     std::size_t line_start = 0;
     while(str.size() - line_start > column_width) {
         std::size_t n = str.rfind(' ', line_start + column_width);
         if(n <= line_start) {
-            os << str.substr(line_start, column_width - 1) << '-' << '\n'
-               << std::string(offset, ' ');
+            fmt::print("{:<{}}\n{: ^{}}", str.substr(line_start, column_width - 1), column_width - offset, "", offset);
             line_start += column_width - 1;
         } else {
-            os << str.substr(line_start, n - line_start) << '\n'
-               << std::string(offset, ' ');
+            fmt::print("{:<{}}\n{: ^{}}", str.substr(line_start, n - line_start), column_width - offset, "", offset);
             line_start = n + 1;
         }
     }
-    os << str.substr(line_start) << '\n';
+    fmt::println("{:<{}}", str.substr(line_start), column_width - offset);
 }
 
 }  // namespace fhamonic

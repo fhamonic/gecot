@@ -206,19 +206,21 @@ int main(int argc, const char * argv[]) {
             gecot::compute_solution_score(instance, solution);
         const double solution_cost = gecot::compute_solution_cost(instance, solution);
 
-        fmt::print("Initial Score:  {}\nBudget: {}\nSolution score: {}\nSolution cost: {}\nSolution:\n", initial_score, budget, solution_score, solution_cost);
-        const std::size_t option_name_max_length =
-            std::ranges::max(std::ranges::views::transform(
-                raw_instance.options(),
-                [&](auto && o) { return raw_instance.option_name(o).size(); }));
-        for(auto && option : raw_instance.options()) {
-            auto option_name = raw_instance.option_name(option);
-            int value = static_cast<int>(instance.contains_option(option_name)
-                                ? solution[instance.option_from_name(option_name)]
-                                : false);
-            fmt::println("    {:<{}} {}", option_name, option_name_max_length, value);
+        if(!opt_output_json_file.has_value() && !opt_output_csv_file.has_value()) { 
+            fmt::print("Initial Score:  {}\nBudget: {}\nSolution score: {}\nSolution cost: {}\nSolution:\n", initial_score, budget, solution_score, solution_cost);
+            const std::size_t option_name_max_length =
+                std::ranges::max(std::ranges::views::transform(
+                    raw_instance.options(),
+                    [&](auto && o) { return raw_instance.option_name(o).size(); }));
+            for(auto && option : raw_instance.options()) {
+                auto option_name = raw_instance.option_name(option);
+                int value = static_cast<int>(instance.contains_option(option_name)
+                                    ? solution[instance.option_from_name(option_name)]
+                                    : false);
+                fmt::println("    {:<{}} {}", option_name, option_name_max_length, value);
+            }
+            fmt::println("Computation time: {} ms", computation_time_ms);
         }
-        fmt::println("Computation time: {} ms", computation_time_ms);
 
         if(opt_output_json_file.has_value()){
             auto out = fmt::output_file(opt_output_json_file.value().string().c_str());

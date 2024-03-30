@@ -82,13 +82,8 @@ struct GreedyIncremental {
                     cases_arc_options[instance_case.id()][best_option])
                     current_pm[a] = std::max(current_pm[a], enhanced_prob);
             }
-            if(verbose) {
-                std::cout << "add option: " << best_option
-                          << "\n\t ratio: " << options_ratios[best_option]
-                          << "\n\t costing: " << best_option_price
-                          << "\n\t budget left: " << budget_left << std::endl;
-            }
-
+            spdlog::trace("add {:>20} (score_gain: {:.5e}, budget_left: {})", instance.option_name(best_option), options_ratios[best_option] * best_option_price, budget_left);
+            
             options.erase(best_option_it);
             const auto [first, last] = std::ranges::remove_if(
                 options, [&instance, budget_left](const option_t & o) {

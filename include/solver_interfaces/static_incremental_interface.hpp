@@ -20,7 +20,7 @@ private:
 
 public:
     StaticIncrementalInterface() : desc(name() + " options") {
-        desc.add_options()("verbose,v", "Log the algorithm steps")(
+        desc.add_options()(
             "parallel,p", "Use multithreaded version");
     }
 
@@ -33,7 +33,6 @@ public:
             vm);
         po::notify(vm);
 
-        solver.verbose = vm.count("verbose") > 0;
         solver.parallel = vm.count("parallel") > 0;
     }
 

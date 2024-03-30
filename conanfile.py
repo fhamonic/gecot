@@ -15,7 +15,7 @@ class CompressorRecipe(ConanFile):
         self.requires("boost/[1.82.0]")
         self.requires("parallel-hashmap/1.37")
         self.requires("eigen/[>=3.4.0]")
-        self.requires("fmt/10.1.1")
+        self.requires("spdlog/[>=1.13.0]")
 
         self.requires("melon/0.5")
         self.requires("mippp/0.1")

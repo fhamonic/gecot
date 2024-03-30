@@ -4,6 +4,8 @@
 #include <filesystem>
 #include <memory>
 
+#include <spdlog/spdlog.h>
+
 #include "mippp/solver_traits/all.hpp"
 
 #ifdef WIN32
@@ -36,12 +38,23 @@ struct mip_solver_traits {
             using traits =
                 typename std::decay_t<decltype(model)>::solver_traits;
 
+            if(traits::prefered_solver.has_value() && traits::prefered_solver.value() == traits::solvers::grb && !mippp::cli_grb_traits::is_available()) {
+                spdlog::warn("Gurboi is prefered but not available at '{}'", mippp::cli_grb_traits::exec_path.string());
+            }
+            if(traits::prefered_solver.has_value() && traits::prefered_solver.value() == traits::solvers::scip && !mippp::cli_scip_traits::is_available() ) {
+                spdlog::warn("SCIP is prefered but not available at '{}'", mippp::cli_scip_traits::exec_path.string());
+            }
+            if(traits::prefered_solver.has_value() && traits::prefered_solver.value() == traits::solvers::cbc && !mippp::cli_cbc_traits::is_available()) {
+                spdlog::warn("Cbc is prefered but not available at '{}'", mippp::cli_cbc_traits::exec_path.string());
+            }
+
             if(mippp::cli_grb_traits::is_available() &&
                (!traits::prefered_solver.has_value() ||
                 traits::prefered_solver.value() == traits::solvers::grb)) {
                 solver =
                     std::make_unique<mippp::cli_grb_traits::solver_wrapper>(
                         model);
+                spdlog::info("Selected Gurobi as MIP solver");
 
             } else if(traits::prefered_solver.has_value() &&
                        traits::prefered_solver.value() ==
@@ -49,10 +62,12 @@ struct mip_solver_traits {
                 solver =
                     std::make_unique<mippp::cli_scip_traits::solver_wrapper>(
                         model);
+                spdlog::info("Selected SCIP as MIP solver");
             } else {
                 solver =
                     std::make_unique<mippp::cli_cbc_traits::solver_wrapper>(
                         model);
+                spdlog::info("Selected Cbc as MIP solver");
             }
         }
 

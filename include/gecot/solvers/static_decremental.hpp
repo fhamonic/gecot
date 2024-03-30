@@ -18,7 +18,6 @@ namespace gecot {
 namespace solvers {
 
 struct StaticDecremental {
-    bool verbose = false;
     bool parallel = false;
     bool only_dec = false;
 
@@ -88,12 +87,7 @@ struct StaticDecremental {
             purchased -= price;
             solution[option] = false;
             free_options.emplace_back(option);
-            if(verbose) {
-                std::cout << "removed option: " << option
-                          << "\n\t ratio: " << options_ratios[option]
-                          << "\n\t costing: " << price
-                          << "\n\t purchased: " << purchased << std::endl;
-            }
+            spdlog::trace("remove {:>20} (ratio: {:.5e}, purchased: {})", instance.option_name(option), options_ratios[option], purchased);
             if(purchased <= budget) break;
         }
 
@@ -137,13 +131,7 @@ struct StaticDecremental {
                 if(purchased + price > budget) continue;
                 purchased += price;
                 solution[option] = true;
-                if(verbose) {
-                    std::cout << "add option: " << option
-                              << "\n\t ratio: " << options_ratios[option]
-                              << "\n\t costing: " << price
-                              << "\n\t budget left: " << budget - purchased
-                              << std::endl;
-                }
+                spdlog::trace("add {:>20} (ratio: {:.5e}, budget_left: {})", instance.option_name(option), options_ratios[option], budget - purchased);
             }
         }
 

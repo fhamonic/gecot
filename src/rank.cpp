@@ -7,11 +7,6 @@
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 
-#include <boost/log/core.hpp>
-#include <boost/log/expressions.hpp>
-#include <boost/log/trivial.hpp>
-namespace logging = boost::log;
-
 // #include "gecot/rankers/mip_xue.hpp"
 // #include "gecot/rankers/mip_pc_num.hpp"
 // #include "gecot/rankers/mip_pc_num_preprocessed.hpp"
@@ -28,11 +23,6 @@ namespace logging = boost::log;
 #include "ranker_interfaces/static_incremental_interface.hpp"
 
 using namespace fhamonic;
-
-void init_logging() {
-    logging::core::get()->set_filter(logging::trivial::severity >=
-                                     logging::trivial::warning);
-}
 
 void print_paragraph(std::ostream & os, std::size_t offset,
                      std::size_t column_width, const std::string & str) {
@@ -193,8 +183,7 @@ int main(int argc, const char * argv[]) {
     bool valid_command = process_command_line(
         args, ranker, instances_description_json, opt_output_csv_file);
     if(!valid_command) return EXIT_FAILURE;
-    init_logging();
-
+    
     Instance raw_instance = parse_instance(instances_description_json);
     Instance instance = trivial_reformulate_instance(raw_instance);
 

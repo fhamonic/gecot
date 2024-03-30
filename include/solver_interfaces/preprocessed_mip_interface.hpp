@@ -20,10 +20,11 @@ private:
     std::filesystem::path cbc_default_path;
 
 public:
-    PreprocessedMIPInterface() : desc(name() + " options") {
-        desc.add_options()("verbose,v", "Log the algorithm steps")(
-            "parallel,p", "Use multithreaded version")(
-            "print-model,m", "Print the mixed integer program")(
+    PreprocessedMIPInterface() : desc(name() + " options")
+        , cbc_default_path(get_exec_path().parent_path() / "cbc") {
+        desc.add_options()(
+            "parallel,p", "Use multithreaded version")("print-model,m",
+                                                       "Print the MIP model")(
             "use-cbc",
             "Prioritizes cbc for soplving MIPs\n(default if gurobi_cl and scip "
             "are not found)")("use-grb",
@@ -47,7 +48,7 @@ public:
             "Sets path to scip executable");
     }
 
-    void parse(const std::vector<std::string> & args) {
+   void parse(const std::vector<std::string> & args) {
         boost::program_options::variables_map vm;
         boost::program_options::store(
             boost::program_options::command_line_parser(args)
@@ -56,7 +57,6 @@ public:
             vm);
         po::notify(vm);
 
-        solver.verbose = vm.count("verbose") > 0;
         solver.parallel = vm.count("parallel") > 0;
         solver.print_model = vm.count("print-model") > 0;
         if(vm.count("use-cbc") + vm.count("use-gurobi") + vm.count("use-scip") >

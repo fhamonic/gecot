@@ -9,6 +9,8 @@
 #include <range/v3/view/filter.hpp>
 #include <range/v3/view/zip.hpp>
 
+#include <spdlog/spdlog.h>
+
 #include "melon/container/static_map.hpp"
 
 #include "gecot/helper.hpp"
@@ -20,7 +22,6 @@ namespace gecot {
 namespace solvers {
 
 struct StaticIncremental {
-    bool verbose = false;
     bool parallel = false;
 
     template <instance_c I>
@@ -69,18 +70,12 @@ struct StaticIncremental {
             if(purchased + price > budget) continue;
             purchased += price;
             solution[option] = true;
-            if(verbose) {
-                std::cout << "add option: " << option
-                          << "\n\t ratio: " << options_ratios[option]
-                          << "\n\t costing: " << price
-                          << "\n\t budget left: " << budget - purchased << std::endl;
-            }
+            spdlog::trace("add {:>20} (ratio: {:.5e}, budget_left: {})", instance.option_name(option), options_ratios[option], budget - purchased);
         }
 
         return solution;
     }
 };
-
 }  // namespace solvers
 }  // namespace gecot
 }  // namespace fhamonic

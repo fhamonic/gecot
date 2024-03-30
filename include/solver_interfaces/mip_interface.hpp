@@ -24,7 +24,7 @@ public:
     MIPInterface()
         : desc(name() + " options")
         , cbc_default_path(get_exec_path().parent_path() / "cbc") {
-        desc.add_options()("verbose,v", "Log the algorithm steps")(
+        desc.add_options()(
             "parallel,p", "Use multithreaded version")("print-model,m",
                                                        "Print the MIP model")(
             "use-cbc",
@@ -59,7 +59,6 @@ public:
             vm);
         po::notify(vm);
 
-        solver.verbose = vm.count("verbose") > 0;
         solver.parallel = vm.count("parallel") > 0;
         solver.print_model = vm.count("print-model") > 0;
         if(vm.count("use-cbc") + vm.count("use-gurobi") + vm.count("use-scip") >

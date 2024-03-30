@@ -7,6 +7,8 @@
 #include <range/v3/range/conversion.hpp>
 #include <range/v3/view/zip.hpp>
 
+#include <spdlog/spdlog.h>
+
 #include "mippp/mip_model.hpp"
 #include "mippp/operators.hpp"
 #include "mippp/xsum.hpp"
@@ -19,7 +21,6 @@
 #include "gecot/indices/pc_num.hpp"
 #include "gecot/preprocessing/compute_big_M_map.hpp"
 #include "gecot/preprocessing/compute_generalized_flow_graph.hpp"
-#include "gecot/utils/chronometer.hpp"
 #include "gecot/utils/mip_solver_traits.hpp"
 
 namespace fhamonic {
@@ -27,7 +28,6 @@ namespace gecot {
 namespace solvers {
 
 struct MIP {
-    bool verbose = false;
     bool parallel = false;
     bool print_model = false;
 
@@ -81,7 +81,6 @@ struct MIP {
     template <instance_c I>
     instance_solution_t<I> solve(const I & instance,
                                  const double budget) const {
-        chronometer chrono;
         auto solution = instance.create_option_map(false);
 
         using namespace mippp;
@@ -209,20 +208,16 @@ struct MIP {
                         [](const auto & p) { return p.second; }));
         }
 
-        if(verbose) {
-            std::cout << "MIP Model with:"
-                      << "\n\tvariables:      " << model.nb_variables()
-                      << "\n\tconstraints:    " << model.nb_constraints()
-                      << "\n\tentries:        " << model.nb_entries()
-                      << std::endl;
-        }
-
+        spdlog::trace("MIP model has:");
+        spdlog::trace("  {:>10} variables", model.nb_variables());
+        spdlog::trace("  {:>10} constraints",  model.nb_constraints());
+        spdlog::trace("  {:>10} entries", model.nb_entries());
+        
         if(print_model) std::cout << "NBLOCKS\n" << nb_blocks << '\n';
-
         if(print_model) std::cout << model << std::endl;
 
         auto solver = model.build();
-        solver.set_loglevel(verbose ? 1 : 0);
+        solver.set_loglevel(spdlog::get_level() == spdlog::level::trace ? 1 : 0);
         solver.set_timeout(3600);
         solver.set_mip_gap(1e-8);
         auto ret_code = solver.optimize();
@@ -232,14 +227,10 @@ struct MIP {
                 std::to_string(ret_code));
         const auto solver_solution = solver.get_solution();
 
+        spdlog::trace("MIP solution found with value: {}", solver.get_objective_value());
         for(const auto & i : instance.options()) {
             solution[i] =
                 solver_solution[static_cast<std::size_t>(X_vars(i).id())];
-        }
-
-        if(verbose) {
-            std::cout << "Solution found with value: with: "
-                      << solver.get_objective_value() << std::endl;
         }
 
         return solution;

@@ -19,7 +19,7 @@ private:
 
 public:
     StaticDecrementalInterface() : desc(name() + " options") {
-        desc.add_options()("verbose,v", "Log the algorithm steps")(
+        desc.add_options()(
             "parallel,p", "Use multithreaded version")(
             "only-dec",
             "Do not perform the final incremental steps that ensure that the "
@@ -35,7 +35,6 @@ public:
             vm);
         po::notify(vm);
 
-        solver.verbose = vm.count("verbose") > 0;
         solver.parallel = vm.count("parallel") > 0;
         solver.only_dec = vm.count("only-dec") > 0;
     }

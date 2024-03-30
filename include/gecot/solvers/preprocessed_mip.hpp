@@ -7,6 +7,8 @@
 #include <range/v3/range/conversion.hpp>
 #include <range/v3/view/zip.hpp>
 
+#include <spdlog/spdlog.h>
+
 #include "mippp/mip_model.hpp"
 #include "mippp/operators.hpp"
 #include "mippp/xsum.hpp"
@@ -20,7 +22,6 @@
 #include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
 #include "gecot/preprocessing/compute_contracted_generalized_flow_graph.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
-#include "gecot/utils/chronometer.hpp"
 #include "gecot/utils/mip_solver_traits.hpp"
 
 namespace fhamonic {
@@ -28,7 +29,6 @@ namespace gecot {
 namespace solvers {
 
 struct preprocessed_MIP {
-    bool verbose = false;
     bool parallel = false;
     bool print_model = false;
 
@@ -78,7 +78,6 @@ struct preprocessed_MIP {
     template <instance_c I>
     instance_solution_t<I> solve(const I & instance,
                                  const double budget) const {
-        chronometer chrono;
         auto solution = instance.create_option_map(false);
 
         using namespace mippp;
@@ -89,7 +88,6 @@ struct preprocessed_MIP {
             instance.cases().size(), [](const case_id_t & id) { return id; },
             [](const case_id_t & id) { return "C_" + std::to_string(id); });
 
-        // model.add_to_objective(C_vars);
         model.add_to_objective(std::visit(
             formula_variable_visitor{model, C_vars}, instance.criterion()));
 
@@ -217,30 +215,31 @@ struct preprocessed_MIP {
             }
         }
 
-        if(verbose) {
-            std::cout << "MIP Model with:"
-                      << "\n\tvariables:      " << model.nb_variables()
-                      << "\n\tconstraints:    " << model.nb_constraints()
-                      << "\n\tentries:        " << model.nb_entries()
-                      << std::endl;
-        }
+        spdlog::trace("MIP model has:");
+        spdlog::trace("  {:>10} variables", model.nb_variables());
+        spdlog::trace("  {:>10} constraints",  model.nb_constraints());
+        spdlog::trace("  {:>10} entries", model.nb_entries());
+        
         if(print_model) std::cout << model << std::endl;
 
         auto solver = model.build();
-        solver.set_loglevel(verbose ? 1 : 0);
+        solver.set_loglevel(spdlog::get_level() == spdlog::level::trace ? 1 : 0);
         solver.set_timeout(3600);
-        solver.optimize();
+        solver.set_mip_gap(1e-8);
+        auto ret_code = solver.optimize();
+        if(ret_code != 0)
+            throw std::runtime_error(
+                "The thirdparty MIP solver failed with code " +
+                std::to_string(ret_code));
         const auto solver_solution = solver.get_solution();
 
+        spdlog::trace("MIP solution found with value: {}", solver.get_objective_value());
         for(const auto & i : instance.options()) {
             solution[i] =
                 solver_solution[static_cast<std::size_t>(X_vars(i).id())];
         }
+        
 
-        if(verbose) {
-            std::cout << "Solution found with value: with: "
-                      << solver.get_objective_value() << std::endl;
-        }
         return solution;
     }
 };

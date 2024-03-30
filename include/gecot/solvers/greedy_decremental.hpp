@@ -109,13 +109,7 @@ struct GreedyDecremental {
             }
             options.erase(worst_option_it);
             free_options.emplace_back(worst_option);
-
-            if(verbose) {
-                std::cout << "removed option: " << worst_option
-                          << "\n\t ratio: " << options_ratios[worst_option]
-                          << "\n\t costing: " << worst_option_price
-                          << "\n\t purchased: " << purchased << std::endl;
-            }
+            spdlog::trace("remove {:>20} (score_loss: {:.5e}, purchased: {})", instance.option_name(worst_option), options_ratios[worst_option] * worst_option_price, purchased);
         }
 
         if(!only_dec) {
@@ -161,13 +155,8 @@ struct GreedyDecremental {
                         cases_arc_options[instance_case.id()][best_option])
                         current_pm[a] = std::max(current_pm[a], enhanced_prob);
                 }
-                if(verbose) {
-                    std::cout << "add option: " << best_option
-                              << "\n\t ratio: " << options_ratios[best_option]
-                              << "\n\t costing: " << best_option_price
-                              << "\n\t budget left: " << budget_left
-                              << std::endl;
-                }
+                spdlog::trace("add {:>20} (score_gain: {:.5e}, budget_left: {})", instance.option_name(best_option), options_ratios[best_option] * best_option_price, budget_left);
+            
 
                 free_options.erase(best_option_it);
                 const auto [first, last] = std::ranges::remove_if(

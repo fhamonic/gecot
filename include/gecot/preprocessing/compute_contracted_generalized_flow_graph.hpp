@@ -24,25 +24,26 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
         instance_case.vertex_options_map();
 
     melon::mutable_digraph graph;
+
+    // create new vertices
     auto original_to_new_vertex_map =
         melon::create_vertex_map<melon::vertex_t<melon::mutable_digraph>>(
             original_graph);
     for(const auto & v : melon::vertices(original_graph)) {
-        auto new_vertex = graph.create_vertex();
-        original_to_new_vertex_map[v] = new_vertex;
+        original_to_new_vertex_map[v] = graph.create_vertex();
     }
     auto quality_map = melon::create_vertex_map<double>(graph);
     auto vertex_options_map =
         melon::create_vertex_map<std::vector<std::pair<double, option_t>>>(
             graph);
     for(const auto & v : melon::vertices(original_graph)) {
-        quality_map[original_to_new_vertex_map[v]] = original_quality_map[v];
-        vertex_options_map[original_to_new_vertex_map[v]] =
-            original_vertex_options_map[v];
+        auto new_v = original_to_new_vertex_map[v];
+        quality_map[new_v] = original_quality_map[v];
+        vertex_options_map[new_v] = original_vertex_options_map[v];
     }
 
     auto original_to_new_arc_map =
-        melon::create_arc_map<melon::arc_t<melon::mutable_digraph>>(
+        melon::create_arc_map<std::optional<melon::arc_t<melon::mutable_digraph>>>(
             original_graph);
     std::vector<std::tuple<melon::arc_t<melon::mutable_digraph>, double,
                            std::optional<option_t>>>
@@ -53,22 +54,23 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
     auto arc_uselessness_map =
         melon::create_arc_map<bool>(original_graph, false);
     for(const auto & a : useless_arcs) arc_uselessness_map[a] = true;
+    for(const auto & a : strong_arcs) arc_uselessness_map[a] = false;
 
+    // create new arcs
     for(const auto & a : melon::arcs(original_graph)) {
         if(arc_uselessness_map[a]) continue;  // filter the useless arcs
-        auto new_arc_source =
+        auto new_source =
             original_to_new_vertex_map[melon::arc_source(original_graph, a)];
-        auto new_arc_target =
+        auto new_target =
             original_to_new_vertex_map[melon::arc_target(original_graph, a)];
-        auto new_arc = graph.create_arc(new_arc_source, new_arc_target);
-        original_to_new_arc_map[a] = new_arc;
+        auto new_arc = graph.create_arc(new_source, new_target);
+        original_to_new_arc_map[a].emplace(new_arc);
         added_arcs.emplace_back(new_arc, original_probability_map[a],
                                 std::nullopt);
         for(auto && [enhanced_prob, option] :
             instance_case.arc_options_map()[a]) {
-            added_arcs.emplace_back(
-                graph.create_arc(new_arc_source, new_arc_target), enhanced_prob,
-                std::make_optional(option));
+            added_arcs.emplace_back(graph.create_arc(new_source, new_target),
+                                    enhanced_prob, std::make_optional(option));
         }
     }
     auto probability_map = melon::create_arc_map<double>(graph);
@@ -81,9 +83,10 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
     // contract strong arcs
     std::vector<melon::arc_t<melon::mutable_digraph>> in_arcs_tmp;
     for(const auto & original_uv : strong_arcs) {
-        if(!instance_case.arc_options_map()[original_uv].empty()) continue;
-        const auto uv = original_to_new_arc_map[original_uv];
-        if(!graph.is_valid_arc(uv)) continue;
+        if(!instance_case.arc_options_map()[original_uv].empty()) continue; // if the arc can be improved
+        if(!original_to_new_arc_map[original_uv].has_value()) continue; // should not be needed (no useless arcs are strong)
+        const auto uv = original_to_new_arc_map[original_uv].value();
+        if(!graph.is_valid_arc(uv)) continue; // if many strong arcs shared the same source
         const auto u = melon::arc_source(graph, uv);
         const auto v = melon::arc_target(graph, uv);
         const auto uv_prob = probability_map[uv];

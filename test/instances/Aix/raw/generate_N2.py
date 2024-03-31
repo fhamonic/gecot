@@ -29,10 +29,10 @@ stretches_csv = open("test/instances/Aix/N2/stretches.csv", "w")
 vertex_options_csv = open("test/instances/Aix/N2/vertex_options.csv", "w")
 arc_options_csv = open("test/instances/Aix/N2/arc_options.csv", "w")
 
-vertices_csv.write("hexagon_id,quality,x,y\n")
+vertices_csv.write("hex_id,quality,x,y\n")
 arcs_csv.write("arc_id,source_id,target_id,probability\n")
 stretches_csv.write("stretch_id,stretch_cost\n")
-vertex_options_csv.write("hexagon_id,stretch_id,quality_gain\n")
+vertex_options_csv.write("hex_id,stretch_id,quality_gain\n")
 arc_options_csv.write("arc_id,stretch_id,improved_prob\n")
 
 hexagons = {}
@@ -41,7 +41,7 @@ stretches = {}
 for hexagon in hexagons_csv:
     # if hexagon['area2'] != "1": continue
     # if hexagon['area3'] != "1": continue
-    # if hexagon['area4'] != "1": continue
+    if hexagon['area4'] != "1": continue
     hexagon_id = hexagon['N2_id']
     hexagon_cost = int(hexagon['cost_mode'])
     hexagons[hexagon_id] = hexagon_cost

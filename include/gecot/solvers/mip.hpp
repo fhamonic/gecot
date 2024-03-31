@@ -114,9 +114,9 @@ struct MIP {
             const auto [graph, quality_map, vertex_options_map, probability_map,
                         arc_option_map] =
                 compute_generalized_flow_graph(instance_case);
-            const auto big_M_map =
-                compute_big_M_map(graph, quality_map, vertex_options_map,
-                                  probability_map, parallel);
+            const auto big_M_map = compute_big_M_map(
+                graph, quality_map, vertex_options_map, probability_map,
+                melon::vertices(graph), parallel);
 
             const auto F_vars = model.add_variables(
                 graph.nb_vertices(),
@@ -145,7 +145,7 @@ struct MIP {
                     if(print_model)
                         std::cout << 'R' << model.nb_constraints() << '\n';
                     model.add_constraint(F_prime_t_var <=
-                                         big_M_map[t] * X_vars(option));
+                                         big_M_map[t].value() * X_vars(option));
                     F_prime_additional_terms.emplace_back(F_prime_t_var,
                                                           quality_gain);
                 }
@@ -194,7 +194,7 @@ struct MIP {
                         std::cout << 'R' << model.nb_constraints() << '\n';
                     model.add_constraint(
                         Phi_t_vars(a) <=
-                        big_M_map[melon::arc_source(graph, a)] *
+                        big_M_map[melon::arc_source(graph, a)].value() *
                             X_vars(arc_option_map[a].value()));
                 }
             }
@@ -210,16 +210,17 @@ struct MIP {
 
         spdlog::trace("MIP model has:");
         spdlog::trace("  {:>10} variables", model.nb_variables());
-        spdlog::trace("  {:>10} constraints",  model.nb_constraints());
+        spdlog::trace("  {:>10} constraints", model.nb_constraints());
         spdlog::trace("  {:>10} entries", model.nb_entries());
-        
+
         if(print_model) std::cout << "NBLOCKS\n" << nb_blocks << '\n';
         if(print_model) std::cout << model << std::endl;
 
         auto solver = model.build();
-        solver.set_loglevel(spdlog::get_level() == spdlog::level::trace ? 1 : 0);
+        solver.set_loglevel(spdlog::get_level() == spdlog::level::trace ? 1
+                                                                        : 0);
         solver.set_timeout(3600);
-        solver.set_mip_gap(1e-8);
+        solver.set_mip_gap(1e-16);
         auto ret_code = solver.optimize();
         if(ret_code != 0)
             throw std::runtime_error(
@@ -227,7 +228,8 @@ struct MIP {
                 std::to_string(ret_code));
         const auto solver_solution = solver.get_solution();
 
-        spdlog::trace("MIP solution found with value: {}", solver.get_objective_value());
+        spdlog::trace("MIP solution found with value: {}",
+                      solver.get_objective_value());
         for(const auto & i : instance.options()) {
             solution[i] =
                 solver_solution[static_cast<std::size_t>(X_vars(i).id())];

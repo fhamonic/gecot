@@ -10,20 +10,17 @@ namespace fhamonic {
 namespace gecot {
 
 namespace detail {
-template <typename GR, typename PM>
+template <typename GR, typename V>
 struct pc_num_dijkstra_traits {
-    using semiring = melon::most_reliable_path_semiring<
-        melon::mapped_value_t<PM, melon::arc_t<GR>>>;
+    using semiring = melon::most_reliable_path_semiring<V>;
     struct entry_cmp {
         [[nodiscard]] constexpr bool operator()(
             const auto & e1, const auto & e2) const noexcept {
             return semiring::less(e1.second, e2.second);
         }
     };
-    using heap =
-        melon::d_ary_heap<4, melon::vertex_t<GR>,
-                          melon::mapped_value_t<PM, melon::arc_t<GR>>,
-                          entry_cmp, melon::vertex_map_t<GR, std::size_t>>;
+    using heap = melon::d_ary_heap<4, melon::vertex_t<GR>, V, entry_cmp,
+                                   melon::vertex_map_t<GR, std::size_t>>;
 
     static constexpr bool store_paths = false;
     static constexpr bool store_distances = false;
@@ -32,14 +29,15 @@ struct pc_num_dijkstra_traits {
 
 template <typename GR, typename QM, typename PM>
 double pc_num(const GR & graph, const QM & quality_map,
-           const PM & probability_map) {
-    auto algo = melon::dijkstra(detail::pc_num_dijkstra_traits<GR, PM>{}, graph,
+              const PM & probability_map) {
+    using V = melon::mapped_value_t<PM, melon::arc_t<GR>>;
+    auto algo = melon::dijkstra(detail::pc_num_dijkstra_traits<GR, V>{}, graph,
                                 probability_map);
 
-    double pc_num_sum = 0.0;
+    V pc_num_sum = 0.0;
     for(const auto & s : melon::vertices(graph)) {
         if(quality_map[s] == 0) continue;
-        double sum = 0.0;
+        V sum = 0.0;
         algo.reset();
         algo.add_source(s);
         for(const auto & [u, prob] : algo) {
@@ -53,12 +51,13 @@ double pc_num(const GR & graph, const QM & quality_map,
 
 template <typename GR, typename QM, typename PM>
 double pc_num_vertex_contribution(const GR & graph, const QM & quality_map,
-                               const PM & probability_map,
-                               const melon::vertex_t<GR> & t) {
-    auto algo = melon::dijkstra(detail::pc_num_dijkstra_traits<GR, PM>{}, graph,
+                                  const PM & probability_map,
+                                  const melon::vertex_t<GR> & t) {
+    using V = melon::mapped_value_t<PM, melon::arc_t<GR>>;
+    auto algo = melon::dijkstra(detail::pc_num_dijkstra_traits<GR, V>{}, graph,
                                 probability_map);
 
-    double sum = 0.0;
+    V sum = 0.0;
     algo.reset();
     algo.add_source(t);
     for(const auto & [u, prob] : algo) {

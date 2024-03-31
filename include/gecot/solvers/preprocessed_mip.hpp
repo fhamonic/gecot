@@ -31,6 +31,7 @@ namespace solvers {
 struct preprocessed_MIP {
     bool parallel = false;
     bool print_model = false;
+    double probability_resolution;
 
     template <typename M, typename V>
     struct formula_variable_visitor {
@@ -120,6 +121,9 @@ struct preprocessed_MIP {
             std::vector<std::pair<variable<int, double>, double>>
                 F_prime_additional_terms;
 
+            spdlog::stopwatch prep_sw;
+            spdlog::trace("Preprocessing the '{}' graph:",
+                          instance_case.name());
             /*
             const auto [strong_arcs_map, useless_arcs_map] =
                 compute_constrained_strong_and_useless_arcs(
@@ -133,8 +137,32 @@ struct preprocessed_MIP {
                     instance_case, parallel,
                     [&instance, budget](const option_t & o) {
                         return instance.option_cost(o) <= budget;
-                    });
+                    },
+                    probability_resolution);
             //*/
+
+            if(spdlog::get_level() == spdlog::level::trace) {
+                int nb_strong, nb_useless, nb_sinks;
+                nb_strong = nb_useless = nb_sinks = 0;
+                for(auto && v : melon::vertices(original_graph)) {
+                    if(original_quality_map[v] == 0 &&
+                       instance_case.vertex_options_map()[v].empty())
+                        continue;
+                    nb_strong += strong_arcs_map[v].size();
+                    nb_useless += useless_arcs_map[v].size();
+                    ++nb_sinks;
+                }
+                spdlog::trace("  {:>8} strong arcs on average",
+                              nb_strong / nb_sinks);
+                spdlog::trace("  {:>8} useless arcs on average",
+                              nb_useless / nb_sinks);
+                spdlog::trace(
+                    "      took {} ms",
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        prep_sw.elapsed())
+                        .count());
+            }
+
             for(const auto & original_t : melon::vertices(original_graph)) {
                 if(original_quality_map[original_t] == 0 &&
                    instance_case.vertex_options_map()[original_t].empty())
@@ -146,9 +174,19 @@ struct preprocessed_MIP {
                         instance_case, strong_arcs_map[original_t],
                         useless_arcs_map[original_t], original_t);
                 using Graph = std::decay_t<decltype(graph)>;
-                const auto big_M_map =
-                    compute_big_M_map(graph, quality_map, vertex_options_map,
-                                      probability_map, parallel);
+                const auto big_M_map = compute_big_M_map(
+                    graph, quality_map, vertex_options_map, probability_map,
+                    std::views::filter(
+                        melon::vertices(graph),
+                        [&graph, &arc_option_map, t](auto && u) {
+                            return u == t ||
+                                   std::ranges::any_of(
+                                       melon::out_arcs(graph, u),
+                                       [&arc_option_map](auto && a) {
+                                           return arc_option_map[a].has_value();
+                                       });
+                        }),
+                    parallel);
 
                 for(const auto & [quality_gain, option] :
                     original_vertex_options_map[original_t]) {
@@ -158,7 +196,7 @@ struct preprocessed_MIP {
                                            std::to_string(case_id) + ")");
                     model.add_constraint(F_prime_t_var <= F_vars(original_t));
                     model.add_constraint(F_prime_t_var <=
-                                         big_M_map[t] * X_vars(option));
+                                         big_M_map[t].value() * X_vars(option));
                     F_prime_additional_terms.emplace_back(F_prime_t_var,
                                                           quality_gain);
                 }
@@ -202,7 +240,7 @@ struct preprocessed_MIP {
                     model.add_constraint(
                         Phi_t_vars(a) <=
                         X_vars(arc_option_map[a].value()) *
-                            big_M_map[melon::arc_source(graph, a)]);
+                            big_M_map[melon::arc_source(graph, a)].value());
                 }
                 model.add_constraint(
                     C_vars(instance_case.id()) <=
@@ -217,15 +255,16 @@ struct preprocessed_MIP {
 
         spdlog::trace("MIP model has:");
         spdlog::trace("  {:>10} variables", model.nb_variables());
-        spdlog::trace("  {:>10} constraints",  model.nb_constraints());
+        spdlog::trace("  {:>10} constraints", model.nb_constraints());
         spdlog::trace("  {:>10} entries", model.nb_entries());
-        
+
         if(print_model) std::cout << model << std::endl;
 
         auto solver = model.build();
-        solver.set_loglevel(spdlog::get_level() == spdlog::level::trace ? 1 : 0);
+        solver.set_loglevel(spdlog::get_level() == spdlog::level::trace ? 1
+                                                                        : 0);
         solver.set_timeout(3600);
-        solver.set_mip_gap(1e-8);
+        solver.set_mip_gap(1e-16);
         auto ret_code = solver.optimize();
         if(ret_code != 0)
             throw std::runtime_error(
@@ -233,12 +272,12 @@ struct preprocessed_MIP {
                 std::to_string(ret_code));
         const auto solver_solution = solver.get_solution();
 
-        spdlog::trace("MIP solution found with value: {}", solver.get_objective_value());
+        spdlog::trace("MIP solution found with value: {}",
+                      solver.get_objective_value());
         for(const auto & i : instance.options()) {
             solution[i] =
                 solver_solution[static_cast<std::size_t>(X_vars(i).id())];
         }
-        
 
         return solution;
     }

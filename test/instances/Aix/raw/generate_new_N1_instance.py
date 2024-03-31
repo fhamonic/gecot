@@ -31,7 +31,7 @@ for hexagon in hexagons_csv:
     # if hexagon['area1'] != "1": continue
     # if hexagon['area2'] != "1": continue
     # if hexagon['area3'] != "1": continue
-    # if hexagon['area4'] != "1": continue
+    if hexagon['area4'] != "1": continue
     id = hexagon["hex_id"]
     hexagons[id] = hexagon
     hexagons[id]["adj_route"] = int(hexagon["route"])

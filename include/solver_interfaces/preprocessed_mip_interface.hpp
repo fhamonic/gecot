@@ -20,11 +20,16 @@ private:
     std::filesystem::path cbc_default_path;
 
 public:
-    PreprocessedMIPInterface() : desc(name() + " options")
+    PreprocessedMIPInterface()
+        : desc(name() + " options")
         , cbc_default_path(get_exec_path().parent_path() / "cbc") {
-        desc.add_options()(
-            "parallel,p", "Use multithreaded version")("print-model,m",
-                                                       "Print the MIP model")(
+        desc.add_options()("parallel,p", "Use multithreaded version")(
+            "print-model,m", "Print the MIP model")(
+            "resolution",
+            po::value<double>(&solver.probability_resolution)
+                ->default_value(0.00000001),
+            "Sets the resolution of the probabilities used by the "
+            "preprocessing algorithm")(
             "use-cbc",
             "Prioritizes cbc for soplving MIPs\n(default if gurobi_cl and scip "
             "are not found)")("use-grb",
@@ -48,7 +53,7 @@ public:
             "Sets path to scip executable");
     }
 
-   void parse(const std::vector<std::string> & args) {
+    void parse(const std::vector<std::string> & args) {
         boost::program_options::variables_map vm;
         boost::program_options::store(
             boost::program_options::command_line_parser(args)

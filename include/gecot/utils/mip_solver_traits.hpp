@@ -38,14 +38,23 @@ struct mip_solver_traits {
             using traits =
                 typename std::decay_t<decltype(model)>::solver_traits;
 
-            if(traits::prefered_solver.has_value() && traits::prefered_solver.value() == traits::solvers::grb && !mippp::cli_grb_traits::is_available()) {
-                spdlog::warn("Gurboi is prefered but not available at '{}'", mippp::cli_grb_traits::exec_path.string());
+            if(traits::prefered_solver.has_value() &&
+               traits::prefered_solver.value() == traits::solvers::grb &&
+               !mippp::cli_grb_traits::is_available()) {
+                spdlog::warn("Gurboi is prefered but not available at '{}'",
+                             mippp::cli_grb_traits::exec_path.string());
             }
-            if(traits::prefered_solver.has_value() && traits::prefered_solver.value() == traits::solvers::scip && !mippp::cli_scip_traits::is_available() ) {
-                spdlog::warn("SCIP is prefered but not available at '{}'", mippp::cli_scip_traits::exec_path.string());
+            if(traits::prefered_solver.has_value() &&
+               traits::prefered_solver.value() == traits::solvers::scip &&
+               !mippp::cli_scip_traits::is_available()) {
+                spdlog::warn("SCIP is prefered but not available at '{}'",
+                             mippp::cli_scip_traits::exec_path.string());
             }
-            if(traits::prefered_solver.has_value() && traits::prefered_solver.value() == traits::solvers::cbc && !mippp::cli_cbc_traits::is_available()) {
-                spdlog::warn("Cbc is prefered but not available at '{}'", mippp::cli_cbc_traits::exec_path.string());
+            if(traits::prefered_solver.has_value() &&
+               traits::prefered_solver.value() == traits::solvers::cbc &&
+               !mippp::cli_cbc_traits::is_available()) {
+                spdlog::warn("Cbc is prefered but not available at '{}'",
+                             mippp::cli_cbc_traits::exec_path.string());
             }
 
             if(mippp::cli_grb_traits::is_available() &&
@@ -57,8 +66,8 @@ struct mip_solver_traits {
                 spdlog::info("Selected Gurobi as MIP solver");
 
             } else if(traits::prefered_solver.has_value() &&
-                       traits::prefered_solver.value() ==
-                           traits::solvers::scip) {
+                      traits::prefered_solver.value() ==
+                          traits::solvers::scip) {
                 solver =
                     std::make_unique<mippp::cli_scip_traits::solver_wrapper>(
                         model);

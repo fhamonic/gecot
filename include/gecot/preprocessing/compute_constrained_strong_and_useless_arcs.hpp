@@ -5,7 +5,7 @@
 
 #include <tbb/concurrent_vector.h>
 
-#include "melon/algorithm/strong_fiber.hpp"
+#include "melon/algorithm/concurrent_dijkstras.hpp"
 #include "melon/graph.hpp"
 
 #include "gecot/helper.hpp"
@@ -117,7 +117,7 @@ auto compute_constrained_strong_and_useless_arcs(
                 melon::views::subgraph(graph, {}, [&](const arc_t & a) -> bool {
                     return !fiber_map[melon::arc_target(graph, a)] && a != uv;
                 });
-            auto algo = melon::strong_fiber(
+            auto algo = melon::concurrent_dijkstras(
                 detail::useless_arc_default_traits<graph_t, double>{}, sgraph,
                 base_probability_map, base_probability_map);
             for(const auto & a : arcs_block) {
@@ -131,8 +131,8 @@ auto compute_constrained_strong_and_useless_arcs(
                     const double budget_modifier = get_modifier(mu, budget);
                     algo.reset();
                     algo.set_reduced_length_map(mu_length_map);
-                    algo.relax_useless_vertex(u);
-                    algo.relax_strong_vertex(
+                    algo.add_red_source(u);
+                    algo.add_blue_source(
                         v, base_probability_map[uv] * budget_modifier);
                     for(auto && [w, w_prob] : mu_fiber)
                         algo.relax_strong_vertex(w, w_prob * budget_modifier);
@@ -165,7 +165,7 @@ auto compute_constrained_strong_and_useless_arcs(
                 melon::views::subgraph(graph, {}, [&](const arc_t & a) -> bool {
                     return !fiber_map[melon::arc_target(graph, a)] && a != uv;
                 });
-            auto algo = melon::strong_fiber(
+            auto algo = melon::concurrent_dijkstras(
                 detail::useless_arc_default_traits<graph_t, double>{}, sgraph,
                 base_probability_map, base_probability_map);
             for(const auto & a : arcs_block) {
@@ -180,8 +180,8 @@ auto compute_constrained_strong_and_useless_arcs(
                     const double budget_modifier = get_modifier(mu, budget);
                     algo.reset();
                     algo.set_reduced_length_map(mu_length_map);
-                    algo.relax_strong_vertex(u, budget_modifier);
-                    algo.relax_useless_vertex(v, mu_length_map[uv]);
+                    algo.add_blue_source(u, budget_modifier);
+                    algo.add_red_source(v, mu_length_map[uv]);
                     for(auto && [w, w_prob] : mu_fiber)
                         algo.relax_strong_vertex(w, w_prob * budget_modifier);
                     for(const auto & [w, w_prob] : algo) {

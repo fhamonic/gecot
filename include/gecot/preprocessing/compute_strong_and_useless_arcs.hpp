@@ -197,7 +197,6 @@
 // }  // namespace gecot
 // }  // namespace fhamonic
 
-
 namespace fhamonic {
 namespace gecot {
 namespace detail {
@@ -266,14 +265,18 @@ struct path_dijkstra_traits {
 template <case_c C>
 auto compute_strong_and_useless_arcs(
     const C & instance_case, const bool parallel = false,
-    const auto & option_predicate = [](const option_t & o) { return true; }, double probability_resolution = 0.00000001) {
+    const auto & option_predicate = [](const option_t & o) { return true; },
+    double probability_resolution = 0.00000001) {
     using graph_t = case_graph_t<C>;
     using arc_t = melon::arc_t<graph_t>;
+    using log_probability_t = uint64_t;
 
-    auto prob_to_length = [probability_resolution](const double p) -> uint64_t {
+    auto prob_to_length =
+        [probability_resolution](const double p) -> log_probability_t {
         assert(p != 0);
-        return static_cast<uint64_t>(-std::log(std::max(p, probability_resolution)) /
-                                     std::log1p(probability_resolution));
+        return static_cast<log_probability_t>(
+            -std::log(std::max(p, probability_resolution)) /
+            std::log1p(probability_resolution));
     };
 
     const auto & graph = instance_case.graph();
@@ -294,8 +297,8 @@ auto compute_strong_and_useless_arcs(
     auto arcs_range = melon::arcs(graph);
     const auto & base_probability_map = instance_case.arc_probability_map();
 
-    auto base_length_map = melon::create_arc_map<uint64_t>(graph);
-    auto improved_length_map = melon::create_arc_map<uint64_t>(graph);
+    auto base_length_map = melon::create_arc_map<log_probability_t>(graph);
+    auto improved_length_map = melon::create_arc_map<log_probability_t>(graph);
 
     const auto & arc_options_map = instance_case.arc_options_map();
     for(const arc_t & a : arcs_range) {
@@ -308,28 +311,27 @@ auto compute_strong_and_useless_arcs(
         }
     }
 
-    auto compute_strong_arcs =
-        [&](const tbb::blocked_range<decltype(arcs_range.begin())> &
-                arcs_block) {
-            arc_t uv;
-            auto sgraph = melon::views::subgraph(
-                graph, {}, [&uv](const arc_t & a) -> bool { return a != uv; });
-            auto algo = melon::concurrent_dijkstras(
-                detail::useless_arc_default_traits<graph_t, uint64_t>{}, sgraph,
-                base_length_map, improved_length_map);
-            for(const auto & a : arcs_block) {
-                uv = a;
-                auto && u = melon::arc_source(graph, uv);
-                auto && v = melon::arc_target(graph, uv);
-                algo.reset();
-                algo.add_red_source(u);
-                algo.add_blue_source(v, base_length_map[uv]);
-                for(const auto & [w, w_dist] : algo) {
-                    if(useless_vertices_map[w]) continue;
-                    strong_arcs_map[w].push_back(uv);
-                }
+    auto compute_strong_arcs = [&](const tbb::blocked_range<
+                                   decltype(arcs_range.begin())> & arcs_block) {
+        arc_t uv;
+        auto sgraph = melon::views::subgraph(
+            graph, {}, [&uv](const arc_t & a) -> bool { return a != uv; });
+        auto algo = melon::concurrent_dijkstras(
+            detail::useless_arc_default_traits<graph_t, log_probability_t>{},
+            sgraph, base_length_map, improved_length_map);
+        for(const auto & a : arcs_block) {
+            uv = a;
+            auto && u = melon::arc_source(graph, uv);
+            auto && v = melon::arc_target(graph, uv);
+            algo.reset();
+            algo.add_red_source(u);
+            algo.add_blue_source(v, base_length_map[uv]);
+            for(const auto & [w, w_dist] : algo) {
+                if(useless_vertices_map[w]) continue;
+                strong_arcs_map[w].push_back(uv);
             }
-        };
+        }
+    };
     if(parallel) {
         tbb::parallel_for(
             tbb::blocked_range(arcs_range.begin(), arcs_range.end()),
@@ -346,8 +348,9 @@ auto compute_strong_and_useless_arcs(
             auto sgraph = melon::views::subgraph(
                 graph, {}, [&uv](const arc_t & a) -> bool { return a != uv; });
             auto algo = melon::concurrent_dijkstras(
-                detail::useless_arc_default_traits<graph_t, uint64_t>{}, sgraph,
-                base_length_map, improved_length_map);
+                detail::useless_arc_default_traits<graph_t,
+                                                   log_probability_t>{},
+                sgraph, base_length_map, improved_length_map);
             for(const auto & a : arcs_block) {
                 uv = a;
                 auto && u = melon::arc_source(graph, uv);

@@ -130,7 +130,8 @@ struct preprocessed_MIP {
                     instance, instance_case, budget, parallel,
                     [&instance, budget](const option_t & o) {
                         return instance.option_cost(o) <= budget;
-                    });
+                    },
+                    probability_resolution);
             /*/
             const auto [strong_arcs_map, useless_arcs_map] =
                 compute_strong_and_useless_arcs(

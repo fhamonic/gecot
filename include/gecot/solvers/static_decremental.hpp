@@ -64,10 +64,10 @@ struct StaticDecremental {
 
         const double max_score =
             compute_score(instance, cases_current_qm, cases_current_pm);
-        compute_options_cases_decr_pc_num(instance, solution, options,
-                                       cases_current_qm, cases_current_pm,
-                                       cases_vertex_options, cases_arc_options,
-                                       options_cases_pc_num, parallel);
+        compute_options_cases_decr_pc_num(
+            instance, solution, options, cases_current_qm, cases_current_pm,
+            cases_vertex_options, cases_arc_options, options_cases_pc_num,
+            parallel);
 
         auto options_ratios = instance.create_option_map(0.0);
         for(auto && option : options) {
@@ -87,7 +87,10 @@ struct StaticDecremental {
             purchased -= price;
             solution[option] = false;
             free_options.emplace_back(option);
-            spdlog::trace("remove {:>20} (ratio: {:.5e}, purchased: {})", instance.option_name(option), options_ratios[option], purchased);
+            spdlog::trace(
+                "remove {:>20} (ratio:{: #.4e}, purchased:{: #.4e})",
+                instance.option_name(option), options_ratios[option],
+                purchased);
             if(purchased <= budget) break;
         }
 
@@ -131,7 +134,10 @@ struct StaticDecremental {
                 if(purchased + price > budget) continue;
                 purchased += price;
                 solution[option] = true;
-                spdlog::trace("add {:>20} (ratio: {:.5e}, budget_left: {})", instance.option_name(option), options_ratios[option], budget - purchased);
+                spdlog::trace(
+                    "add {:>20} (ratio:{: #.4e}, budget_left:{: #.4e})",
+                    instance.option_name(option), options_ratios[option],
+                    budget - purchased);
             }
         }
 

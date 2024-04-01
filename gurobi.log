@@ -2897,3 +2897,2500 @@ Best objective 1.416630976396e+11, best bound 1.416630976396e+11, gap 0.0000%
 
 Wrote result file '/tmp/mippp/138658641200960/solution.sol'
 
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 18:56:21 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 18:56:21 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/139636203407168/model.lp
+Reading time = 0.22 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x706a3fbb
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 39930 rows and 78350 columns
+Presolve time: 2.08s
+Presolved: 124446 rows, 229217 columns, 636552 nonzeros
+Variable types: 228929 continuous, 288 integer (260 binary)
+Root relaxation presolved: 124419 rows, 229162 columns, 636426 nonzeros
+
+Deterministic concurrent LP optimizer: primal simplex, dual simplex, and barrier
+Showing barrier log only...
+
+Root barrier log...
+
+Ordering time: 0.02s
+
+Barrier statistics:
+ Dense cols : 260
+ AA' NZ     : 3.697e+05
+ Factor NZ  : 3.374e+06 (roughly 170 MB of memory)
+ Factor Ops : 3.430e+08 (less than 1 second per iteration)
+ Threads    : 14
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.60778193e+13  3.35562443e+14  7.85e+06 7.84e+04  3.43e+12     3s
+   1   5.53310764e+13  3.60915267e+14  8.09e+06 4.44e+06  3.24e+12     3s
+   2   5.01249912e+13  4.01764854e+14  7.29e+06 1.43e+06  3.10e+12     3s
+   3   3.09703754e+13  5.48883106e+14  5.03e+06 2.13e+06  2.03e+12     3s
+   4   1.45098666e+13  5.97322398e+14  2.35e+06 6.63e+05  9.54e+11     3s
+   5   7.98304333e+12  6.18329144e+14  1.27e+06 2.23e+05  5.23e+11     3s
+   6   4.70860736e+12  6.23004868e+14  7.21e+05 4.02e+04  3.01e+11     3s
+   7   1.04078580e+12  6.05251648e+14  1.49e+05 1.61e-03  6.42e+10     3s
+
+Barrier performed 7 iterations in 3.28 seconds (4.95 work units)
+Barrier solve interrupted - model solved by another algorithm
+
+Concurrent spin time: 0.04s
+
+Solved with dual simplex
+
+Root relaxation: objective 1.416872e+11, 34259 iterations, 1.07 seconds (1.08 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+H    0     0                    1.415946e+11 1.4169e+11  0.07%     -    3s
+H    0     0                    1.416332e+11 1.4169e+11  0.04%     -    3s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416367e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416621e+11 1.4168e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    4 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    2 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4167e+11    0    6 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+H    0     0                    1.416631e+11 1.4166e+11  0.00%     -    6s
+
+Cutting planes:
+  Cover: 1
+  MIR: 2
+  StrongCG: 1
+  Flow cover: 93
+  GUB cover: 1
+  RLT: 2
+
+Explored 1 nodes (43240 simplex iterations) in 6.45 seconds (8.79 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 7: 1.41663e+11 1.41663e+11 1.41662e+11 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Warning: max constraint violation (4.5586e-05) exceeds tolerance
+Best objective 1.416630976396e+11, best bound 1.416630976396e+11, gap 0.0000%
+
+Wrote result file '/tmp/mippp/139636203407168/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:02:15 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:02:15 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/125510353413952/model.lp
+Reading time = 0.21 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x706a3fbb
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 39930 rows and 78350 columns
+Presolve time: 1.91s
+Presolved: 124446 rows, 229217 columns, 636552 nonzeros
+Variable types: 228929 continuous, 288 integer (260 binary)
+Root relaxation presolved: 124419 rows, 229162 columns, 636426 nonzeros
+
+Deterministic concurrent LP optimizer: primal simplex, dual simplex, and barrier
+Showing barrier log only...
+
+Root barrier log...
+
+Ordering time: 0.02s
+
+Barrier statistics:
+ Dense cols : 260
+ AA' NZ     : 3.697e+05
+ Factor NZ  : 3.374e+06 (roughly 170 MB of memory)
+ Factor Ops : 3.430e+08 (less than 1 second per iteration)
+ Threads    : 14
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.60778193e+13  3.35562443e+14  7.85e+06 7.84e+04  3.43e+12     3s
+   1   5.53310764e+13  3.60915267e+14  8.09e+06 4.44e+06  3.24e+12     3s
+   2   5.01249912e+13  4.01764854e+14  7.29e+06 1.43e+06  3.10e+12     3s
+   3   3.09703754e+13  5.48883106e+14  5.03e+06 2.13e+06  2.03e+12     3s
+   4   1.45098666e+13  5.97322398e+14  2.35e+06 6.63e+05  9.54e+11     3s
+   5   7.98304333e+12  6.18329144e+14  1.27e+06 2.23e+05  5.23e+11     3s
+   6   4.70860736e+12  6.23004868e+14  7.21e+05 4.02e+04  3.01e+11     3s
+
+Barrier performed 6 iterations in 3.09 seconds (4.89 work units)
+Barrier solve interrupted - model solved by another algorithm
+
+Concurrent spin time: 0.04s
+
+Solved with dual simplex
+
+Root relaxation: objective 1.416872e+11, 34259 iterations, 1.05 seconds (1.08 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+H    0     0                    1.415946e+11 1.4169e+11  0.07%     -    3s
+H    0     0                    1.416332e+11 1.4169e+11  0.04%     -    3s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416367e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416621e+11 1.4168e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    4 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    2 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    6 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+H    0     0                    1.416631e+11 1.4166e+11  0.00%     -    6s
+
+Cutting planes:
+  Cover: 1
+  MIR: 2
+  StrongCG: 1
+  Flow cover: 93
+  GUB cover: 1
+  RLT: 2
+
+Explored 1 nodes (43240 simplex iterations) in 6.19 seconds (8.79 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 7: 1.41663e+11 1.41663e+11 1.41662e+11 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Warning: max constraint violation (4.5586e-05) exceeds tolerance
+Best objective 1.416630976396e+11, best bound 1.416630976396e+11, gap 0.0000%
+
+Wrote result file '/tmp/mippp/125510353413952/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:03:36 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:03:36 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/135961546155840/model.lp
+Reading time = 0.22 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x706a3fbb
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 36736 rows and 73667 columns
+Presolve time: 0.62s
+
+Explored 0 nodes (0 simplex iterations) in 0.66 seconds (1.62 work units)
+Thread count was 1 (of 32 available processors)
+
+Solution count 1: -0 
+No other solutions better than 0
+
+Solve interrupted
+Best objective -0.000000000000e+00, best bound -, gap -
+
+Wrote result file '/tmp/mippp/135961546155840/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:04:55 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:04:55 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/139979802576704/model.lp
+Reading time = 0.21 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x706a3fbb
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 39930 rows and 78350 columns
+Presolve time: 1.95s
+Presolved: 124446 rows, 229217 columns, 636552 nonzeros
+Variable types: 228929 continuous, 288 integer (260 binary)
+Root relaxation presolved: 124419 rows, 229162 columns, 636426 nonzeros
+
+Deterministic concurrent LP optimizer: primal simplex, dual simplex, and barrier
+Showing barrier log only...
+
+Root barrier log...
+
+Ordering time: 0.02s
+
+Barrier statistics:
+ Dense cols : 260
+ AA' NZ     : 3.697e+05
+ Factor NZ  : 3.374e+06 (roughly 170 MB of memory)
+ Factor Ops : 3.430e+08 (less than 1 second per iteration)
+ Threads    : 14
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.60778193e+13  3.35562443e+14  7.85e+06 7.84e+04  3.43e+12     3s
+   1   5.53310764e+13  3.60915267e+14  8.09e+06 4.44e+06  3.24e+12     3s
+   2   5.01249912e+13  4.01764854e+14  7.29e+06 1.43e+06  3.10e+12     3s
+   3   3.09703754e+13  5.48883106e+14  5.03e+06 2.13e+06  2.03e+12     3s
+   4   1.45098666e+13  5.97322398e+14  2.35e+06 6.63e+05  9.54e+11     3s
+   5   7.98304333e+12  6.18329144e+14  1.27e+06 2.23e+05  5.23e+11     3s
+   6   4.70860736e+12  6.23004868e+14  7.21e+05 4.02e+04  3.01e+11     3s
+   7   1.04078580e+12  6.05251648e+14  1.49e+05 1.61e-03  6.42e+10     3s
+
+Barrier performed 7 iterations in 3.11 seconds (4.95 work units)
+Barrier solve interrupted - model solved by another algorithm
+
+Concurrent spin time: 0.01s
+
+Solved with dual simplex
+
+Root relaxation: objective 1.416872e+11, 34259 iterations, 1.04 seconds (1.08 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+H    0     0                    1.415946e+11 1.4169e+11  0.07%     -    3s
+H    0     0                    1.416332e+11 1.4169e+11  0.04%     -    3s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416367e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416621e+11 1.4168e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    4 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    2 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    6 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+H    0     0                    1.416631e+11 1.4166e+11  0.00%     -    6s
+
+Cutting planes:
+  Cover: 1
+  MIR: 2
+  StrongCG: 1
+  Flow cover: 93
+  GUB cover: 1
+  RLT: 2
+
+Explored 1 nodes (43240 simplex iterations) in 6.17 seconds (8.79 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 7: 1.41663e+11 1.41663e+11 1.41662e+11 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Warning: max constraint violation (4.5586e-05) exceeds tolerance
+Best objective 1.416630976396e+11, best bound 1.416630976396e+11, gap 0.0000%
+
+Wrote result file '/tmp/mippp/139979802576704/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:06:04 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:06:05 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/123525858850624/model.lp
+Reading time = 0.22 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x706a3fbb
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 39930 rows and 78350 columns
+Presolve time: 1.99s
+Presolved: 124446 rows, 229217 columns, 636552 nonzeros
+Variable types: 228929 continuous, 288 integer (260 binary)
+Root relaxation presolved: 124419 rows, 229162 columns, 636426 nonzeros
+
+Deterministic concurrent LP optimizer: primal simplex, dual simplex, and barrier
+Showing barrier log only...
+
+Root barrier log...
+
+Ordering time: 0.02s
+
+Barrier statistics:
+ Dense cols : 260
+ AA' NZ     : 3.697e+05
+ Factor NZ  : 3.374e+06 (roughly 170 MB of memory)
+ Factor Ops : 3.430e+08 (less than 1 second per iteration)
+ Threads    : 14
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.60778193e+13  3.35562443e+14  7.85e+06 7.84e+04  3.43e+12     3s
+   1   5.53310764e+13  3.60915267e+14  8.09e+06 4.44e+06  3.24e+12     3s
+   2   5.01249912e+13  4.01764854e+14  7.29e+06 1.43e+06  3.10e+12     3s
+   3   3.09703754e+13  5.48883106e+14  5.03e+06 2.13e+06  2.03e+12     3s
+   4   1.45098666e+13  5.97322398e+14  2.35e+06 6.63e+05  9.54e+11     3s
+   5   7.98304333e+12  6.18329144e+14  1.27e+06 2.23e+05  5.23e+11     3s
+   6   4.70860736e+12  6.23004868e+14  7.21e+05 4.02e+04  3.01e+11     3s
+   7   1.04078580e+12  6.05251648e+14  1.49e+05 1.61e-03  6.42e+10     3s
+   8   7.30970180e+11  5.30391633e+14  1.01e+05 6.50e-03  4.33e+10     3s
+
+Barrier performed 8 iterations in 3.20 seconds (5.01 work units)
+Barrier solve interrupted - model solved by another algorithm
+
+Concurrent spin time: 0.03s
+
+Solved with dual simplex
+
+Root relaxation: objective 1.416872e+11, 34259 iterations, 1.09 seconds (1.08 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+H    0     0                    1.415946e+11 1.4169e+11  0.07%     -    3s
+H    0     0                    1.416332e+11 1.4169e+11  0.04%     -    3s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416367e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416621e+11 1.4168e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    4 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    2 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4167e+11    0    6 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+H    0     0                    1.416631e+11 1.4166e+11  0.00%     -    6s
+
+Cutting planes:
+  Cover: 1
+  MIR: 2
+  StrongCG: 1
+  Flow cover: 93
+  GUB cover: 1
+  RLT: 2
+
+Explored 1 nodes (43240 simplex iterations) in 6.42 seconds (8.79 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 7: 1.41663e+11 1.41663e+11 1.41662e+11 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Warning: max constraint violation (4.5586e-05) exceeds tolerance
+Best objective 1.416630976396e+11, best bound 1.416630976396e+11, gap 0.0000%
+
+Wrote result file '/tmp/mippp/123525858850624/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:06:56 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:06:56 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/131900220311360/model.lp
+Reading time = 0.22 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x706a3fbb
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 39930 rows and 78350 columns
+Presolve time: 1.89s
+Presolved: 124446 rows, 229217 columns, 636552 nonzeros
+Variable types: 228929 continuous, 288 integer (260 binary)
+Root relaxation presolved: 124419 rows, 229162 columns, 636426 nonzeros
+
+Deterministic concurrent LP optimizer: primal simplex, dual simplex, and barrier
+Showing barrier log only...
+
+Root barrier log...
+
+Ordering time: 0.02s
+
+Barrier statistics:
+ Dense cols : 260
+ AA' NZ     : 3.697e+05
+ Factor NZ  : 3.374e+06 (roughly 170 MB of memory)
+ Factor Ops : 3.430e+08 (less than 1 second per iteration)
+ Threads    : 14
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.60778193e+13  3.35562443e+14  7.85e+06 7.84e+04  3.43e+12     3s
+   1   5.53310764e+13  3.60915267e+14  8.09e+06 4.44e+06  3.24e+12     3s
+   2   5.01249912e+13  4.01764854e+14  7.29e+06 1.43e+06  3.10e+12     3s
+   3   3.09703754e+13  5.48883106e+14  5.03e+06 2.13e+06  2.03e+12     3s
+   4   1.45098666e+13  5.97322398e+14  2.35e+06 6.63e+05  9.54e+11     3s
+   5   7.98304333e+12  6.18329144e+14  1.27e+06 2.23e+05  5.23e+11     3s
+   6   4.70860736e+12  6.23004868e+14  7.21e+05 4.02e+04  3.01e+11     3s
+   7   1.04078580e+12  6.05251648e+14  1.49e+05 1.61e-03  6.42e+10     3s
+
+Barrier performed 7 iterations in 3.07 seconds (4.95 work units)
+Barrier solve interrupted - model solved by another algorithm
+
+Concurrent spin time: 0.05s
+
+Solved with dual simplex
+
+Root relaxation: objective 1.416872e+11, 34259 iterations, 1.07 seconds (1.08 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+H    0     0                    1.415946e+11 1.4169e+11  0.07%     -    3s
+H    0     0                    1.416332e+11 1.4169e+11  0.04%     -    3s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416367e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416621e+11 1.4168e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    4 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    2 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    6 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+H    0     0                    1.416631e+11 1.4166e+11  0.00%     -    6s
+
+Cutting planes:
+  Cover: 1
+  MIR: 2
+  StrongCG: 1
+  Flow cover: 93
+  GUB cover: 1
+  RLT: 2
+
+Explored 1 nodes (43240 simplex iterations) in 6.22 seconds (8.79 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 7: 1.41663e+11 1.41663e+11 1.41662e+11 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Warning: max constraint violation (4.5586e-05) exceeds tolerance
+Best objective 1.416630976396e+11, best bound 1.416630976396e+11, gap 0.0000%
+
+Wrote result file '/tmp/mippp/131900220311360/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:07:42 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:07:43 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/136164256241472/model.lp
+Reading time = 0.22 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x706a3fbb
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 39930 rows and 78350 columns
+Presolve time: 2.06s
+Presolved: 124446 rows, 229217 columns, 636552 nonzeros
+Variable types: 228929 continuous, 288 integer (260 binary)
+Root relaxation presolved: 124419 rows, 229162 columns, 636426 nonzeros
+
+Deterministic concurrent LP optimizer: primal simplex, dual simplex, and barrier
+Showing barrier log only...
+
+Root barrier log...
+
+Ordering time: 0.02s
+
+Barrier statistics:
+ Dense cols : 260
+ AA' NZ     : 3.697e+05
+ Factor NZ  : 3.374e+06 (roughly 170 MB of memory)
+ Factor Ops : 3.430e+08 (less than 1 second per iteration)
+ Threads    : 14
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.60778193e+13  3.35562443e+14  7.85e+06 7.84e+04  3.43e+12     3s
+   1   5.53310764e+13  3.60915267e+14  8.09e+06 4.44e+06  3.24e+12     3s
+   2   5.01249912e+13  4.01764854e+14  7.29e+06 1.43e+06  3.10e+12     3s
+   3   3.09703754e+13  5.48883106e+14  5.03e+06 2.13e+06  2.03e+12     3s
+   4   1.45098666e+13  5.97322398e+14  2.35e+06 6.63e+05  9.54e+11     3s
+   5   7.98304333e+12  6.18329144e+14  1.27e+06 2.23e+05  5.23e+11     3s
+   6   4.70860736e+12  6.23004868e+14  7.21e+05 4.02e+04  3.01e+11     3s
+
+Barrier performed 6 iterations in 3.25 seconds (4.89 work units)
+Barrier solve interrupted - model solved by another algorithm
+
+Concurrent spin time: 0.03s
+
+Solved with dual simplex
+
+Root relaxation: objective 1.416872e+11, 34259 iterations, 1.07 seconds (1.08 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+H    0     0                    1.415946e+11 1.4169e+11  0.07%     -    3s
+H    0     0                    1.416332e+11 1.4169e+11  0.04%     -    3s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416367e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416621e+11 1.4168e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    4 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    2 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4167e+11    0    6 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+H    0     0                    1.416631e+11 1.4166e+11  0.00%     -    6s
+
+Cutting planes:
+  Cover: 1
+  MIR: 2
+  StrongCG: 1
+  Flow cover: 93
+  GUB cover: 1
+  RLT: 2
+
+Explored 1 nodes (43240 simplex iterations) in 6.46 seconds (8.79 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 7: 1.41663e+11 1.41663e+11 1.41662e+11 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Warning: max constraint violation (4.5586e-05) exceeds tolerance
+Best objective 1.416630976396e+11, best bound 1.416630976396e+11, gap 0.0000%
+
+Wrote result file '/tmp/mippp/136164256241472/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:16:11 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:16:11 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/135868833302336/model.lp
+Reading time = 0.21 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x706a3fbb
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 39930 rows and 78350 columns
+Presolve time: 1.92s
+Presolved: 124446 rows, 229217 columns, 636552 nonzeros
+Variable types: 228929 continuous, 288 integer (260 binary)
+Root relaxation presolved: 124419 rows, 229162 columns, 636426 nonzeros
+
+Deterministic concurrent LP optimizer: primal simplex, dual simplex, and barrier
+Showing barrier log only...
+
+Root barrier log...
+
+Ordering time: 0.02s
+
+Barrier statistics:
+ Dense cols : 260
+ AA' NZ     : 3.697e+05
+ Factor NZ  : 3.374e+06 (roughly 170 MB of memory)
+ Factor Ops : 3.430e+08 (less than 1 second per iteration)
+ Threads    : 14
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.60778193e+13  3.35562443e+14  7.85e+06 7.84e+04  3.43e+12     3s
+   1   5.53310764e+13  3.60915267e+14  8.09e+06 4.44e+06  3.24e+12     3s
+   2   5.01249912e+13  4.01764854e+14  7.29e+06 1.43e+06  3.10e+12     3s
+   3   3.09703754e+13  5.48883106e+14  5.03e+06 2.13e+06  2.03e+12     3s
+   4   1.45098666e+13  5.97322398e+14  2.35e+06 6.63e+05  9.54e+11     3s
+   5   7.98304333e+12  6.18329144e+14  1.27e+06 2.23e+05  5.23e+11     3s
+   6   4.70860736e+12  6.23004868e+14  7.21e+05 4.02e+04  3.01e+11     3s
+   7   1.04078580e+12  6.05251648e+14  1.49e+05 1.61e-03  6.42e+10     3s
+
+Barrier performed 7 iterations in 3.08 seconds (4.96 work units)
+Barrier solve interrupted - model solved by another algorithm
+
+Concurrent spin time: 0.02s
+
+Solved with dual simplex
+
+Root relaxation: objective 1.416872e+11, 34259 iterations, 1.03 seconds (1.08 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+H    0     0                    1.415946e+11 1.4169e+11  0.07%     -    3s
+H    0     0                    1.416332e+11 1.4169e+11  0.04%     -    3s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416367e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416621e+11 1.4168e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    4 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    2 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    6 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+H    0     0                    1.416631e+11 1.4166e+11  0.00%     -    6s
+
+Cutting planes:
+  Cover: 1
+  MIR: 2
+  StrongCG: 1
+  Flow cover: 93
+  GUB cover: 1
+  RLT: 2
+
+Explored 1 nodes (43240 simplex iterations) in 6.15 seconds (8.79 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 7: 1.41663e+11 1.41663e+11 1.41662e+11 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Warning: max constraint violation (4.5586e-05) exceeds tolerance
+Best objective 1.416630976396e+11, best bound 1.416630976396e+11, gap 0.0000%
+
+Wrote result file '/tmp/mippp/135868833302336/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:20:06 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:20:06 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/140177048041280/model.lp
+Reading time = 0.22 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x706a3fbb
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 39930 rows and 78350 columns
+Presolve time: 1.90s
+Presolved: 124446 rows, 229217 columns, 636552 nonzeros
+Variable types: 228929 continuous, 288 integer (260 binary)
+Root relaxation presolved: 124419 rows, 229162 columns, 636426 nonzeros
+
+Deterministic concurrent LP optimizer: primal simplex, dual simplex, and barrier
+Showing barrier log only...
+
+Root barrier log...
+
+Ordering time: 0.02s
+
+Barrier statistics:
+ Dense cols : 260
+ AA' NZ     : 3.697e+05
+ Factor NZ  : 3.374e+06 (roughly 170 MB of memory)
+ Factor Ops : 3.430e+08 (less than 1 second per iteration)
+ Threads    : 14
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.60778193e+13  3.35562443e+14  7.85e+06 7.84e+04  3.43e+12     3s
+   1   5.53310764e+13  3.60915267e+14  8.09e+06 4.44e+06  3.24e+12     3s
+   2   5.01249912e+13  4.01764854e+14  7.29e+06 1.43e+06  3.10e+12     3s
+   3   3.09703754e+13  5.48883106e+14  5.03e+06 2.13e+06  2.03e+12     3s
+   4   1.45098666e+13  5.97322398e+14  2.35e+06 6.63e+05  9.54e+11     3s
+   5   7.98304333e+12  6.18329144e+14  1.27e+06 2.23e+05  5.23e+11     3s
+   6   4.70860736e+12  6.23004868e+14  7.21e+05 4.02e+04  3.01e+11     3s
+   7   1.04078580e+12  6.05251648e+14  1.49e+05 1.61e-03  6.42e+10     3s
+
+Barrier performed 7 iterations in 3.11 seconds (4.95 work units)
+Barrier solve interrupted - model solved by another algorithm
+
+Concurrent spin time: 0.02s
+
+Solved with dual simplex
+
+Root relaxation: objective 1.416872e+11, 34259 iterations, 1.08 seconds (1.08 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+H    0     0                    1.415946e+11 1.4169e+11  0.07%     -    3s
+H    0     0                    1.416332e+11 1.4169e+11  0.04%     -    3s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416367e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416621e+11 1.4168e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    4 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    2 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    6 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+H    0     0                    1.416631e+11 1.4166e+11  0.00%     -    6s
+
+Cutting planes:
+  Cover: 1
+  MIR: 2
+  StrongCG: 1
+  Flow cover: 93
+  GUB cover: 1
+  RLT: 2
+
+Explored 1 nodes (43240 simplex iterations) in 6.19 seconds (8.79 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 7: 1.41663e+11 1.41663e+11 1.41662e+11 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Warning: max constraint violation (4.5586e-05) exceeds tolerance
+Best objective 1.416630976396e+11, best bound 1.416630976396e+11, gap 0.0000%
+
+Wrote result file '/tmp/mippp/140177048041280/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:21:02 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:21:02 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/125211689469760/model.lp
+Reading time = 0.21 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x706a3fbb
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 39930 rows and 78350 columns
+Presolve time: 1.96s
+Presolved: 124446 rows, 229217 columns, 636552 nonzeros
+Variable types: 228929 continuous, 288 integer (260 binary)
+Root relaxation presolved: 124419 rows, 229162 columns, 636426 nonzeros
+
+Deterministic concurrent LP optimizer: primal simplex, dual simplex, and barrier
+Showing barrier log only...
+
+Root barrier log...
+
+Ordering time: 0.02s
+
+Barrier statistics:
+ Dense cols : 260
+ AA' NZ     : 3.697e+05
+ Factor NZ  : 3.374e+06 (roughly 170 MB of memory)
+ Factor Ops : 3.430e+08 (less than 1 second per iteration)
+ Threads    : 14
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.60778193e+13  3.35562443e+14  7.85e+06 7.84e+04  3.43e+12     3s
+   1   5.53310764e+13  3.60915267e+14  8.09e+06 4.44e+06  3.24e+12     3s
+   2   5.01249912e+13  4.01764854e+14  7.29e+06 1.43e+06  3.10e+12     3s
+   3   3.09703754e+13  5.48883106e+14  5.03e+06 2.13e+06  2.03e+12     3s
+   4   1.45098666e+13  5.97322398e+14  2.35e+06 6.63e+05  9.54e+11     3s
+   5   7.98304333e+12  6.18329144e+14  1.27e+06 2.23e+05  5.23e+11     3s
+   6   4.70860736e+12  6.23004868e+14  7.21e+05 4.02e+04  3.01e+11     3s
+
+Barrier performed 6 iterations in 3.12 seconds (4.89 work units)
+Barrier solve interrupted - model solved by another algorithm
+
+Concurrent spin time: 0.02s
+
+Solved with dual simplex
+
+Root relaxation: objective 1.416872e+11, 34259 iterations, 1.05 seconds (1.08 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+H    0     0                    1.415946e+11 1.4169e+11  0.07%     -    3s
+H    0     0                    1.416332e+11 1.4169e+11  0.04%     -    3s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416367e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416621e+11 1.4168e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    4 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    2 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    6 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+H    0     0                    1.416631e+11 1.4166e+11  0.00%     -    6s
+
+Cutting planes:
+  Cover: 1
+  MIR: 2
+  StrongCG: 1
+  Flow cover: 93
+  GUB cover: 1
+  RLT: 2
+
+Explored 1 nodes (43240 simplex iterations) in 6.22 seconds (8.79 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 7: 1.41663e+11 1.41663e+11 1.41662e+11 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Warning: max constraint violation (4.5586e-05) exceeds tolerance
+Best objective 1.416630976396e+11, best bound 1.416630976396e+11, gap 0.0000%
+
+Wrote result file '/tmp/mippp/125211689469760/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:22:09 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:22:09 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/137933544851264/model.lp
+Reading time = 0.21 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x706a3fbb
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 39930 rows and 78350 columns
+Presolve time: 2.00s
+Presolved: 124446 rows, 229217 columns, 636552 nonzeros
+Variable types: 228929 continuous, 288 integer (260 binary)
+Root relaxation presolved: 124419 rows, 229162 columns, 636426 nonzeros
+
+Deterministic concurrent LP optimizer: primal simplex, dual simplex, and barrier
+Showing barrier log only...
+
+Root barrier log...
+
+Ordering time: 0.02s
+
+Barrier statistics:
+ Dense cols : 260
+ AA' NZ     : 3.697e+05
+ Factor NZ  : 3.374e+06 (roughly 170 MB of memory)
+ Factor Ops : 3.430e+08 (less than 1 second per iteration)
+ Threads    : 14
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.60778193e+13  3.35562443e+14  7.85e+06 7.84e+04  3.43e+12     3s
+   1   5.53310764e+13  3.60915267e+14  8.09e+06 4.44e+06  3.24e+12     3s
+   2   5.01249912e+13  4.01764854e+14  7.29e+06 1.43e+06  3.10e+12     3s
+   3   3.09703754e+13  5.48883106e+14  5.03e+06 2.13e+06  2.03e+12     3s
+   4   1.45098666e+13  5.97322398e+14  2.35e+06 6.63e+05  9.54e+11     3s
+   5   7.98304333e+12  6.18329144e+14  1.27e+06 2.23e+05  5.23e+11     3s
+   6   4.70860736e+12  6.23004868e+14  7.21e+05 4.02e+04  3.01e+11     3s
+
+Barrier performed 6 iterations in 3.16 seconds (4.89 work units)
+Barrier solve interrupted - model solved by another algorithm
+
+Concurrent spin time: 0.03s
+
+Solved with dual simplex
+
+Root relaxation: objective 1.416872e+11, 34259 iterations, 1.04 seconds (1.08 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+H    0     0                    1.415946e+11 1.4169e+11  0.07%     -    3s
+H    0     0                    1.416332e+11 1.4169e+11  0.04%     -    3s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416367e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416621e+11 1.4168e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    4 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    2 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    6 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+H    0     0                    1.416631e+11 1.4166e+11  0.00%     -    6s
+
+Cutting planes:
+  Cover: 1
+  MIR: 2
+  StrongCG: 1
+  Flow cover: 93
+  GUB cover: 1
+  RLT: 2
+
+Explored 1 nodes (43240 simplex iterations) in 6.28 seconds (8.79 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 7: 1.41663e+11 1.41663e+11 1.41662e+11 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Warning: max constraint violation (4.5586e-05) exceeds tolerance
+Best objective 1.416630976396e+11, best bound 1.416630976396e+11, gap 0.0000%
+
+Wrote result file '/tmp/mippp/137933544851264/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:25:22 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:25:22 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/134411702937408/model.lp
+Reading time = 0.21 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x706a3fbb
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 39930 rows and 78350 columns
+Presolve time: 1.98s
+Presolved: 124446 rows, 229217 columns, 636552 nonzeros
+Variable types: 228929 continuous, 288 integer (260 binary)
+Root relaxation presolved: 124419 rows, 229162 columns, 636426 nonzeros
+
+Deterministic concurrent LP optimizer: primal simplex, dual simplex, and barrier
+Showing barrier log only...
+
+Root barrier log...
+
+Ordering time: 0.02s
+
+Barrier statistics:
+ Dense cols : 260
+ AA' NZ     : 3.697e+05
+ Factor NZ  : 3.374e+06 (roughly 170 MB of memory)
+ Factor Ops : 3.430e+08 (less than 1 second per iteration)
+ Threads    : 14
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.60778193e+13  3.35562443e+14  7.85e+06 7.84e+04  3.43e+12     3s
+   1   5.53310764e+13  3.60915267e+14  8.09e+06 4.44e+06  3.24e+12     3s
+   2   5.01249912e+13  4.01764854e+14  7.29e+06 1.43e+06  3.10e+12     3s
+   3   3.09703754e+13  5.48883106e+14  5.03e+06 2.13e+06  2.03e+12     3s
+   4   1.45098666e+13  5.97322398e+14  2.35e+06 6.63e+05  9.54e+11     3s
+   5   7.98304333e+12  6.18329144e+14  1.27e+06 2.23e+05  5.23e+11     3s
+   6   4.70860736e+12  6.23004868e+14  7.21e+05 4.02e+04  3.01e+11     3s
+   7   1.04078580e+12  6.05251648e+14  1.49e+05 1.61e-03  6.42e+10     3s
+   8   7.30970180e+11  5.30391633e+14  1.01e+05 6.50e-03  4.33e+10     3s
+
+Barrier performed 8 iterations in 3.18 seconds (5.01 work units)
+Barrier solve interrupted - model solved by another algorithm
+
+Concurrent spin time: 0.02s
+
+Solved with dual simplex
+
+Root relaxation: objective 1.416872e+11, 34259 iterations, 1.07 seconds (1.08 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+H    0     0                    1.415946e+11 1.4169e+11  0.07%     -    3s
+H    0     0                    1.416332e+11 1.4169e+11  0.04%     -    3s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416367e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416621e+11 1.4168e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    4 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    2 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    6 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+H    0     0                    1.416631e+11 1.4166e+11  0.00%     -    6s
+
+Cutting planes:
+  Cover: 1
+  MIR: 2
+  StrongCG: 1
+  Flow cover: 93
+  GUB cover: 1
+  RLT: 2
+
+Explored 1 nodes (43240 simplex iterations) in 6.24 seconds (8.79 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 7: 1.41663e+11 1.41663e+11 1.41662e+11 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Warning: max constraint violation (4.5586e-05) exceeds tolerance
+Best objective 1.416630976396e+11, best bound 1.416630976396e+11, gap 0.0000%
+
+Wrote result file '/tmp/mippp/134411702937408/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:27:12 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:27:13 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/131522049001280/model.lp
+Reading time = 0.22 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x706a3fbb
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 39930 rows and 78350 columns
+Presolve time: 2.07s
+Presolved: 124446 rows, 229217 columns, 636552 nonzeros
+Variable types: 228929 continuous, 288 integer (260 binary)
+Root relaxation presolved: 124419 rows, 229162 columns, 636426 nonzeros
+
+Deterministic concurrent LP optimizer: primal simplex, dual simplex, and barrier
+Showing barrier log only...
+
+Root barrier log...
+
+Ordering time: 0.02s
+
+Barrier statistics:
+ Dense cols : 260
+ AA' NZ     : 3.697e+05
+ Factor NZ  : 3.374e+06 (roughly 170 MB of memory)
+ Factor Ops : 3.430e+08 (less than 1 second per iteration)
+ Threads    : 14
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.60778193e+13  3.35562443e+14  7.85e+06 7.84e+04  3.43e+12     3s
+   1   5.53310764e+13  3.60915267e+14  8.09e+06 4.44e+06  3.24e+12     3s
+   2   5.01249912e+13  4.01764854e+14  7.29e+06 1.43e+06  3.10e+12     3s
+   3   3.09703754e+13  5.48883106e+14  5.03e+06 2.13e+06  2.03e+12     3s
+   4   1.45098666e+13  5.97322398e+14  2.35e+06 6.63e+05  9.54e+11     3s
+   5   7.98304333e+12  6.18329144e+14  1.27e+06 2.23e+05  5.23e+11     3s
+   6   4.70860736e+12  6.23004868e+14  7.21e+05 4.02e+04  3.01e+11     3s
+   7   1.04078580e+12  6.05251648e+14  1.49e+05 1.61e-03  6.42e+10     3s
+
+Barrier performed 7 iterations in 3.32 seconds (4.95 work units)
+Barrier solve interrupted - model solved by another algorithm
+
+Concurrent spin time: 0.04s
+
+Solved with dual simplex
+
+Root relaxation: objective 1.416872e+11, 34259 iterations, 1.11 seconds (1.08 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+H    0     0                    1.415946e+11 1.4169e+11  0.07%     -    3s
+H    0     0                    1.416332e+11 1.4169e+11  0.04%     -    3s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416367e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416621e+11 1.4168e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    4 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    2 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4167e+11    0    6 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+H    0     0                    1.416631e+11 1.4166e+11  0.00%     -    6s
+
+Cutting planes:
+  Cover: 1
+  MIR: 2
+  StrongCG: 1
+  Flow cover: 93
+  GUB cover: 1
+  RLT: 2
+
+Explored 1 nodes (43240 simplex iterations) in 6.46 seconds (8.79 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 7: 1.41663e+11 1.41663e+11 1.41662e+11 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Warning: max constraint violation (4.5586e-05) exceeds tolerance
+Best objective 1.416630976396e+11, best bound 1.416630976396e+11, gap 0.0000%
+
+Wrote result file '/tmp/mippp/131522049001280/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:29:04 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:29:04 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/126135741417280/model.lp
+Reading time = 0.22 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x706a3fbb
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 39930 rows and 78350 columns
+Presolve time: 1.94s
+Presolved: 124446 rows, 229217 columns, 636552 nonzeros
+Variable types: 228929 continuous, 288 integer (260 binary)
+Root relaxation presolved: 124419 rows, 229162 columns, 636426 nonzeros
+
+Deterministic concurrent LP optimizer: primal simplex, dual simplex, and barrier
+Showing barrier log only...
+
+Root barrier log...
+
+Ordering time: 0.02s
+
+Barrier statistics:
+ Dense cols : 260
+ AA' NZ     : 3.697e+05
+ Factor NZ  : 3.374e+06 (roughly 170 MB of memory)
+ Factor Ops : 3.430e+08 (less than 1 second per iteration)
+ Threads    : 14
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.60778193e+13  3.35562443e+14  7.85e+06 7.84e+04  3.43e+12     3s
+   1   5.53310764e+13  3.60915267e+14  8.09e+06 4.44e+06  3.24e+12     3s
+   2   5.01249912e+13  4.01764854e+14  7.29e+06 1.43e+06  3.10e+12     3s
+   3   3.09703754e+13  5.48883106e+14  5.03e+06 2.13e+06  2.03e+12     3s
+   4   1.45098666e+13  5.97322398e+14  2.35e+06 6.63e+05  9.54e+11     3s
+   5   7.98304333e+12  6.18329144e+14  1.27e+06 2.23e+05  5.23e+11     3s
+   6   4.70860736e+12  6.23004868e+14  7.21e+05 4.02e+04  3.01e+11     3s
+   7   1.04078580e+12  6.05251648e+14  1.49e+05 1.61e-03  6.42e+10     3s
+
+Barrier performed 7 iterations in 3.14 seconds (4.96 work units)
+Barrier solve interrupted - model solved by another algorithm
+
+Concurrent spin time: 0.01s
+
+Solved with dual simplex
+
+Root relaxation: objective 1.416872e+11, 34259 iterations, 1.07 seconds (1.08 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+H    0     0                    1.415946e+11 1.4169e+11  0.07%     -    3s
+H    0     0                    1.416332e+11 1.4169e+11  0.04%     -    3s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416367e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416621e+11 1.4168e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    4 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    2 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    6 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+H    0     0                    1.416631e+11 1.4166e+11  0.00%     -    6s
+
+Cutting planes:
+  Cover: 1
+  MIR: 2
+  StrongCG: 1
+  Flow cover: 93
+  GUB cover: 1
+  RLT: 2
+
+Explored 1 nodes (43240 simplex iterations) in 6.30 seconds (8.79 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 7: 1.41663e+11 1.41663e+11 1.41662e+11 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Warning: max constraint violation (4.5586e-05) exceeds tolerance
+Best objective 1.416630976396e+11, best bound 1.416630976396e+11, gap 0.0000%
+
+Wrote result file '/tmp/mippp/126135741417280/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:30:22 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:30:22 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/129549583181632/model.lp
+Reading time = 0.22 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x706a3fbb
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 39930 rows and 78350 columns
+Presolve time: 2.09s
+Presolved: 124446 rows, 229217 columns, 636552 nonzeros
+Variable types: 228929 continuous, 288 integer (260 binary)
+Root relaxation presolved: 124419 rows, 229162 columns, 636426 nonzeros
+
+Deterministic concurrent LP optimizer: primal simplex, dual simplex, and barrier
+Showing barrier log only...
+
+Root barrier log...
+
+Ordering time: 0.02s
+
+Barrier statistics:
+ Dense cols : 260
+ AA' NZ     : 3.697e+05
+ Factor NZ  : 3.374e+06 (roughly 170 MB of memory)
+ Factor Ops : 3.430e+08 (less than 1 second per iteration)
+ Threads    : 14
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.60778193e+13  3.35562443e+14  7.85e+06 7.84e+04  3.43e+12     3s
+   1   5.53310764e+13  3.60915267e+14  8.09e+06 4.44e+06  3.24e+12     3s
+   2   5.01249912e+13  4.01764854e+14  7.29e+06 1.43e+06  3.10e+12     3s
+   3   3.09703754e+13  5.48883106e+14  5.03e+06 2.13e+06  2.03e+12     3s
+   4   1.45098666e+13  5.97322398e+14  2.35e+06 6.63e+05  9.54e+11     3s
+   5   7.98304333e+12  6.18329144e+14  1.27e+06 2.23e+05  5.23e+11     3s
+   6   4.70860736e+12  6.23004868e+14  7.21e+05 4.02e+04  3.01e+11     3s
+   7   1.04078580e+12  6.05251648e+14  1.49e+05 1.61e-03  6.42e+10     3s
+
+Barrier performed 7 iterations in 3.28 seconds (4.95 work units)
+Barrier solve interrupted - model solved by another algorithm
+
+Concurrent spin time: 0.02s
+
+Solved with dual simplex
+
+Root relaxation: objective 1.416872e+11, 34259 iterations, 1.06 seconds (1.08 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+H    0     0                    1.415946e+11 1.4169e+11  0.07%     -    3s
+H    0     0                    1.416332e+11 1.4169e+11  0.04%     -    3s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416367e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416621e+11 1.4168e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    4 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    2 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4167e+11    0    6 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+H    0     0                    1.416631e+11 1.4166e+11  0.00%     -    6s
+
+Cutting planes:
+  Cover: 1
+  MIR: 2
+  StrongCG: 1
+  Flow cover: 93
+  GUB cover: 1
+  RLT: 2
+
+Explored 1 nodes (43240 simplex iterations) in 6.46 seconds (8.79 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 7: 1.41663e+11 1.41663e+11 1.41662e+11 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Warning: max constraint violation (4.5586e-05) exceeds tolerance
+Best objective 1.416630976396e+11, best bound 1.416630976396e+11, gap 0.0000%
+
+Wrote result file '/tmp/mippp/129549583181632/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:34:58 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:34:58 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/140271154181952/model.lp
+Reading time = 0.21 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x706a3fbb
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 39930 rows and 78350 columns
+Presolve time: 2.02s
+Presolved: 124446 rows, 229217 columns, 636552 nonzeros
+Variable types: 228929 continuous, 288 integer (260 binary)
+Root relaxation presolved: 124419 rows, 229162 columns, 636426 nonzeros
+
+Deterministic concurrent LP optimizer: primal simplex, dual simplex, and barrier
+Showing barrier log only...
+
+Root barrier log...
+
+Ordering time: 0.02s
+
+Barrier statistics:
+ Dense cols : 260
+ AA' NZ     : 3.697e+05
+ Factor NZ  : 3.374e+06 (roughly 170 MB of memory)
+ Factor Ops : 3.430e+08 (less than 1 second per iteration)
+ Threads    : 14
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.60778193e+13  3.35562443e+14  7.85e+06 7.84e+04  3.43e+12     3s
+   1   5.53310764e+13  3.60915267e+14  8.09e+06 4.44e+06  3.24e+12     3s
+   2   5.01249912e+13  4.01764854e+14  7.29e+06 1.43e+06  3.10e+12     3s
+   3   3.09703754e+13  5.48883106e+14  5.03e+06 2.13e+06  2.03e+12     3s
+   4   1.45098666e+13  5.97322398e+14  2.35e+06 6.63e+05  9.54e+11     3s
+   5   7.98304333e+12  6.18329144e+14  1.27e+06 2.23e+05  5.23e+11     3s
+   6   4.70860736e+12  6.23004868e+14  7.21e+05 4.02e+04  3.01e+11     3s
+   7   1.04078580e+12  6.05251648e+14  1.49e+05 1.61e-03  6.42e+10     3s
+
+Barrier performed 7 iterations in 3.23 seconds (4.96 work units)
+Barrier solve interrupted - model solved by another algorithm
+
+Concurrent spin time: 0.01s
+
+Solved with dual simplex
+
+Root relaxation: objective 1.416872e+11, 34259 iterations, 1.09 seconds (1.08 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+H    0     0                    1.415946e+11 1.4169e+11  0.07%     -    3s
+H    0     0                    1.416332e+11 1.4169e+11  0.04%     -    3s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416367e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416621e+11 1.4168e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    4 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    2 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    6 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+H    0     0                    1.416631e+11 1.4166e+11  0.00%     -    6s
+
+Cutting planes:
+  Cover: 1
+  MIR: 2
+  StrongCG: 1
+  Flow cover: 93
+  GUB cover: 1
+  RLT: 2
+
+Explored 1 nodes (43240 simplex iterations) in 6.33 seconds (8.79 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 7: 1.41663e+11 1.41663e+11 1.41662e+11 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Warning: max constraint violation (4.5586e-05) exceeds tolerance
+Best objective 1.416630976396e+11, best bound 1.416630976396e+11, gap 0.0000%
+
+Wrote result file '/tmp/mippp/140271154181952/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:36:39 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:36:39 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/130602647910208/model.lp
+Reading time = 0.21 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x706a3fbb
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 39930 rows and 78350 columns
+Presolve time: 2.02s
+Presolved: 124446 rows, 229217 columns, 636552 nonzeros
+Variable types: 228929 continuous, 288 integer (260 binary)
+Root relaxation presolved: 124419 rows, 229162 columns, 636426 nonzeros
+
+Deterministic concurrent LP optimizer: primal simplex, dual simplex, and barrier
+Showing barrier log only...
+
+Root barrier log...
+
+Ordering time: 0.02s
+
+Barrier statistics:
+ Dense cols : 260
+ AA' NZ     : 3.697e+05
+ Factor NZ  : 3.374e+06 (roughly 170 MB of memory)
+ Factor Ops : 3.430e+08 (less than 1 second per iteration)
+ Threads    : 14
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.60778193e+13  3.35562443e+14  7.85e+06 7.84e+04  3.43e+12     3s
+   1   5.53310764e+13  3.60915267e+14  8.09e+06 4.44e+06  3.24e+12     3s
+
+Barrier performed 1 iterations in 2.87 seconds (4.41 work units)
+Optimization interrupted
+
+
+
+Root relaxation: interrupted, 0 iterations, 0.66 seconds (0.63 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0          -    0        -0.00000          -      -     -    2s
+
+Explored 1 nodes (0 simplex iterations) in 2.89 seconds (4.49 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 1: -0 
+
+Solve interrupted
+Best objective -0.000000000000e+00, best bound -, gap -
+
+Wrote result file '/tmp/mippp/130602647910208/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:37:25 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:37:25 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/133499726612288/model.lp
+Reading time = 0.22 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x706a3fbb
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 39930 rows and 78350 columns
+Presolve time: 2.02s
+Presolved: 124446 rows, 229217 columns, 636552 nonzeros
+Variable types: 228929 continuous, 288 integer (260 binary)
+Root relaxation presolved: 124419 rows, 229162 columns, 636426 nonzeros
+
+Deterministic concurrent LP optimizer: primal simplex, dual simplex, and barrier
+Showing barrier log only...
+
+Root barrier log...
+
+Ordering time: 0.02s
+
+Barrier statistics:
+ Dense cols : 260
+ AA' NZ     : 3.697e+05
+ Factor NZ  : 3.374e+06 (roughly 170 MB of memory)
+ Factor Ops : 3.430e+08 (less than 1 second per iteration)
+ Threads    : 14
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.60778193e+13  3.35562443e+14  7.85e+06 7.84e+04  3.43e+12     3s
+   1   5.53310764e+13  3.60915267e+14  8.09e+06 4.44e+06  3.24e+12     3s
+   2   5.01249912e+13  4.01764854e+14  7.29e+06 1.43e+06  3.10e+12     3s
+   3   3.09703754e+13  5.48883106e+14  5.03e+06 2.13e+06  2.03e+12     3s
+   4   1.45098666e+13  5.97322398e+14  2.35e+06 6.63e+05  9.54e+11     3s
+   5   7.98304333e+12  6.18329144e+14  1.27e+06 2.23e+05  5.23e+11     3s
+   6   4.70860736e+12  6.23004868e+14  7.21e+05 4.02e+04  3.01e+11     3s
+
+Barrier performed 6 iterations in 3.21 seconds (4.89 work units)
+Barrier solve interrupted - model solved by another algorithm
+
+Concurrent spin time: 0.01s
+
+Solved with dual simplex
+
+Root relaxation: objective 1.416872e+11, 34259 iterations, 1.06 seconds (1.08 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+H    0     0                    1.415946e+11 1.4169e+11  0.07%     -    3s
+H    0     0                    1.416332e+11 1.4169e+11  0.04%     -    3s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416367e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416621e+11 1.4168e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    4 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    2 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4167e+11    0    6 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+H    0     0                    1.416631e+11 1.4166e+11  0.00%     -    6s
+
+Cutting planes:
+  Cover: 1
+  MIR: 2
+  StrongCG: 1
+  Flow cover: 93
+  GUB cover: 1
+  RLT: 2
+
+Explored 1 nodes (43240 simplex iterations) in 6.48 seconds (8.79 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 7: 1.41663e+11 1.41663e+11 1.41662e+11 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Warning: max constraint violation (4.5586e-05) exceeds tolerance
+Best objective 1.416630976396e+11, best bound 1.416630976396e+11, gap 0.0000%
+
+Wrote result file '/tmp/mippp/133499726612288/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:38:07 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 19:38:07 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/134432661866304/model.lp
+Reading time = 0.22 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x706a3fbb
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 39930 rows and 78350 columns
+Presolve time: 2.02s
+Presolved: 124446 rows, 229217 columns, 636552 nonzeros
+Variable types: 228929 continuous, 288 integer (260 binary)
+Root relaxation presolved: 124419 rows, 229162 columns, 636426 nonzeros
+
+Deterministic concurrent LP optimizer: primal simplex, dual simplex, and barrier
+Showing barrier log only...
+
+Root barrier log...
+
+Ordering time: 0.02s
+
+Barrier statistics:
+ Dense cols : 260
+ AA' NZ     : 3.697e+05
+ Factor NZ  : 3.374e+06 (roughly 170 MB of memory)
+ Factor Ops : 3.430e+08 (less than 1 second per iteration)
+ Threads    : 14
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.60778193e+13  3.35562443e+14  7.85e+06 7.84e+04  3.43e+12     3s
+   1   5.53310764e+13  3.60915267e+14  8.09e+06 4.44e+06  3.24e+12     3s
+   2   5.01249912e+13  4.01764854e+14  7.29e+06 1.43e+06  3.10e+12     3s
+   3   3.09703754e+13  5.48883106e+14  5.03e+06 2.13e+06  2.03e+12     3s
+   4   1.45098666e+13  5.97322398e+14  2.35e+06 6.63e+05  9.54e+11     3s
+   5   7.98304333e+12  6.18329144e+14  1.27e+06 2.23e+05  5.23e+11     3s
+   6   4.70860736e+12  6.23004868e+14  7.21e+05 4.02e+04  3.01e+11     3s
+
+Barrier performed 6 iterations in 3.19 seconds (4.89 work units)
+Barrier solve interrupted - model solved by another algorithm
+
+Concurrent spin time: 0.03s
+
+Solved with dual simplex
+
+Root relaxation: objective 1.416872e+11, 34259 iterations, 1.05 seconds (1.08 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+H    0     0                    1.415946e+11 1.4169e+11  0.07%     -    3s
+H    0     0                    1.416332e+11 1.4169e+11  0.04%     -    3s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416367e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416621e+11 1.4168e+11  0.01%     -    4s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    4 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    2 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4167e+11    0    6 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+H    0     0                    1.416631e+11 1.4166e+11  0.00%     -    6s
+
+Cutting planes:
+  Cover: 1
+  MIR: 2
+  StrongCG: 1
+  Flow cover: 93
+  GUB cover: 1
+  RLT: 2
+
+Explored 1 nodes (43240 simplex iterations) in 6.37 seconds (8.79 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 7: 1.41663e+11 1.41663e+11 1.41662e+11 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Warning: max constraint violation (4.5586e-05) exceeds tolerance
+Best objective 1.416630976396e+11, best bound 1.416630976396e+11, gap 0.0000%
+
+Wrote result file '/tmp/mippp/134432661866304/solution.sol'
+
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 20:14:05 2024
+
+Set parameter Username
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi 10.0.3 (linux64, gurobi_cl) logging started Mon Apr  1 20:14:06 2024
+
+Set parameter Username
+Set parameter MIPGap to value 0
+Set parameter LogFile to value "gurobi.log"
+Academic license - for non-commercial use only - expires 2024-11-12
+Using license file /home/plaiseek/gurobi.lic
+
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (linux64)
+Copyright (c) 2023, Gurobi Optimization, LLC
+
+Warning: row 261 (name "R261") contains 47 small (<= 1e-13) coefficient(s), ignored
+Warning: row 676 (name "R676") contains 48 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1117 (name "R1117") contains 49 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1558 (name "R1558") contains 50 small (<= 1e-13) coefficient(s), ignored
+Warning: row 1999 (name "R1999") contains 51 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2438 (name "R2438") contains 52 small (<= 1e-13) coefficient(s), ignored
+Warning: row 2876 (name "R2876") contains 53 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3314 (name "R3314") contains 54 small (<= 1e-13) coefficient(s), ignored
+Warning: row 3752 (name "R3752") contains 83 small (<= 1e-13) coefficient(s), ignored
+Warning: row 4153 (name "R4153") contains 113 small (<= 1e-13) coefficient(s), ignored
+skipping further warning of this kind
+Warning: row 4567 (name "R4567") contains 114 small (<= 1e-13) coefficient(s), ignored
+Warning: lp file contains 5946 small (<= 1e-13) coefficient(s), ignored
+Read LP format model from file /tmp/mippp/135219810813760/model.lp
+Reading time = 0.23 seconds
+: 164376 rows, 307567 columns, 758467 nonzeros
+
+CPU model: AMD Ryzen 9 7950X 16-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 164376 rows, 307567 columns and 758467 nonzeros
+Model fingerprint: 0x80234a61
+Variable types: 307307 continuous, 260 integer (260 binary)
+Coefficient statistics:
+  Matrix range     [1e-13, 2e+05]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [3e-03, 2e+05]
+Warning: Model contains large matrix coefficient range
+         Consider reformulating model or setting NumericFocus parameter
+         to avoid numerical issues.
+Found heuristic solution: objective -0.0000000
+Presolve removed 39918 rows and 78337 columns
+Presolve time: 2.13s
+Presolved: 124458 rows, 229230 columns, 636596 nonzeros
+Variable types: 228942 continuous, 288 integer (260 binary)
+Root relaxation presolved: 124431 rows, 229175 columns, 636470 nonzeros
+
+Deterministic concurrent LP optimizer: primal simplex, dual simplex, and barrier
+Showing barrier log only...
+
+Root barrier log...
+
+Ordering time: 0.02s
+
+Barrier statistics:
+ Dense cols : 260
+ AA' NZ     : 3.697e+05
+ Factor NZ  : 3.374e+06 (roughly 170 MB of memory)
+ Factor Ops : 3.430e+08 (less than 1 second per iteration)
+ Threads    : 14
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.60805753e+13  3.35591170e+14  7.86e+06 7.84e+04  3.43e+12     3s
+   1   5.53337813e+13  3.60940099e+14  8.09e+06 4.44e+06  3.24e+12     3s
+   2   5.01281106e+13  4.01765492e+14  7.29e+06 1.43e+06  3.10e+12     3s
+   3   3.09719263e+13  5.48892521e+14  5.03e+06 2.13e+06  2.04e+12     3s
+   4   1.45125621e+13  5.97352404e+14  2.35e+06 6.63e+05  9.54e+11     3s
+   5   7.98558839e+12  6.18356937e+14  1.27e+06 2.23e+05  5.24e+11     3s
+   6   4.70856927e+12  6.23063276e+14  7.21e+05 4.02e+04  3.01e+11     3s
+
+Barrier performed 6 iterations in 3.30 seconds (4.89 work units)
+Barrier solve interrupted - model solved by another algorithm
+
+Concurrent spin time: 0.02s
+
+Solved with dual simplex
+
+Root relaxation: objective 1.416872e+11, 33724 iterations, 1.03 seconds (1.06 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+     0     0 1.4169e+11    0    7   -0.00000 1.4169e+11      -     -    3s
+H    0     0                    1.415946e+11 1.4169e+11  0.07%     -    3s
+H    0     0                    1.416332e+11 1.4169e+11  0.04%     -    3s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+     0     0 1.4168e+11    0    8 1.4163e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416367e+11 1.4168e+11  0.03%     -    4s
+H    0     0                    1.416621e+11 1.4168e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    7 1.4166e+11 1.4167e+11  0.01%     -    5s
+     0     0 1.4167e+11    0    4 1.4166e+11 1.4167e+11  0.00%     -    5s
+     0     0 1.4167e+11    0    2 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4167e+11    0    4 1.4166e+11 1.4167e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+     0     0 1.4166e+11    0    6 1.4166e+11 1.4166e+11  0.00%     -    6s
+H    0     0                    1.416631e+11 1.4166e+11  0.00%     -    6s
+
+Cutting planes:
+  Cover: 1
+  MIR: 2
+  StrongCG: 1
+  Flow cover: 94
+  RLT: 2
+
+Explored 1 nodes (42687 simplex iterations) in 6.46 seconds (8.76 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 7: 1.41663e+11 1.41663e+11 1.41662e+11 ... -0
+
+Optimal solution found (tolerance 0.00e+00)
+Warning: max constraint violation (8.3726e-05) exceeds tolerance
+Best objective 1.416630976396e+11, best bound 1.416630976396e+11, gap 0.0000%
+
+Wrote result file '/tmp/mippp/135219810813760/solution.sol'
+

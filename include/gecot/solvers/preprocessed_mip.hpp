@@ -262,14 +262,15 @@ struct preprocessed_MIP {
 
         auto solver = mip_helper::build_solver(model);
         solver->set_loglevel(spdlog::get_level() == spdlog::level::trace ? 1
-                                                                        : 0);
+                                                                         : 0);
         solver->set_timeout(3600);
         solver->set_mip_gap(1e-10);
         auto ret_code = solver->optimize();
         if(ret_code != 0)
             throw std::runtime_error(solver->name() + " failed with code " +
                                      std::to_string(ret_code) +
-                                     ", see logs at " + solver->logs_path().string());
+                                     ", see logs at " +
+                                     solver->logs_path().string());
         const auto solver_solution = solver->get_solution();
 
         spdlog::trace("MIP solution found with value: {}",

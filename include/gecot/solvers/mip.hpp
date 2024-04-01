@@ -218,9 +218,9 @@ struct MIP {
 
         auto solver = mip_helper::build_solver(model);
         solver->set_loglevel(spdlog::get_level() == spdlog::level::trace ? 1
-                                                                        : 0);
+                                                                         : 0);
         solver->set_timeout(3600);
-        solver->set_mip_gap(1e-16);
+        solver->set_mip_gap(1e-10);
         auto ret_code = solver->optimize();
         if(ret_code != 0)
             throw std::runtime_error(

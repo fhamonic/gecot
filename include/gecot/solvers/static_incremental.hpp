@@ -57,7 +57,8 @@ struct StaticIncremental {
         auto options_ratios = instance.create_option_map(0.0);
         for(const option_t & option : options) {
             options_ratios[option] =
-                (instance.eval_criterion(options_cases_pc_num[option]) - base_score) /
+                (instance.eval_criterion(options_cases_pc_num[option]) -
+                 base_score) /
                 instance.option_cost(option);
         }
         std::ranges::sort(options, [&options_ratios](auto && o1, auto && o2) {
@@ -70,7 +71,10 @@ struct StaticIncremental {
             if(purchased + price > budget) continue;
             purchased += price;
             solution[option] = true;
-            spdlog::trace("add {:>20} (ratio: {:.5e}, budget_left: {})", instance.option_name(option), options_ratios[option], budget - purchased);
+            spdlog::trace(
+                "add {:>20} (ratio:{: #.4e}, budget_left:{: #.4e})",
+                instance.option_name(option), options_ratios[option],
+                budget - purchased);
         }
 
         return solution;

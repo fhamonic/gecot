@@ -109,7 +109,10 @@ struct GreedyDecremental {
             }
             options.erase(worst_option_it);
             free_options.emplace_back(worst_option);
-            spdlog::trace("remove {:>20} (score_loss: {:.5e}, purchased: {})", instance.option_name(worst_option), options_ratios[worst_option] * worst_option_price, purchased);
+            spdlog::trace(
+                "remove {:>20} (loss:{: #.4e}, purchased:{: #.4e})",
+                instance.option_name(worst_option),
+                options_ratios[worst_option] * worst_option_price, purchased);
         }
 
         if(!only_dec) {
@@ -126,8 +129,8 @@ struct GreedyDecremental {
             while(free_options.size() > 0) {
                 compute_options_cases_incr_pc_num(
                     instance, free_options, cases_current_qm, cases_current_pm,
-                    cases_vertex_options, cases_arc_options, options_cases_pc_num,
-                    parallel);
+                    cases_vertex_options, cases_arc_options,
+                    options_cases_pc_num, parallel);
                 for(const option_t & option : free_options) {
                     options_ratios[option] =
                         (instance.eval_criterion(options_cases_pc_num[option]) -
@@ -155,8 +158,11 @@ struct GreedyDecremental {
                         cases_arc_options[instance_case.id()][best_option])
                         current_pm[a] = std::max(current_pm[a], enhanced_prob);
                 }
-                spdlog::trace("add {:>20} (score_gain: {:.5e}, budget_left: {})", instance.option_name(best_option), options_ratios[best_option] * best_option_price, budget_left);
-            
+                spdlog::trace(
+                    "add {:>20} (gain:{: #.4e}, budget_left:{: #.4e})",
+                    instance.option_name(best_option),
+                    options_ratios[best_option] * best_option_price,
+                    budget_left);
 
                 free_options.erase(best_option_it);
                 const auto [first, last] = std::ranges::remove_if(

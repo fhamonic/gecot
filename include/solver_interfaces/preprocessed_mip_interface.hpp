@@ -6,7 +6,7 @@
 #include <boost/program_options.hpp>
 
 #include "gecot/solvers/preprocessed_mip.hpp"
-#include "gecot/utils/mip_solver_traits.hpp"
+#include "gecot/utils/mip_helper.hpp"
 
 #include "instance.hpp"
 #include "solver_interfaces/abstract_solver.hpp"
@@ -40,16 +40,16 @@ public:
             "academic "
             "use only)")(
             "cbc-path",
-            po::value<std::filesystem::path>(&mippp::cli_cbc_traits::exec_path),
+            po::value<std::filesystem::path>(&mippp::cli_cbc_solver::exec_path),
             (std::string("Sets path to cbc executable\n(default: '") +
              cbc_default_path.string() + "')")
                 .c_str())(
             "grb-path",
-            po::value<std::filesystem::path>(&mippp::cli_grb_traits::exec_path),
+            po::value<std::filesystem::path>(&mippp::cli_grb_solver::exec_path),
             "Sets path to gurobi_cl executable")(
             "scip-path",
             po::value<std::filesystem::path>(
-                &mippp::cli_scip_traits::exec_path),
+                &mippp::cli_scip_solver::exec_path),
             "Sets path to scip executable");
     }
 
@@ -71,16 +71,16 @@ public:
                 "'use-scip'");
         }
         if(!vm.count("cbc-path"))
-            mippp::cli_cbc_traits::exec_path = cbc_default_path;
+            mippp::cli_cbc_solver::exec_path = cbc_default_path;
         if(vm.count("use-cbc"))
-            gecot::mip_solver_traits::prefered_solver =
-                gecot::mip_solver_traits::solvers::cbc;
+            gecot::mip_helper::prefered_solver =
+                gecot::mip_helper::solvers::cbc;
         if(vm.count("use-gurobi"))
-            gecot::mip_solver_traits::prefered_solver =
-                gecot::mip_solver_traits::solvers::grb;
+            gecot::mip_helper::prefered_solver =
+                gecot::mip_helper::solvers::grb;
         if(vm.count("use-scip"))
-            gecot::mip_solver_traits::prefered_solver =
-                gecot::mip_solver_traits::solvers::scip;
+            gecot::mip_helper::prefered_solver =
+                gecot::mip_helper::solvers::scip;
     }
 
     gecot::instance_solution_t<Instance> solve(const Instance & instance,

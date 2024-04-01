@@ -21,7 +21,7 @@
 #include "gecot/indices/pc_num.hpp"
 #include "gecot/preprocessing/compute_big_M_map.hpp"
 #include "gecot/preprocessing/compute_generalized_flow_graph.hpp"
-#include "gecot/utils/mip_solver_traits.hpp"
+#include "gecot/utils/mip_helper.hpp"
 
 namespace fhamonic {
 namespace gecot {
@@ -84,7 +84,7 @@ struct MIP {
         auto solution = instance.create_option_map(false);
 
         using namespace mippp;
-        using mip = mip_model<mip_solver_traits>;
+        using mip = mip_model<cli_solver_model_traits>;
         mip model;
 
         const auto C_vars = model.add_variables(
@@ -216,20 +216,20 @@ struct MIP {
         if(print_model) std::cout << "NBLOCKS\n" << nb_blocks << '\n';
         if(print_model) std::cout << model << std::endl;
 
-        auto solver = model.build();
-        solver.set_loglevel(spdlog::get_level() == spdlog::level::trace ? 1
+        auto solver = mip_helper::build_solver(model);
+        solver->set_loglevel(spdlog::get_level() == spdlog::level::trace ? 1
                                                                         : 0);
-        solver.set_timeout(3600);
-        solver.set_mip_gap(1e-16);
-        auto ret_code = solver.optimize();
+        solver->set_timeout(3600);
+        solver->set_mip_gap(1e-16);
+        auto ret_code = solver->optimize();
         if(ret_code != 0)
             throw std::runtime_error(
                 "The thirdparty MIP solver failed with code " +
                 std::to_string(ret_code));
-        const auto solver_solution = solver.get_solution();
+        const auto solver_solution = solver->get_solution();
 
         spdlog::trace("MIP solution found with value: {}",
-                      solver.get_objective_value());
+                      solver->get_objective_value());
         for(const auto & i : instance.options()) {
             solution[i] =
                 solver_solution[static_cast<std::size_t>(X_vars(i).id())];

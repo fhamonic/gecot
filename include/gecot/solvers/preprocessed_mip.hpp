@@ -22,7 +22,7 @@
 #include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
 #include "gecot/preprocessing/compute_contracted_generalized_flow_graph.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
-#include "gecot/utils/mip_solver_traits.hpp"
+#include "gecot/utils/mip_helper.hpp"
 
 namespace fhamonic {
 namespace gecot {
@@ -82,7 +82,7 @@ struct preprocessed_MIP {
         auto solution = instance.create_option_map(false);
 
         using namespace mippp;
-        using mip = mip_model<mip_solver_traits>;
+        using mip = mip_model<cli_solver_model_traits>;
         mip model;
 
         const auto C_vars = model.add_variables(
@@ -157,7 +157,7 @@ struct preprocessed_MIP {
                 spdlog::trace("  {:>8} useless arcs on average",
                               nb_useless / nb_sinks);
                 spdlog::trace(
-                    "      took {} ms",
+                    "           (took {} ms)",
                     std::chrono::duration_cast<std::chrono::milliseconds>(
                         prep_sw.elapsed())
                         .count());
@@ -242,15 +242,15 @@ struct preprocessed_MIP {
                         X_vars(arc_option_map[a].value()) *
                             big_M_map[melon::arc_source(graph, a)].value());
                 }
-                model.add_constraint(
-                    C_vars(instance_case.id()) <=
-                    xsum(melon::vertices(original_graph), F_vars,
-                         original_quality_map) +
-                        xsum(
-                            F_prime_additional_terms,
-                            [](const auto & p) { return p.first; },
-                            [](const auto & p) { return p.second; }));
             }
+            model.add_constraint(
+                C_vars(instance_case.id()) <=
+                xsum(melon::vertices(original_graph), F_vars,
+                     original_quality_map) +
+                    xsum(
+                        F_prime_additional_terms,
+                        [](const auto & p) { return p.first; },
+                        [](const auto & p) { return p.second; }));
         }
 
         spdlog::trace("MIP model has:");
@@ -260,20 +260,20 @@ struct preprocessed_MIP {
 
         if(print_model) std::cout << model << std::endl;
 
-        auto solver = model.build();
-        solver.set_loglevel(spdlog::get_level() == spdlog::level::trace ? 1
+        auto solver = mip_helper::build_solver(model);
+        solver->set_loglevel(spdlog::get_level() == spdlog::level::trace ? 1
                                                                         : 0);
-        solver.set_timeout(3600);
-        solver.set_mip_gap(1e-16);
-        auto ret_code = solver.optimize();
+        solver->set_timeout(3600);
+        solver->set_mip_gap(1e-10);
+        auto ret_code = solver->optimize();
         if(ret_code != 0)
-            throw std::runtime_error(
-                "The thirdparty MIP solver failed with code " +
-                std::to_string(ret_code));
-        const auto solver_solution = solver.get_solution();
+            throw std::runtime_error(solver->name() + " failed with code " +
+                                     std::to_string(ret_code) +
+                                     ", see logs at " + solver->logs_path().string());
+        const auto solver_solution = solver->get_solution();
 
         spdlog::trace("MIP solution found with value: {}",
-                      solver.get_objective_value());
+                      solver->get_objective_value());
         for(const auto & i : instance.options()) {
             solution[i] =
                 solver_solution[static_cast<std::size_t>(X_vars(i).id())];

@@ -35,7 +35,7 @@ void print_instance_size(auto && instance,
                     instance_case.name(), instance_name_max_length,
                     graph.nb_vertices(), nb_improvable_vertices,
                     nb_habitat_vertices);
-        spdlog::log(lvl, "    {:>{}}  {:>6} arcs     ({} improvable)", "",
+        spdlog::log(lvl, "    {:>{}}{:>8} arcs     ({} improvable)", "",
                     instance_name_max_length, graph.nb_arcs(),
                     nb_improvable_arcs);
     }

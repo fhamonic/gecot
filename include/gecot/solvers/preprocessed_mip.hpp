@@ -32,6 +32,7 @@ struct preprocessed_MIP {
     bool parallel = false;
     bool print_model = false;
     double probability_resolution;
+    int nb_mus;
 
     template <typename M, typename V>
     struct formula_variable_visitor {
@@ -75,6 +76,27 @@ struct preprocessed_MIP {
             return var;
         }
     };
+
+    template <instance_c I, case_c C>
+    auto _compute_strong_and_useless_arcs(const I & instance,
+                                          const C & instance_case,
+                                          const double budget) const {
+        if(nb_mus > 1) {
+            return compute_constrained_strong_and_useless_arcs(
+                instance, instance_case, budget, parallel,
+                [&instance, budget](const option_t & o) {
+                    return instance.option_cost(o) <= budget;
+                },
+                probability_resolution, nb_mus);
+        } else {
+            return compute_strong_and_useless_arcs(
+                instance_case, parallel,
+                [&instance, budget](const option_t & o) {
+                    return instance.option_cost(o) <= budget;
+                },
+                probability_resolution);
+        }
+    }
 
     template <instance_c I>
     instance_solution_t<I> solve(const I & instance,
@@ -124,23 +146,10 @@ struct preprocessed_MIP {
             spdlog::stopwatch prep_sw;
             spdlog::trace("Preprocessing the '{}' graph:",
                           instance_case.name());
-            /*
+
             const auto [strong_arcs_map, useless_arcs_map] =
-                compute_constrained_strong_and_useless_arcs(
-                    instance, instance_case, budget, parallel,
-                    [&instance, budget](const option_t & o) {
-                        return instance.option_cost(o) <= budget;
-                    },
-                    probability_resolution);
-            /*/
-            const auto [strong_arcs_map, useless_arcs_map] =
-                compute_strong_and_useless_arcs(
-                    instance_case, parallel,
-                    [&instance, budget](const option_t & o) {
-                        return instance.option_cost(o) <= budget;
-                    },
-                    probability_resolution);
-            //*/
+                _compute_strong_and_useless_arcs(instance, instance_case,
+                                                 budget);
 
             if(spdlog::get_level() == spdlog::level::trace) {
                 int nb_strong, nb_useless, nb_sinks;

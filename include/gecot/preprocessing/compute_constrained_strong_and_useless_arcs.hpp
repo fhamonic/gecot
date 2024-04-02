@@ -19,7 +19,7 @@ auto compute_constrained_strong_and_useless_arcs(
     const I & instance, const C & instance_case, const double budget,
     const bool parallel = false,
     const auto & option_predicate = [](const option_t & o) { return true; },
-    double probability_resolution = 0.00000001) {
+    double probability_resolution = 0.00000001, int nb_mus = 10) {
     using graph_t = case_graph_t<C>;
     using log_probability_t = uint64_t;
     using log_probability_map_t = melon::arc_map_t<graph_t, log_probability_t>;
@@ -54,7 +54,7 @@ auto compute_constrained_strong_and_useless_arcs(
     compute_case_arc_options(instance_case, arcs_options);
 
     auto cost_map = melon::create_arc_map<double>(graph);
-    const int nb_mus = 10;
+    double min_mu = std::numeric_limits<double>::max();
     double max_mu = 0;
     for(auto && i : instance.options()) {
         const double arc_cost = instance.option_cost(i) /
@@ -63,18 +63,17 @@ auto compute_constrained_strong_and_useless_arcs(
             max_mu = std::max(
                 max_mu, (base_length_map[a] - prob_to_length(enhanced_prob)) /
                             arc_cost);
+            min_mu = std::min(min_mu, 1 / arc_cost);
         }
     }
-    max_mu = 1;
 
-    std::cout << "max_mu: " << max_mu << "\tbudget penalty: " << max_mu * budget
-              << std::endl;
+    double geometrical_ratio = std::pow(max_mu / min_mu, 1.0 / nb_mus);
+    spdlog::trace("Min µ: {}, Max µ = {}, geometrical ratio: {}", min_mu,
+                  max_mu, geometrical_ratio);
 
     std::vector<std::pair<double, log_probability_map_t>>
         lagrange_improved_length_maps;
-    for(double mu = 0; mu <= max_mu;
-        mu += max_mu / static_cast<double>(nb_mus - 1)) {
-        // std::cout << "mu: " << mu << std::endl;
+    for(double mu = min_mu; mu <= max_mu; mu *= geometrical_ratio) {
         auto mu_length_map = base_length_map;
         for(auto && i : instance.options()) {
             const double arc_cost = instance.option_cost(i) /

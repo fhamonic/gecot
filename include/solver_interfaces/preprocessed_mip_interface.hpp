@@ -30,6 +30,9 @@ public:
                 ->default_value(0.00000001),
             "Sets the resolution of the probabilities used by the "
             "preprocessing algorithm")(
+            "nb-mus", po::value<int>(&solver.nb_mus)->default_value(0),
+            "Sets the number of lagragrian multipliers to test for the "
+            "constrained preprocessing algorithm (experimental)")(
             "use-cbc",
             "Prioritizes cbc for soplving MIPs\n(default if gurobi_cl and scip "
             "are not found)")("use-grb",

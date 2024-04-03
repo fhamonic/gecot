@@ -1,17 +1,14 @@
 #ifndef GECOT_SOLVERS_GREEDY_DECREMENTAL_HPP
 #define GECOT_SOLVERS_GREEDY_DECREMENTAL_HPP
 
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_reduce.h>
+#include <algorithm>
+#include <ranges>
+#include <vector>
 
-#include <range/v3/algorithm/sort.hpp>
-#include <range/v3/range/conversion.hpp>
-#include <range/v3/view/zip.hpp>
+#include <spdlog/spdlog.h>
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
-#include "gecot/indices/pc_num.hpp"
-#include "gecot/utils/chronometer.hpp"
 
 namespace fhamonic {
 namespace gecot {
@@ -64,6 +61,9 @@ struct GreedyDecremental {
             }
         }
 
+        spdlog::trace("---------------------------------------------------");
+        spdlog::trace("  removed option id  | score loss | solution cost");
+        spdlog::trace("---------------------------------------------------");
         std::vector<option_t> free_options;
         double previous_score = compute_score(instance, cases_current_qm,
                                               cases_current_pm, parallel);
@@ -109,10 +109,10 @@ struct GreedyDecremental {
             }
             options.erase(worst_option_it);
             free_options.emplace_back(worst_option);
-            spdlog::trace(
-                "remove {:>20} (loss:{: #.4e}, purchased:{: #.4e})",
-                instance.option_name(worst_option),
-                options_ratios[worst_option] * worst_option_price, purchased);
+            spdlog::trace("{:>20} |{: #.4e} | {: #.5e}",
+                          instance.option_name(worst_option),
+                          options_ratios[worst_option] * worst_option_price,
+                          purchased);
         }
 
         if(!only_dec) {
@@ -125,6 +125,14 @@ struct GreedyDecremental {
                         return instance.option_cost(o) > budget_left;
                     });
                 free_options.erase(first, last);
+            }
+            if(free_options.size() > 0) {
+                spdlog::trace(
+                    "---------------------------------------------------");
+                spdlog::trace(
+                    "   added option id   | score gain |  budget left");
+                spdlog::trace(
+                    "---------------------------------------------------");
             }
             while(free_options.size() > 0) {
                 compute_options_cases_incr_pc_num(
@@ -158,11 +166,10 @@ struct GreedyDecremental {
                         cases_arc_options[instance_case.id()][best_option])
                         current_pm[a] = std::max(current_pm[a], enhanced_prob);
                 }
-                spdlog::trace(
-                    "add {:>20} (gain:{: #.4e}, budget_left:{: #.4e})",
-                    instance.option_name(best_option),
-                    options_ratios[best_option] * best_option_price,
-                    budget_left);
+                spdlog::trace("{:>20} |{: #.4e} | {: #.5e}",
+                              instance.option_name(best_option),
+                              options_ratios[best_option] * best_option_price,
+                              budget_left);
 
                 free_options.erase(best_option_it);
                 const auto [first, last] = std::ranges::remove_if(
@@ -172,6 +179,7 @@ struct GreedyDecremental {
                 free_options.erase(first, last);
             }
         }
+        spdlog::trace("---------------------------------------------------");
 
         return solution;
     }

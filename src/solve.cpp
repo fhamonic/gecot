@@ -203,7 +203,7 @@ int main(int argc, const char * argv[]) {
         spdlog::info(
             "Budget represents {:.2f}% of the total options cost (={:g})",
             budget / options_total_cost * 100, options_total_cost);
-        
+
         Instance instance = trivial_reformulate_instance(raw_instance, budget);
         print_instance_size<spdlog::level::trace>(instance,
                                                   "Simplified instance");
@@ -255,10 +255,14 @@ int main(int argc, const char * argv[]) {
             auto out =
                 fmt::output_file(opt_output_json_file.value().string().c_str());
             out.print(
-                "{{\n    \"initial_score\":  {},\n    \"budget\":         "
-                "{},\n    \"solution_score\": {},\n    \"solution_cost\":  "
-                "{},\n    \"solution\": {{",
-                initial_score, budget, solution_score, solution_cost);
+                "{{\n    \"instance_path\":  \"{}\",\n    \"algorithm\":  "
+                "\"{}\",\n    \"computation_time_ms\":  {},\n    "
+                "\"initial_score\":  {},\n    \"budget\":         {},\n    "
+                "\"solution_score\": {},\n    \"solution_cost\":  {},\n    "
+                "\"solution\": {{",
+                std::filesystem::absolute(instances_description_json).string(),
+                solver->name(), computation_time_ms, initial_score, budget,
+                solution_score, solution_cost);
             const std::size_t option_name_max_length =
                 std::ranges::max(std::ranges::views::transform(
                     raw_instance.options(),
@@ -278,8 +282,7 @@ int main(int argc, const char * argv[]) {
                           option_name, option_name_max_length, value);
                 first_line = false;
             }
-            out.print("\n    }},\n    \"computation_time_ms\": {}\n}}",
-                      computation_time_ms);
+            out.print("\n    }}\n}}");
         }
 
         if(opt_output_csv_file.has_value()) {

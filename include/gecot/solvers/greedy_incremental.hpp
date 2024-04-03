@@ -1,17 +1,14 @@
 #ifndef GECOT_SOLVERS_GREEDY_INCREMENTAL_HPP
 #define GECOT_SOLVERS_GREEDY_INCREMENTAL_HPP
 
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_reduce.h>
+#include <algorithm>
+#include <ranges>
+#include <vector>
 
-#include <range/v3/algorithm/sort.hpp>
-#include <range/v3/range/conversion.hpp>
-#include <range/v3/view/zip.hpp>
+#include <spdlog/spdlog.h>
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
-#include "gecot/indices/pc_num.hpp"
-#include "gecot/utils/chronometer.hpp"
 
 namespace fhamonic {
 namespace gecot {
@@ -50,6 +47,10 @@ struct GreedyIncremental {
         const auto cases_arc_options = compute_cases_arc_options(instance);
         auto options_ratios = instance.create_option_map(0.0);
 
+        spdlog::trace("---------------------------------------------------");
+        spdlog::trace("   added option id   | score gain |  budget left");
+        spdlog::trace("---------------------------------------------------");
+
         double previous_score = compute_base_score(instance, parallel);
         double budget_left = budget;
         while(options.size() > 0) {
@@ -82,10 +83,10 @@ struct GreedyIncremental {
                     cases_arc_options[instance_case.id()][best_option])
                     current_pm[a] = std::max(current_pm[a], enhanced_prob);
             }
-            spdlog::trace(
-                "add {:>20} (gain:{: #.4e}, budget_left:{: #.4e})",
-                instance.option_name(best_option),
-                options_ratios[best_option] * best_option_price, budget_left);
+            spdlog::trace("{:>20} |{: #.4e} | {: #.5e}",
+                          instance.option_name(best_option),
+                          options_ratios[best_option] * best_option_price,
+                          budget_left);
 
             options.erase(best_option_it);
             const auto [first, last] = std::ranges::remove_if(
@@ -94,6 +95,7 @@ struct GreedyIncremental {
                 });
             options.erase(first, last);
         }
+        spdlog::trace("---------------------------------------------------");
 
         return solution;
     }

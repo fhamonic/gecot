@@ -393,7 +393,7 @@ auto compute_strong_and_useless_arcs(
         spdlog::trace("  {:>10.2f} useless arcs on average",
                         static_cast<double>(nb_useless) / nb_sinks);
         spdlog::trace(
-            "           (took {} ms)",
+            "          (took {} ms)",
             std::chrono::duration_cast<std::chrono::milliseconds>(
                 prep_sw.elapsed())
                 .count());

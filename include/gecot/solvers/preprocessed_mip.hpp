@@ -1,11 +1,8 @@
 #ifndef GECOT_SOLVERS_PREPROCESSED_MIP_HPP
 #define GECOT_SOLVERS_PREPROCESSED_MIP_HPP
 
+#include <stdexcept>
 #include <type_traits>
-
-#include <range/v3/algorithm/sort.hpp>
-#include <range/v3/range/conversion.hpp>
-#include <range/v3/view/zip.hpp>
 
 #include <spdlog/spdlog.h>
 
@@ -17,8 +14,6 @@
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
-#include "gecot/indices/parallel_pc_num.hpp"
-#include "gecot/indices/pc_num.hpp"
 #include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
 #include "gecot/preprocessing/compute_contracted_generalized_flow_graph.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"

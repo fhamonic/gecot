@@ -3,10 +3,6 @@
 
 #include <stdexcept>
 
-#include <range/v3/algorithm/sort.hpp>
-#include <range/v3/range/conversion.hpp>
-#include <range/v3/view/zip.hpp>
-
 #include <spdlog/spdlog.h>
 
 #include "mippp/mip_model.hpp"
@@ -17,8 +13,6 @@
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
-#include "gecot/indices/parallel_pc_num.hpp"
-#include "gecot/indices/pc_num.hpp"
 #include "gecot/preprocessing/compute_big_M_map.hpp"
 #include "gecot/preprocessing/compute_generalized_flow_graph.hpp"
 #include "gecot/utils/mip_helper.hpp"
@@ -223,9 +217,10 @@ struct MIP {
         solver->set_mip_gap(1e-10);
         auto ret_code = solver->optimize();
         if(ret_code != 0)
-            throw std::runtime_error(
-                "The thirdparty MIP solver failed with code " +
-                std::to_string(ret_code));
+            throw std::runtime_error(solver->name() + " failed with code " +
+                                     std::to_string(ret_code) +
+                                     ", see logs at " +
+                                     solver->logs_path().string());
         const auto solver_solution = solver->get_solution();
 
         spdlog::trace("MIP solution found with value: {}",

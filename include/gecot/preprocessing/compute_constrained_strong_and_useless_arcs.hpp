@@ -220,7 +220,7 @@ auto compute_constrained_strong_and_useless_arcs(
         const auto nb_arcs = melon::nb_arcs(graph);
         for(auto i : std::views::iota(std::size_t(0), mus.size())) {
             if(i > 0 && stong_counters[i].load() == stong_counters[i-1].load() && useless_counters[i].load() == useless_counters[i-1].load()) continue;
-            spdlog::trace(" {:>.3e} | {:>10f}   | {:>11f}  ", mus[i], static_cast<double>(stong_counters[i]) / nb_arcs, static_cast<double>(useless_counters[i]) / nb_arcs);
+            spdlog::trace(" {:>.3e} | {:>12.3f} | {:>13.3f}  ", mus[i], static_cast<double>(stong_counters[i]) / nb_arcs, static_cast<double>(useless_counters[i]) / nb_arcs);
         }
         spdlog::trace("------------------------------------------");
 
@@ -236,7 +236,7 @@ auto compute_constrained_strong_and_useless_arcs(
                         static_cast<double>(nb_strong) / nb_sinks);
         spdlog::trace("  {:>10.2f} useless arcs on average",
                         static_cast<double>(nb_useless) / nb_sinks);
-        spdlog::trace("           (took {} ms)",
+        spdlog::trace("          (took {} ms)",
             std::chrono::duration_cast<std::chrono::milliseconds>(
                 prep_sw.elapsed())
                 .count());

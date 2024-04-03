@@ -1,17 +1,14 @@
 #ifndef GECOT_SOLVERS_STATIC_DECREMENTAL_HPP
 #define GECOT_SOLVERS_STATIC_DECREMENTAL_HPP
 
-#include <tbb/blocked_range2d.h>
-#include <tbb/parallel_for.h>
+#include <algorithm>
+#include <ranges>
+#include <vector>
 
-#include <range/v3/algorithm/sort.hpp>
-#include <range/v3/range/conversion.hpp>
-#include <range/v3/view/zip.hpp>
+#include <spdlog/spdlog.h>
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
-#include "gecot/indices/pc_num.hpp"
-#include "gecot/utils/chronometer.hpp"
 
 namespace fhamonic {
 namespace gecot {
@@ -62,6 +59,12 @@ struct StaticDecremental {
             }
         }
 
+        spdlog::trace(
+            "--------------------------------------------------------");
+        spdlog::trace("  removed option id  | loss/cost ratio | solution cost");
+        spdlog::trace(
+            "--------------------------------------------------------");
+
         const double max_score =
             compute_score(instance, cases_current_qm, cases_current_pm);
         compute_options_cases_decr_pc_num(
@@ -87,14 +90,25 @@ struct StaticDecremental {
             purchased -= price;
             solution[option] = false;
             free_options.emplace_back(option);
-            spdlog::trace(
-                "remove {:>20} (ratio:{: #.4e}, purchased:{: #.4e})",
-                instance.option_name(option), options_ratios[option],
-                purchased);
+            spdlog::trace("{:>20} |  {: #.6e}  | {: #.5e}",
+                          instance.option_name(option), options_ratios[option],
+                          purchased);
             if(purchased <= budget) break;
         }
 
-        if(!only_dec) {
+        if(!only_dec &&
+           std::ranges::any_of(
+               free_options, [&instance, budget_left = budget - purchased](
+                                 const option_t & o) {
+                   return instance.option_cost(o) <= budget_left;
+               })) {
+            spdlog::trace(
+                "--------------------------------------------------------");
+            spdlog::trace(
+                "   added option id   | gain/cost ratio | solution cost");
+            spdlog::trace(
+                "--------------------------------------------------------");
+
             for(auto instance_case : cases) {
                 auto & current_qm = (cases_current_qm[instance_case.id()] =
                                          instance_case.vertex_quality_map());
@@ -134,12 +148,13 @@ struct StaticDecremental {
                 if(purchased + price > budget) continue;
                 purchased += price;
                 solution[option] = true;
-                spdlog::trace(
-                    "add {:>20} (ratio:{: #.4e}, budget_left:{: #.4e})",
-                    instance.option_name(option), options_ratios[option],
-                    budget - purchased);
+                spdlog::trace("{:>20} |  {: #.6e}  | {: #.5e}",
+                              instance.option_name(option),
+                              options_ratios[option], budget - purchased);
             }
         }
+        spdlog::trace(
+            "--------------------------------------------------------");
 
         return solution;
     }

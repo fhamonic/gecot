@@ -1,21 +1,14 @@
 #ifndef GECOT_SOLVERS_STATIC_INCREMENTAL_HPP
 #define GECOT_SOLVERS_STATIC_INCREMENTAL_HPP
 
-#include <tbb/blocked_range2d.h>
-#include <tbb/parallel_for.h>
-
-#include <range/v3/algorithm/sort.hpp>
-#include <range/v3/range/conversion.hpp>
-#include <range/v3/view/filter.hpp>
-#include <range/v3/view/zip.hpp>
+#include <algorithm>
+#include <ranges>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 
-#include "melon/container/static_map.hpp"
-
+#include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
-#include "gecot/indices/pc_num.hpp"
-#include "gecot/utils/chronometer.hpp"
 
 namespace fhamonic {
 namespace gecot {
@@ -35,6 +28,12 @@ struct StaticIncremental {
             if(instance.option_cost(option) > budget) continue;
             options.emplace_back(option);
         }
+
+        spdlog::trace(
+            "--------------------------------------------------------");
+        spdlog::trace("   added option id   | gain/cost ratio | solution cost");
+        spdlog::trace(
+            "--------------------------------------------------------");
 
         const double base_score = compute_base_score(instance, parallel);
         auto options_cases_pc_num = instance.create_option_map(
@@ -71,11 +70,12 @@ struct StaticIncremental {
             if(purchased + price > budget) continue;
             purchased += price;
             solution[option] = true;
-            spdlog::trace(
-                "add {:>20} (ratio:{: #.4e}, budget_left:{: #.4e})",
-                instance.option_name(option), options_ratios[option],
-                budget - purchased);
+            spdlog::trace("{:>20} |  {: #.6e}  | {: #.5e}",
+                          instance.option_name(option), options_ratios[option],
+                          budget - purchased);
         }
+        spdlog::trace(
+            "--------------------------------------------------------");
 
         return solution;
     }

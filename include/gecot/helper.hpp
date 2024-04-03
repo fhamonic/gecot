@@ -2,21 +2,25 @@
 #define GECOT_HELPER_HPP
 
 #include <atomic>
+#include <condition_variable>
 #include <optional>
 #include <utility>
 #include <vector>
 
+#include <fmt/core.h>
+
 #include <tbb/blocked_range.h>
 #include <tbb/blocked_range2d.h>
 #include <tbb/parallel_for.h>
+#include <tbb/task_group.h>
 
 #include "melon/container/static_map.hpp"
 #include "melon/graph.hpp"
 #include "melon/mapping.hpp"
 
 #include "gecot/concepts/instance.hpp"
-#include "gecot/indices/pc_num.hpp"
 #include "gecot/indices/parallel_pc_num.hpp"
+#include "gecot/indices/pc_num.hpp"
 
 namespace fhamonic {
 namespace gecot {
@@ -159,8 +163,8 @@ void _compute_options_cases_incr_pc_num(
     auto && cases_arc_options, auto & options_cases_pc_num) {
     const auto & cases = instance.cases();
 
-    std::atomic<int> cpt = 0;
-    int nb_pass = free_options.size() * cases.size();
+    std::atomic<std::size_t> cpt = 0;
+    std::size_t nb_pass = free_options.size() * cases.size();
 
     auto compute_options_enhanced_pc_num =
         [&](const tbb::blocked_range2d<decltype(cases.begin()),
@@ -189,17 +193,21 @@ void _compute_options_cases_incr_pc_num(
                         enhanced_pm[a] =
                             std::max(enhanced_pm[a], enhanced_prob);
 
-                    // if constexpr(parallel) {
+                    if constexpr(parallel) {
                         options_cases_pc_num[option][instance_case.id()] =
                             parallel_pc_num(graph, enhanced_qm, enhanced_pm);
+                    } else {
+                        options_cases_pc_num[option][instance_case.id()] =
+                            pc_num(graph, enhanced_qm, enhanced_pm);
+                    }
 
-                    // } else {
-                    //     options_cases_pc_num[option][instance_case.id()] =
-                    //         pc_num(graph, enhanced_qm, enhanced_pm);
-                    // }
-
-                    std::cout << 100.0 * (++cpt) / nb_pass << "%        "
-                              << '\r'<< std::flush;
+                    const std::size_t step_cpt = ++cpt;
+                    if(std::fmod(50 * step_cpt, nb_pass) <= 50) {
+                        std::size_t progress = 50 * step_cpt / nb_pass;
+                        fmt::print("[{0:=^{1}}>{0: ^{2}}] {3}%\r", "", progress,
+                                   50 - progress, 100 * step_cpt / nb_pass);
+                        fflush(stdout);
+                    }
 
                     if(++it == options_block.end()) break;
 
@@ -225,13 +233,11 @@ void _compute_options_cases_incr_pc_num(
 }  // namespace detail
 
 template <instance_c I, detail::range_of<option_t> O>
-void compute_options_cases_incr_pc_num(const I & instance, const O & free_options,
-                                    auto && cases_current_qm,
-                                    auto && cases_current_pm,
-                                    auto && cases_vertex_options,
-                                    auto && cases_arc_options,
-                                    auto & options_cases_pc_num,
-                                    bool parallel = false) {
+void compute_options_cases_incr_pc_num(
+    const I & instance, const O & free_options, auto && cases_current_qm,
+    auto && cases_current_pm, auto && cases_vertex_options,
+    auto && cases_arc_options, auto & options_cases_pc_num,
+    bool parallel = false) {
     if(parallel) {
         detail::_compute_options_cases_incr_pc_num<true>(
             instance, free_options, cases_current_qm, cases_current_pm,

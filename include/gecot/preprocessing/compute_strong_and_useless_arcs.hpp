@@ -271,6 +271,10 @@ auto compute_strong_and_useless_arcs(
     using arc_t = melon::arc_t<graph_t>;
     using log_probability_t = uint64_t;
 
+    spdlog::stopwatch prep_sw;
+    spdlog::trace("Preprocessing of the '{}' graph:",
+                    instance_case.name());
+
     auto prob_to_length =
         [probability_resolution](const double p) -> log_probability_t {
         assert(p != 0);
@@ -371,6 +375,28 @@ auto compute_strong_and_useless_arcs(
     } else {
         compute_useless_arcs(
             tbb::blocked_range(arcs_range.begin(), arcs_range.end()));
+    }
+
+    if(spdlog::get_level() == spdlog::level::trace) {
+        int nb_strong, nb_useless, nb_sinks;
+        nb_strong = nb_useless = nb_sinks = 0;
+        for(auto && v : melon::vertices(graph)) {
+            if(instance_case.vertex_quality_map()[v] == 0 &&
+                instance_case.vertex_options_map()[v].empty())
+                continue;
+            nb_strong += strong_arcs_map[v].size();
+            nb_useless += useless_arcs_map[v].size();
+            ++nb_sinks;
+        }
+        spdlog::trace("  {:>10.2f} strong arcs on average",
+                        static_cast<double>(nb_strong) / nb_sinks);
+        spdlog::trace("  {:>10.2f} useless arcs on average",
+                        static_cast<double>(nb_useless) / nb_sinks);
+        spdlog::trace(
+            "           (took {} ms)",
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                prep_sw.elapsed())
+                .count());
     }
 
     return std::make_pair(strong_arcs_map, useless_arcs_map);

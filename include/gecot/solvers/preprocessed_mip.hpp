@@ -81,7 +81,7 @@ struct preprocessed_MIP {
     auto _compute_strong_and_useless_arcs(const I & instance,
                                           const C & instance_case,
                                           const double budget) const {
-        if(nb_mus > 1) {
+        if(nb_mus >= 1) {
             return compute_constrained_strong_and_useless_arcs(
                 instance, instance_case, budget, parallel,
                 [&instance, budget](const option_t & o) {
@@ -143,35 +143,9 @@ struct preprocessed_MIP {
             std::vector<std::pair<variable<int, double>, double>>
                 F_prime_additional_terms;
 
-            spdlog::stopwatch prep_sw;
-            spdlog::trace("Preprocessing the '{}' graph:",
-                          instance_case.name());
-
             const auto [strong_arcs_map, useless_arcs_map] =
                 _compute_strong_and_useless_arcs(instance, instance_case,
                                                  budget);
-
-            if(spdlog::get_level() == spdlog::level::trace) {
-                int nb_strong, nb_useless, nb_sinks;
-                nb_strong = nb_useless = nb_sinks = 0;
-                for(auto && v : melon::vertices(original_graph)) {
-                    if(original_quality_map[v] == 0 &&
-                       instance_case.vertex_options_map()[v].empty())
-                        continue;
-                    nb_strong += strong_arcs_map[v].size();
-                    nb_useless += useless_arcs_map[v].size();
-                    ++nb_sinks;
-                }
-                spdlog::trace("  {:>8} strong arcs on average",
-                              nb_strong / nb_sinks);
-                spdlog::trace("  {:>8} useless arcs on average",
-                              nb_useless / nb_sinks);
-                spdlog::trace(
-                    "           (took {} ms)",
-                    std::chrono::duration_cast<std::chrono::milliseconds>(
-                        prep_sw.elapsed())
-                        .count());
-            }
 
             for(const auto & original_t : melon::vertices(original_graph)) {
                 if(original_quality_map[original_t] == 0 &&

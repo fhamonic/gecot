@@ -201,7 +201,7 @@ int main(int argc, const char * argv[]) {
         for(auto && o : raw_instance.options())
             options_total_cost += raw_instance.option_cost(o);
         spdlog::info(
-            "Budget represents {:.2f}% of the total options cost (={:6g})",
+            "Budget represents {:.2f}% of the total options cost (={:g})",
             budget / options_total_cost * 100, options_total_cost);
         
         Instance instance = trivial_reformulate_instance(raw_instance, budget);

@@ -1,5 +1,5 @@
 import csv
-
+import os
 
 def readCSV(file_name, delimiter=","):
     file = csv.DictReader(open(file_name), delimiter=delimiter)
@@ -7,7 +7,9 @@ def readCSV(file_name, delimiter=","):
 
 
 def writeCSV(file_name, columns):
-    file = open("test/instances/Aix/" + file_name, "w")
+    file_path = "test/instances/Aix/" + file_name
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    file = open(file_path, "w")
     file.write(columns + "\n")
     return file
 

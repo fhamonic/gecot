@@ -1,6 +1,7 @@
 #ifndef GECOT_COMPUTE_CONSTRAINED_STRONG_AND_USELESS_ARCS_HPP
 #define GECOT_COMPUTE_CONSTRAINED_STRONG_AND_USELESS_ARCS_HPP
 
+#include <atomic>
 #include <utility>
 
 #include <tbb/concurrent_vector.h>
@@ -26,6 +27,10 @@ auto compute_constrained_strong_and_useless_arcs(
     using vertex_t = melon::vertex_t<graph_t>;
     using arc_t = melon::arc_t<graph_t>;
 
+    spdlog::stopwatch prep_sw;
+    spdlog::trace("Lagrangian preprocessing of the '{}' graph:",
+                    instance_case.name());
+
     auto prob_to_length =
         [probability_resolution](const double p) -> log_probability_t {
         assert(p != 0);
@@ -35,6 +40,14 @@ auto compute_constrained_strong_and_useless_arcs(
     };
 
     const auto & graph = instance_case.graph();
+    const auto & quality_map = instance_case.vertex_quality_map();
+
+    auto useless_vertices_map = melon::create_vertex_map<bool>(graph);
+    for(const auto & v : melon::vertices(graph)) {
+        useless_vertices_map[v] =
+            (quality_map[v] == 0 &&
+             instance_case.vertex_options_map()[v].empty());
+    }
 
     auto strong_arcs_map =
         melon::create_vertex_map<tbb::concurrent_vector<arc_t>>(graph);
@@ -60,20 +73,28 @@ auto compute_constrained_strong_and_useless_arcs(
         const double arc_cost = instance.option_cost(i) /
                                 static_cast<double>(arcs_options[i].size());
         for(auto && [a, enhanced_prob] : arcs_options[i]) {
-            max_mu = std::max(
-                max_mu, (base_length_map[a] - prob_to_length(enhanced_prob)) /
-                            arc_cost);
             min_mu = std::min(min_mu, 1 / arc_cost);
+            if(base_length_map[a] > prob_to_length(enhanced_prob))
+                max_mu = std::max(
+                    max_mu, (base_length_map[a] - prob_to_length(enhanced_prob))
+                    / arc_cost);
         }
     }
 
     double geometrical_ratio = std::pow(max_mu / min_mu, 1.0 / nb_mus);
-    spdlog::trace("Min µ: {}, Max µ = {}, geometrical ratio: {}", min_mu,
+    spdlog::trace("Min µ: {:.4e}, Max µ: {:.4e}, common ratio: {:.6g}", min_mu,
                   max_mu, geometrical_ratio);
 
+    std::vector<double> mus;
+    mus.push_back(0.0);
+    for(double mu = min_mu; mu <= max_mu; mu *= geometrical_ratio)
+        mus.push_back(mu);
+
+    std::vector<std::atomic<std::size_t>> stong_counters(mus.size());
+    std::vector<std::atomic<std::size_t>> useless_counters(mus.size());
     std::vector<std::pair<double, log_probability_map_t>>
         lagrange_improved_length_maps;
-    for(double mu = min_mu; mu <= max_mu; mu *= geometrical_ratio) {
+    for(double mu : mus) {
         auto mu_length_map = base_length_map;
         for(auto && i : instance.options()) {
             const double arc_cost = instance.option_cost(i) /
@@ -104,8 +125,10 @@ auto compute_constrained_strong_and_useless_arcs(
             fiber_map.fill(false);
             auto && u = melon::arc_source(graph, uv);
             auto && v = melon::arc_target(graph, uv);
+            std::size_t previous_fiber_size = 0;
             std::vector<std::pair<vertex_t, log_probability_t>> mu_fiber;
-            for(auto && [mu, mu_length_map] : lagrange_improved_length_maps) {
+            for(auto i : std::views::iota(std::size_t(0), mus.size())) {
+                auto && [mu, mu_length_map] = lagrange_improved_length_maps[i];
                 const log_probability_t budget_penalty = mu * budget;
                 algo.reset();
                 algo.set_red_length_map(mu_length_map);
@@ -116,9 +139,13 @@ auto compute_constrained_strong_and_useless_arcs(
                 for(const auto & [w, w_dist] : algo) {
                     if(fiber_map[w]) continue;
                     fiber_map[w] = true;
-                    strong_arcs_map[w].push_back(uv);
                     mu_fiber.emplace_back(w, w_dist.first - budget_penalty);
+                    if(useless_vertices_map[w]) continue;
+                    strong_arcs_map[w].push_back(uv);
                 }
+                if(mu_fiber.size() == previous_fiber_size) continue;
+                stong_counters[i] += mu_fiber.size() - previous_fiber_size;
+                previous_fiber_size = mu_fiber.size();
             }
         }
     };
@@ -148,8 +175,10 @@ auto compute_constrained_strong_and_useless_arcs(
             fiber_map.fill(false);
             auto && u = melon::arc_source(graph, uv);
             auto && v = melon::arc_target(graph, uv);
+            std::size_t previous_fiber_size = 0;
             std::vector<std::pair<vertex_t, log_probability_t>> mu_fiber;
-            for(auto && [mu, mu_length_map] : lagrange_improved_length_maps) {
+            for(auto i : std::views::iota(std::size_t(0), mus.size())) {
+                auto && [mu, mu_length_map] = lagrange_improved_length_maps[i];
                 const log_probability_t budget_penalty = mu * budget;
                 algo.reset();
                 algo.set_red_length_map(mu_length_map);
@@ -160,9 +189,13 @@ auto compute_constrained_strong_and_useless_arcs(
                 for(const auto & [w, w_dist] : algo) {
                     if(fiber_map[w]) continue;
                     fiber_map[w] = true;
-                    useless_arcs_map[w].push_back(uv);
                     mu_fiber.emplace_back(w, w_dist.first - budget_penalty);
+                    if(useless_vertices_map[w]) continue;
+                    useless_arcs_map[w].push_back(uv);
                 }
+                if(mu_fiber.size() == previous_fiber_size) continue;
+                useless_counters[i] += mu_fiber.size() - previous_fiber_size;
+                previous_fiber_size = mu_fiber.size();
             }
         }
     };
@@ -173,6 +206,41 @@ auto compute_constrained_strong_and_useless_arcs(
     } else {
         compute_useless_arcs(
             tbb::blocked_range(arcs_range.begin(), arcs_range.end()));
+    }
+
+    if(spdlog::get_level() == spdlog::level::trace) {
+        for(auto i : std::views::iota(std::size_t(1), mus.size())) {
+            stong_counters[i] += stong_counters[i-1];
+            useless_counters[i] += useless_counters[i-1];
+        }
+        spdlog::trace("------------------------------------------");
+        spdlog::trace("  µ value  | strong fiber | useless fiber ");
+        spdlog::trace("           |  (avg size)  |  (avg size)");
+        spdlog::trace("------------------------------------------");
+        const auto nb_arcs = melon::nb_arcs(graph);
+        for(auto i : std::views::iota(std::size_t(0), mus.size())) {
+            if(i > 0 && stong_counters[i].load() == stong_counters[i-1].load() && useless_counters[i].load() == useless_counters[i-1].load()) continue;
+            spdlog::trace(" {:>.3e} | {:>10f}   | {:>11f}  ", mus[i], static_cast<double>(stong_counters[i]) / nb_arcs, static_cast<double>(useless_counters[i]) / nb_arcs);
+        }
+        spdlog::trace("------------------------------------------");
+
+        int nb_strong, nb_useless, nb_sinks;
+        nb_strong = nb_useless = nb_sinks = 0;
+        for(auto && v : melon::vertices(graph)) {
+            if(useless_vertices_map[v]) continue;
+            nb_strong += strong_arcs_map[v].size();
+            nb_useless += useless_arcs_map[v].size();
+            ++nb_sinks;
+        }
+        spdlog::trace("  {:>10.2f} strong arcs on average",
+                        static_cast<double>(nb_strong) / nb_sinks);
+        spdlog::trace("  {:>10.2f} useless arcs on average",
+                        static_cast<double>(nb_useless) / nb_sinks);
+        spdlog::trace("           (took {} ms)",
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                prep_sw.elapsed())
+                .count());
+
     }
 
     return std::make_pair(strong_arcs_map, useless_arcs_map);

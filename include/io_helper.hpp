@@ -11,10 +11,10 @@
 
 namespace fhamonic {
 
-template <spdlog::level::level_enum lvl>
+template <spdlog::level::level_enum LVL>
 void print_instance_size(auto && instance,
                          const std::string & instance_name = "Instance") {
-    spdlog::log(lvl, "{} has {} options and {} species graph:", instance_name,
+    spdlog::log(LVL, "{} has {} options and {} species graph:", instance_name,
                 instance.nb_options(), instance.cases().size());
     const std::size_t instance_name_max_length =
         std::ranges::max(std::ranges::views::transform(
@@ -31,11 +31,11 @@ void print_instance_size(auto && instance,
         int nb_improvable_arcs = 0;
         for(auto && a : melon::arcs(graph))
             nb_improvable_arcs += instance_case.arc_options_map()[a].size() > 0;
-        spdlog::log(lvl, "    {:>{}}: {:>6} vertices ({} improvable, {} habitats)",
-                    instance_case.name(), instance_name_max_length,
-                    graph.nb_vertices(), nb_improvable_vertices,
-                    nb_habitat_vertices);
-        spdlog::log(lvl, "    {:>{}}{:>8} arcs     ({} improvable)", "",
+        spdlog::log(
+            LVL, "    {:>{}}: {:>6} vertices ({} improvable, {} habitats)",
+            instance_case.name(), instance_name_max_length, graph.nb_vertices(),
+            nb_improvable_vertices, nb_habitat_vertices);
+        spdlog::log(LVL, "    {:>{}}{:>8} arcs     ({} improvable)", "",
                     instance_name_max_length, graph.nb_arcs(),
                     nb_improvable_arcs);
     }
@@ -60,6 +60,40 @@ void print_paragraph(std::size_t offset, std::size_t column_width,
     }
     fmt::println("{:<{}}", str.substr(line_start), column_width - offset);
 }
+
+template <spdlog::level::level_enum LVL, std::size_t BAR_LENGTH>
+class progress_bar {
+private:
+    std::atomic<std::size_t> _current_ticks;
+    std::size_t _final_ticks;
+
+private:
+    void _print_bar(std::size_t progress) {
+        fmt::print("[{0:=^{1}}>{0: ^{2}}] {3:>3}%\r", "", progress,
+                   BAR_LENGTH - progress, 100 * progress / BAR_LENGTH);
+        fflush(stdout);
+    }
+
+public:
+    progress_bar(const std::size_t nb_ticks)
+        : _current_ticks(0), _final_ticks(nb_ticks) {
+        if(spdlog::get_level() > LVL) return;
+        _print_bar(0);
+    }
+    ~progress_bar() {
+        if(spdlog::get_level() > LVL) return;
+        fmt::print("{0: ^{1}}\r", "", BAR_LENGTH + 8);
+        fflush(stdout);
+    }
+    void tick(const std::size_t incr = 1) {
+        const std::size_t ticks = (_current_ticks += incr);
+        if(spdlog::get_level() > LVL) return;
+        if((BAR_LENGTH * ticks) % _final_ticks <= BAR_LENGTH) {
+            _print_bar(BAR_LENGTH * ticks / _final_ticks);
+        }
+    }
+    void reset() { _current_ticks = 0; }
+};
 
 }  // namespace fhamonic
 

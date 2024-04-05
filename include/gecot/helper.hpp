@@ -22,6 +22,8 @@
 #include "gecot/indices/parallel_pc_num.hpp"
 #include "gecot/indices/pc_num.hpp"
 
+#include "io_helper.hpp"
+
 namespace fhamonic {
 namespace gecot {
 
@@ -163,8 +165,8 @@ void _compute_options_cases_incr_pc_num(
     auto && cases_arc_options, auto & options_cases_pc_num) {
     const auto & cases = instance.cases();
 
-    std::atomic<std::size_t> cpt = 0;
-    std::size_t nb_pass = free_options.size() * cases.size();
+    progress_bar<spdlog::level::trace, 50> pb(free_options.size() *
+                                              cases.size());
 
     auto compute_options_enhanced_pc_num =
         [&](const tbb::blocked_range2d<decltype(cases.begin()),
@@ -201,13 +203,7 @@ void _compute_options_cases_incr_pc_num(
                             pc_num(graph, enhanced_qm, enhanced_pm);
                     }
 
-                    const std::size_t step_cpt = ++cpt;
-                    if(std::fmod(50 * step_cpt, nb_pass) <= 50) {
-                        std::size_t progress = 50 * step_cpt / nb_pass;
-                        fmt::print("[{0:=^{1}}>{0: ^{2}}] {3}%\r", "", progress,
-                                   50 - progress, 100 * step_cpt / nb_pass);
-                        fflush(stdout);
-                    }
+                    pb.tick();
 
                     if(++it == options_block.end()) break;
 
@@ -248,16 +244,20 @@ void compute_options_cases_incr_pc_num(
             cases_vertex_options, cases_arc_options, options_cases_pc_num);
     }
 }
-
-template <instance_c I, melon::input_mapping<option_t> S,
+namespace detail {
+template <bool parallel, instance_c I, melon::input_mapping<option_t> S,
           detail::range_of<option_t> O>
     requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
-void compute_options_cases_decr_pc_num(
+void _compute_options_cases_decr_pc_num(
     const I & instance, const S & current_solution, const O & taken_options,
     auto && cases_current_qm, auto && cases_current_pm,
     auto && cases_vertex_options, auto && cases_arc_options,
-    auto & options_cases_pc_num, const bool parallel = false) {
+    auto & options_cases_pc_num) {
     const auto & cases = instance.cases();
+
+    progress_bar<spdlog::level::trace, 50> pb(taken_options.size() *
+                                              cases.size());
+
     auto compute_options_enhanced_pc_num =
         [&](const tbb::blocked_range2d<decltype(cases.begin()),
                                        decltype(taken_options.begin())> &
@@ -292,8 +292,17 @@ void compute_options_cases_decr_pc_num(
                         }
                     }
 
-                    options_cases_pc_num[option][instance_case.id()] =
-                        pc_num(instance_case.graph(), enhanced_qm, enhanced_pm);
+                    if constexpr(parallel) {
+                        options_cases_pc_num[option][instance_case.id()] =
+                            parallel_pc_num(instance_case.graph(), enhanced_qm,
+                                            enhanced_pm);
+                    } else {
+                        options_cases_pc_num[option][instance_case.id()] =
+                            pc_num(instance_case.graph(), enhanced_qm,
+                                   enhanced_pm);
+                    }
+
+                    pb.tick();
 
                     if(++it == options_block.end()) break;
 
@@ -305,7 +314,7 @@ void compute_options_cases_decr_pc_num(
             }
         };
 
-    if(parallel) {
+    if constexpr(parallel) {
         tbb::parallel_for(
             tbb::blocked_range2d(cases.begin(), cases.end(),
                                  taken_options.begin(), taken_options.end()),
@@ -314,6 +323,28 @@ void compute_options_cases_decr_pc_num(
         compute_options_enhanced_pc_num(
             tbb::blocked_range2d(cases.begin(), cases.end(),
                                  taken_options.begin(), taken_options.end()));
+    }
+}
+}  // namespace detail
+
+template <instance_c I, melon::input_mapping<option_t> S,
+          detail::range_of<option_t> O>
+    requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
+void compute_options_cases_decr_pc_num(
+    const I & instance, const S & current_solution, const O & taken_options,
+    auto && cases_current_qm, auto && cases_current_pm,
+    auto && cases_vertex_options, auto && cases_arc_options,
+    auto & options_cases_pc_num, const bool parallel = false) {
+    if(parallel) {
+        detail::_compute_options_cases_decr_pc_num<true>(
+            instance, current_solution, taken_options, cases_current_qm,
+            cases_current_pm, cases_vertex_options, cases_arc_options,
+            options_cases_pc_num);
+    } else {
+        detail::_compute_options_cases_decr_pc_num<false>(
+            instance, current_solution, taken_options, cases_current_qm,
+            cases_current_pm, cases_vertex_options, cases_arc_options,
+            options_cases_pc_num);
     }
 }
 

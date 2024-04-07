@@ -210,6 +210,7 @@ auto compute_constrained_strong_and_useless_arcs(
                         mu_fiber.size() - previous_fiber_size;
                     previous_fiber_size = mu_fiber.size();
                 }
+
                 pb.tick();
             }
         };

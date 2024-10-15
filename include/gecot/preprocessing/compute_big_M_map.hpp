@@ -27,10 +27,11 @@ auto compute_big_M_map(const GR & graph, const QM & quality_map,
 
     auto compute_big_Ms = [&](auto && vertices_subrange) {
         auto reversed_graph = melon::views::reverse(graph);
-        auto algo = melon::dijkstra(
-            detail::parallel_pc_num_dijkstra_traits<melon::views::reverse<GR>,
-                                                    PM>{},
-            reversed_graph, probability_map);
+        auto algo =
+            melon::dijkstra(detail::parallel_pc_num_dijkstra_traits<
+                                melon::views::reverse<GR>,
+                                melon::mapped_value_t<PM, melon::arc_t<GR>>>{},
+                            reversed_graph, probability_map);
 
         for(auto && s : vertices_subrange) {
             double M = 0;

@@ -15,29 +15,29 @@ template <spdlog::level::level_enum LVL>
 void print_instance_size(auto && instance,
                          const std::string & instance_name = "Instance") {
     spdlog::log(LVL, "{} has {} options and {} species graph:", instance_name,
-                instance.nb_options(), instance.cases().size());
+                instance.num_options(), instance.cases().size());
     const std::size_t instance_name_max_length =
         std::ranges::max(std::ranges::views::transform(
             instance.cases(), [&](auto && c) { return c.name().size(); }));
     for(auto instance_case : instance.cases()) {
         auto && graph = instance_case.graph();
-        int nb_improvable_vertices = 0;
-        int nb_habitat_vertices = 0;
+        int num_improvable_vertices = 0;
+        int num_habitat_vertices = 0;
         for(auto && v : melon::vertices(graph)) {
-            nb_improvable_vertices +=
+            num_improvable_vertices +=
                 instance_case.vertex_options_map()[v].size() > 0;
-            nb_habitat_vertices += instance_case.vertex_quality_map()[v] > 0;
+            num_habitat_vertices += instance_case.vertex_quality_map()[v] > 0;
         }
-        int nb_improvable_arcs = 0;
+        int num_improvable_arcs = 0;
         for(auto && a : melon::arcs(graph))
-            nb_improvable_arcs += instance_case.arc_options_map()[a].size() > 0;
+            num_improvable_arcs += instance_case.arc_options_map()[a].size() > 0;
         spdlog::log(
             LVL, "    {:>{}}: {:>6} vertices ({} improvable, {} habitats)",
-            instance_case.name(), instance_name_max_length, graph.nb_vertices(),
-            nb_improvable_vertices, nb_habitat_vertices);
+            instance_case.name(), instance_name_max_length, graph.num_vertices(),
+            num_improvable_vertices, num_habitat_vertices);
         spdlog::log(LVL, "    {:>{}}{:>8} arcs     ({} improvable)", "",
-                    instance_name_max_length, graph.nb_arcs(),
-                    nb_improvable_arcs);
+                    instance_name_max_length, graph.num_arcs(),
+                    num_improvable_arcs);
     }
 }
 
@@ -75,8 +75,8 @@ private:
     }
 
 public:
-    progress_bar(const std::size_t nb_ticks)
-        : _current_ticks(0), _final_ticks(nb_ticks) {
+    progress_bar(const std::size_t num_ticks)
+        : _current_ticks(0), _final_ticks(num_ticks) {
         if(spdlog::get_level() > LVL) return;
         _print_bar(0);
     }

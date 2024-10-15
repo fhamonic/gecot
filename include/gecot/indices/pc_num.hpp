@@ -13,14 +13,10 @@ namespace detail {
 template <typename GR, typename V>
 struct pc_num_dijkstra_traits {
     using semiring = melon::most_reliable_path_semiring<V>;
-    struct entry_cmp {
-        [[nodiscard]] constexpr bool operator()(
-            const auto & e1, const auto & e2) const noexcept {
-            return semiring::less(e1.second, e2.second);
-        }
-    };
-    using heap = melon::d_ary_heap<4, melon::vertex_t<GR>, V, entry_cmp,
-                                   melon::vertex_map_t<GR, std::size_t>>;
+    using heap = melon::updatable_d_ary_heap<
+        4, std::pair<melon::vertex_t<GR>, V>, typename semiring::less_t,
+        melon::vertex_map_t<GR, std::size_t>, melon::views::get_map<1>,
+        melon::views::get_map<0>>;
 
     static constexpr bool store_paths = false;
     static constexpr bool store_distances = false;

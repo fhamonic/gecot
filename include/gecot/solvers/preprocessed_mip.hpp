@@ -27,7 +27,7 @@ struct preprocessed_MIP {
     bool parallel = false;
     bool print_model = false;
     double probability_resolution;
-    int nb_mus;
+    int num_mus;
 
     template <typename M, typename V>
     struct formula_variable_visitor {
@@ -76,13 +76,13 @@ struct preprocessed_MIP {
     auto _compute_strong_and_useless_arcs(const I & instance,
                                           const C & instance_case,
                                           const double budget) const {
-        if(nb_mus >= 1) {
+        if(num_mus >= 1) {
             return compute_constrained_strong_and_useless_arcs(
                 instance, instance_case, budget, parallel,
                 [&instance, budget](const option_t & o) {
                     return instance.option_cost(o) <= budget;
                 },
-                probability_resolution, nb_mus);
+                probability_resolution, num_mus);
         } else {
             return compute_strong_and_useless_arcs(
                 instance_case, parallel,
@@ -127,7 +127,7 @@ struct preprocessed_MIP {
                 instance_case.vertex_options_map();
 
             const auto F_vars = model.add_variables(
-                original_graph.nb_vertices(),
+                original_graph.num_vertices(),
                 [](const melon::vertex_t<instance_graph_t<I>> & v) {
                     return v;
                 },
@@ -180,7 +180,7 @@ struct preprocessed_MIP {
                                                           quality_gain);
                 }
                 const auto Phi_t_vars = model.add_variables(
-                    graph.nb_arcs(),
+                    graph.num_arcs(),
                     [&arc_no_map](const melon::arc_t<Graph> & a) {
                         return arc_no_map[a];
                     },
@@ -233,9 +233,9 @@ struct preprocessed_MIP {
         }
 
         spdlog::trace("MIP model has:");
-        spdlog::trace("  {:>10} variables", model.nb_variables());
-        spdlog::trace("  {:>10} constraints", model.nb_constraints());
-        spdlog::trace("  {:>10} entries", model.nb_entries());
+        spdlog::trace("  {:>10} variables", model.num_variables());
+        spdlog::trace("  {:>10} constraints", model.num_constraints());
+        spdlog::trace("  {:>10} entries", model.num_entries());
 
         if(print_model) std::cout << model << std::endl;
 

@@ -6,7 +6,7 @@
 
 #include <tbb/concurrent_vector.h>
 
-#include "melon/algorithm/concurrent_dijkstras.hpp"
+#include "melon/algorithm/competing_dijkstras.hpp"
 #include "melon/graph.hpp"
 
 #include "gecot/helper.hpp"
@@ -22,7 +22,7 @@ auto compute_constrained_strong_and_useless_arcs(
     const I & instance, const C & instance_case, const double budget,
     const bool parallel = false,
     const auto & option_predicate = [](const option_t & o) { return true; },
-    double probability_resolution = 0.00000001, int nb_mus = 10) {
+    double probability_resolution = 0.00000001, int num_mus = 10) {
     using graph_t = case_graph_t<C>;
     using log_probability_t = uint64_t;
     using log_probability_map_t = melon::arc_map_t<graph_t, log_probability_t>;
@@ -83,7 +83,7 @@ auto compute_constrained_strong_and_useless_arcs(
         }
     }
 
-    double geometrical_ratio = std::pow(max_mu / min_mu, 1.0 / nb_mus);
+    double geometrical_ratio = std::pow(max_mu / min_mu, 1.0 / num_mus);
     spdlog::trace("Min µ: {:.4e}, Max µ: {:.4e}, common ratio: {:.6g}", min_mu,
                   max_mu, geometrical_ratio);
 
@@ -123,7 +123,7 @@ auto compute_constrained_strong_and_useless_arcs(
                 melon::views::subgraph(graph, {}, [&](const arc_t & a) -> bool {
                     return !fiber_map[melon::arc_target(graph, a)] && a != uv;
                 });
-            auto algo = melon::concurrent_dijkstras(
+            auto algo = melon::competing_dijkstras(
                 detail::useless_arc_default_traits<graph_t,
                                                    log_probability_t>{},
                 sgraph, base_length_map, base_length_map);
@@ -177,7 +177,7 @@ auto compute_constrained_strong_and_useless_arcs(
                 melon::views::subgraph(graph, {}, [&](const arc_t & a) -> bool {
                     return !fiber_map[melon::arc_target(graph, a)] && a != uv;
                 });
-            auto algo = melon::concurrent_dijkstras(
+            auto algo = melon::competing_dijkstras(
                 detail::useless_arc_default_traits<graph_t,
                                                    log_probability_t>{},
                 sgraph, base_length_map, base_length_map);
@@ -232,30 +232,30 @@ auto compute_constrained_strong_and_useless_arcs(
         spdlog::trace("  µ value  | strong fiber | useless fiber ");
         spdlog::trace("           |  (avg size)  |  (avg size)");
         spdlog::trace("------------------------------------------");
-        const auto nb_arcs = melon::nb_arcs(graph);
+        const auto num_arcs = melon::num_arcs(graph);
         for(auto i : std::views::iota(std::size_t(0), mus.size())) {
             if(i > 0 &&
                stong_counters[i].load() == stong_counters[i - 1].load() &&
                useless_counters[i].load() == useless_counters[i - 1].load())
                 continue;
             spdlog::trace(" {:>.3e} | {:>12.3f} | {:>13.3f}  ", mus[i],
-                          static_cast<double>(stong_counters[i]) / nb_arcs,
-                          static_cast<double>(useless_counters[i]) / nb_arcs);
+                          static_cast<double>(stong_counters[i]) / num_arcs,
+                          static_cast<double>(useless_counters[i]) / num_arcs);
         }
         spdlog::trace("------------------------------------------");
 
-        int nb_strong, nb_useless, nb_sinks;
-        nb_strong = nb_useless = nb_sinks = 0;
+        int num_strong, num_useless, num_sinks;
+        num_strong = num_useless = num_sinks = 0;
         for(auto && v : melon::vertices(graph)) {
             if(useless_vertices_map[v]) continue;
-            nb_strong += strong_arcs_map[v].size();
-            nb_useless += useless_arcs_map[v].size();
-            ++nb_sinks;
+            num_strong += strong_arcs_map[v].size();
+            num_useless += useless_arcs_map[v].size();
+            ++num_sinks;
         }
         spdlog::trace("  {:>10.2f} strong arcs on average",
-                      static_cast<double>(nb_strong) / nb_sinks);
+                      static_cast<double>(num_strong) / num_sinks);
         spdlog::trace("  {:>10.2f} useless arcs on average",
-                      static_cast<double>(nb_useless) / nb_sinks);
+                      static_cast<double>(num_useless) / num_sinks);
         spdlog::trace("          (took {} ms)",
                       std::chrono::duration_cast<std::chrono::milliseconds>(
                           prep_sw.elapsed())

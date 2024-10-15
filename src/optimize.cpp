@@ -240,7 +240,7 @@ int main(int argc, const char * argv[]) {
                         return raw_instance.option_name(o).size();
                     }));
             for(auto && option : raw_instance.options()) {
-                auto option_name = raw_instance.option_name(option);
+                const auto & option_name = raw_instance.option_name(option);
                 int value = static_cast<int>(
                     instance.contains_option(option_name)
                         ? solution[instance.option_from_name(option_name)]
@@ -272,14 +272,14 @@ int main(int argc, const char * argv[]) {
                 3;
             bool first_line = true;
             for(auto && option : raw_instance.options()) {
-                auto option_name = std::string("\"") +
-                                   raw_instance.option_name(option) + "\":";
-                int value =
+                const auto & option_name = raw_instance.option_name(option);
+                bool value =
                     instance.contains_option(option_name)
                         ? solution[instance.option_from_name(option_name)]
                         : false;
                 out.print("{}\n        {:<{}} {}", first_line ? "" : ",",
-                          option_name, option_name_max_length, value);
+                          std::string("\"") + option_name + "\":",
+                          option_name_max_length, value);
                 first_line = false;
             }
             out.print("\n    }}\n}}");
@@ -290,7 +290,7 @@ int main(int argc, const char * argv[]) {
                 fmt::output_file(opt_output_csv_file.value().string().c_str());
             out.print("option_id,value\n");
             for(auto && option : raw_instance.options()) {
-                auto option_name = raw_instance.option_name(option);
+                const auto & option_name = raw_instance.option_name(option);
                 int value = static_cast<int>(
                     instance.contains_option(option_name)
                         ? solution[instance.option_from_name(option_name)]

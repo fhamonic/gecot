@@ -34,5 +34,30 @@
             }
         }
     },
-    "criterion": "trout"
+    "criterion": {
+        "operation": "sum",
+        "values": [
+            [
+                0.1,
+                "trout"
+            ],
+            [
+                0.05,
+                "trout"
+            ],
+            {
+                "operation": "min",
+                "values": [
+                    [
+                        1,
+                        "trout"
+                    ],
+                    [
+                        0.5,
+                        "trout"
+                    ]
+                ]
+            }
+        ]
+    }
 }

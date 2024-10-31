@@ -629,7 +629,7 @@ criterion_formula parse_formula(Instance & instance, auto json_object) {
         auto operation_type =
             json_object["operation"].template get<std::string>();
         std::vector<criterion_formula> values;
-        for(auto && value_json : json_object) {
+        for(auto && value_json : json_object["values"]) {
             values.emplace_back(parse_formula(instance, value_json));
         }
         if(operation_type == "sum") return criterion_sum{std::move(values)};

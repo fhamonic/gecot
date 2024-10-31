@@ -5,7 +5,7 @@
 
 #include <tbb/concurrent_vector.h>
 
-#include "melon/algorithm/concurrent_dijkstras.hpp"
+#include "melon/algorithm/competing_dijkstras.hpp"
 #include "melon/views/subgraph.hpp"
 
 #include "gecot/helper.hpp"
@@ -28,11 +28,13 @@ struct strong_arc_default_traits {
     struct entry_cmp {
         [[nodiscard]] constexpr bool operator()(
             const auto & e1, const auto & e2) const noexcept {
-            return compare_entries(e1.second, e2.second);
+            return compare_entries(e1, e2);
         }
     };
-    using heap = melon::d_ary_heap<2, melon::vertex_t<_Graph>, entry, entry_cmp,
-                                   melon::vertex_map_t<_Graph, std::size_t>>;
+    using heap = melon::updatable_d_ary_heap<
+        2, std::pair<melon::vertex_t<_Graph>, entry>, entry_cmp,
+        melon::vertex_map_t<_Graph, std::size_t>, melon::views::get_map<1>,
+        melon::views::get_map<0>>;
 
     static constexpr bool store_distances = false;
     static constexpr bool store_paths = false;
@@ -50,11 +52,13 @@ struct useless_arc_default_traits {
     struct entry_cmp {
         [[nodiscard]] constexpr bool operator()(
             const auto & e1, const auto & e2) const noexcept {
-            return compare_entries(e1.second, e2.second);
+            return compare_entries(e1, e2);
         }
     };
-    using heap = melon::d_ary_heap<2, melon::vertex_t<_Graph>, entry, entry_cmp,
-                                   melon::vertex_map_t<_Graph, std::size_t>>;
+    using heap = melon::updatable_d_ary_heap<
+        2, std::pair<melon::vertex_t<_Graph>, entry>, entry_cmp,
+        melon::vertex_map_t<_Graph, std::size_t>, melon::views::get_map<1>,
+        melon::views::get_map<0>>;
 
     static constexpr bool store_distances = false;
     static constexpr bool store_paths = false;
@@ -63,14 +67,11 @@ struct useless_arc_default_traits {
 template <typename GR, typename V>
 struct path_dijkstra_traits {
     using semiring = melon::most_reliable_path_semiring<V>;
-    struct entry_cmp {
-        [[nodiscard]] constexpr bool operator()(
-            const auto & e1, const auto & e2) const noexcept {
-            return semiring::less(e1.second, e2.second);
-        }
-    };
-    using heap = melon::d_ary_heap<4, melon::vertex_t<GR>, V, entry_cmp,
-                                   melon::vertex_map_t<GR, std::size_t>>;
+
+    using heap = melon::updatable_d_ary_heap<
+        4, std::pair<melon::vertex_t<GR>, V>, typename semiring::less_t,
+        melon::vertex_map_t<GR, std::size_t>, melon::views::get_map<1>,
+        melon::views::get_map<0>>;
 
     static constexpr bool store_paths = true;
     static constexpr bool store_distances = false;
@@ -139,7 +140,7 @@ auto compute_strong_and_useless_arcs(
                 auto sgraph = melon::views::subgraph(
                     graph, {},
                     [&uv](const arc_t & a) -> bool { return a != uv; });
-                auto algo = melon::concurrent_dijkstras(
+                auto algo = melon::competing_dijkstras(
                     detail::useless_arc_default_traits<graph_t,
                                                        log_probability_t>{},
                     sgraph, base_length_map, improved_length_map);
@@ -173,7 +174,7 @@ auto compute_strong_and_useless_arcs(
                 auto sgraph = melon::views::subgraph(
                     graph, {},
                     [&uv](const arc_t & a) -> bool { return a != uv; });
-                auto algo = melon::concurrent_dijkstras(
+                auto algo = melon::competing_dijkstras(
                     detail::useless_arc_default_traits<graph_t,
                                                        log_probability_t>{},
                     sgraph, base_length_map, improved_length_map);
@@ -202,20 +203,20 @@ auto compute_strong_and_useless_arcs(
     }
 
     if(spdlog::get_level() == spdlog::level::trace) {
-        int nb_strong, nb_useless, nb_sinks;
-        nb_strong = nb_useless = nb_sinks = 0;
+        int num_strong, num_useless, num_sinks;
+        num_strong = num_useless = num_sinks = 0;
         for(auto && v : melon::vertices(graph)) {
             if(instance_case.vertex_quality_map()[v] == 0 &&
                instance_case.vertex_options_map()[v].empty())
                 continue;
-            nb_strong += strong_arcs_map[v].size();
-            nb_useless += useless_arcs_map[v].size();
-            ++nb_sinks;
+            num_strong += strong_arcs_map[v].size();
+            num_useless += useless_arcs_map[v].size();
+            ++num_sinks;
         }
         spdlog::trace("  {:>10.2f} strong arcs on average",
-                      static_cast<double>(nb_strong) / nb_sinks);
+                      static_cast<double>(num_strong) / num_sinks);
         spdlog::trace("  {:>10.2f} useless arcs on average",
-                      static_cast<double>(nb_useless) / nb_sinks);
+                      static_cast<double>(num_useless) / num_sinks);
         spdlog::trace("          (took {} ms)",
                       std::chrono::duration_cast<std::chrono::milliseconds>(
                           prep_sw.elapsed())

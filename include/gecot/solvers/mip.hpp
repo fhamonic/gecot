@@ -40,7 +40,7 @@ struct MIP {
         auto operator()(const criterion_var & v) { return C_vars.get()(v); }
         auto operator()(const criterion_sum & f) {
             auto var = model.get().add_variable();
-            std::cout << 'R' << model.get().nb_constraints() << '\n';
+            std::cout << 'R' << model.get().num_constraints() << '\n';
             model.get().add_constraint(
                 var <= mippp::xsum(f.values, [this](const auto & e) {
                     return std::visit(*this, e);
@@ -56,7 +56,7 @@ struct MIP {
                     "!");
 
             auto var = model.get().add_variable();
-            std::cout << 'R' << model.get().nb_constraints() << '\n';
+            std::cout << 'R' << model.get().num_constraints() << '\n';
             model.get().add_constraint(
                 var <= std::get<criterion_constant>(f.values[0]) *
                            std::visit(*this, f.values[1]));
@@ -65,7 +65,7 @@ struct MIP {
         auto operator()(const criterion_min & f) {
             auto var = model.get().add_variable();
             for(auto && e : f.values) {
-                std::cout << 'R' << model.get().nb_constraints() << '\n';
+                std::cout << 'R' << model.get().num_constraints() << '\n';
                 model.get().add_constraint(var <= std::visit(*this, e));
             }
             return var;
@@ -95,13 +95,13 @@ struct MIP {
             [](const option_t & i) { return "Y_" + std::to_string(i); },
             {.upper_bound = 1, .type = mip::var_category::binary});
 
-        if(print_model) std::cout << 'R' << model.nb_constraints() << '\n';
+        if(print_model) std::cout << 'R' << model.num_constraints() << '\n';
         model.add_constraint(
             xsum(instance.options(), X_vars, [&instance](const auto & o) {
                 return instance.option_cost(o);
             }) <= budget);
 
-        int nb_blocks = 0;
+        int num_blocks = 0;
 
         for(auto && instance_case : instance.cases()) {
             const auto case_id = instance_case.id();
@@ -113,7 +113,7 @@ struct MIP {
                 melon::vertices(graph), parallel);
 
             const auto F_vars = model.add_variables(
-                graph.nb_vertices(),
+                graph.num_vertices(),
                 [](const melon::vertex_t<instance_graph_t<I>> & v) {
                     return v;
                 },
@@ -125,7 +125,7 @@ struct MIP {
                 F_prime_additional_terms;
 
             for(const auto & t : melon::vertices(graph)) {
-                if(print_model) std::cout << "BLOCK " << ++nb_blocks << "\n";
+                if(print_model) std::cout << "BLOCK " << ++num_blocks << "\n";
                 for(const auto & [quality_gain, option] :
                     vertex_options_map[t]) {
                     const auto F_prime_t_var =
@@ -134,17 +134,17 @@ struct MIP {
                                            std::to_string(case_id) + ")");
 
                     if(print_model)
-                        std::cout << 'R' << model.nb_constraints() << '\n';
+                        std::cout << 'R' << model.num_constraints() << '\n';
                     model.add_constraint(F_prime_t_var <= F_vars(t));
                     if(print_model)
-                        std::cout << 'R' << model.nb_constraints() << '\n';
+                        std::cout << 'R' << model.num_constraints() << '\n';
                     model.add_constraint(F_prime_t_var <=
                                          big_M_map[t].value() * X_vars(option));
                     F_prime_additional_terms.emplace_back(F_prime_t_var,
                                                           quality_gain);
                 }
                 const auto Phi_t_vars = model.add_variables(
-                    graph.nb_arcs(),
+                    graph.num_arcs(),
                     [](const melon::arc_t<instance_graph_t<I>> & a) {
                         return a;
                     },
@@ -156,7 +156,7 @@ struct MIP {
                 for(const auto & u : melon::vertices(graph)) {
                     if(u == t) continue;
                     if(print_model)
-                        std::cout << 'R' << model.nb_constraints() << '\n';
+                        std::cout << 'R' << model.num_constraints() << '\n';
                     model.add_constraint(
                         xsum(graph.out_arcs(u), Phi_t_vars) <=
                         xsum(graph.in_arcs(u), Phi_t_vars, probability_map) +
@@ -169,7 +169,7 @@ struct MIP {
                                 [](const auto & p) { return p.first; }));
                 }
                 if(print_model)
-                    std::cout << 'R' << model.nb_constraints() << '\n';
+                    std::cout << 'R' << model.num_constraints() << '\n';
                 model.add_constraint(
                     F_vars(t) + xsum(graph.out_arcs(t), Phi_t_vars) <=
                     xsum(graph.in_arcs(t), Phi_t_vars, probability_map) +
@@ -185,14 +185,14 @@ struct MIP {
                     if(!arc_option_map[a].has_value()) continue;
 
                     if(print_model)
-                        std::cout << 'R' << model.nb_constraints() << '\n';
+                        std::cout << 'R' << model.num_constraints() << '\n';
                     model.add_constraint(
                         Phi_t_vars(a) <=
                         big_M_map[melon::arc_source(graph, a)].value() *
                             X_vars(arc_option_map[a].value()));
                 }
             }
-            if(print_model) std::cout << 'R' << model.nb_constraints() << '\n';
+            if(print_model) std::cout << 'R' << model.num_constraints() << '\n';
             model.add_constraint(
                 C_vars(instance_case.id()) <=
                 xsum(melon::vertices(graph), F_vars, quality_map) +
@@ -203,11 +203,11 @@ struct MIP {
         }
 
         spdlog::trace("MIP model has:");
-        spdlog::trace("  {:>10} variables", model.nb_variables());
-        spdlog::trace("  {:>10} constraints", model.nb_constraints());
-        spdlog::trace("  {:>10} entries", model.nb_entries());
+        spdlog::trace("  {:>10} variables", model.num_variables());
+        spdlog::trace("  {:>10} constraints", model.num_constraints());
+        spdlog::trace("  {:>10} entries", model.num_entries());
 
-        if(print_model) std::cout << "NBLOCKS\n" << nb_blocks << '\n';
+        if(print_model) std::cout << "NBLOCKS\n" << num_blocks << '\n';
         if(print_model) std::cout << model << std::endl;
 
         auto solver = mip_helper::build_solver(model);

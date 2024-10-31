@@ -8,16 +8,18 @@ class CompressorRecipe(ConanFile):
     build_policy = "missing"
 
     def requirements(self):
+        self.requires("nlohmann_json/3.11.3", override=True)
         self.requires("json-schema-validator/[>=2.0.0]")
         self.requires("fast-cpp-csv-parser/cci.20211104")
-        #if self.settings.os != "Windows":
-        self.requires("onetbb/2021.9.0")
+        # if self.settings.os != "Windows":
+        self.requires("onetbb/2021.12.0")
         self.requires("boost/[1.82.0]")
         self.requires("parallel-hashmap/1.37")
         self.requires("eigen/[>=3.4.0]")
         self.requires("spdlog/[>=1.13.0]")
+        self.requires("gdal/[>=3.8.3]")
 
-        self.requires("melon/0.5")
+        self.requires("melon/1.0.0-alpha.1")
         self.requires("mippp/0.1")
 
     def build_requirements(self):
@@ -40,8 +42,12 @@ class CompressorRecipe(ConanFile):
         if self.settings.os == "Windows":
             for lib, dep in self.dependencies.items():
                 if lib.ref.name == "onetbb":
-                    vars["CONAN_TBB_INCLUDE_DIR"] =  ";".join(dep.cpp_info.components["libtbb"].includedirs)
-                    vars["CONAN_TBB_LIB_DIR"] =  ";".join(dep.cpp_info.components["libtbb"].libdirs)
+                    vars["CONAN_TBB_INCLUDE_DIR"] = ";".join(
+                        dep.cpp_info.components["libtbb"].includedirs
+                    )
+                    vars["CONAN_TBB_LIB_DIR"] = ";".join(
+                        dep.cpp_info.components["libtbb"].libdirs
+                    )
                 if lib.ref.name == "mingw-builds":
                     vars["CONAN_MINGW_LIB_DIR"] = ";".join(dep.cpp_info.libdirs)
         print("variables ", vars)

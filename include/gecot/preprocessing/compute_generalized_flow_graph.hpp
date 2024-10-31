@@ -19,7 +19,7 @@ auto compute_generalized_flow_graph(const C & instance_case) {
 
     melon::static_digraph_builder<melon::static_digraph, double,
                                   std::optional<option_t>>
-        builder(original_graph.nb_vertices());
+        builder(original_graph.num_vertices());
 
     for(auto && a : melon::arcs(original_graph)) {
         builder.add_arc(melon::arc_source(original_graph, a),

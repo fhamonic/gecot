@@ -46,11 +46,11 @@ struct MIP {
         using Model = Model<GrbTraits>;
         Model model;
 
-        auto F_vars = model.add_variables(graph.nb_vertices(),
+        auto F_vars = model.add_variables(graph.num_vertices(),
                                      [](const melon::vertex_t<Graph> v) { return v; });
         auto Phi_vars = model.add_variables(
-            graph.nb_vertices() * graph.nb_arcs(),
-            [n = graph.nb_vertices()](const melon::vertex_t<Graph> v, const melon::arc_t<Graph> a) {
+            graph.num_vertices() * graph.num_arcs(),
+            [n = graph.num_vertices()](const melon::vertex_t<Graph> v, const melon::arc_t<Graph> a) {
                 return v * n + a;
             });
         auto X_vars = model.add_variables(instance.options().size(),
@@ -160,9 +160,9 @@ struct MIP {
 //     }
 //     solution.setComputeTimeMs(chrono.time_ms());
 //     solution.obj = solver->getObjValue();
-//     solution.nb_vars = solver_builder.getNbNonZeroVars();
-//     solution.nb_constraints = solver_builder.getNbConstraints();
-//     solution.nb_elems = solver->getNumElements();
+//     solution.num_vars = solver_builder.getNbNonZeroVars();
+//     solution.num_constraints = solver_builder.getNbConstraints();
+//     solution.num_elems = solver->getNumElements();
 //     if(log_level >= 1) {
 //         std::cout << name()
 //                   << ": Complete solving : " << solution.getComputeTimeMs()

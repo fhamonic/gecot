@@ -109,15 +109,15 @@ for id, hexagons in N2_hexagons.items():
         ]
     )
 
-    nb_bati = sum([row["cost"] == 1000 for row in hexagons])
+    num_bati = sum([row["cost"] == 1000 for row in hexagons])
 
-    init_prob = math.pow(init_prob, 1 / (len(hexagons) - nb_bati))
+    init_prob = math.pow(init_prob, 1 / (len(hexagons) - num_bati))
 
-    if nb_bati in [1, 2]:
+    if num_bati in [1, 2]:
         init_prob = 0.4
-    if nb_bati in [3, 4]:
+    if num_bati in [3, 4]:
         init_prob = 0.2
-    if nb_bati in [5, 6, 7]:
+    if num_bati in [5, 6, 7]:
         init_prob = 0
 
     init_quality = mean([cost_to_quality(int(row["cost"])) for row in hexagons])

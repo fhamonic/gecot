@@ -55,6 +55,7 @@ find_package(Boost REQUIRED COMPONENTS program_options)
 find_package(fmt REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(GDAL REQUIRED)
 
 find_package(melon REQUIRED)
 find_package(mippp REQUIRED)
@@ -70,7 +71,7 @@ if(WIN32)
   target_link_directories(gecot INTERFACE ${CONAN_TBB_LIB_DIR} "${CONAN_TBB_LIB_DIR}\\..\\bin")
   target_link_libraries(gecot INTERFACE "${CONAN_TBB_LIB_DIR}/../bin/libtbb12.dll")
 else()
-  target_link_libraries(gecot INTERFACE TBB::tbb)
+  target_link_libraries(gecot INTERFACE onetbb::onetbb)
 endif()
 target_link_libraries(gecot INTERFACE Boost::program_options)
 target_link_libraries(gecot INTERFACE Eigen3::Eigen)
@@ -81,28 +82,29 @@ target_link_libraries(gecot INTERFACE melon::melon)
 target_link_libraries(gecot INTERFACE mippp::mippp)
 
 # ################### EXEC target ####################
-add_executable(gecot_solve src/solve.cpp ${WINDRES_ICON_O})
-target_link_libraries(gecot_solve PUBLIC gecot)
-target_link_libraries(gecot_solve
-                      PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser)
-target_link_libraries(gecot_solve PUBLIC nlohmann_json::nlohmann_json)
-target_link_libraries(
-  gecot_solve
-  PUBLIC nlohmann_json_schema_validator)
-target_link_libraries(gecot_solve PUBLIC phmap)
+add_executable(gecot_optimize src/optimize.cpp ${WINDRES_ICON_O})
+target_link_libraries(gecot_optimize PUBLIC gecot)
+target_link_libraries(gecot_optimize PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser)
+target_link_libraries(gecot_optimize PUBLIC nlohmann_json::nlohmann_json)
+target_link_libraries(gecot_optimize PUBLIC nlohmann_json_schema_validator)
+target_link_libraries(gecot_optimize PUBLIC phmap)
+target_compile_options(gecot_optimize PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
+# target_compile_options(gecot_optimize PRIVATE -fsanitize=address)
+# target_link_options(gecot_optimize PRIVATE -fsanitize=address -lpthread -static-libasan)
 
-target_compile_options(gecot_solve PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
-# target_compile_options(gecot_solve PRIVATE -fsanitize=address)
-# target_link_options(gecot_solve PRIVATE -fsanitize=address -lpthread -static-libasan)
+add_executable(gecot_rank_options src/rank_options.cpp ${WINDRES_ICON_O})
+target_link_libraries(gecot_rank_options PUBLIC gecot) 
+target_link_libraries(gecot_rank_options PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser) 
+target_link_libraries(gecot_rank_options PUBLIC nlohmann_json::nlohmann_json) 
+target_link_libraries(gecot_rank_options PUBLIC nlohmann_json_schema_validator)
+target_link_libraries(gecot_rank_options PUBLIC phmap)
+target_compile_options(gecot_rank_options PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 
-add_executable(gecot_rank src/rank.cpp ${WINDRES_ICON_O})
-target_link_libraries(gecot_rank PUBLIC gecot) 
-target_link_libraries(gecot_rank PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser) 
-target_link_libraries(gecot_rank PUBLIC nlohmann_json::nlohmann_json) 
-target_link_libraries(gecot_rank PUBLIC nlohmann_json_schema_validator)
-target_link_libraries(gecot_rank PUBLIC phmap)
-
-target_compile_options(gecot_rank PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
+add_executable(gecot_hexagonify src/hexagonify.cpp ${WINDRES_ICON_O})
+target_link_libraries(gecot_hexagonify PUBLIC gecot)
+target_link_libraries(gecot_hexagonify PUBLIC Boost::headers) # geometry
+target_link_libraries(gecot_hexagonify PUBLIC GDAL::GDAL)
+target_compile_options(gecot_hexagonify PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 
 add_executable(gecot_test src/test.cpp)
 target_link_libraries(gecot_test PUBLIC gecot)
@@ -124,13 +126,13 @@ add_subdirectory(test)
 endif()
 
 # ################## INSTALL #####################
-install(TARGETS gecot_solve gecot_rank RUNTIME DESTINATION bin LIBRARY DESTINATION lib
+install(TARGETS gecot_optimize gecot_rank_options RUNTIME DESTINATION bin LIBRARY DESTINATION lib
 ARCHIVE DESTINATION lib)
 
 if(NOT WIN32)
   install(CODE [[
     file(GET_RUNTIME_DEPENDENCIES
-      EXECUTABLES $<TARGET_FILE:gecot_solve> $<TARGET_FILE:gecot_rank>
+      EXECUTABLES $<TARGET_FILE:gecot_optimize> $<TARGET_FILE:gecot_rank_options>
       RESOLVED_DEPENDENCIES_VAR _r_deps
       UNRESOLVED_DEPENDENCIES_VAR _u_deps
       DIRECTORIES bin
@@ -159,7 +161,7 @@ install(FILES
   set(CPACK_NSIS_DISPLAY_NAME Gecot)
   set(CPACK_NSIS_URL_INFO_ABOUT "https://github.com/fhamonic/gecot")
   set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
-  set(CPACK_NSIS_INSTALLED_ICON_NAME "bin/gecot_solve.exe")
+  set(CPACK_NSIS_INSTALLED_ICON_NAME "bin/gecot_optimize.exe")
   set(CPACK_NSIS_MUI_ICON "${PROJECT_SOURCE_DIR}/misc/gecot.ico")
   set(CPACK_NSIS_MUI_HEADERIMAGE "${PROJECT_SOURCE_DIR}/misc\\gecot_header.bmp") # must contain a backslash because fuck
   #set(CPACK_NSIS_EXTRA_PREINSTALL_COMMANDS "

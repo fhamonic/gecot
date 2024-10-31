@@ -1,0 +1,46 @@
+{
+    "options": {
+        "csv_file": "options.csv",
+        "csv_columns": {
+            "id": "option_id",
+            "cost": "cost"
+        }
+    },
+    "cases": {
+        "squirrel": {
+            "vertices": {
+                "csv_file": "vertices.csv",
+                "csv_columns": {
+                    "id": "id",
+                    "quality": "quality"
+                }
+            },
+            "arcs": {
+                "csv_file": "arcs.csv",
+                "csv_columns": {
+                    "id": "arc_id",
+                    "from": "source_id",
+                    "to": "target_id",
+                    "probability": "probability"
+                }
+            },
+            "vertices_improvements": {
+                "csv_file": "vertex_options.csv",
+                "csv_columns": {
+                    "vertex_id": "vertex_id",
+                    "option_id": "option_id",
+                    "quality_gain": "quality_gain"
+                }
+            },
+            "arcs_improvements": {
+                "csv_file": "arc_options.csv",
+                "csv_columns": {
+                    "arc_id": "arc_id",
+                    "option_id": "option_id",
+                    "improved_probability": "improved_prob"
+                }
+            }
+        }
+    },
+    "criterion": "squirrel"
+}

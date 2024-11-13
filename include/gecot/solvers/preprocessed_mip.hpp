@@ -6,6 +6,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include "mippp/expressions/linear_expression.hpp"
 #include "mippp/mip_model.hpp"
 #include "mippp/operators.hpp"
 #include "mippp/xsum.hpp"
@@ -41,13 +42,21 @@ struct preprocessed_MIP {
             return model.get().add_variable(
                 {.lower_bound = c, .upper_bound = c});
         }
-        auto operator()(const criterion_var & v) { return C_vars.get()(v); }
+        auto operator()(const criterion_var & v) {
+            return C_vars.get()(v);
+        }
         auto operator()(const criterion_sum & f) {
             auto var = model.get().add_variable();
+            std::vector<typename M::var> vars;
+            for(auto && e : f.values) vars.emplace_back(std::visit(*this, e));
+
             model.get().add_constraint(
-                var <= mippp::xsum(f.values, [this](const auto & e) {
-                    return std::visit(*this, e);
-                }));
+                var <= mippp::linear_expression(
+                           ranges::views::transform(
+                               vars, [](auto && v) { return v.id(); }),
+                           ranges::views::transform(
+                               vars, [](auto && v) { return 1.0; }),
+                           0.0));
             return var;
         }
         auto operator()(const criterion_product & f) {

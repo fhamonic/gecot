@@ -1,4 +1,4 @@
-arc_id,option_id,improved_prob
+arc_id,option_id,improved_probability
 43:0_in_arc,218,0.999499874937461
 43:0_out_arc,218,0.999499874937461
 44:0_in_arc,218,0.999499874937461

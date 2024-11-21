@@ -1,4 +1,4 @@
-arc_id,source_id,target_id,probability
+id,from,to,probability
 0:0_in_arc,0:0_in,0:0,1.0
 0:0_out_arc,0:0,0:0_out,1.0
 0:0_to_1:0,0:0_out,1:0_in,1

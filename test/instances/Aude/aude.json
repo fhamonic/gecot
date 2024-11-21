@@ -1,10 +1,6 @@
 {
     "options": {
-        "csv_file": "dams.csv",
-        "csv_columns": {
-            "id": "name",
-            "cost": "cost"
-        }
+        "csv_file": "dams.csv"
     },
     "cases": {
         "trout": {

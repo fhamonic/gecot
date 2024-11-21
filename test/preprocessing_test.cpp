@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 #include <string>
 
+#include <spdlog/spdlog.h>
+#include <spdlog/stopwatch.h>
+
 #include "melon/mapping.hpp"
 #include "melon/utility/graphviz_printer.hpp"
 #include "melon/views/reverse.hpp"
@@ -12,8 +15,8 @@
 #include "gecot/preprocessing/compute_generalized_flow_graph.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 
-#include "instance.hpp"
-#include "parse_instance.hpp"
+#include "optimize/instance.hpp"
+#include "optimize/parse_instance.hpp"
 
 using namespace fhamonic;
 
@@ -42,8 +45,8 @@ double compute_original_contribution(auto && graph, auto quality_map,
 GTEST_TEST(preprocessing, fuzzy_test) {
     std::string instance_path = PROJECT_SOURCE_DIR;
     // instance_path.append("/test/instances/aude.json");
-    // instance_path.append("/test/instances/quebec_438_RASY.json");
-    instance_path.append("/test/instances/biorevaix.json");
+    instance_path.append("/test/instances/quebec_438_RASY.json");
+    // instance_path.append("/test/instances/biorevaix_N1.json");
     Instance instance = parse_instance(instance_path);
     double budget = 0;
     for(auto && o : instance.options()) budget += instance.option_cost(o);
@@ -102,7 +105,7 @@ GTEST_TEST(preprocessing, fuzzy_test) {
                     contracted_quality_map, contracted_probability_map, t);
 
             cpt += 1;
-            if(std::abs(contribution - contracted_contribution) <= 1e-5) {
+            if(std::abs(contribution - contracted_contribution) <= 1e-6 * std::min(contribution, contracted_contribution)) {
                 cpt_ok += 1;
             } else {
                 std::cout << original_t << "\t" << melon::num_vertices(graph)
@@ -182,6 +185,5 @@ GTEST_TEST(preprocessing, fuzzy_test) {
               << std::endl;
     std::cout << "contracted_num_constraints: " << contracted_num_constraints
               << std::endl;
-    ASSERT_TRUE(false);
     ASSERT_EQ(cpt, cpt_ok);
 }

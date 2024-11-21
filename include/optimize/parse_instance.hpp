@@ -48,8 +48,7 @@ static const nlohmann::json instance_schema = R"(
                         }
                     },
                     "required": [
-                        "csv_file",
-                        "csv_columns"
+                        "csv_file"
                     ],
                     "additionalProperties": false
                 },
@@ -101,8 +100,7 @@ static const nlohmann::json instance_schema = R"(
                                         }
                                     },
                                     "required": [
-                                        "csv_file",
-                                        "csv_columns"
+                                        "csv_file"
                                     ],
                                     "additionalProperties": false
                                 },
@@ -156,8 +154,7 @@ static const nlohmann::json instance_schema = R"(
                                         }
                                     },
                                     "required": [
-                                        "csv_file",
-                                        "csv_columns"
+                                        "csv_file"
                                     ],
                                     "additionalProperties": false
                                 },
@@ -214,8 +211,7 @@ static const nlohmann::json instance_schema = R"(
                                         }
                                     },
                                     "required": [
-                                        "csv_file",
-                                        "csv_columns"
+                                        "csv_file"
                                     ],
                                     "additionalProperties": false
                                 },
@@ -268,8 +264,7 @@ static const nlohmann::json instance_schema = R"(
                                         }
                                     },
                                     "required": [
-                                        "csv_file",
-                                        "csv_columns"
+                                        "csv_file"
                                     ],
                                     "additionalProperties": false
                                 },
@@ -388,6 +383,19 @@ static const nlohmann::json instance_schema = R"(
 }
 
 template <typename T>
+void parse_columns_aliases(
+    T json_object,
+    std::initializer_list<std::reference_wrapper<std::string>> column_names) {
+    if(!json_object.contains("csv_columns")) return;
+    auto columns = json_object["csv_columns"];
+    for(auto & s : column_names) {
+        if(columns.contains(s)) {
+            s.get() = columns[s];
+        }
+    }
+}
+
+template <typename T>
 void parse_options(Instance & instance, T json_object,
                    const std::filesystem::path & parent_path) {
     auto add_option = [&](const std::string & option_id,
@@ -403,9 +411,11 @@ void parse_options(Instance & instance, T json_object,
         if(options_csv_path.is_relative())
             options_csv_path = (parent_path / options_csv_path);
         io::CSVReader<2> options_csv(options_csv_path.string());
-        auto columns = json_object["csv_columns"];
-        options_csv.read_header(io::ignore_extra_column, columns["id"],
-                                columns["cost"]);
+        std::string id_column = "id";
+        std::string cost_column = "cost";
+        parse_columns_aliases(json_object, {id_column, cost_column});
+        options_csv.read_header(io::ignore_extra_column, id_column,
+                                cost_column);
 
         std::string option_id;
         double option_cost;
@@ -444,11 +454,15 @@ void parse_vertices_options(InstanceCase & instance_case, T json_object,
                     (parent_path / vertex_options_csv_path);
             io::CSVReader<3> vertex_options_csv(
                 vertex_options_csv_path.string());
-
-            auto columns = vertex_options_json["csv_columns"];
-            vertex_options_csv.read_header(
-                io::ignore_extra_column, columns["option_id"],
-                columns["vertex_id"], columns["quality_gain"]);
+            std::string option_id_column = "option_id";
+            std::string vertex_id_column = "vertex_id";
+            std::string quality_gain_column = "quality_gain";
+            parse_columns_aliases(
+                vertex_options_json,
+                {option_id_column, vertex_id_column, quality_gain_column});
+            vertex_options_csv.read_header(io::ignore_extra_column,
+                                           option_id_column, vertex_id_column,
+                                           quality_gain_column);
 
             std::size_t line_no = 2;
             try {
@@ -498,11 +512,15 @@ void parse_arcs_options(InstanceCase & instance_case, T json_object,
             if(arc_options_csv_path.is_relative())
                 arc_options_csv_path = (parent_path / arc_options_csv_path);
             io::CSVReader<3> arc_options_csv(arc_options_csv_path.string());
-
-            auto columns = arc_options_json["csv_columns"];
+            std::string option_id_column = "option_id";
+            std::string arc_id_column = "arc_id";
+            std::string improved_probability_column = "improved_probability";
+            parse_columns_aliases(
+                arc_options_json,
+                {option_id_column, arc_id_column, improved_probability_column});
             arc_options_csv.read_header(io::ignore_extra_column,
-                                        columns["option_id"], columns["arc_id"],
-                                        columns["improved_probability"]);
+                                        option_id_column, arc_id_column,
+                                        improved_probability_column);
 
             std::size_t line_no = 2;
             try {
@@ -554,10 +572,12 @@ decltype(auto) parse_instance_case(T json_object, std::string case_name,
         if(vertices_csv_path.is_relative())
             vertices_csv_path = (parent_path / vertices_csv_path);
         io::CSVReader<2> vertices_csv(vertices_csv_path.string());
-        auto vertices_columns = vertices_json["csv_columns"];
-        vertices_csv.read_header(io::ignore_extra_column,
-                                 vertices_columns["id"],
-                                 vertices_columns["quality"]);
+        std::string id_column = "id";
+        std::string quality_column = "quality";
+        parse_columns_aliases(vertices_json, {id_column, quality_column});
+        vertices_csv.read_header(io::ignore_extra_column, id_column,
+                                 quality_column);
+
         std::string vertex_id;
         double vertex_quality;
         while(vertices_csv.read_row(vertex_id, vertex_quality)) {
@@ -587,10 +607,14 @@ decltype(auto) parse_instance_case(T json_object, std::string case_name,
         if(arcs_csv_path.is_relative())
             arcs_csv_path = (parent_path / arcs_csv_path);
         io::CSVReader<4> arcs_csv(arcs_csv_path.string());
-        auto arcs_columns = arcs_json["csv_columns"];
-        arcs_csv.read_header(io::ignore_extra_column, arcs_columns["id"],
-                             arcs_columns["from"], arcs_columns["to"],
-                             arcs_columns["probability"]);
+        std::string id_column = "id";
+        std::string from_column = "from";
+        std::string to_column = "to";
+        std::string probability_column = "probability";
+        parse_columns_aliases(
+            arcs_json, {id_column, from_column, to_column, probability_column});
+        arcs_csv.read_header(io::ignore_extra_column, id_column, from_column,
+                             to_column, probability_column);
 
         std::string arc_id, from, to;
         double arc_probability;
@@ -641,35 +665,23 @@ criterion_formula parse_formula(Instance & instance, auto json_object) {
         "Unexpected criterion format : Update the JSON schema !");
 }
 
-Instance parse_instance(const std::filesystem::path & instance_path) {
+Instance parse_instance_json(const nlohmann::json & instance_json,
+                             const std::filesystem::path & relative_path = "") {
     Instance instance;
-
-    if(!std::filesystem::exists(instance_path))
-        throw std::invalid_argument("File '" + instance_path.string() +
-                                    "' does not exists");
-    if(std::filesystem::is_directory(instance_path))
-        throw std::invalid_argument("'" + instance_path.string() +
-                                    "' is a directory");
-
-    std::ifstream instance_stream(instance_path);
-    nlohmann::json instance_json;
-    instance_stream >> instance_json;
 
     nlohmann::json_schema::json_validator validator;
     validator.set_root_schema(detail::instance_schema);
     validator.validate(instance_json);
 
     auto options_json = instance_json["options"];
-    parse_options(instance, options_json, instance_path.parent_path());
+    parse_options(instance, options_json, relative_path);
 
     for(auto && [case_name, case_json] : instance_json["cases"].items()) {
-        InstanceCase & instance_case = parse_instance_case(
-            case_json, case_name, instance_path.parent_path(), instance);
-
-        parse_vertices_options(instance_case, case_json,
-                               instance_path.parent_path(), instance);
-        parse_arcs_options(instance_case, case_json,
-                           instance_path.parent_path(), instance);
+        InstanceCase & instance_case =
+            parse_instance_case(case_json, case_name, relative_path, instance);
+        parse_vertices_options(instance_case, case_json, relative_path,
+                               instance);
+        parse_arcs_options(instance_case, case_json, relative_path, instance);
     }
 
     if(instance_json.contains("criterion")) {
@@ -683,6 +695,21 @@ Instance parse_instance(const std::filesystem::path & instance_path) {
     }
 
     return instance;
+}
+
+Instance parse_instance(const std::filesystem::path & instance_path) {
+    if(!std::filesystem::exists(instance_path))
+        throw std::invalid_argument("File '" + instance_path.string() +
+                                    "' does not exists");
+    if(std::filesystem::is_directory(instance_path))
+        throw std::invalid_argument("'" + instance_path.string() +
+                                    "' is a directory");
+
+    std::ifstream instance_stream(instance_path);
+    nlohmann::json instance_json;
+    instance_stream >> instance_json;
+
+    return parse_instance_json(instance_json, instance_path.parent_path());
 }
 
 }  // namespace fhamonic

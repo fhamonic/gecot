@@ -13,6 +13,7 @@ project(
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+option(ENABLE_TESTING "Enable unit tests" OFF)
 option(WARNINGS "Enable warnings" OFF)
 option(OPTIMIZE_FOR_NATIVE "Build with -march=native" OFF)
 
@@ -106,33 +107,22 @@ target_compile_options(gecot_rank_options PUBLIC -fconcepts-diagnostics-depth=4 
 # target_link_libraries(gecot_hexagonify PUBLIC GDAL::GDAL)
 # target_compile_options(gecot_hexagonify PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 
-add_executable(gecot_test src/test.cpp)
-target_link_libraries(gecot_test PUBLIC gecot)
-target_link_libraries(gecot_test PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser)
-target_link_libraries(gecot_test PUBLIC nlohmann_json::nlohmann_json)
-target_link_libraries(
-  gecot_test
-  PUBLIC nlohmann_json_schema_validator)
-target_link_libraries(gecot_test PUBLIC phmap)
-
-target_compile_options(gecot_test PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
-
 # ################### TESTS ######################
 if(ENABLE_TESTING)
-enable_testing()
-message("Building Tests.")
-set_project_warnings(gecot)
-add_subdirectory(test) 
+  enable_testing()
+  message("Building Tests.")
+  set_project_warnings(gecot)
+  add_subdirectory(test) 
 endif()
 
 # ################## INSTALL #####################
-install(TARGETS gecot_optimize gecot_rank_options RUNTIME DESTINATION bin LIBRARY DESTINATION lib
+install(TARGETS gecot_optimize RUNTIME DESTINATION bin LIBRARY DESTINATION lib
 ARCHIVE DESTINATION lib)
 
 if(NOT WIN32)
   install(CODE [[
     file(GET_RUNTIME_DEPENDENCIES
-      EXECUTABLES $<TARGET_FILE:gecot_optimize> $<TARGET_FILE:gecot_rank_options>
+      EXECUTABLES $<TARGET_FILE:gecot_optimize>
       RESOLVED_DEPENDENCIES_VAR _r_deps
       UNRESOLVED_DEPENDENCIES_VAR _u_deps
       DIRECTORIES bin
@@ -173,8 +163,10 @@ endif()
 set(CPACK_PACKAGE_VENDOR "F. HAMONIC")
 if(WIN32)
   set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/misc/windows_licenses.txt")
+  install(FILES "${PROJECT_SOURCE_DIR}/misc/windows_licenses.txt" RENAME "LICENCE.txt" DESTINATION .)
 else()
   set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/misc/linux_licenses.txt")
+  install(FILES "${PROJECT_SOURCE_DIR}/misc/linux_licenses.txt" RENAME "LICENCE" DESTINATION .)
 endif()
 
 include(CPack)

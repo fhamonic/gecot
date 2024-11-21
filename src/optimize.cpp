@@ -273,7 +273,7 @@ int main(int argc, const char * argv[]) {
             bool first_line = true;
             for(auto && option : raw_instance.options()) {
                 const auto & option_name = raw_instance.option_name(option);
-                bool value =
+                int value =
                     instance.contains_option(option_name)
                         ? solution[instance.option_from_name(option_name)]
                         : false;

@@ -1,7 +1,7 @@
 This release contains many executables and shared libraries that are
 distributed under different licenses.
 
-gecot_solve, gecot_rank:
+gecot_optimize:
    Graph-based Ecological Connectivity Optimization tool
    (GECOT, https://github.com/fhamonic/gecot) distributed under the
    General Public License version 3 or later

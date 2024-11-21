@@ -15,6 +15,8 @@ For Windows, download the installer in the [last release](https://github.com/fha
 
 For Linux, download and extract the precompiled binaries in the [last release](https://github.com/fhamonic/gecot/releases).
 
+Otherise, follow the [build instructions](https://github.com/fhamonic/gecot/wiki/Build-instructions) to compile GECOT localy.
+
 ## Usage
 
     gecot_solve <algorithm_name> <instance_file> <budget_value> [<option>=<value>]

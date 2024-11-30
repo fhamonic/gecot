@@ -11,11 +11,11 @@ GECOT, the Graph-based Ecological Connectivity Optimization Tool, is an open-sou
 
 ## Installation
 
-### Windows
+For Windows, download the installer in the [last release](https://github.com/fhamonic/gecot/releases), execute it and check "Add GECOT to the system path".
 
-### Linux
+For Linux, download and extract the precompiled binaries in the [last release](https://github.com/fhamonic/gecot/releases).
 
-## Citation
+Otherwise, follow the [build instructions](https://github.com/fhamonic/gecot/wiki/Build-instructions) to compile GECOT locally.
 
 ## Usage
 

@@ -1,16 +1,16 @@
 Licensing Information for Distributed Components:
 
-gecot_solve, gecot_rank:
-   These executables are part of the
+gecot_optimize:
+   This executable is part of the
    Graph-based Ecological Connectivity Optimization tool
    (GECOT, https://github.com/fhamonic/gecot) distributed under the
    General Public License version 3 or later
    (GPLv3, https://www.gnu.org/licenses/gpl-3.0.html#license-text).
 
 cbc:
-   This executable is part of the COIN-OR Branch-and-Cut solve
+   This executable is part of the COIN-OR Branch-and-Cut solver
    (CBC, https://github.com/coin-or/Cbc) and is distributed under the
-   Eclmipse Public license v2.0 (https://www.eclipse.org/legal/epl-2.0/)
+   Eclipse Public license v2.0 (https://www.eclipse.org/legal/epl-2.0/)
 
 libtbb12.dll:
    This library is part of Intel oneAPI Threading Building Blocks
@@ -31,7 +31,7 @@ libgcc_s_seh-1.dll, libstdc++-6.dll:
 
 The concerned licenses texts are reproduced below.
 
-================================================================================
+=====================================================
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -234,7 +234,7 @@ The concerned licenses texts are reproduced below.
    See the License for the specific language governing permissions and
    limitations under the License.
 
-================================================================================
+=====================================================
 Eclipse Public License - v 2.0
 
 THE ACCOMPANYING PROGRAM IS PROVIDED UNDER THE TERMS OF THIS ECLIPSE PUBLIC
@@ -480,7 +480,7 @@ Nothing in this Agreement is intended to be enforceable by any entity that is
 not a Contributor or Recipient. No third-party beneficiary rights are created
 under this Agreement.
 
-================================================================================
+=====================================================
 Copyright (c) 2011 mingw-w64 project
 
 Permission is hereby granted, free of charge, to any person obtaining a
@@ -538,7 +538,7 @@ DEALINGS IN THE SOFTWARE.
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-================================================================================
+=====================================================
 #
 # The BSD 3-Clause License. http://www.opensource.org/licenses/BSD-3-Clause
 #
@@ -573,7 +573,7 @@ DEALINGS IN THE SOFTWARE.
 # USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-================================================================================
+=====================================================
 GNU GENERAL PUBLIC LICENSE
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1277,4 +1277,4 @@ applications with the library. If this is what you want to do, use the
 GNU Lesser General Public License instead of this License. But first,
 please read https://www.gnu.org/licenses/why-not-lgpl.html.
 
-================================================================================
+=====================================================

@@ -38,7 +38,8 @@ class CompressorRecipe(ConanFile):
 
     def cmake_variables(self):
         vars = {}
-        vars["ENABLE_TESTING"] = "ON"
+        if self.settings.os != "Windows":
+            vars["ENABLE_TESTING"] = "ON"
         if self.settings.os == "Windows":
             for lib, dep in self.dependencies.items():
                 if lib.ref.name == "onetbb":

@@ -1,23 +1,23 @@
-#ifndef GECOT_GREEDY_INCREMENTAL_INTERFACE_HPP
-#define GECOT_GREEDY_INCREMENTAL_INTERFACE_HPP
+#ifndef GECOT_MIP_INTERFACE_HPP
+#define GECOT_MIP_INTERFACE_HPP
 
 #include <sstream>
 
 #include <boost/program_options.hpp>
 
-#include "gecot/solvers/greedy_incremental.hpp"
+#include "gecot/solvers/mip.hpp"
 
-#include "optimize/solver_interfaces/abstract_solver.hpp"
+#include "solver_interfaces/abstract_solver.hpp"
 
 namespace fhamonic {
 
-class GreedyIncrementalInterface : public AbstractSolver {
+class MIPInterface : public AbstractSolver {
 private:
-    gecot::solvers::GreedyIncremental solver;
+    gecot::solvers::MIP solver;
     boost::program_options::options_description desc;
 
 public:
-    GreedyIncrementalInterface() : desc(name() + " options") {
+    MIPInterface() : desc(name() + " options") {
         desc.add_options()("verbose,v", "Log the algorithm steps")(
             "parallel,p", "Use multithreaded version");
     }
@@ -35,24 +35,26 @@ public:
         solver.parallel = vm.count("parallel") > 0;
     }
 
-    gecot::instance_solution_t<Instance> solve(const Instance & instance,
+    typename Instance::Solution solve(const Instance & instance,
                                       const double B) const {
         return solver.solve(instance, B);
     };
 
-    std::string name() const { return "greedy_incr"; }
+    std::string name() const { return "mip"; }
     std::string description() const {
-        return "From the base landscape, iteratively add the option with the "
-               "best gain/cost ratio.";
+        return "Mixed Integer Program from 'Optimizing the ecological "
+               "connectivity of landscapes with generalized flow models and "
+               "preprocessing', François Hamonic, Cécile Albert, Basile "
+               "Couëtoux, Yann Vaxès";
     }
     std::string options_description() const {
         std::ostringstream s;
         s << desc;
         return s.str();
     }
-    std::string string() const { return name(); }
+    std::string string() const { return "mip"; }
 };
 
 }  // namespace fhamonic
 
-#endif  // GECOT_GREEDY_INCREMENTAL_INTERFACE_HPP
+#endif  // GECOT_MIP_INTERFACE_HPP

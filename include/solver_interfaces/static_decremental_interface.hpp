@@ -1,26 +1,28 @@
-#ifndef GECOT_STATIC_INCREMENTAL_INTERFACE_HPP
-#define GECOT_STATIC_INCREMENTAL_INTERFACE_HPP
+#ifndef GECOT_STATIC_DECREMENTAL_INTERFACE_HPP
+#define GECOT_STATIC_DECREMENTAL_INTERFACE_HPP
 
 #include <sstream>
 
 #include <boost/program_options.hpp>
 
-#include "gecot/concepts/instance.hpp"
-#include "gecot/solvers/static_incremental.hpp"
+#include "gecot/solvers/static_decremental.hpp"
 
-#include "optimize/solver_interfaces/abstract_solver.hpp"
+#include "solver_interfaces/abstract_solver.hpp"
 
 namespace fhamonic {
 
-class StaticIncrementalInterface : public AbstractSolver {
+class StaticDecrementalInterface : public AbstractSolver {
 private:
-    gecot::solvers::StaticIncremental solver;
+    gecot::solvers::StaticDecremental solver;
     boost::program_options::options_description desc;
 
 public:
-    StaticIncrementalInterface() : desc(name() + " options") {
+    StaticDecrementalInterface() : desc(name() + " options") {
         desc.add_options()(
-            "parallel,p", "Use multithreaded version");
+            "parallel,p", "Use multithreaded version")(
+            "only-dec",
+            "Do not perform the final incremental steps that ensure that the "
+            "entire budget is used");
     }
 
     void parse(const std::vector<std::string> & args) {
@@ -33,6 +35,7 @@ public:
         po::notify(vm);
 
         solver.parallel = vm.count("parallel") > 0;
+        solver.only_dec = vm.count("only-dec") > 0;
     }
 
     gecot::instance_solution_t<Instance> solve(const Instance & instance,
@@ -40,9 +43,9 @@ public:
         return solver.solve(instance, B);
     };
 
-    std::string name() const { return "static_incr"; }
+    std::string name() const { return "static_decr"; }
     std::string description() const {
-        return "From the base landscape, add the options with the best "
+        return "From the improved landscape, remove the options with the worst "
                "gain/cost ratio.";
     }
     std::string options_description() const {
@@ -55,4 +58,4 @@ public:
 
 }  // namespace fhamonic
 
-#endif  // GECOT_STATIC_INCREMENTAL_INTERFACE_HPP
+#endif  // GECOT_STATIC_DECREMENTAL_INTERFACE_HPP

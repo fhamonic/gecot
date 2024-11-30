@@ -16,17 +16,17 @@ namespace po = boost::program_options;
 #include "gecot/helper.hpp"
 
 #include "io_helper.hpp"
-#include "optimize/instance.hpp"
-#include "optimize/parse_instance.hpp"
-#include "optimize/trivial_reformulate.hpp"
+#include "instance.hpp"
+#include "parse_instance.hpp"
+#include "trivial_reformulate.hpp"
 
-#include "optimize/solver_interfaces/abstract_solver.hpp"
-#include "optimize/solver_interfaces/greedy_decremental_interface.hpp"
-#include "optimize/solver_interfaces/greedy_incremental_interface.hpp"
-#include "optimize/solver_interfaces/mip_interface.hpp"
-#include "optimize/solver_interfaces/preprocessed_mip_interface.hpp"
-#include "optimize/solver_interfaces/static_decremental_interface.hpp"
-#include "optimize/solver_interfaces/static_incremental_interface.hpp"
+#include "solver_interfaces/abstract_solver.hpp"
+#include "solver_interfaces/greedy_decremental_interface.hpp"
+#include "solver_interfaces/greedy_incremental_interface.hpp"
+#include "solver_interfaces/mip_interface.hpp"
+#include "solver_interfaces/preprocessed_mip_interface.hpp"
+#include "solver_interfaces/static_decremental_interface.hpp"
+#include "solver_interfaces/static_incremental_interface.hpp"
 
 using namespace fhamonic;
 

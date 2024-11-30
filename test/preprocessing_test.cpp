@@ -15,8 +15,8 @@
 #include "gecot/preprocessing/compute_generalized_flow_graph.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 
-#include "optimize/instance.hpp"
-#include "optimize/parse_instance.hpp"
+#include "instance.hpp"
+#include "parse_instance.hpp"
 
 using namespace fhamonic;
 

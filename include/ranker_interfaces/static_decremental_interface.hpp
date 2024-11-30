@@ -1,23 +1,23 @@
-#ifndef GECOT_MIP_INTERFACE_HPP
-#define GECOT_MIP_INTERFACE_HPP
+#ifndef GECOT_STATIC_DECREMENTAL_INTERFACE_HPP
+#define GECOT_STATIC_DECREMENTAL_INTERFACE_HPP
 
 #include <sstream>
 
 #include <boost/program_options.hpp>
 
-#include "gecot/rankers/mip.hpp"
+#include "gecot/rankers/static_decremental.hpp"
 
-#include "optimize/ranker_interfaces/abstract_ranker.hpp"
+#include "ranker_interfaces/abstract_ranker.hpp"
 
 namespace fhamonic {
 
-class RelaxedMIPInterface : public AbstractRanker {
+class StaticDecrementalInterface : public AbstractRanker {
 private:
-    gecot::rankers::MIP ranker;
+    gecot::rankers::StaticDecremental ranker;
     boost::program_options::options_description desc;
 
 public:
-    MIPInterface() : desc(name() + " options") {
+    StaticDecrementalInterface() : desc(name() + " options") {
         desc.add_options()("verbose,v", "Log the algorithm steps")(
             "parallel,p", "Use multithreaded version");
     }
@@ -35,26 +35,24 @@ public:
         ranker.parallel = vm.count("parallel") > 0;
     }
 
-    typename gecot::instance_option_map_t<Instance, double> rank_options(
+    typename gecot::instance_options_rank_t<Instance> rank_options(
         const Instance & instance) const {
         return ranker.rank_options(instance);
     };
 
-    std::string name() const { return "mip"; }
+    std::string name() const { return "static_decremental"; }
     std::string description() const {
-        return "Mixed Integer Program from 'Optimizing the ecological "
-               "connectivity of landscapes with generalized flow models and "
-               "preprocessing', François Hamonic, Cécile Albert, Basile "
-               "Couëtoux, Yann Vaxès";
+        return "From the improved landscape, remove the options with the worst "
+               "gain/cost ratio.";
     }
     std::string options_description() const {
         std::ostringstream s;
         s << desc;
         return s.str();
     }
-    std::string string() const { return "mip"; }
+    std::string string() const { return "static_decremental"; }
 };
 
 }  // namespace fhamonic
 
-#endif  // GECOT_MIP_INTERFACE_HPP
+#endif  // GECOT_STATIC_DECREMENTAL_INTERFACE_HPP

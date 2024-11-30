@@ -203,7 +203,7 @@ auto compute_strong_and_useless_arcs(
     }
 
     if(spdlog::get_level() == spdlog::level::trace) {
-        int num_strong, num_useless, num_sinks;
+        std::size_t num_strong, num_useless, num_sinks;
         num_strong = num_useless = num_sinks = 0;
         for(auto && v : melon::vertices(graph)) {
             if(instance_case.vertex_quality_map()[v] == 0 &&
@@ -213,10 +213,12 @@ auto compute_strong_and_useless_arcs(
             num_useless += useless_arcs_map[v].size();
             ++num_sinks;
         }
-        spdlog::trace("  {:>10.2f} strong arcs on average",
-                      static_cast<double>(num_strong) / num_sinks);
-        spdlog::trace("  {:>10.2f} useless arcs on average",
-                      static_cast<double>(num_useless) / num_sinks);
+        spdlog::trace(
+            "  {:>10.2f} strong arcs on average",
+            static_cast<double>(num_strong) / static_cast<double>(num_sinks));
+        spdlog::trace(
+            "  {:>10.2f} useless arcs on average",
+            static_cast<double>(num_useless) / static_cast<double>(num_sinks));
         spdlog::trace("          (took {} ms)",
                       std::chrono::duration_cast<std::chrono::milliseconds>(
                           prep_sw.elapsed())

@@ -1,22 +1,6 @@
-#ifndef PARSE_INSTANCE_HPP
-#define PARSE_INSTANCE_HPP
-
-#include <exception>
-#include <filesystem>
-#include <fstream>
-#include <initializer_list>
-#include <iostream>
-
-#include <fast-cpp-csv-parser/csv.h>
-#include <nlohmann/json-schema.hpp>
-#include <nlohmann/json.hpp>
-
-#include "melon/utility/static_digraph_builder.hpp"
-
-#include "instance.hpp"
+#include "parse_instance.hpp"
 
 namespace fhamonic {
-namespace detail {
 
 static const nlohmann::json instance_schema = R"(
 {
@@ -380,11 +364,9 @@ static const nlohmann::json instance_schema = R"(
     "additionalProperties": false
 }
 )"_json;
-}
 
-template <typename T>
 void parse_columns_aliases(
-    T json_object,
+    const nlohmann::json & json_object,
     std::initializer_list<std::reference_wrapper<std::string>> column_names) {
     if(!json_object.contains("csv_columns")) return;
     auto columns = json_object["csv_columns"];
@@ -395,8 +377,7 @@ void parse_columns_aliases(
     }
 }
 
-template <typename T>
-void parse_options(Instance & instance, T json_object,
+void parse_options(Instance & instance, const nlohmann::json & json_object,
                    const std::filesystem::path & parent_path) {
     auto add_option = [&](const std::string & option_id,
                           const double option_cost) {
@@ -429,8 +410,8 @@ void parse_options(Instance & instance, T json_object,
     }
 }
 
-template <typename T>
-void parse_vertices_options(InstanceCase & instance_case, T json_object,
+void parse_vertices_options(InstanceCase & instance_case,
+                            const nlohmann::json & json_object,
                             const std::filesystem::path & parent_path,
                             const Instance & instance) {
     auto vertex_options = melon::create_vertex_map<
@@ -489,8 +470,8 @@ void parse_vertices_options(InstanceCase & instance_case, T json_object,
     instance_case.set_vertex_options_map(std::move(vertex_options));
 }
 
-template <typename T>
-void parse_arcs_options(InstanceCase & instance_case, T json_object,
+void parse_arcs_options(InstanceCase & instance_case,
+                        const nlohmann::json & json_object,
                         const std::filesystem::path & parent_path,
                         const Instance & instance) {
     auto arc_options =
@@ -546,8 +527,8 @@ void parse_arcs_options(InstanceCase & instance_case, T json_object,
     instance_case.set_arc_options_map(std::move(arc_options));
 }
 
-template <typename T>
-decltype(auto) parse_instance_case(T json_object, std::string case_name,
+InstanceCase & parse_instance_case(const nlohmann::json & json_object,
+                                   std::string case_name,
                                    const std::filesystem::path & parent_path,
                                    Instance & instance) {
     std::vector<double> vertex_quality_map;
@@ -640,7 +621,8 @@ decltype(auto) parse_instance_case(T json_object, std::string case_name,
         std::move(arc_name_to_id_map));
 }
 
-criterion_formula parse_formula(Instance & instance, auto json_object) {
+criterion_formula parse_formula(Instance & instance,
+                                const nlohmann::json & json_object) {
     if(json_object.is_number()) {
         return criterion_constant{json_object.template get<double>()};
     } else if(json_object.is_string()) {
@@ -666,11 +648,11 @@ criterion_formula parse_formula(Instance & instance, auto json_object) {
 }
 
 Instance parse_instance_json(const nlohmann::json & instance_json,
-                             const std::filesystem::path & relative_path = "") {
+                             const std::filesystem::path & relative_path) {
     Instance instance;
 
     nlohmann::json_schema::json_validator validator;
-    validator.set_root_schema(detail::instance_schema);
+    validator.set_root_schema(instance_schema);
     validator.validate(instance_json);
 
     auto options_json = instance_json["options"];
@@ -713,5 +695,3 @@ Instance parse_instance(const std::filesystem::path & instance_path) {
 }
 
 }  // namespace fhamonic
-
-#endif  // PARSE_INSTANCE_HPP

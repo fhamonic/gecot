@@ -1,24 +1,24 @@
-#ifndef GECOT_STATIC_DECREMENTAL_INTERFACE_HPP
-#define GECOT_STATIC_DECREMENTAL_INTERFACE_HPP
+#ifndef GECOT_GREEDY_DECREMENTAL_INTERFACE_HPP
+#define GECOT_GREEDY_DECREMENTAL_INTERFACE_HPP
 
 #include <sstream>
 
 #include <boost/program_options.hpp>
 
-#include "gecot/solvers/static_decremental.hpp"
+#include "gecot/solvers/greedy_decremental.hpp"
 
-#include "optimize/solver_interfaces/abstract_solver.hpp"
+#include "solver_interfaces/abstract_solver.hpp"
 
 namespace fhamonic {
 
-class StaticDecrementalInterface : public AbstractSolver {
+class GreedyDecrementalInterface : public AbstractSolver {
 private:
-    gecot::solvers::StaticDecremental solver;
+    gecot::solvers::GreedyDecremental solver;
     boost::program_options::options_description desc;
 
 public:
-    StaticDecrementalInterface() : desc(name() + " options") {
-        desc.add_options()(
+    GreedyDecrementalInterface() : desc(name() + " options") {
+        desc.add_options()("verbose,v", "Log the algorithm steps")(
             "parallel,p", "Use multithreaded version")(
             "only-dec",
             "Do not perform the final incremental steps that ensure that the "
@@ -34,6 +34,7 @@ public:
             vm);
         po::notify(vm);
 
+        solver.verbose = vm.count("verbose") > 0;
         solver.parallel = vm.count("parallel") > 0;
         solver.only_dec = vm.count("only-dec") > 0;
     }
@@ -43,10 +44,10 @@ public:
         return solver.solve(instance, B);
     };
 
-    std::string name() const { return "static_decr"; }
+    std::string name() const { return "greedy_decr"; }
     std::string description() const {
-        return "From the improved landscape, remove the options with the worst "
-               "gain/cost ratio.";
+        return "From the improved landscape, iteratively remove the option with "
+               "the worst gain/cost ratio (Zonation Algorithm).";
     }
     std::string options_description() const {
         std::ostringstream s;
@@ -58,4 +59,4 @@ public:
 
 }  // namespace fhamonic
 
-#endif  // GECOT_STATIC_DECREMENTAL_INTERFACE_HPP
+#endif  // GECOT_GREEDY_DECREMENTAL_INTERFACE_HPP

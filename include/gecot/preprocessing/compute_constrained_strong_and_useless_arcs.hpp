@@ -40,6 +40,10 @@ auto compute_constrained_strong_and_useless_arcs(
             -std::log(std::max(p, probability_resolution)) /
             std::log1p(probability_resolution));
     };
+    auto cost_to_penatlty = [](const double mu,
+                               const double cost) -> log_probability_t {
+        return static_cast<log_probability_t>(mu * cost);
+    };
 
     const auto & graph = instance_case.graph();
     const auto & quality_map = instance_case.vertex_quality_map();
@@ -77,9 +81,10 @@ auto compute_constrained_strong_and_useless_arcs(
         for(auto && [a, enhanced_prob] : arcs_options[i]) {
             min_mu = std::min(min_mu, 1 / arc_cost);
             if(base_length_map[a] > prob_to_length(enhanced_prob))
-                max_mu = std::max(max_mu, (base_length_map[a] -
-                                           prob_to_length(enhanced_prob)) /
-                                              arc_cost);
+                max_mu = std::max(
+                    max_mu, static_cast<double>(base_length_map[a] -
+                                                prob_to_length(enhanced_prob)) /
+                                arc_cost);
         }
     }
 
@@ -101,7 +106,7 @@ auto compute_constrained_strong_and_useless_arcs(
         for(auto && i : instance.options()) {
             const double arc_cost = instance.option_cost(i) /
                                     static_cast<double>(arcs_options[i].size());
-            const log_probability_t penalty = mu * arc_cost;
+            const log_probability_t penalty = cost_to_penatlty(mu, arc_cost);
             for(auto && [a, enhanced_prob] : arcs_options[i]) {
                 mu_length_map[a] = std::min(
                     mu_length_map[a], prob_to_length(enhanced_prob) + penalty);
@@ -137,7 +142,8 @@ auto compute_constrained_strong_and_useless_arcs(
                 for(auto i : std::views::iota(std::size_t(0), mus.size())) {
                     auto && [mu, mu_length_map] =
                         lagrange_improved_length_maps[i];
-                    const log_probability_t budget_penalty = mu * budget;
+                    const log_probability_t budget_penalty =
+                        cost_to_penatlty(mu, budget);
                     algo.reset();
                     algo.set_red_length_map(mu_length_map);
                     algo.add_red_source(u);
@@ -191,7 +197,8 @@ auto compute_constrained_strong_and_useless_arcs(
                 for(auto i : std::views::iota(std::size_t(0), mus.size())) {
                     auto && [mu, mu_length_map] =
                         lagrange_improved_length_maps[i];
-                    const log_probability_t budget_penalty = mu * budget;
+                    const log_probability_t budget_penalty =
+                        cost_to_penatlty(mu, budget);
                     algo.reset();
                     algo.set_red_length_map(mu_length_map);
                     algo.add_blue_source(u, budget_penalty);
@@ -239,12 +246,14 @@ auto compute_constrained_strong_and_useless_arcs(
                useless_counters[i].load() == useless_counters[i - 1].load())
                 continue;
             spdlog::trace(" {:>.3e} | {:>12.3f} | {:>13.3f}  ", mus[i],
-                          static_cast<double>(stong_counters[i]) / num_arcs,
-                          static_cast<double>(useless_counters[i]) / num_arcs);
+                          static_cast<double>(stong_counters[i]) /
+                              static_cast<double>(num_arcs),
+                          static_cast<double>(useless_counters[i]) /
+                              static_cast<double>(num_arcs));
         }
         spdlog::trace("------------------------------------------");
 
-        int num_strong, num_useless, num_sinks;
+        std::size_t num_strong, num_useless, num_sinks;
         num_strong = num_useless = num_sinks = 0;
         for(auto && v : melon::vertices(graph)) {
             if(useless_vertices_map[v]) continue;
@@ -252,10 +261,12 @@ auto compute_constrained_strong_and_useless_arcs(
             num_useless += useless_arcs_map[v].size();
             ++num_sinks;
         }
-        spdlog::trace("  {:>10.2f} strong arcs on average",
-                      static_cast<double>(num_strong) / num_sinks);
-        spdlog::trace("  {:>10.2f} useless arcs on average",
-                      static_cast<double>(num_useless) / num_sinks);
+        spdlog::trace(
+            "  {:>10.2f} strong arcs on average",
+            static_cast<double>(num_strong) / static_cast<double>(num_sinks));
+        spdlog::trace(
+            "  {:>10.2f} useless arcs on average",
+            static_cast<double>(num_useless) / static_cast<double>(num_sinks));
         spdlog::trace("          (took {} ms)",
                       std::chrono::duration_cast<std::chrono::milliseconds>(
                           prep_sw.elapsed())

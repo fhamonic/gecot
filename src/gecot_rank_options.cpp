@@ -12,15 +12,15 @@ namespace po = boost::program_options;
 // #include "gecot/rankers/mip_pc_num_preprocessed.hpp"
 // #include "gecot/rankers/randomized_rounding.hpp"
 
-#include "optimize/instance.hpp"
-#include "optimize/parse_instance.hpp"
-#include "optimize/trivial_reformulate.hpp"
+#include "instance.hpp"
+#include "parse_instance.hpp"
+#include "trivial_reformulate.hpp"
 
-#include "optimize/ranker_interfaces/abstract_ranker.hpp"
-#include "optimize/ranker_interfaces/greedy_decremental_interface.hpp"
-#include "optimize/ranker_interfaces/greedy_incremental_interface.hpp"
-#include "optimize/ranker_interfaces/static_decremental_interface.hpp"
-#include "optimize/ranker_interfaces/static_incremental_interface.hpp"
+#include "ranker_interfaces/abstract_ranker.hpp"
+#include "ranker_interfaces/greedy_decremental_interface.hpp"
+#include "ranker_interfaces/greedy_incremental_interface.hpp"
+#include "ranker_interfaces/static_decremental_interface.hpp"
+#include "ranker_interfaces/static_incremental_interface.hpp"
 
 using namespace fhamonic;
 

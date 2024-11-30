@@ -5,9 +5,10 @@
 
 #include <boost/program_options.hpp>
 
+#include "gecot/concepts/instance.hpp"
 #include "gecot/solvers/static_incremental.hpp"
 
-#include "optimize/solver_interfaces/abstract_solver.hpp"
+#include "solver_interfaces/abstract_solver.hpp"
 
 namespace fhamonic {
 
@@ -18,7 +19,7 @@ private:
 
 public:
     StaticIncrementalInterface() : desc(name() + " options") {
-        desc.add_options()("verbose,v", "Log the algorithm steps")(
+        desc.add_options()(
             "parallel,p", "Use multithreaded version");
     }
 
@@ -31,16 +32,15 @@ public:
             vm);
         po::notify(vm);
 
-        solver.verbose = vm.count("verbose") > 0;
         solver.parallel = vm.count("parallel") > 0;
     }
 
-    typename Instance::Solution solve(const Instance & instance,
+    gecot::instance_solution_t<Instance> solve(const Instance & instance,
                                       const double B) const {
         return solver.solve(instance, B);
     };
 
-    std::string name() const { return "static_incremental"; }
+    std::string name() const { return "static_incr"; }
     std::string description() const {
         return "From the base landscape, add the options with the best "
                "gain/cost ratio.";
@@ -50,7 +50,7 @@ public:
         s << desc;
         return s.str();
     }
-    std::string string() const { return "static_incremental"; }
+    std::string string() const { return name(); }
 };
 
 }  // namespace fhamonic

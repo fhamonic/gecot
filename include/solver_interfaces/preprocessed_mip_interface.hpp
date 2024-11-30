@@ -8,7 +8,7 @@
 #include "gecot/solvers/preprocessed_mip.hpp"
 #include "gecot/utils/mip_helper.hpp"
 
-#include "optimize/solver_interfaces/abstract_solver.hpp"
+#include "solver_interfaces/abstract_solver.hpp"
 
 namespace fhamonic {
 

@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "optimize/instance.hpp"
+#include "instance.hpp"
 
 namespace fhamonic {
 

@@ -1,23 +1,23 @@
-#ifndef GECOT_MIP_INTERFACE_HPP
-#define GECOT_MIP_INTERFACE_HPP
+#ifndef GECOT_STATIC_INCREMENTAL_INTERFACE_HPP
+#define GECOT_STATIC_INCREMENTAL_INTERFACE_HPP
 
 #include <sstream>
 
 #include <boost/program_options.hpp>
 
-#include "gecot/solvers/mip.hpp"
+#include "gecot/solvers/static_incremental.hpp"
 
-#include "optimize/solver_interfaces/abstract_solver.hpp"
+#include "solver_interfaces/abstract_solver.hpp"
 
 namespace fhamonic {
 
-class MIPInterface : public AbstractSolver {
+class StaticIncrementalInterface : public AbstractSolver {
 private:
-    gecot::solvers::MIP solver;
+    gecot::solvers::StaticIncremental solver;
     boost::program_options::options_description desc;
 
 public:
-    MIPInterface() : desc(name() + " options") {
+    StaticIncrementalInterface() : desc(name() + " options") {
         desc.add_options()("verbose,v", "Log the algorithm steps")(
             "parallel,p", "Use multithreaded version");
     }
@@ -40,21 +40,19 @@ public:
         return solver.solve(instance, B);
     };
 
-    std::string name() const { return "mip"; }
+    std::string name() const { return "static_incremental"; }
     std::string description() const {
-        return "Mixed Integer Program from 'Optimizing the ecological "
-               "connectivity of landscapes with generalized flow models and "
-               "preprocessing', François Hamonic, Cécile Albert, Basile "
-               "Couëtoux, Yann Vaxès";
+        return "From the base landscape, add the options with the best "
+               "gain/cost ratio.";
     }
     std::string options_description() const {
         std::ostringstream s;
         s << desc;
         return s.str();
     }
-    std::string string() const { return "mip"; }
+    std::string string() const { return "static_incremental"; }
 };
 
 }  // namespace fhamonic
 
-#endif  // GECOT_MIP_INTERFACE_HPP
+#endif  // GECOT_STATIC_INCREMENTAL_INTERFACE_HPP

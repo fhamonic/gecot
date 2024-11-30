@@ -5,24 +5,21 @@
 
 #include <boost/program_options.hpp>
 
-#include "gecot/solvers/greedy_decremental.hpp"
+#include "gecot/rankers/greedy_decremental.hpp"
 
-#include "optimize/solver_interfaces/abstract_solver.hpp"
+#include "ranker_interfaces/abstract_ranker.hpp"
 
 namespace fhamonic {
 
-class GreedyDecrementalInterface : public AbstractSolver {
+class GreedyDecrementalInterface : public AbstractRanker {
 private:
-    gecot::solvers::GreedyDecremental solver;
+    gecot::rankers::GreedyDecremental ranker;
     boost::program_options::options_description desc;
 
 public:
     GreedyDecrementalInterface() : desc(name() + " options") {
         desc.add_options()("verbose,v", "Log the algorithm steps")(
-            "parallel,p", "Use multithreaded version")(
-            "only-dec",
-            "Do not perform the final incremental steps that ensure that the "
-            "entire budget is used");
+            "parallel,p", "Use multithreaded version");
     }
 
     void parse(const std::vector<std::string> & args) {
@@ -34,17 +31,16 @@ public:
             vm);
         po::notify(vm);
 
-        solver.verbose = vm.count("verbose") > 0;
-        solver.parallel = vm.count("parallel") > 0;
-        solver.only_dec = vm.count("only-dec") > 0;
+        ranker.verbose = vm.count("verbose") > 0;
+        ranker.parallel = vm.count("parallel") > 0;
     }
 
-    gecot::instance_solution_t<Instance> solve(const Instance & instance,
-                                      const double B) const {
-        return solver.solve(instance, B);
+    typename gecot::instance_options_rank_t<Instance> rank_options(
+        const Instance & instance) const {
+        return ranker.rank_options(instance);
     };
 
-    std::string name() const { return "greedy_decr"; }
+    std::string name() const { return "greedy_decremental"; }
     std::string description() const {
         return "From the improved landscape, iteratively remove the option with "
                "the worst gain/cost ratio (Zonation Algorithm).";
@@ -54,7 +50,7 @@ public:
         s << desc;
         return s.str();
     }
-    std::string string() const { return name(); }
+    std::string string() const { return "greedy_decremental"; }
 };
 
 }  // namespace fhamonic

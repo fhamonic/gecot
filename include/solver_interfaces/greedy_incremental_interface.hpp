@@ -5,15 +5,15 @@
 
 #include <boost/program_options.hpp>
 
-#include "gecot/rankers/greedy_incremental.hpp"
+#include "gecot/solvers/greedy_incremental.hpp"
 
-#include "optimize/ranker_interfaces/abstract_ranker.hpp"
+#include "solver_interfaces/abstract_solver.hpp"
 
 namespace fhamonic {
 
-class GreedyIncrementalInterface : public AbstractRanker {
+class GreedyIncrementalInterface : public AbstractSolver {
 private:
-    gecot::rankers::GreedyIncremental ranker;
+    gecot::solvers::GreedyIncremental solver;
     boost::program_options::options_description desc;
 
 public:
@@ -31,16 +31,16 @@ public:
             vm);
         po::notify(vm);
 
-        ranker.verbose = vm.count("verbose") > 0;
-        ranker.parallel = vm.count("parallel") > 0;
+        solver.verbose = vm.count("verbose") > 0;
+        solver.parallel = vm.count("parallel") > 0;
     }
 
-    typename gecot::instance_options_rank_t<Instance> rank_options(
-        const Instance & instance) const {
-        return ranker.rank_options(instance);
+    gecot::instance_solution_t<Instance> solve(const Instance & instance,
+                                      const double B) const {
+        return solver.solve(instance, B);
     };
 
-    std::string name() const { return "greedy_incremental"; }
+    std::string name() const { return "greedy_incr"; }
     std::string description() const {
         return "From the base landscape, iteratively add the option with the "
                "best gain/cost ratio.";
@@ -50,7 +50,7 @@ public:
         s << desc;
         return s.str();
     }
-    std::string string() const { return "greedy_incremental"; }
+    std::string string() const { return name(); }
 };
 
 }  // namespace fhamonic

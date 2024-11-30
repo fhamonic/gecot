@@ -11,12 +11,28 @@
 #include "gecot/concepts/instance.hpp"
 #include "gecot/indices/pc_num.hpp"
 
-#include "optimize/instance.hpp"
-#include "optimize/parse_instance.hpp"
+#include "instance.hpp"
+#include "parse_instance.hpp"
 
 using namespace fhamonic;
 
-GTEST_TEST(preprocessing, fuzzy_test) {
+// GTEST_TEST(parse_instance, json_test) {
+//     static const nlohmann::json instance_schema = R"(
+// {
+    
+// }
+// )"_json;
+//     std::string instance_path = PROJECT_SOURCE_DIR;
+//     // instance_path.append("/test/instances/aude.json");
+//     instance_path.append("/test/instances/quebec_438_RASY.json");
+//     // instance_path.append("/test/instances/biorevaix_N1.json");
+//     Instance instance = parse_instance(instance_path);
+//     double budget = 0;
+//     for(auto && o : instance.options()) budget += instance.option_cost(o);
+// }
+
+
+GTEST_TEST(parse_instance, test) {
     std::string instance_path = PROJECT_SOURCE_DIR;
     // instance_path.append("/test/instances/aude.json");
     instance_path.append("/test/instances/quebec_438_RASY.json");

@@ -1,23 +1,23 @@
-#ifndef GECOT_GREEDY_DECREMENTAL_INTERFACE_HPP
-#define GECOT_GREEDY_DECREMENTAL_INTERFACE_HPP
+#ifndef GECOT_STATIC_INCREMENTAL_INTERFACE_HPP
+#define GECOT_STATIC_INCREMENTAL_INTERFACE_HPP
 
 #include <sstream>
 
 #include <boost/program_options.hpp>
 
-#include "gecot/rankers/greedy_decremental.hpp"
+#include "gecot/rankers/static_incremental.hpp"
 
-#include "optimize/ranker_interfaces/abstract_ranker.hpp"
+#include "ranker_interfaces/abstract_ranker.hpp"
 
 namespace fhamonic {
 
-class GreedyDecrementalInterface : public AbstractRanker {
+class StaticIncrementalInterface : public AbstractRanker {
 private:
-    gecot::rankers::GreedyDecremental ranker;
+    gecot::rankers::StaticIncremental ranker;
     boost::program_options::options_description desc;
 
 public:
-    GreedyDecrementalInterface() : desc(name() + " options") {
+    StaticIncrementalInterface() : desc(name() + " options") {
         desc.add_options()("verbose,v", "Log the algorithm steps")(
             "parallel,p", "Use multithreaded version");
     }
@@ -40,19 +40,19 @@ public:
         return ranker.rank_options(instance);
     };
 
-    std::string name() const { return "greedy_decremental"; }
+    std::string name() const { return "static_incremental"; }
     std::string description() const {
-        return "From the improved landscape, iteratively remove the option with "
-               "the worst gain/cost ratio (Zonation Algorithm).";
+        return "From the base landscape, add the options with the best "
+               "gain/cost ratio.";
     }
     std::string options_description() const {
         std::ostringstream s;
         s << desc;
         return s.str();
     }
-    std::string string() const { return "greedy_decremental"; }
+    std::string string() const { return "static_incremental"; }
 };
 
 }  // namespace fhamonic
 
-#endif  // GECOT_GREEDY_DECREMENTAL_INTERFACE_HPP
+#endif  // GECOT_STATIC_INCREMENTAL_INTERFACE_HPP

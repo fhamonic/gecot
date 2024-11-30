@@ -19,8 +19,8 @@ auto trivial_reformulate_instance(
     Instance reformulated_instance;
     reformulated_instance.set_criterion(instance.criterion());
 
-    auto reformulated_option_map = instance.template create_option_map<
-        std::optional<gecot::option_t>>();
+    auto reformulated_option_map =
+        instance.template create_option_map<std::optional<gecot::option_t>>();
     for(auto && original_option : instance.options()) {
         const double cost = instance.option_cost(original_option);
         if(cost > budget) continue;
@@ -86,7 +86,8 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
             for(const arc_t & a : melon::out_arcs(original_graph, v)) {
                 const vertex_t & w = melon::arc_target(original_graph, a);
                 if(i == component_num_map[w]) continue;
-                builder.add_arc(i, component_num_map[w],
+                builder.add_arc(static_cast<vertex_t>(i),
+                                static_cast<vertex_t>(component_num_map[w]),
                                 original_probability_map[a],
                                 instance_case.arc_name(a), a);
             }
@@ -106,7 +107,7 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
     for(arc_t a : melon::arcs(graph)) arc_name_to_id_map[arc_names[a]] = a;
 
     auto & reformulated_case = instance.emplace_case(
-        std::move(instance_case.name()), std::move(graph),
+        instance_case.name(), std::move(graph),
         std::move(vertex_quality_map), std::move(arc_probability_map),
         std::move(vertex_names_map), std::move(vertex_name_to_id_map),
         std::move(arc_names), std::move(arc_name_to_id_map));
@@ -127,8 +128,9 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
     }
     reformulated_case.set_vertex_options_map(std::move(vertex_options));
 
-    auto arc_options = melon::create_arc_map<
-        std::vector<std::pair<double, gecot::option_t>>>(graph, {});
+    auto arc_options =
+        melon::create_arc_map<std::vector<std::pair<double, gecot::option_t>>>(
+            graph, {});
     for(arc_t a : melon::arcs(graph)) {
         for(const auto & [improved_prob, original_option] :
             original_arc_options_map[original_arc_map[a]]) {

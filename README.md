@@ -45,5 +45,5 @@ Allowed parameters:
 
 
 ## Acknowledgments
-This work has been funded by [Region Sud](https://www.maregionsud.fr/) and Natural [Solutions](https://www.natural-solutions.eu/) ([PhD thesis](https://theses.fr/api/v1/document/2023AIXM9063) of François Hamonic) and by the ERC project [SCALED](https://www.scaled-erc.eu/), grant n°949812 (postdoctoral position of François Hamonic).
+This work has been funded by [Region Sud](https://www.maregionsud.fr/) and Natural [Solutions](https://www.natural-solutions.eu/) ([PhD thesis](https://theses.fr/api/v1/document/2023AIXM9063) of François Hamonic) and by the ERC project [SCALED](https://www.scaled-erc.eu/), grant n°949812 (postdoctoral position).
 

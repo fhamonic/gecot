@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.30)
 
 project(
   Gecot
@@ -140,26 +140,43 @@ if(NOT WIN32)
     endif()
   ]])
 else()
+# install(FILES 
+# "c:/libs/cbc/bin/cbc.exe" 
+# "${CONAN_TBB_LIB_DIR}/../bin/libtbb12.dll" 
+# "${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libgcc_s_seh-1.dll" 
+# "${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libwinpthread-1.dll" 
+# "${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libstdc++-6.dll" 
+# DESTINATION bin)
+# set(CPACK_NSIS_MODIFY_PATH 2)
+# set(CPACK_NSIS_DISPLAY_NAME Gecot)
+# set(CPACK_NSIS_URL_INFO_ABOUT "https://github.com/fhamonic/gecot")
+# set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+# set(CPACK_NSIS_INSTALLED_ICON_NAME "bin/gecot_optimize.exe")
+# set(CPACK_NSIS_MUI_ICON "${PROJECT_SOURCE_DIR}/misc/gecot.ico")
+# set(CPACK_NSIS_MUI_HEADERIMAGE "${PROJECT_SOURCE_DIR}/misc\\nsis_gecot_header.bmp")
 install(FILES 
-  "c:/libs/cbc/bin/cbc.exe" 
-  "${CONAN_TBB_LIB_DIR}/../bin/libtbb12.dll" 
-  "${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libgcc_s_seh-1.dll" 
-  "${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libwinpthread-1.dll" 
-  "${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libstdc++-6.dll" 
-  DESTINATION bin)
-  set(CPACK_NSIS_MODIFY_PATH 2)
-  set(CPACK_NSIS_DISPLAY_NAME Gecot)
-  set(CPACK_NSIS_URL_INFO_ABOUT "https://github.com/fhamonic/gecot")
-  set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
-  set(CPACK_NSIS_INSTALLED_ICON_NAME "bin/gecot_optimize.exe")
-  set(CPACK_NSIS_MUI_ICON "${PROJECT_SOURCE_DIR}/misc/gecot.ico")
-  set(CPACK_NSIS_MUI_HEADERIMAGE "${PROJECT_SOURCE_DIR}/misc\\gecot_header.bmp") # must contain a backslash because fuck
-  #set(CPACK_NSIS_EXTRA_PREINSTALL_COMMANDS "
-  #WriteINIStr \\\"C:\\\\Users\\\\Plaiseek\\\\Documents\\\\Softwares\\\\gecot\\\\build\\\\_CPack_Packages\\\\win64\\\\NSIS\\\\NSIS.InstallOptions.ini\\\" \\\"Field 2\\\" \\\"Text\\\" \\\"Pouet\\\"
-  #FlushINI \\\"C:\\\\Users\\\\Plaiseek\\\\Documents\\\\Softwares\\\\gecot\\\\build\\\\_CPack_Packages\\\\win64\\\\NSIS\\\\NSIS.InstallOptions.ini\\\"")
-  #set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "crAASSSSHHHH")
+"c:/libs/cbc/bin/cbc.exe" 
+"${CONAN_TBB_LIB_DIR}/../bin/libtbb12.dll" 
+"${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libgcc_s_seh-1.dll" 
+"${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libwinpthread-1.dll" 
+"${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libstdc++-6.dll" 
+DESTINATION bin)
+
+set(CPACK_GENERATOR WIX)
+set(CPACK_WIX_VERSION 3)
+
+# set(CPACK_WIX_PRODUCT_GUID 7315e975-bdb5-4797-b9e0-628fe7c89ee6)
+set(CPACK_WIX_UPGRADE_GUID 504AB3DC-9C1E-4E24-B4D5-E3D3732DBD46)
+
+set(CPACK_WIX_PROPERTY_ARPURLINFOABOUT "https://github.com/fhamonic/gecot")
+set(CPACK_WIX_PRODUCT_ICON "${PROJECT_SOURCE_DIR}/misc/gecot.ico")
+set(CPACK_WIX_UI_BANNER "${PROJECT_SOURCE_DIR}/misc/wix_gecot_banner.png")
+set(CPACK_WIX_UI_DIALOG "${PROJECT_SOURCE_DIR}/misc/wix_gecot_dialog.png")
+set(CPACK_WIX_PATCH_FILE "${PROJECT_SOURCE_DIR}/misc/PathPatch.xml")
+set(CPACK_WIX_EXTENSIONS "WixUtilExtension")
+
 endif()
-#set(CPACK_PACKAGE_ICON "${PROJECT_SOURCE_DIR}/misc/gecot.ico")
+set(CPACK_PACKAGE_ICON "${PROJECT_SOURCE_DIR}/misc/gecot.ico")
 set(CPACK_PACKAGE_VENDOR "F. HAMONIC")
 if(WIN32)
   set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/misc/windows_licenses.txt")

@@ -22,7 +22,6 @@ class CompressorRecipe(ConanFile):
         self.requires("mippp/0.1")
 
     def build_requirements(self):
-        self.tool_requires("cmake/3.27.1")
         self.requires("gtest/1.14.0")
 
         if self.settings.os == "Windows":

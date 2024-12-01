@@ -55,7 +55,7 @@ static bool process_command_line(
   gecot_optimize --help
   gecot_optimize --list-algorithms
   gecot_optimize <algorithm> --list-params
-  gecot_optimize <algorithm> <instance> <budget> [<params> ...]
+  gecot_optimize <algorithm> <instance> <budget> [<parameters> ...]
 
 )");
     };
@@ -76,7 +76,7 @@ static bool process_command_line(
         return false;
     };
 
-    po::options_description desc("Allowed options");
+    po::options_description desc("Allowed parameters");
     desc.add_options()("help,h", "Display this help message")(
         "list-algorithms,A", "List the available algorithms")(
         "list-params,P", "List the parameters of the chosen algorithm")(

@@ -11,10 +11,10 @@
                 "csv_file": "arcs.csv"
             },
             "vertices_improvements": {
-                "csv_file": "vertex_options.csv"
+                "csv_file": "vertices_improvements.csv"
             },
             "arcs_improvements": {
-                "csv_file": "arc_options.csv"
+                "csv_file": "arcs_improvements.csv"
             }
         }
     },

@@ -102,9 +102,9 @@ double compute_score(const I & instance, const auto & cases_current_qm,
 }
 
 template <instance_c I>
-double compute_base_score(const I & instance,
-                          const bool parallel = false) noexcept {
-    return compute_score(
+auto compute_base_cases_pc_num(const I & instance,
+                               const bool parallel = false) noexcept {
+    return compute_cases_pc_num(
         instance, melon::views::map([&](auto && case_id) {
             return instance.cases()[case_id].vertex_quality_map();
         }),
@@ -112,6 +112,13 @@ double compute_base_score(const I & instance,
             return instance.cases()[case_id].arc_probability_map();
         }),
         parallel);
+}
+
+template <instance_c I>
+double compute_base_score(const I & instance,
+                          const bool parallel = false) noexcept {
+    return instance.eval_criterion(
+        compute_base_cases_pc_num(instance, parallel));
 }
 
 template <instance_c I, melon::input_mapping<option_t> S>
@@ -126,11 +133,11 @@ double compute_solution_cost(const I & instance, const S & solution) noexcept {
 
 template <instance_c I, melon::input_mapping<option_t> S>
     requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
-double compute_solution_score(const I & instance, const S & solution,
-                              const auto & cases_vertex_options,
-                              const auto & cases_arc_options,
-                              const bool parallel = false) noexcept {
-    return compute_score(
+auto compute_solution_cases_pc_num(const I & instance, const S & solution,
+                                   const auto & cases_vertex_options,
+                                   const auto & cases_arc_options,
+                                   const bool parallel = false) noexcept {
+    return compute_cases_pc_num(
         instance, melon::views::map([&](auto && case_id) {
             auto enhanced_qm = instance.cases()[case_id].vertex_quality_map();
             auto && vertex_options = cases_vertex_options[case_id];
@@ -157,12 +164,12 @@ double compute_solution_score(const I & instance, const S & solution,
 
 template <instance_c I, melon::input_mapping<option_t> S>
     requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
-double compute_solution_score(const I & instance, const S & solution,
-                              const bool parallel = false) noexcept {
+auto compute_solution_cases_pc_num(const I & instance, const S & solution,
+                                   const bool parallel = false) noexcept {
     const auto cases_vertex_options = compute_cases_vertex_options(instance);
     const auto cases_arc_options = compute_cases_arc_options(instance);
-    return compute_solution_score(instance, solution, cases_vertex_options,
-                                  cases_arc_options, parallel);
+    return compute_solution_cases_pc_num(
+        instance, solution, cases_vertex_options, cases_arc_options, parallel);
 }
 
 namespace detail {

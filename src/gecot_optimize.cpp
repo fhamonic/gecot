@@ -15,8 +15,8 @@ namespace po = boost::program_options;
 
 #include "gecot/helper.hpp"
 
-#include "io_helper.hpp"
 #include "instance.hpp"
+#include "io_helper.hpp"
 #include "parse_instance.hpp"
 #include "trivial_reformulate.hpp"
 
@@ -222,9 +222,14 @@ int main(int argc, const char * argv[]) {
                      computation_time_ms);
 
         program_state = "Printing solution";
-        const double initial_score = gecot::compute_base_score(instance);
+        const auto initial_cases_pc_num =
+            gecot::compute_base_cases_pc_num(instance);
+        const double initial_score =
+            instance.eval_criterion(initial_cases_pc_num);
+        const auto solution_cases_pc_num =
+            gecot::compute_solution_cases_pc_num(instance, solution);
         const double solution_score =
-            gecot::compute_solution_score(instance, solution);
+            instance.eval_criterion(solution_cases_pc_num);
         const double solution_cost =
             gecot::compute_solution_cost(instance, solution);
 
@@ -232,8 +237,13 @@ int main(int argc, const char * argv[]) {
            !opt_output_csv_file.has_value()) {
             fmt::print(
                 "Initial Score:  {}\nBudget: {}\nSolution score: {}\nSolution "
-                "cost: {}\nSolution:\n",
+                "cost: {}\nPC_num:\n",
                 initial_score, budget, solution_score, solution_cost);
+            for(const auto & instance_case : instance.cases()) {
+                fmt::print("\t{}: {}\n", instance_case.name(),
+                           solution_cases_pc_num[instance_case.id()]);
+            }
+            fmt::print("Solution:\n");
             const std::size_t option_name_max_length =
                 std::ranges::max(std::ranges::views::transform(
                     raw_instance.options(), [&](auto && o) {
@@ -254,35 +264,65 @@ int main(int argc, const char * argv[]) {
         if(opt_output_json_file.has_value()) {
             auto out =
                 fmt::output_file(opt_output_json_file.value().string().c_str());
+            auto print_property = [&](const std::string & property_name,
+                                      auto && pairs_range) {
+                out.print("\n    \"{}\": {{", property_name);
+                const std::size_t key_max_length =
+                    std::ranges::max(std::ranges::views::transform(
+                        std::views::keys(pairs_range),
+                        [&](auto && s) { return s.size(); })) +
+                    3;
+                bool first_line = true;
+                for(const auto & [key, value] : pairs_range) {
+                    out.print("{}\n        {:<{}} {}", first_line ? "" : ",",
+                              std::string("\"") + key + "\":", key_max_length,
+                              value);
+                    first_line = false;
+                }
+                out.print("\n    }}");
+            };
             out.print(
                 "{{\n    \"instance_path\":  \"{}\",\n    \"algorithm\":  "
                 "\"{}\",\n    \"computation_time_ms\":  {},\n    "
-                "\"initial_score\":  {},\n    \"budget\":         {},\n    "
-                "\"solution_score\": {},\n    \"solution_cost\":  {},\n    "
-                "\"solution\": {{",
+                "\"initial_score\":  {},",
                 std::filesystem::absolute(instances_description_json).string(),
-                solver->name(), computation_time_ms, initial_score, budget,
-                solution_score, solution_cost);
-            const std::size_t option_name_max_length =
-                std::ranges::max(std::ranges::views::transform(
+                solver->name(), computation_time_ms, initial_score);
+            print_property(
+                "initial_pc_num",
+                std::views::transform(
+                    instance.cases(),
+                    [&initial_cases_pc_num](const auto & instance_case) {
+                        return std::make_pair(
+                            instance_case.name(),
+                            initial_cases_pc_num[instance_case.id()]);
+                    }));
+            out.print(
+                ",\n    \"budget\":         {},\n    "
+                "\"solution_score\": {},",
+                budget, solution_score);
+            print_property(
+                "solution_pc_num",
+                std::views::transform(
+                    instance.cases(),
+                    [&solution_cases_pc_num](const auto & instance_case) {
+                        return std::make_pair(
+                            instance_case.name(),
+                            solution_cases_pc_num[instance_case.id()]);
+                    }));
+            out.print(",\n    \"solution_cost\":  {},", solution_cost);
+            print_property(
+                "solution",
+                std::views::transform(
                     raw_instance.options(),
-                    [&](auto && o) {
-                        return raw_instance.option_name(o).size();
-                    })) +
-                3;
-            bool first_line = true;
-            for(auto && option : raw_instance.options()) {
-                const auto & option_name = raw_instance.option_name(option);
-                int value =
-                    instance.contains_option(option_name)
-                        ? solution[instance.option_from_name(option_name)]
-                        : false;
-                out.print("{}\n        {:<{}} {}", first_line ? "" : ",",
-                          std::string("\"") + option_name + "\":",
-                          option_name_max_length, value);
-                first_line = false;
-            }
-            out.print("\n    }}\n}}");
+                    [&raw_instance, &instance, &solution](const auto & option) {
+                        const auto & option_name =
+                            raw_instance.option_name(option);
+                        return std::make_pair(
+                            option_name,
+                            static_cast<int>(solution[instance.option_from_name(
+                                option_name)]));
+                    }));
+            out.print("\n}}");
         }
 
         if(opt_output_csv_file.has_value()) {

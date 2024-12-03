@@ -25,10 +25,7 @@ static const nlohmann::json instance_schema = R"(
                                     "type": "string"
                                 }
                             },
-                            "required": [
-                                "id",
-                                "cost"
-                            ]
+                            "additionalProperties": false
                         }
                     },
                     "required": [
@@ -77,10 +74,7 @@ static const nlohmann::json instance_schema = R"(
                                                     "type": "string"
                                                 }
                                             },
-                                            "required": [
-                                                "id",
-                                                "quality"
-                                            ]
+                                            "additionalProperties": false
                                         }
                                     },
                                     "required": [
@@ -129,12 +123,7 @@ static const nlohmann::json instance_schema = R"(
                                                     "type": "string"
                                                 }
                                             },
-                                            "required": [
-                                                "id",
-                                                "from",
-                                                "to",
-                                                "probability"
-                                            ]
+                                            "additionalProperties": false
                                         }
                                     },
                                     "required": [
@@ -187,11 +176,7 @@ static const nlohmann::json instance_schema = R"(
                                                     "type": "string"
                                                 }
                                             },
-                                            "required": [
-                                                "vertex_id",
-                                                "option_id",
-                                                "quality_gain"
-                                            ]
+                                            "additionalProperties": false
                                         }
                                     },
                                     "required": [
@@ -240,11 +225,7 @@ static const nlohmann::json instance_schema = R"(
                                                     "type": "string"
                                                 }
                                             },
-                                            "required": [
-                                                "arc_id",
-                                                "option_id",
-                                                "improved_probability"
-                                            ]
+                                            "additionalProperties": false
                                         }
                                     },
                                     "required": [

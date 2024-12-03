@@ -45,7 +45,8 @@ double compute_original_contribution(auto && graph, auto quality_map,
 GTEST_TEST(preprocessing, fuzzy_test) {
     std::string instance_path = PROJECT_SOURCE_DIR;
     // instance_path.append("/test/instances/aude.json");
-    instance_path.append("/test/instances/quebec_438_RASY.json");
+    instance_path.append(
+        "/test/instances/Quebec_438_RASY/instance.json");
     // instance_path.append("/test/instances/biorevaix_N1.json");
     Instance instance = parse_instance(instance_path);
     double budget = 0;
@@ -105,7 +106,8 @@ GTEST_TEST(preprocessing, fuzzy_test) {
                     contracted_quality_map, contracted_probability_map, t);
 
             cpt += 1;
-            if(std::abs(contribution - contracted_contribution) <= 1e-6 * std::min(contribution, contracted_contribution)) {
+            if(std::abs(contribution - contracted_contribution) <=
+               1e-6 * std::min(contribution, contracted_contribution)) {
                 cpt_ok += 1;
             } else {
                 std::cout << original_t << "\t" << melon::num_vertices(graph)

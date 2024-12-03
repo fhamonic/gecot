@@ -71,9 +71,9 @@ auto compute_cases_arc_options(const I & instance) noexcept {
 }
 
 template <instance_c I>
-double compute_score(const I & instance, const auto & cases_current_qm,
-                     const auto & cases_current_pm,
-                     const bool parallel = false) noexcept {
+auto compute_cases_pc_num(const I & instance, const auto & cases_current_qm,
+                          const auto & cases_current_pm,
+                          const bool parallel = false) noexcept {
     const auto & cases = instance.cases();
     auto cases_pc_num = instance.template create_case_map<double>();
     auto compute_base_pc_num =
@@ -90,7 +90,15 @@ double compute_score(const I & instance, const auto & cases_current_qm,
     } else {
         compute_base_pc_num(tbb::blocked_range(cases.begin(), cases.end()));
     }
-    return instance.eval_criterion(cases_pc_num);
+    return cases_pc_num;
+}
+
+template <instance_c I>
+double compute_score(const I & instance, const auto & cases_current_qm,
+                     const auto & cases_current_pm,
+                     const bool parallel = false) noexcept {
+    return instance.eval_criterion(compute_cases_pc_num(
+        instance, cases_current_qm, cases_current_pm, parallel));
 }
 
 template <instance_c I>

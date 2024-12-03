@@ -19,7 +19,7 @@ using namespace fhamonic;
 // GTEST_TEST(parse_instance, json_test) {
 //     static const nlohmann::json instance_schema = R"(
 // {
-    
+
 // }
 // )"_json;
 //     std::string instance_path = PROJECT_SOURCE_DIR;
@@ -31,11 +31,11 @@ using namespace fhamonic;
 //     for(auto && o : instance.options()) budget += instance.option_cost(o);
 // }
 
-
 GTEST_TEST(parse_instance, test) {
     std::string instance_path = PROJECT_SOURCE_DIR;
     // instance_path.append("/test/instances/aude.json");
-    instance_path.append("/test/instances/quebec_438_RASY.json");
+    instance_path.append(
+        "/test/instances/Quebec_438_RASY/instance.json");
     // instance_path.append("/test/instances/biorevaix_N1.json");
     Instance instance = parse_instance(instance_path);
     double budget = 0;

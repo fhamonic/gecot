@@ -15,7 +15,7 @@ For Windows, download and run the [last released](https://github.com/fhamonic/ge
 
 For Linux, download and extract the precompiled binaries of the [last release](https://github.com/fhamonic/gecot/releases).
 
-Otherwise, follow the [build instructions](https://github.com/fhamonic/gecot/wiki/Build-instructions) to compile GECOT locally.
+Otherwise, [here](https://github.com/fhamonic/gecot_docker) is a Docker container for building and testing GECOT.
 
 ## Usage
 

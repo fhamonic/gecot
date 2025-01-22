@@ -40,7 +40,6 @@ struct MIP {
         auto operator()(const criterion_var & v) { return C_vars.get()(v); }
         auto operator()(const criterion_sum & f) {
             auto var = model.get().add_variable();
-            std::cout << 'R' << model.get().num_constraints() << '\n';
             model.get().add_constraint(
                 var <= mippp::xsum(f.values, [this](const auto & e) {
                     return std::visit(*this, e);
@@ -65,7 +64,6 @@ struct MIP {
         auto operator()(const criterion_min & f) {
             auto var = model.get().add_variable();
             for(auto && e : f.values) {
-                std::cout << 'R' << model.get().num_constraints() << '\n';
                 model.get().add_constraint(var <= std::visit(*this, e));
             }
             return var;

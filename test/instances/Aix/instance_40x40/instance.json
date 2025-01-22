@@ -1,0 +1,22 @@
+{
+    "options": {
+        "csv_file": "options.csv"
+    },
+    "cases": {
+        "squirrel": {
+            "vertices": {
+                "csv_file": "vertices.csv"
+            },
+            "arcs": {
+                "csv_file": "arcs.csv"
+            },
+            "vertices_improvements": {
+                "csv_file": "vertices_improvements.csv"
+            },
+            "arcs_improvements": {
+                "csv_file": "arcs_improvements.csv"
+            }
+        }
+    },
+    "criterion": "squirrel"
+}

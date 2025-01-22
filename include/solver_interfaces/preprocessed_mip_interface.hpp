@@ -21,7 +21,11 @@ private:
 public:
     PreprocessedMIPInterface()
         : desc(name() + " options")
-        , cbc_default_path(get_exec_path().parent_path() / "cbc") {
+        , cbc_default_path(
+#ifdef WIN32
+get_exec_path().parent_path() /
+#endif
+"cbc") {
         desc.add_options()("parallel,p", "Use multithreaded version")(
             "print-model,m", "Print the MIP model")(
             "resolution",

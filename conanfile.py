@@ -11,7 +11,7 @@ class CompressorRecipe(ConanFile):
         self.requires("nlohmann_json/3.11.3", override=True)
         self.requires("json-schema-validator/2.3.0")
         self.requires("fast-cpp-csv-parser/cci.20240102")
-        self.requires("onetbb/2021.9.0")
+        self.requires("onetbb/2021.12.0")
         self.requires("boost/1.85.0")
         self.requires("parallel-hashmap/1.37")
         self.requires("eigen/3.4.0")
@@ -39,17 +39,17 @@ class CompressorRecipe(ConanFile):
         vars = {}
         if self.settings.os != "Windows":
             vars["ENABLE_TESTING"] = "ON"
-        if self.settings.os == "Windows":
-            for lib, dep in self.dependencies.items():
-                if lib.ref.name == "onetbb":
-                    vars["CONAN_TBB_INCLUDE_DIR"] = ";".join(
-                        dep.cpp_info.components["libtbb"].includedirs
-                    )
-                    vars["CONAN_TBB_LIB_DIR"] = ";".join(
-                        dep.cpp_info.components["libtbb"].libdirs
-                    )
-                if lib.ref.name == "mingw-builds":
-                    vars["CONAN_MINGW_LIB_DIR"] = ";".join(dep.cpp_info.libdirs)
+        # if self.settings.os == "Windows":
+        for lib, dep in self.dependencies.items():
+            if lib.ref.name == "onetbb":
+                vars["CONAN_TBB_INCLUDE_DIR"] = ";".join(
+                    dep.cpp_info.components["libtbb"].includedirs
+                )
+                vars["CONAN_TBB_LIB_DIR"] = ";".join(
+                    dep.cpp_info.components["libtbb"].libdirs
+                )
+            if lib.ref.name == "mingw-builds":
+                vars["CONAN_MINGW_LIB_DIR"] = ";".join(dep.cpp_info.libdirs)
         print("variables ", vars)
         return vars
 

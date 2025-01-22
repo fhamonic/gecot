@@ -61,6 +61,7 @@ find_package(Eigen3 REQUIRED)
 find_package(melon REQUIRED)
 find_package(mippp REQUIRED)
 
+
 # ################### LIB target ####################
 add_library(gecot INTERFACE)
 target_compile_definitions(gecot INTERFACE PROJECT_VERSION="${CMAKE_PROJECT_VERSION_MAJOR}.${CMAKE_PROJECT_VERSION_MINOR}")
@@ -72,7 +73,8 @@ if(WIN32)
   target_link_directories(gecot INTERFACE ${CONAN_TBB_LIB_DIR} "${CONAN_TBB_LIB_DIR}\\..\\bin")
   target_link_libraries(gecot INTERFACE "${CONAN_TBB_LIB_DIR}/../bin/libtbb12.dll")
 else()
-  target_link_libraries(gecot INTERFACE onetbb::onetbb)
+  list(APPEND CMAKE_INSTALL_RPATH ${CONAN_TBB_LIB_DIR})
+  target_link_libraries(gecot INTERFACE TBB::tbb)
 endif()
 target_link_libraries(gecot INTERFACE Boost::program_options)
 target_link_libraries(gecot INTERFACE Eigen3::Eigen)
@@ -90,6 +92,7 @@ target_link_libraries(gecot_optimize PUBLIC nlohmann_json::nlohmann_json)
 target_link_libraries(gecot_optimize PUBLIC nlohmann_json_schema_validator)
 target_link_libraries(gecot_optimize PUBLIC phmap)
 target_compile_options(gecot_optimize PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
+
 # target_compile_options(gecot_optimize PRIVATE -fsanitize=address)
 # target_link_options(gecot_optimize PRIVATE -fsanitize=address -lpthread -static-libasan)
 

@@ -42,9 +42,7 @@ struct preprocessed_MIP {
             return model.get().add_variable(
                 {.lower_bound = c, .upper_bound = c});
         }
-        auto operator()(const criterion_var & v) {
-            return C_vars.get()(v);
-        }
+        auto operator()(const criterion_var & v) { return C_vars.get()(v); }
         auto operator()(const criterion_sum & f) {
             auto var = model.get().add_variable();
             std::vector<typename M::var> vars;
@@ -75,8 +73,9 @@ struct preprocessed_MIP {
         }
         auto operator()(const criterion_min & f) {
             auto var = model.get().add_variable();
-            for(auto && e : f.values)
+            for(auto && e : f.values) {
                 model.get().add_constraint(var <= std::visit(*this, e));
+            }
             return var;
         }
     };

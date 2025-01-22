@@ -1,5 +1,5 @@
 BUILD_DIR = build
-BUILD_TYPE = default
+BUILD_TYPE = debug
 
 .PHONY: all test clean
 

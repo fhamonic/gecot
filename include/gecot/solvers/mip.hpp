@@ -40,10 +40,16 @@ struct MIP {
         auto operator()(const criterion_var & v) { return C_vars.get()(v); }
         auto operator()(const criterion_sum & f) {
             auto var = model.get().add_variable();
+            std::vector<typename M::var> vars;
+            for(auto && e : f.values) vars.emplace_back(std::visit(*this, e));
+
             model.get().add_constraint(
-                var <= mippp::xsum(f.values, [this](const auto & e) {
-                    return std::visit(*this, e);
-                }));
+                var <= mippp::linear_expression(
+                           ranges::views::transform(
+                               vars, [](auto && v) { return v.id(); }),
+                           ranges::views::transform(
+                               vars, [](auto && v) { return 1.0; }),
+                           0.0));
             return var;
         }
         auto operator()(const criterion_product & f) {
@@ -55,7 +61,6 @@ struct MIP {
                     "!");
 
             auto var = model.get().add_variable();
-            std::cout << 'R' << model.get().num_constraints() << '\n';
             model.get().add_constraint(
                 var <= std::get<criterion_constant>(f.values[0]) *
                            std::visit(*this, f.values[1]));
@@ -83,8 +88,6 @@ struct MIP {
             instance.cases().size(), [](const case_id_t & id) { return id; },
             [](const case_id_t & id) { return "C_" + std::to_string(id); });
 
-        // model.add_to_objective(C_vars);
-        if(print_model) std::cout << "PRESOLVED\n0\nMASTERCONSS\n";
         model.add_to_objective(std::visit(
             formula_variable_visitor{model, C_vars}, instance.criterion()));
 
@@ -93,7 +96,6 @@ struct MIP {
             [](const option_t & i) { return "Y_" + std::to_string(i); },
             {.upper_bound = 1, .type = mip::var_category::binary});
 
-        if(print_model) std::cout << 'R' << model.num_constraints() << '\n';
         model.add_constraint(
             xsum(instance.options(), X_vars, [&instance](const auto & o) {
                 return instance.option_cost(o);
@@ -123,19 +125,13 @@ struct MIP {
                 F_prime_additional_terms;
 
             for(const auto & t : melon::vertices(graph)) {
-                if(print_model) std::cout << "BLOCK " << ++num_blocks << "\n";
                 for(const auto & [quality_gain, option] :
                     vertex_options_map[t]) {
                     const auto F_prime_t_var =
                         model.add_variable("F'_" + std::to_string(t) + "_" +
                                            std::to_string(option) + "(" +
                                            std::to_string(case_id) + ")");
-
-                    if(print_model)
-                        std::cout << 'R' << model.num_constraints() << '\n';
                     model.add_constraint(F_prime_t_var <= F_vars(t));
-                    if(print_model)
-                        std::cout << 'R' << model.num_constraints() << '\n';
                     model.add_constraint(F_prime_t_var <=
                                          big_M_map[t].value() * X_vars(option));
                     F_prime_additional_terms.emplace_back(F_prime_t_var,
@@ -153,8 +149,6 @@ struct MIP {
                     });
                 for(const auto & u : melon::vertices(graph)) {
                     if(u == t) continue;
-                    if(print_model)
-                        std::cout << 'R' << model.num_constraints() << '\n';
                     model.add_constraint(
                         xsum(graph.out_arcs(u), Phi_t_vars) <=
                         xsum(graph.in_arcs(u), Phi_t_vars, probability_map) +
@@ -166,8 +160,6 @@ struct MIP {
                                 },
                                 [](const auto & p) { return p.first; }));
                 }
-                if(print_model)
-                    std::cout << 'R' << model.num_constraints() << '\n';
                 model.add_constraint(
                     F_vars(t) + xsum(graph.out_arcs(t), Phi_t_vars) <=
                     xsum(graph.in_arcs(t), Phi_t_vars, probability_map) +
@@ -181,16 +173,12 @@ struct MIP {
 
                 for(const auto & a : melon::arcs(graph)) {
                     if(!arc_option_map[a].has_value()) continue;
-
-                    if(print_model)
-                        std::cout << 'R' << model.num_constraints() << '\n';
                     model.add_constraint(
                         Phi_t_vars(a) <=
                         big_M_map[melon::arc_source(graph, a)].value() *
                             X_vars(arc_option_map[a].value()));
                 }
             }
-            if(print_model) std::cout << 'R' << model.num_constraints() << '\n';
             model.add_constraint(
                 C_vars(instance_case.id()) <=
                 xsum(melon::vertices(graph), F_vars, quality_map) +
@@ -204,9 +192,6 @@ struct MIP {
         spdlog::trace("  {:>10} variables", model.num_variables());
         spdlog::trace("  {:>10} constraints", model.num_constraints());
         spdlog::trace("  {:>10} entries", model.num_entries());
-
-        if(print_model) std::cout << "NBLOCKS\n" << num_blocks << '\n';
-        if(print_model) std::cout << model << std::endl;
 
         auto solver = mip_helper::build_solver(model);
         solver->set_loglevel(spdlog::get_level() == spdlog::level::trace ? 1

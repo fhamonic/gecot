@@ -26,14 +26,13 @@ public:
         desc.add_options()("parallel,p", "Use multithreaded version")(
             "print-model,m", "Print the MIP model")(
             "use-cbc",
-            "Prioritizes cbc for soplving MIPs\n(default if gurobi_cl and scip "
+            "Prioritizes cbc for solving MIPs\n(default if gurobi_cl and scip "
             "are not found)")("use-grb",
-                              "Prioritizes cbc for soplving MIPs\n(default "
-                              "if gurobi_cl is found)")(
+                              "Prioritizes cbc for soplving MIPs\n(default if "
+                              "gurobi_cl is found)")(
             "use-scip",
             "Prioritizes scip for soplving MIPs\n(warning: scip is for "
-            "academic "
-            "use only)")(
+            "academic use only)")(
             "cbc-path",
             po::value<std::filesystem::path>(&mippp::cli_cbc_solver::exec_path),
             (std::string("Sets path to cbc executable\n(default: '") +

@@ -14,7 +14,7 @@
 *.links
 *.o
 *.log
-*.json
+/*.json
 
 CMakeUserPresets.json
 /doc/html

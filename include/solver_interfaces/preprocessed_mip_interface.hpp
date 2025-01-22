@@ -33,7 +33,7 @@ public:
             "Sets the number of lagragrian multipliers to test for the "
             "constrained preprocessing algorithm (experimental)")(
             "use-cbc",
-            "Prioritizes cbc for soplving MIPs\n(default if gurobi_cl and scip "
+            "Prioritizes cbc for solving MIPs\n(default if gurobi_cl and scip "
             "are not found)")("use-grb",
                               "Prioritizes cbc for soplving MIPs\n(default "
                               "if gurobi_cl is found)")(

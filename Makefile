@@ -1,7 +1,7 @@
 BUILD_DIR = build
 BUILD_TYPE = default
 
-.PHONY: all test clean
+.PHONY: all test clean ${BUILD_DIR}
 
 all: test package
 

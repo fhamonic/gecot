@@ -6,8 +6,7 @@
 #include <spdlog/spdlog.h>
 
 #include "mippp/mip_model.hpp"
-#include "mippp/operators.hpp"
-#include "mippp/xsum.hpp"
+#include "mippp/detail/std_ranges_to_range_v3.hpp"
 
 #include "melon/graph.hpp"
 
@@ -39,20 +38,15 @@ struct MIP {
         }
         auto operator()(const criterion_var & v) { return C_vars.get()(v); }
         auto operator()(const criterion_sum & f) {
+            using namespace mippp::operators;
             auto var = model.get().add_variable();
             std::vector<typename M::var> vars;
             for(auto && e : f.values) vars.emplace_back(std::visit(*this, e));
-
-            model.get().add_constraint(
-                var <= mippp::linear_expression(
-                           ranges::views::transform(
-                               vars, [](auto && v) { return v.id(); }),
-                           ranges::views::transform(
-                               vars, [](auto && v) { return 1.0; }),
-                           0.0));
+            model.get().add_constraint(var <= xsum(vars));
             return var;
         }
         auto operator()(const criterion_product & f) {
+            using namespace mippp::operators;
             if(!std::holds_alternative<criterion_constant>(f.values[0]) &&
                f.values.size() != 2)
                 throw std::invalid_argument(
@@ -67,6 +61,7 @@ struct MIP {
             return var;
         }
         auto operator()(const criterion_min & f) {
+            using namespace mippp::operators;
             auto var = model.get().add_variable();
             for(auto && e : f.values) {
                 model.get().add_constraint(var <= std::visit(*this, e));
@@ -81,6 +76,7 @@ struct MIP {
         auto solution = instance.create_option_map(false);
 
         using namespace mippp;
+        using namespace mippp::operators;
         using mip = mip_model<cli_solver_model_traits>;
         mip model;
 
@@ -96,10 +92,9 @@ struct MIP {
             [](const option_t & i) { return "Y_" + std::to_string(i); },
             {.upper_bound = 1, .type = mip::var_category::binary});
 
-        model.add_constraint(
-            xsum(instance.options(), X_vars, [&instance](const auto & o) {
-                return instance.option_cost(o);
-            }) <= budget);
+        model.add_constraint(xsum(instance.options(), [&](auto && o) {
+                                 return instance.option_cost(o) * X_vars(o);
+                             }) <= budget);
 
         int num_blocks = 0;
 
@@ -151,25 +146,25 @@ struct MIP {
                     if(u == t) continue;
                     model.add_constraint(
                         xsum(graph.out_arcs(u), Phi_t_vars) <=
-                        xsum(graph.in_arcs(u), Phi_t_vars, probability_map) +
+                        xsum(graph.in_arcs(u),
+                             [&](auto && a) {
+                                 return probability_map[a] * Phi_t_vars(a);
+                             }) +
                             quality_map[u] +
-                            xsum(
-                                vertex_options_map[u],
-                                [&X_vars](const auto & p) {
-                                    return X_vars(p.second);
-                                },
-                                [](const auto & p) { return p.first; }));
+                            xsum(vertex_options_map[u], [&X_vars](auto && p) {
+                                return p.first * X_vars(p.second);
+                            }));
                 }
                 model.add_constraint(
                     F_vars(t) + xsum(graph.out_arcs(t), Phi_t_vars) <=
-                    xsum(graph.in_arcs(t), Phi_t_vars, probability_map) +
+                    xsum(graph.in_arcs(t),
+                         [&](auto && a) {
+                             return probability_map[a] * Phi_t_vars(a);
+                         }) +
                         quality_map[t] +
-                        xsum(
-                            vertex_options_map[t],
-                            [&X_vars](const auto & p) {
-                                return X_vars(p.second);
-                            },
-                            [](const auto & p) { return p.first; }));
+                        xsum(vertex_options_map[t], [&X_vars](const auto & p) {
+                            return p.first * X_vars(p.second);
+                        }));
 
                 for(const auto & a : melon::arcs(graph)) {
                     if(!arc_option_map[a].has_value()) continue;
@@ -181,11 +176,11 @@ struct MIP {
             }
             model.add_constraint(
                 C_vars(instance_case.id()) <=
-                xsum(melon::vertices(graph), F_vars, quality_map) +
-                    xsum(
-                        F_prime_additional_terms,
-                        [](const auto & p) { return p.first; },
-                        [](const auto & p) { return p.second; }));
+                xsum(melon::vertices(graph), [&](auto && v) {
+                    return quality_map[v] * F_vars(v);
+                }) + xsum(F_prime_additional_terms, [](auto && p) {
+                    return p.first * p.second;
+                }));
         }
 
         spdlog::trace("MIP model has:");

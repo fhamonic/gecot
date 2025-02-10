@@ -6,10 +6,13 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
 import os
+import pathlib
 
 # ################################ INPUT DATA #################################
 
-tif_image = Image.open("map.tiff")
+root_path = pathlib.Path(__file__).parent.resolve()
+
+tif_image = Image.open(root_path / "map.tiff")
 tif_matrix = np.array(tif_image)
 
 # instance_name = "instance_70x70"
@@ -63,7 +66,7 @@ quality_map = {
 probability_map = {
     "habitat": 1,
     "field": 0.98,
-    "road": 0.8,
+    "road": 0.66,
     "wildlife crossing": 0.8,
     "land acquisition": 0.98,
 }
@@ -74,7 +77,7 @@ cell_cost = {"wildlife crossing": 1, "land acquisition": 0.2}
 
 # ################################ PRINT IMAGE ################################
 
-os.makedirs(instance_name, exist_ok=True)
+os.makedirs(root_path / instance_name, exist_ok=True)
 
 (width, height) = tif_matrix.shape
 img = Image.new("RGB", (width, height))
@@ -101,9 +104,11 @@ ax.set_xticks([])
 ax.set_yticks([])
 
 plt.tight_layout()
-plt.savefig(f"{instance_name}/{instance_name}.png")
+# plt.show()
+plt.savefig(root_path / f"{instance_name}/{instance_name}.png")
 
 # ################################ PRINT FILES ################################
+
 
 def readCSVDict(file_name, id_column="id", delimiter=","):
     file = csv.DictReader(open(file_name), delimiter=delimiter)
@@ -119,8 +124,9 @@ def writeCSV(file_name, columns):
     file.write(columns + "\n")
     return file
 
-vertices_csv = writeCSV(f"{instance_name}/vertices.csv", "id,quality,x,y")
-arcs_csv = writeCSV(f"{instance_name}/arcs.csv", "id,from,to,probability")
+
+vertices_csv = writeCSV(root_path / f"{instance_name}/vertices.csv", "id,quality,x,y")
+arcs_csv = writeCSV(root_path / f"{instance_name}/arcs.csv", "id,from,to,probability")
 
 
 def add_vertex(id, quality, x, y):
@@ -156,12 +162,14 @@ for idx, value in np.ndenumerate(tif_matrix):
 vertices_csv.close()
 arcs_csv.close()
 
-options_csv = writeCSV(f"{instance_name}/options.csv", "id,cost")
+options_csv = writeCSV(root_path / f"{instance_name}/options.csv", "id,cost")
 vertex_options_csv = writeCSV(
-    f"{instance_name}/vertices_improvements.csv", "vertex_id,option_id,quality_gain"
+    root_path / f"{instance_name}/vertices_improvements.csv",
+    "vertex_id,option_id,quality_gain",
 )
 arc_options_csv = writeCSV(
-    f"{instance_name}/arcs_improvements.csv", "arc_id,option_id,improved_probability"
+    root_path / f"{instance_name}/arcs_improvements.csv",
+    "arc_id,option_id,improved_probability",
 )
 
 
@@ -210,8 +218,9 @@ vertex_options_csv.close()
 arc_options_csv.close()
 
 
-instance_file = open(f"{instance_name}/instance.json", "w")
-instance_file.write("""{
+instance_file = open(root_path / f"{instance_name}/instance.json", "w")
+instance_file.write(
+    """{
     "options": {
         "csv_file": "options.csv"
     },
@@ -232,5 +241,6 @@ instance_file.write("""{
         }
     },
     "criterion": "squirrel"
-}""")
+}"""
+)
 instance_file.close()

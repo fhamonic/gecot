@@ -2,17 +2,17 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
+import pathlib
 
+root_path = pathlib.Path(__file__).parent.resolve()
 
-tif_image = Image.open("map.tiff")
+tif_image = Image.open(root_path / "map.tiff")
 tif_matrix = np.array(tif_image)
 
-# crop matrix
-# tif_matrix = tif_matrix[0:40, 0:40]
-# print(tif_matrix)
+instance_name = "instance_40x40"
+tif_matrix = tif_matrix[0:40, 0:40]
 
-instance_name = "instance_70x70"
-
+# instance_name = "instance_70x70"
 
 # return the type of a cell as a function of its value
 def cell_type(v):
@@ -49,71 +49,33 @@ colors = {
 }
 
 solution = {
-    "218": 0,
     "125": 0,
-    "145": 0,
-    "109": 1,
-    "126": 0,
-    "124": 0,
-    "108": 1,
-    "138": 0,
-    "117": 0,
-    "116": 0,
-    "202": 1,
-    "204": 0,
-    "139": 0,
-    "207": 1,
-    "102": 0,
-    "107": 1,
-    "115": 0,
-    "216": 0,
-    "137": 0,
-    "106": 1,
-    "118": 0,
-    "121": 0,
-    "210": 0,
-    "212": 1,
-    "206": 0,
-    "120": 0,
-    "101": 0,
-    "114": 1,
-    "211": 0,
-    "110": 0,
-    "128": 0,
-    "201": 0,
-    "111": 0,
-    "119": 0,
-    "214": 0,
-    "132": 0,
-    "127": 0,
-    "213": 0,
-    "122": 1,
-    "131": 0,
-    "134": 0,
-    "209": 0,
-    "133": 0,
-    "208": 0,
-    "113": 0,
-    "129": 0,
-    "217": 0,
-    "112": 1,
-    "130": 0,
-    "105": 1,
-    "141": 0,
-    "140": 0,
-    "205": 1,
-    "215": 0,
-    "219": 0,
-    "144": 0,
-    "104": 0,
-    "203": 0,
-    "123": 1,
-    "143": 0,
-    "220": 0,
-    "103": 1,
-    "135": 0,
-    "142": 0,
-    "136": 0,
+        "126": 0,
+        "124": 1,
+        "138": 1,
+        "117": 0,
+        "116": 0,
+        "207": 1,
+        "102": 1,
+        "115": 0,
+        "216": 1,
+        "137": 0,
+        "118": 0,
+        "121": 0,
+        "206": 1,
+        "120": 0,
+        "101": 0,
+        "114": 1,
+        "128": 0,
+        "201": 1,
+        "119": 0,
+        "214": 1,
+        "132": 0,
+        "127": 0,
+        "213": 1,
+        "122": 0,
+        "209": 1,
+        "113": 1
 }
 
 solution_color = (0, 0, 0)
@@ -153,4 +115,4 @@ ax.set_xticks([])
 ax.set_yticks([])
 
 plt.tight_layout()
-plt.savefig(f"{instance_name}/{instance_name}_solution.png")
+plt.savefig(root_path / f"{instance_name}/{instance_name}_solution.png")

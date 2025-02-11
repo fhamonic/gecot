@@ -285,7 +285,7 @@ int main(int argc, const char * argv[]) {
                 "{{\n    \"instance_path\":  \"{}\",\n    \"algorithm\":  "
                 "\"{}\",\n    \"computation_time_ms\":  {},\n    "
                 "\"initial_score\":  {},",
-                std::filesystem::absolute(instances_description_json).string(),
+                std::filesystem::absolute(instances_description_json).generic_string(),
                 solver->name(), computation_time_ms, initial_score);
             print_property(
                 "initial_pc_num",
@@ -323,6 +323,8 @@ int main(int argc, const char * argv[]) {
                                 option_name)]));
                     }));
             out.print("\n}}");
+
+            spdlog::info("Solution printed to '{}'", std::filesystem::absolute(opt_output_json_file.value()).string());
         }
 
         if(opt_output_csv_file.has_value()) {
@@ -340,6 +342,8 @@ int main(int argc, const char * argv[]) {
             spdlog::info("Solution written to '{}'",
                          std::filesystem::absolute(opt_output_csv_file.value())
                              .string());
+            
+            spdlog::info("Solution printed to '{}'", std::filesystem::absolute(opt_output_csv_file.value()).string());
         }
     } catch(const std::exception & e) {
         spdlog::error("{}: {}", program_state, e.what());

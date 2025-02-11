@@ -96,8 +96,6 @@ struct MIP {
                                  return instance.option_cost(o) * X_vars(o);
                              }) <= budget);
 
-        int num_blocks = 0;
-
         for(auto && instance_case : instance.cases()) {
             const auto case_id = instance_case.id();
             const auto [graph, quality_map, vertex_options_map, probability_map,

@@ -24,9 +24,6 @@ class CompressorRecipe(ConanFile):
     def build_requirements(self):
         self.requires("gtest/1.14.0")
 
-        if self.settings.os == "Windows":
-            self.requires("mingw-builds/12.2.0")
-
     def generate(self):
         print("conanfile.py: IDE include dirs:")
         for lib, dep in self.dependencies.items():

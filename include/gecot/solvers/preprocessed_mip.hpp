@@ -259,13 +259,13 @@ struct preprocessed_MIP {
         // for(std::size_t i = 1; i < block_first_constraint.size(); ++i) {
         //     std::cout << "\n\nblock " << i;
         //     for(auto && c :
-        //         ranges::iota_view<mip::constraint_id_t, mip::constraint_id_t>(
+        //         ranges::iota_view<mip::constraint_id_t,
+        //         mip::constraint_id_t>(
         //             block_first_constraint[i - 1],
         //             block_first_constraint[i]))
         //         std::cout << "\nR" << c;
         // }
         // std::cout << std::endl;
-
 
         spdlog::trace("MIP model has:");
         spdlog::trace("  {:>10} variables", model.num_variables());
@@ -277,8 +277,7 @@ struct preprocessed_MIP {
         auto solver = mip_helper::build_solver(model);
         solver->set_loglevel(spdlog::get_level() == spdlog::level::trace ? 1
                                                                          : 0);
-        solver->set_timeout(3600);
-        solver->set_mip_gap(1e-10);
+        solver->set_mip_optimality_gap(1e-10);
         auto ret_code = solver->optimize();
         if(ret_code != 0)
             throw std::runtime_error(solver->name() + " failed with code " +

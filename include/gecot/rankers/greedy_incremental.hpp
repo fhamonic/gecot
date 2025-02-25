@@ -18,7 +18,6 @@ namespace gecot {
 namespace rankers {
 
 struct GreedyIncremental {
-    bool verbose = false;
     bool parallel = false;
 
     template <instance_c I>
@@ -79,13 +78,12 @@ struct GreedyIncremental {
                     cases_arc_options[instance_case.id()][best_option])
                     current_pm[a] = std::max(current_pm[a], enhanced_prob);
             }
-            if(verbose) {
-                std::cout << "ranked option: " << best_option
-                          << "\n\t rank: " << rank
-                          << "\n\t ratio: " << options_ratios[best_option]
-                          << "\n\t costing: " << best_option_price
-                          << std::endl;
-            }
+            // std::cout << "ranked option: " << best_option
+            //           << "\n\t rank: " << rank
+            //           << "\n\t ratio: " << options_ratios[best_option]
+            //           << "\n\t costing: " << best_option_price
+            //           << std::endl;
+            
 
             options.erase(best_option_it);
             ++rank;

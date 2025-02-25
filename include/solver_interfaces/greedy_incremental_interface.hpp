@@ -7,19 +7,19 @@
 
 #include "gecot/solvers/greedy_incremental.hpp"
 
-#include "solver_interfaces/abstract_solver.hpp"
+#include "solver_interfaces/abstract_solver_interface.hpp"
 
 namespace fhamonic {
 
-class GreedyIncrementalInterface : public AbstractSolver {
+class GreedyIncrementalInterface : public AbstractSolverInterface {
 private:
     gecot::solvers::GreedyIncremental solver;
     boost::program_options::options_description desc;
 
 public:
     GreedyIncrementalInterface() : desc(name() + " options") {
-        desc.add_options()("verbose,v", "Log the algorithm steps")(
-            "parallel,p", "Use multithreaded version");
+        desc.add_options()("parallel,p", "Use multithreaded version")(
+            "feasability-tolerance,t", "Tolearnce for rounding errors");
     }
 
     void parse(const std::vector<std::string> & args) {
@@ -31,12 +31,12 @@ public:
             vm);
         po::notify(vm);
 
-        solver.verbose = vm.count("verbose") > 0;
         solver.parallel = vm.count("parallel") > 0;
+        solver.feasability_tol = vm.at("feasability-tolerance").as<double>();
     }
 
     gecot::instance_solution_t<Instance> solve(const Instance & instance,
-                                      const double B) const {
+                                               const double B) const {
         return solver.solve(instance, B);
     };
 

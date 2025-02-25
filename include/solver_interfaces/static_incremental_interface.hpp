@@ -8,19 +8,19 @@
 #include "gecot/concepts/instance.hpp"
 #include "gecot/solvers/static_incremental.hpp"
 
-#include "solver_interfaces/abstract_solver.hpp"
+#include "solver_interfaces/abstract_solver_interface.hpp"
 
 namespace fhamonic {
 
-class StaticIncrementalInterface : public AbstractSolver {
+class StaticIncrementalInterface : public AbstractSolverInterface {
 private:
     gecot::solvers::StaticIncremental solver;
     boost::program_options::options_description desc;
 
 public:
     StaticIncrementalInterface() : desc(name() + " options") {
-        desc.add_options()(
-            "parallel,p", "Use multithreaded version");
+        desc.add_options()("parallel,p", "Use multithreaded version")(
+            "feasability-tolerance,t", "Tolearnce for rounding errors");
     }
 
     void parse(const std::vector<std::string> & args) {
@@ -33,10 +33,11 @@ public:
         po::notify(vm);
 
         solver.parallel = vm.count("parallel") > 0;
+        solver.feasability_tol = vm.at("feasability-tolerance").as<double>();
     }
 
     gecot::instance_solution_t<Instance> solve(const Instance & instance,
-                                      const double B) const {
+                                               const double B) const {
         return solver.solve(instance, B);
     };
 

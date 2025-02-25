@@ -7,11 +7,11 @@
 
 #include "gecot/utils/mip_helper.hpp"
 
-#include "solver_interfaces/abstract_solver.hpp"
+#include "solver_interfaces/abstract_solver_interface.hpp"
 
 namespace fhamonic {
 
-class AbstractMIPInterface : public AbstractSolver {
+class AbstractMIPInterface : public AbstractSolverInterface {
 protected:
     boost::program_options::options_description desc;
     std::filesystem::path cbc_default_path;
@@ -25,6 +25,7 @@ public:
 #endif
               "cbc") {
         desc.add_options()("parallel,p", "Use multithreaded version")(
+            "feasability-tolerance,t", "Tolearnce for rounding errors")(
             "print-model,m", "Print the MIP model")(
             "use-cbc",
             "Prioritizes cbc for solving MIPs\n(default if gurobi_cl and scip "
@@ -79,7 +80,8 @@ public:
         handle_options(vm);
     }
 
-    virtual void handle_options(const boost::program_options::variables_map & vm) = 0;
+    virtual void handle_options(
+        const boost::program_options::variables_map & vm) = 0;
 
     virtual gecot::instance_solution_t<Instance> solve(
         const Instance & instance, const double B) const = 0;

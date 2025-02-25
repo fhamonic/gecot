@@ -22,7 +22,6 @@ namespace gecot {
 namespace solvers {
 
 struct MIP {
-    bool verbose = false;
     bool parallel = false;
 
     template <instance_c I>

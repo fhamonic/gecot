@@ -2,6 +2,7 @@
 #define GECOT_SOLVERS_STATIC_DECREMENTAL_HPP
 
 #include <algorithm>
+#include <limits>
 #include <ranges>
 #include <vector>
 
@@ -16,6 +17,7 @@ namespace solvers {
 
 struct StaticDecremental {
     bool parallel = false;
+    double feasability_tol = std::numeric_limits<double>::epsilon();
     bool only_dec = false;
 
     template <instance_c I>
@@ -27,7 +29,8 @@ struct StaticDecremental {
         std::vector<option_t> options;
         double purchased = 0.0;
         for(const option_t & option : instance.options()) {
-            if(instance.option_cost(option) > budget) continue;
+            if(instance.option_cost(option) > budget + feasability_tol)
+                continue;
             options.emplace_back(option);
             solution[option] = true;
             purchased += instance.option_cost(option);
@@ -93,13 +96,14 @@ struct StaticDecremental {
             spdlog::trace("{:>20} |  {: #.6e}  | {: #.5e}",
                           instance.option_name(option), options_ratios[option],
                           purchased);
-            if(purchased <= budget) break;
+            if(purchased <= budget + feasability_tol) break;
         }
 
         if(!only_dec &&
            std::ranges::any_of(
-               free_options, [&instance, budget_left = budget - purchased](
-                                 const option_t & o) {
+               free_options,
+               [&instance, budget_left = budget - purchased +
+                                         feasability_tol](const option_t & o) {
                    return instance.option_cost(o) <= budget_left;
                })) {
             spdlog::trace(
@@ -145,7 +149,7 @@ struct StaticDecremental {
 
             for(const option_t & option : free_options) {
                 const double price = instance.option_cost(option);
-                if(purchased + price > budget) continue;
+                if(purchased + price > budget + feasability_tol) continue;
                 purchased += price;
                 solution[option] = true;
                 spdlog::trace("{:>20} |  {: #.6e}  | {: #.5e}",

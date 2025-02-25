@@ -9,8 +9,11 @@ root_path = pathlib.Path(__file__).parent.resolve()
 tif_image = Image.open(root_path / "map.tiff")
 tif_matrix = np.array(tif_image)
 
-instance_name = "instance_40x40"
-tif_matrix = tif_matrix[0:40, 0:40]
+# instance_name = "instance_40x40"
+# tif_matrix = tif_matrix[0:40, 0:40]
+
+instance_name = "instance_30x30"
+tif_matrix = tif_matrix[0:30, 11:41]
 
 # instance_name = "instance_70x70"
 
@@ -49,33 +52,24 @@ colors = {
 }
 
 solution = {
-    "125": 0,
+        "125": 0,
         "126": 0,
         "124": 1,
         "138": 1,
-        "117": 0,
-        "116": 0,
         "207": 1,
+        "202": 1,
         "102": 1,
-        "115": 0,
         "216": 1,
         "137": 0,
-        "118": 0,
         "121": 0,
-        "206": 1,
         "120": 0,
         "101": 0,
-        "114": 1,
+        "114": 0,
         "128": 0,
-        "201": 1,
+        "201": 0,
         "119": 0,
         "214": 1,
-        "132": 0,
-        "127": 0,
-        "213": 1,
-        "122": 0,
-        "209": 1,
-        "113": 1
+        "132": 0
 }
 
 solution_color = (0, 0, 0)

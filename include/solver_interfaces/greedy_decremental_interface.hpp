@@ -7,19 +7,19 @@
 
 #include "gecot/solvers/greedy_decremental.hpp"
 
-#include "solver_interfaces/abstract_solver.hpp"
+#include "solver_interfaces/abstract_solver_interface.hpp"
 
 namespace fhamonic {
 
-class GreedyDecrementalInterface : public AbstractSolver {
+class GreedyDecrementalInterface : public AbstractSolverInterface {
 private:
     gecot::solvers::GreedyDecremental solver;
     boost::program_options::options_description desc;
 
 public:
     GreedyDecrementalInterface() : desc(name() + " options") {
-        desc.add_options()("verbose,v", "Log the algorithm steps")(
-            "parallel,p", "Use multithreaded version")(
+        desc.add_options()("parallel,p", "Use multithreaded version")(
+            "feasability-tolerance,t", "Tolearnce for rounding errors")(
             "only-dec",
             "Do not perform the final incremental steps that ensure that the "
             "entire budget is used");
@@ -34,19 +34,20 @@ public:
             vm);
         po::notify(vm);
 
-        solver.verbose = vm.count("verbose") > 0;
         solver.parallel = vm.count("parallel") > 0;
+        solver.feasability_tol = vm.at("feasability-tolerance").as<double>();
         solver.only_dec = vm.count("only-dec") > 0;
     }
 
     gecot::instance_solution_t<Instance> solve(const Instance & instance,
-                                      const double B) const {
+                                               const double B) const {
         return solver.solve(instance, B);
     };
 
     std::string name() const { return "greedy_decr"; }
     std::string description() const {
-        return "From the improved landscape, iteratively remove the option with "
+        return "From the improved landscape, iteratively remove the option "
+               "with "
                "the worst gain/cost ratio (Zonation Algorithm).";
     }
     std::string options_description() const {

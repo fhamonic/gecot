@@ -2,6 +2,7 @@
 #define GECOT_SOLVERS_GREEDY_DECREMENTAL_HPP
 
 #include <algorithm>
+#include <limits>
 #include <ranges>
 #include <vector>
 
@@ -15,8 +16,8 @@ namespace gecot {
 namespace solvers {
 
 struct GreedyDecremental {
-    bool verbose = false;
     bool parallel = false;
+    double feasability_tol = std::numeric_limits<double>::epsilon();
     bool only_dec = false;
 
     template <instance_c I>
@@ -67,7 +68,7 @@ struct GreedyDecremental {
         std::vector<option_t> free_options;
         double previous_score = compute_score(instance, cases_current_qm,
                                               cases_current_pm, parallel);
-        while(purchased > budget) {
+        while(purchased > budget + feasability_tol) {
             compute_options_cases_decr_pc_num(
                 instance, solution, options, cases_current_qm, cases_current_pm,
                 cases_vertex_options, cases_arc_options, options_cases_pc_num,
@@ -121,8 +122,10 @@ struct GreedyDecremental {
             double budget_left = budget - purchased;
             {
                 const auto [first, last] = std::ranges::remove_if(
-                    free_options, [&instance, budget_left](const option_t & o) {
-                        return instance.option_cost(o) > budget_left;
+                    free_options,
+                    [&instance,
+                     b = budget_left + feasability_tol](const option_t & o) {
+                        return instance.option_cost(o) > b;
                     });
                 free_options.erase(first, last);
             }
@@ -173,8 +176,10 @@ struct GreedyDecremental {
 
                 free_options.erase(best_option_it);
                 const auto [first, last] = std::ranges::remove_if(
-                    free_options, [&instance, budget_left](const option_t & o) {
-                        return instance.option_cost(o) > budget_left;
+                    free_options,
+                    [&instance,
+                     b = budget_left + feasability_tol](const option_t & o) {
+                        return instance.option_cost(o) > b;
                     });
                 free_options.erase(first, last);
             }

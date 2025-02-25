@@ -2,6 +2,7 @@
 #define GECOT_SOLVERS_GREEDY_INCREMENTAL_HPP
 
 #include <algorithm>
+#include <limits>
 #include <ranges>
 #include <vector>
 
@@ -15,8 +16,8 @@ namespace gecot {
 namespace solvers {
 
 struct GreedyIncremental {
-    bool verbose = false;
     bool parallel = false;
+    double feasability_tol = std::numeric_limits<double>::epsilon();
 
     template <instance_c I>
     instance_solution_t<I> solve(const I & instance,
@@ -26,7 +27,8 @@ struct GreedyIncremental {
         const auto & cases = instance.cases();
         std::vector<option_t> options;
         for(const option_t & option : instance.options()) {
-            if(instance.option_cost(option) > budget) continue;
+            if(instance.option_cost(option) > budget + feasability_tol)
+                continue;
             options.emplace_back(option);
         }
 
@@ -90,8 +92,9 @@ struct GreedyIncremental {
 
             options.erase(best_option_it);
             const auto [first, last] = std::ranges::remove_if(
-                options, [&instance, budget_left](const option_t & o) {
-                    return instance.option_cost(o) > budget_left;
+                options, [&instance, b = budget_left +
+                                         feasability_tol](const option_t & o) {
+                    return instance.option_cost(o) > b;
                 });
             options.erase(first, last);
         }

@@ -17,8 +17,11 @@ tif_matrix = np.array(tif_image)
 
 # instance_name = "instance_70x70"
 
-instance_name = "instance_40x40"
-tif_matrix = tif_matrix[0:40, 0:40]
+instance_name = "instance_30x30"
+tif_matrix = tif_matrix[0:30, 11:41]
+
+# instance_name = "instance_40x40"
+# tif_matrix = tif_matrix[0:40, 0:40]
 
 # print(tif_matrix)
 

@@ -18,7 +18,6 @@ namespace gecot {
 namespace rankers {
 
 struct GreedyDecremental {
-    bool verbose = false;
     bool parallel = false;
     bool only_dec = false;
 
@@ -106,13 +105,12 @@ struct GreedyDecremental {
             }
             options.erase(worst_option_it);
 
-            if(verbose) {
-                std::cout << "ranked option: " << worst_option
-                          << "\n\t rank: " << rank
-                          << "\n\t ratio: " << options_ratios[worst_option]
-                          << "\n\t costing: " << worst_option_price
-                          << std::endl;
-            }
+            // std::cout << "ranked option: " << worst_option
+            //           << "\n\t rank: " << rank
+            //           << "\n\t ratio: " << options_ratios[worst_option]
+            //           << "\n\t costing: " << worst_option_price
+            //           << std::endl;
+            
             --rank;
         }
 

@@ -7,19 +7,18 @@
 
 #include "gecot/solvers/static_incremental.hpp"
 
-#include "solver_interfaces/abstract_solver.hpp"
+#include "solver_interfaces/abstract_solver_interface.hpp"
 
 namespace fhamonic {
 
-class StaticIncrementalInterface : public AbstractSolver {
+class StaticIncrementalInterface : public AbstractSolverInterface {
 private:
     gecot::solvers::StaticIncremental solver;
     boost::program_options::options_description desc;
 
 public:
     StaticIncrementalInterface() : desc(name() + " options") {
-        desc.add_options()("verbose,v", "Log the algorithm steps")(
-            "parallel,p", "Use multithreaded version");
+        desc.add_options()("parallel,p", "Use multithreaded version");
     }
 
     void parse(const std::vector<std::string> & args) {
@@ -31,7 +30,6 @@ public:
             vm);
         po::notify(vm);
 
-        solver.verbose = vm.count("verbose") > 0;
         solver.parallel = vm.count("parallel") > 0;
     }
 

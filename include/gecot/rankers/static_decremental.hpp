@@ -18,7 +18,6 @@ namespace gecot {
 namespace rankers {
 
 struct StaticDecremental {
-    bool verbose = false;
     bool parallel = false;
 
     template <instance_c I>

@@ -31,6 +31,7 @@ public:
 
     void handle_options(const boost::program_options::variables_map & vm) {
         solver.parallel = vm.count("parallel") > 0;
+        solver.feasability_tol = vm.at("feasability-tolerance").as<double>();
         solver.print_model = vm.count("print-model") > 0;
     }
 

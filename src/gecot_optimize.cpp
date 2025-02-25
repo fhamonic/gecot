@@ -20,7 +20,7 @@ namespace po = boost::program_options;
 #include "parse_instance.hpp"
 #include "trivial_reformulate.hpp"
 
-#include "solver_interfaces/abstract_solver.hpp"
+#include "solver_interfaces/abstract_solver_interface.hpp"
 #include "solver_interfaces/greedy_decremental_interface.hpp"
 #include "solver_interfaces/greedy_incremental_interface.hpp"
 #include "solver_interfaces/mip_interface.hpp"
@@ -32,11 +32,11 @@ using namespace fhamonic;
 
 static bool process_command_line(
     const std::vector<std::string> & args,
-    std::shared_ptr<AbstractSolver> & solver,
+    std::shared_ptr<AbstractSolverInterface> & solver,
     std::filesystem::path & instances_description_json_file, double & budget,
     std::optional<std::filesystem::path> & opt_output_json_file,
     std::optional<std::filesystem::path> & opt_output_csv_file) {
-    std::vector<std::shared_ptr<AbstractSolver>> solver_interfaces{
+    std::vector<std::shared_ptr<AbstractSolverInterface>> solver_interfaces{
         std::make_unique<StaticIncrementalInterface>(),
         std::make_unique<StaticDecrementalInterface>(),
         std::make_unique<GreedyIncrementalInterface>(),
@@ -90,8 +90,8 @@ static bool process_command_line(
         "output-json,o", po::value<std::filesystem::path>(),
         "Output solution data in JSON file")(
         "output-csv", po::value<std::filesystem::path>(),
-        "Output solution value in CSV file")("verbose,v",
-                                             "Enable all logging informations")(
+        "Output solution value in CSV file")(
+        "verbose,v", "Enable logging of algorithms trace")(
         "quiet,q", "Silence all logging except errors");
 
     po::positional_options_description p;
@@ -175,7 +175,7 @@ int main(int argc, const char * argv[]) {
 #ifdef WIN32
     std::system("chcp 65001 > NUL");
 #endif
-    std::shared_ptr<AbstractSolver> solver;
+    std::shared_ptr<AbstractSolverInterface> solver;
     std::filesystem::path instances_description_json;
     double budget;
     std::optional<std::filesystem::path> opt_output_json_file;
@@ -285,7 +285,8 @@ int main(int argc, const char * argv[]) {
                 "{{\n    \"instance_path\":  \"{}\",\n    \"algorithm\":  "
                 "\"{}\",\n    \"computation_time_ms\":  {},\n    "
                 "\"initial_score\":  {},",
-                std::filesystem::absolute(instances_description_json).generic_string(),
+                std::filesystem::absolute(instances_description_json)
+                    .generic_string(),
                 solver->name(), computation_time_ms, initial_score);
             print_property(
                 "initial_pc_num",
@@ -324,7 +325,9 @@ int main(int argc, const char * argv[]) {
                     }));
             out.print("\n}}");
 
-            spdlog::info("Solution printed to '{}'", std::filesystem::absolute(opt_output_json_file.value()).string());
+            spdlog::info("Solution printed to '{}'",
+                         std::filesystem::absolute(opt_output_json_file.value())
+                             .string());
         }
 
         if(opt_output_csv_file.has_value()) {
@@ -342,8 +345,10 @@ int main(int argc, const char * argv[]) {
             spdlog::info("Solution written to '{}'",
                          std::filesystem::absolute(opt_output_csv_file.value())
                              .string());
-            
-            spdlog::info("Solution printed to '{}'", std::filesystem::absolute(opt_output_csv_file.value()).string());
+
+            spdlog::info("Solution printed to '{}'",
+                         std::filesystem::absolute(opt_output_csv_file.value())
+                             .string());
         }
     } catch(const std::exception & e) {
         spdlog::error("{}: {}", program_state, e.what());

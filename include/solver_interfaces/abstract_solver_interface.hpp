@@ -1,5 +1,5 @@
-#ifndef ABSTRACT_SOLVER_HPP
-#define ABSTRACT_SOLVER_HPP
+#ifndef ABSTRACT_SOLVER_INTERFACE_HPP
+#define ABSTRACT_SOLVER_INTERFACE_HPP
 
 #include <string>
 #include <vector>
@@ -8,9 +8,9 @@
 
 namespace fhamonic {
 
-class AbstractSolver {
+class AbstractSolverInterface {
 public:
-    virtual ~AbstractSolver() {}
+    virtual ~AbstractSolverInterface() {}
 
     virtual void parse(const std::vector<std::string> & args) = 0;
     virtual gecot::instance_solution_t<Instance> solve(
@@ -24,4 +24,4 @@ public:
 
 }  // namespace fhamonic
 
-#endif  // ABSTRACT_SOLVER_HPP
+#endif  // ABSTRACT_SOLVER_INTERFACE_HPP

@@ -1,6 +1,7 @@
 #ifndef GECOT_SOLVERS_PREPROCESSED_MIP_HPP
 #define GECOT_SOLVERS_PREPROCESSED_MIP_HPP
 
+#include <limits>
 #include <stdexcept>
 #include <type_traits>
 
@@ -27,6 +28,7 @@ namespace solvers {
 
 struct preprocessed_MIP {
     bool parallel = false;
+    double feasability_tol = std::numeric_limits<double>::epsilon();
     bool print_model = false;
     double probability_resolution;
     int num_mus;
@@ -278,6 +280,7 @@ struct preprocessed_MIP {
         solver->set_loglevel(spdlog::get_level() == spdlog::level::trace ? 1
                                                                          : 0);
         solver->set_mip_optimality_gap(1e-10);
+        solver->set_feasability_tolerance(feasability_tol);
         auto ret_code = solver->optimize();
         if(ret_code != 0)
             throw std::runtime_error(solver->name() + " failed with code " +

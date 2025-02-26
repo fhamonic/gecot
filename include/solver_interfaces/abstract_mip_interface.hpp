@@ -25,7 +25,8 @@ public:
 #endif
               "cbc") {
         desc.add_options()(
-            "feasability-tolerance,t", "Tolearnce for rounding errors")(
+            "feasability-tolerance,t", po::value<double>()
+                ->default_value(1e-7), "Tolearnce for rounding errors")(
             "print-model,m", "Print the MIP model")(
             "use-cbc",
             "Prioritizes cbc for solving MIPs\n(default if gurobi_cl and scip "

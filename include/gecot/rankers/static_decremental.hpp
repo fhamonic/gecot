@@ -59,7 +59,7 @@ struct StaticDecremental {
         compute_options_cases_decr_pc_num(
             instance, melon::views::map([](option_t o) { return true; }),
             options, cases_current_qm, cases_current_pm, cases_vertex_options,
-            cases_arc_options, options_cases_pc_num, parallel);
+            cases_arc_options, options_cases_pc_num);
 
         auto options_ratios = instance.create_option_map(0.0);
         for(auto && option : options) {

@@ -16,8 +16,7 @@ namespace gecot {
 namespace solvers {
 
 struct GreedyIncremental {
-    bool parallel = false;
-    double feasability_tol = std::numeric_limits<double>::epsilon();
+    double feasability_tol = 0.0;
 
     template <instance_c I>
     instance_solution_t<I> solve(const I & instance,
@@ -53,13 +52,12 @@ struct GreedyIncremental {
         spdlog::trace("   added option id   | score gain |  budget left");
         spdlog::trace("---------------------------------------------------");
 
-        double previous_score = compute_base_score(instance, parallel);
+        double previous_score = compute_base_score(instance);
         double budget_left = budget;
         while(options.size() > 0) {
             compute_options_cases_incr_pc_num(
                 instance, options, cases_current_qm, cases_current_pm,
-                cases_vertex_options, cases_arc_options, options_cases_pc_num,
-                parallel);
+                cases_vertex_options, cases_arc_options, options_cases_pc_num);
             for(const option_t & option : options) {
                 options_ratios[option] =
                     (instance.eval_criterion(options_cases_pc_num[option]) -

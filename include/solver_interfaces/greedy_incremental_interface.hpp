@@ -18,8 +18,9 @@ private:
 
 public:
     GreedyIncrementalInterface() : desc(name() + " options") {
-        desc.add_options()("parallel,p", "Use multithreaded version")(
-            "feasability-tolerance,t", "Tolearnce for rounding errors");
+        desc.add_options()(
+        "feasability-tolerance,t", po::value<double>(&solver.feasability_tol)
+            ->default_value(1e-7), "Tolearnce for rounding errors");
     }
 
     void parse(const std::vector<std::string> & args) {
@@ -30,9 +31,6 @@ public:
                 .run(),
             vm);
         po::notify(vm);
-
-        solver.parallel = vm.count("parallel") > 0;
-        solver.feasability_tol = vm.at("feasability-tolerance").as<double>();
     }
 
     gecot::instance_solution_t<Instance> solve(const Instance & instance,

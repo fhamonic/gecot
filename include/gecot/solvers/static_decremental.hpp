@@ -16,8 +16,7 @@ namespace gecot {
 namespace solvers {
 
 struct StaticDecremental {
-    bool parallel = false;
-    double feasability_tol = std::numeric_limits<double>::epsilon();
+    double feasability_tol = 0.0;
     bool only_dec = false;
 
     template <instance_c I>
@@ -72,8 +71,7 @@ struct StaticDecremental {
             compute_score(instance, cases_current_qm, cases_current_pm);
         compute_options_cases_decr_pc_num(
             instance, solution, options, cases_current_qm, cases_current_pm,
-            cases_vertex_options, cases_arc_options, options_cases_pc_num,
-            parallel);
+            cases_vertex_options, cases_arc_options, options_cases_pc_num);
 
         auto options_ratios = instance.create_option_map(0.0);
         for(auto && option : options) {
@@ -133,8 +131,7 @@ struct StaticDecremental {
                 compute_score(instance, cases_current_qm, cases_current_pm);
             compute_options_cases_incr_pc_num(
                 instance, free_options, cases_current_qm, cases_current_pm,
-                cases_vertex_options, cases_arc_options, options_cases_pc_num,
-                parallel);
+                cases_vertex_options, cases_arc_options, options_cases_pc_num);
 
             for(const option_t & option : free_options) {
                 options_ratios[option] =

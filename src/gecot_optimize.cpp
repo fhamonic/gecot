@@ -13,6 +13,8 @@ namespace po = boost::program_options;
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 
+#include <tbb/global_control.h>
+
 #include "gecot/helper.hpp"
 
 #include "instance.hpp"
@@ -35,7 +37,8 @@ static bool process_command_line(
     std::shared_ptr<AbstractSolverInterface> & solver,
     std::filesystem::path & instances_description_json_file, double & budget,
     std::optional<std::filesystem::path> & opt_output_json_file,
-    std::optional<std::filesystem::path> & opt_output_csv_file) {
+    std::optional<std::filesystem::path> & opt_output_csv_file,
+    std::optional<tbb::global_control> & opt_tbb_global_control) {
     std::vector<std::shared_ptr<AbstractSolverInterface>> solver_interfaces{
         std::make_unique<StaticIncrementalInterface>(),
         std::make_unique<StaticDecrementalInterface>(),
@@ -92,7 +95,9 @@ static bool process_command_line(
         "output-csv", po::value<std::filesystem::path>(),
         "Output solution value in CSV file")(
         "verbose,v", "Enable logging of algorithms trace")(
-        "quiet,q", "Silence all logging except errors");
+        "quiet,q", "Silence all logging except errors")(
+        "max-threads", po::value<std::size_t>(),
+        "Limits the number of threads used");
 
     po::positional_options_description p;
     p.add("algorithm", 1);
@@ -164,6 +169,12 @@ static bool process_command_line(
     } else {
         spdlog::set_level(spdlog::level::info);
     }
+    if(vm.count("max-threads")) {
+        opt_tbb_global_control.emplace(
+            tbb::global_control::max_allowed_parallelism,
+            vm.at("max-threads").as<std::size_t>());
+    }
+
     std::vector<std::string> opts =
         po::collect_unrecognized(parsed.options, po::exclude_positional);
     solver->parse(opts);
@@ -180,6 +191,7 @@ int main(int argc, const char * argv[]) {
     double budget;
     std::optional<std::filesystem::path> opt_output_json_file;
     std::optional<std::filesystem::path> opt_output_csv_file;
+    std::optional<tbb::global_control> opt_tbb_global_control;
 
     spdlog::set_pattern("[%^%l%$] %v");
     std::string program_state = "Parsing arguments";
@@ -188,7 +200,7 @@ int main(int argc, const char * argv[]) {
         std::vector<std::string> args(argv + 1, argv + argc);
         if(!process_command_line(args, solver, instances_description_json,
                                  budget, opt_output_json_file,
-                                 opt_output_csv_file))
+                                 opt_output_csv_file, opt_tbb_global_control))
             return EXIT_SUCCESS;
         program_state = "Parsing instance";
         Instance raw_instance = parse_instance(instances_description_json);

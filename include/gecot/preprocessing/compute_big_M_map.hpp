@@ -16,8 +16,7 @@ namespace gecot {
 template <typename GR, typename QM, typename VOM, typename PM>
 auto compute_big_M_map(const GR & graph, const QM & quality_map,
                        const VOM & vertex_options_map,
-                       const PM & probability_map, auto && vertices,
-                       const bool parallel = false) {
+                       const PM & probability_map, auto && vertices) {
     auto big_M_map = melon::create_vertex_map<std::optional<double>>(graph);
     auto improved_quality_map = quality_map;
     for(const auto & v : melon::vertices(graph)) {
@@ -25,38 +24,28 @@ auto compute_big_M_map(const GR & graph, const QM & quality_map,
             improved_quality_map[v] += quality_gain;
     }
 
-    auto compute_big_Ms = [&](auto && vertices_subrange) {
-        auto reversed_graph = melon::views::reverse(graph);
-        auto algo =
-            melon::dijkstra(detail::parallel_pc_num_dijkstra_traits<
-                                melon::views::reverse<GR>,
-                                melon::mapped_value_t<PM, melon::arc_t<GR>>>{},
-                            reversed_graph, probability_map);
-
-        for(auto && s : vertices_subrange) {
-            double M = 0;
-            algo.reset().add_source(s);
-            for(const auto & [t, t_prob] : algo) {
-                M += t_prob * improved_quality_map[t];
-            }
-            big_M_map[s].emplace(M);
-        }
-    };
-
-    auto do_compute = [&](auto && vertices_range) {
-        if(parallel) {
-            tbb::parallel_for(tbb::blocked_range(vertices_range.begin(),
-                                                 vertices_range.end()),
-                              compute_big_Ms);
-        } else {
-            compute_big_Ms(tbb::blocked_range(vertices_range.begin(),
-                                              vertices_range.end()));
-        }
-    };
-
     std::vector<melon::vertex_t<GR>> vertices_vector;
     std::ranges::copy(vertices, std::back_inserter(vertices_vector));
-    do_compute(vertices_vector);
+
+    tbb::parallel_for(
+        tbb::blocked_range(vertices_vector.begin(), vertices_vector.end()),
+        [&](auto && vertices_subrange) {
+            auto reversed_graph = melon::views::reverse(graph);
+            auto algo = melon::dijkstra(
+                detail::parallel_pc_num_dijkstra_traits<
+                    melon::views::reverse<GR>,
+                    melon::mapped_value_t<PM, melon::arc_t<GR>>>{},
+                reversed_graph, probability_map);
+
+            for(auto && s : vertices_subrange) {
+                double M = 0;
+                algo.reset().add_source(s);
+                for(const auto & [t, t_prob] : algo) {
+                    M += t_prob * improved_quality_map[t];
+                }
+                big_M_map[s].emplace(M);
+            }
+        });
 
     return big_M_map;
 }

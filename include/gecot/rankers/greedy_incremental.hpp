@@ -48,12 +48,11 @@ struct GreedyIncremental {
         auto options_ratios = instance.create_option_map(0.0);
 
         unsigned int rank = 1;
-        double previous_score = compute_base_score(instance, parallel);
+        double previous_score = compute_base_score(instance);
         while(options.size() > 0) {
             compute_options_cases_incr_pc_num(
                 instance, options, cases_current_qm, cases_current_pm,
-                cases_vertex_options, cases_arc_options, options_cases_pc_num,
-                parallel);
+                cases_vertex_options, cases_arc_options, options_cases_pc_num);
             for(const option_t & option : options) {
                 options_ratios[option] =
                     (instance.eval_criterion(options_cases_pc_num[option]) -

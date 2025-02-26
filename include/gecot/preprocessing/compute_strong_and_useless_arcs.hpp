@@ -80,7 +80,7 @@ struct path_dijkstra_traits {
 
 template <case_c C>
 auto compute_strong_and_useless_arcs(
-    const C & instance_case, const bool parallel = false,
+    const C & instance_case,
     const auto & option_predicate = [](const option_t & o) { return true; },
     double probability_resolution = 0.00000001) {
     using graph_t = case_graph_t<C>;
@@ -133,7 +133,8 @@ auto compute_strong_and_useless_arcs(
     {
         progress_bar<spdlog::level::trace, 50> pb(2 * arcs_range.size());
 
-        auto compute_strong_arcs =
+        tbb::parallel_for(
+            tbb::blocked_range(arcs_range.begin(), arcs_range.end()),
             [&](const tbb::blocked_range<decltype(arcs_range.begin())> &
                     arcs_block) {
                 arc_t uv;
@@ -157,17 +158,10 @@ auto compute_strong_and_useless_arcs(
                     }
                     pb.tick();
                 }
-            };
-        if(parallel) {
-            tbb::parallel_for(
-                tbb::blocked_range(arcs_range.begin(), arcs_range.end()),
-                compute_strong_arcs);
-        } else {
-            compute_strong_arcs(
-                tbb::blocked_range(arcs_range.begin(), arcs_range.end()));
-        }
+            });
 
-        auto compute_useless_arcs =
+        tbb::parallel_for(
+            tbb::blocked_range(arcs_range.begin(), arcs_range.end()),
             [&](const tbb::blocked_range<decltype(arcs_range.begin())> &
                     arcs_block) {
                 arc_t uv;
@@ -191,15 +185,7 @@ auto compute_strong_and_useless_arcs(
                     }
                     pb.tick();
                 }
-            };
-        if(parallel) {
-            tbb::parallel_for(
-                tbb::blocked_range(arcs_range.begin(), arcs_range.end()),
-                compute_useless_arcs);
-        } else {
-            compute_useless_arcs(
-                tbb::blocked_range(arcs_range.begin(), arcs_range.end()));
-        }
+            });
     }
 
     if(spdlog::get_level() == spdlog::level::trace) {

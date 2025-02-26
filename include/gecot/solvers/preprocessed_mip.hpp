@@ -27,8 +27,7 @@ namespace gecot {
 namespace solvers {
 
 struct preprocessed_MIP {
-    bool parallel = false;
-    double feasability_tol = std::numeric_limits<double>::epsilon();
+    double feasability_tol = 0.0;
     bool print_model = false;
     double probability_resolution;
     int num_mus;
@@ -86,14 +85,14 @@ struct preprocessed_MIP {
                                           const double budget) const {
         if(num_mus >= 1) {
             return compute_constrained_strong_and_useless_arcs(
-                instance, instance_case, budget, parallel,
+                instance, instance_case, budget,
                 [&instance, budget](const option_t & o) {
                     return instance.option_cost(o) <= budget;
                 },
                 probability_resolution, num_mus);
         } else {
             return compute_strong_and_useless_arcs(
-                instance_case, parallel,
+                instance_case,
                 [&instance, budget](const option_t & o) {
                     return instance.option_cost(o) <= budget;
                 },
@@ -182,8 +181,7 @@ struct preprocessed_MIP {
                                        [&arc_option_map](auto && a) {
                                            return arc_option_map[a].has_value();
                                        });
-                        }),
-                    parallel);
+                        }));
 
                 for(const auto & [quality_gain, option] :
                     original_vertex_options_map[original_t]) {

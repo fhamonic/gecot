@@ -72,53 +72,42 @@ auto compute_cases_arc_options(const I & instance) noexcept {
 
 template <instance_c I>
 auto compute_cases_pc_num(const I & instance, const auto & cases_current_qm,
-                          const auto & cases_current_pm,
-                          const bool parallel = false) noexcept {
+                          const auto & cases_current_pm) noexcept {
     const auto & cases = instance.cases();
     auto cases_pc_num = instance.template create_case_map<double>();
-    auto compute_base_pc_num =
+    tbb::parallel_for(
+        tbb::blocked_range(cases.begin(), cases.end()),
         [&](const tbb::blocked_range<decltype(cases.begin())> & cases_block) {
             for(auto instance_case : cases_block) {
                 cases_pc_num[instance_case.id()] = pc_num(
                     instance_case.graph(), cases_current_qm[instance_case.id()],
                     cases_current_pm[instance_case.id()]);
             }
-        };
-    if(parallel) {
-        tbb::parallel_for(tbb::blocked_range(cases.begin(), cases.end()),
-                          compute_base_pc_num);
-    } else {
-        compute_base_pc_num(tbb::blocked_range(cases.begin(), cases.end()));
-    }
+        });
     return cases_pc_num;
 }
 
 template <instance_c I>
 double compute_score(const I & instance, const auto & cases_current_qm,
-                     const auto & cases_current_pm,
-                     const bool parallel = false) noexcept {
-    return instance.eval_criterion(compute_cases_pc_num(
-        instance, cases_current_qm, cases_current_pm, parallel));
+                     const auto & cases_current_pm) noexcept {
+    return instance.eval_criterion(
+        compute_cases_pc_num(instance, cases_current_qm, cases_current_pm));
 }
 
 template <instance_c I>
-auto compute_base_cases_pc_num(const I & instance,
-                               const bool parallel = false) noexcept {
+auto compute_base_cases_pc_num(const I & instance) noexcept {
     return compute_cases_pc_num(
         instance, melon::views::map([&](auto && case_id) {
             return instance.cases()[case_id].vertex_quality_map();
         }),
         melon::views::map([&](auto && case_id) {
             return instance.cases()[case_id].arc_probability_map();
-        }),
-        parallel);
+        }));
 }
 
 template <instance_c I>
-double compute_base_score(const I & instance,
-                          const bool parallel = false) noexcept {
-    return instance.eval_criterion(
-        compute_base_cases_pc_num(instance, parallel));
+double compute_base_score(const I & instance) noexcept {
+    return instance.eval_criterion(compute_base_cases_pc_num(instance));
 }
 
 template <instance_c I, melon::input_mapping<option_t> S>
@@ -135,8 +124,7 @@ template <instance_c I, melon::input_mapping<option_t> S>
     requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
 auto compute_solution_cases_pc_num(const I & instance, const S & solution,
                                    const auto & cases_vertex_options,
-                                   const auto & cases_arc_options,
-                                   const bool parallel = false) noexcept {
+                                   const auto & cases_arc_options) noexcept {
     return compute_cases_pc_num(
         instance, melon::views::map([&](auto && case_id) {
             auto enhanced_qm = instance.cases()[case_id].vertex_quality_map();
@@ -158,32 +146,30 @@ auto compute_solution_cases_pc_num(const I & instance, const S & solution,
                 }
             }
             return enhanced_pm;
-        }),
-        parallel);
+        }));
 }
 
 template <instance_c I, melon::input_mapping<option_t> S>
     requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
-auto compute_solution_cases_pc_num(const I & instance, const S & solution,
-                                   const bool parallel = false) noexcept {
+auto compute_solution_cases_pc_num(const I & instance,
+                                   const S & solution) noexcept {
     const auto cases_vertex_options = compute_cases_vertex_options(instance);
     const auto cases_arc_options = compute_cases_arc_options(instance);
     return compute_solution_cases_pc_num(
-        instance, solution, cases_vertex_options, cases_arc_options, parallel);
+        instance, solution, cases_vertex_options, cases_arc_options);
 }
 
-namespace detail {
-template <bool parallel = false>
-void _compute_options_cases_incr_pc_num(
-    const auto & instance, const auto & free_options, auto && cases_current_qm,
+template <instance_c I, detail::range_of<option_t> O>
+void compute_options_cases_incr_pc_num(
+    const I & instance, const O & free_options, auto && cases_current_qm,
     auto && cases_current_pm, auto && cases_vertex_options,
     auto && cases_arc_options, auto & options_cases_pc_num) {
     const auto & cases = instance.cases();
-
     progress_bar<spdlog::level::trace, 50> pb(free_options.size() *
                                               cases.size());
-
-    auto compute_options_enhanced_pc_num =
+    tbb::parallel_for(
+        tbb::blocked_range2d(cases.begin(), cases.end(), free_options.begin(),
+                             free_options.end()),
         [&](const tbb::blocked_range2d<decltype(cases.begin()),
                                        decltype(free_options.begin())> &
                 cases_options_block) {
@@ -210,16 +196,10 @@ void _compute_options_cases_incr_pc_num(
                         enhanced_pm[a] =
                             std::max(enhanced_pm[a], enhanced_prob);
 
-                    if constexpr(parallel) {
-                        options_cases_pc_num[option][instance_case.id()] =
-                            parallel_pc_num(graph, enhanced_qm, enhanced_pm);
-                    } else {
-                        options_cases_pc_num[option][instance_case.id()] =
-                            pc_num(graph, enhanced_qm, enhanced_pm);
-                    }
+                    options_cases_pc_num[option][instance_case.id()] =
+                        parallel_pc_num(graph, enhanced_qm, enhanced_pm);
 
                     pb.tick();
-
                     if(++it == options_block.end()) break;
 
                     for(auto && [u, quality_gain] : vertex_options[option])
@@ -228,52 +208,23 @@ void _compute_options_cases_incr_pc_num(
                         enhanced_pm[a] = current_pm[a];
                 }
             }
-        };
-
-    if constexpr(parallel) {
-        tbb::parallel_for(
-            tbb::blocked_range2d(cases.begin(), cases.end(),
-                                 free_options.begin(), free_options.end()),
-            compute_options_enhanced_pc_num);
-    } else {
-        compute_options_enhanced_pc_num(
-            tbb::blocked_range2d(cases.begin(), cases.end(),
-                                 free_options.begin(), free_options.end()));
-    }
+        });
 }
-}  // namespace detail
 
-template <instance_c I, detail::range_of<option_t> O>
-void compute_options_cases_incr_pc_num(
-    const I & instance, const O & free_options, auto && cases_current_qm,
-    auto && cases_current_pm, auto && cases_vertex_options,
-    auto && cases_arc_options, auto & options_cases_pc_num,
-    bool parallel = false) {
-    if(parallel) {
-        detail::_compute_options_cases_incr_pc_num<true>(
-            instance, free_options, cases_current_qm, cases_current_pm,
-            cases_vertex_options, cases_arc_options, options_cases_pc_num);
-    } else {
-        detail::_compute_options_cases_incr_pc_num<false>(
-            instance, free_options, cases_current_qm, cases_current_pm,
-            cases_vertex_options, cases_arc_options, options_cases_pc_num);
-    }
-}
-namespace detail {
-template <bool parallel, instance_c I, melon::input_mapping<option_t> S,
+template <instance_c I, melon::input_mapping<option_t> S,
           detail::range_of<option_t> O>
     requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
-void _compute_options_cases_decr_pc_num(
+void compute_options_cases_decr_pc_num(
     const I & instance, const S & current_solution, const O & taken_options,
     auto && cases_current_qm, auto && cases_current_pm,
     auto && cases_vertex_options, auto && cases_arc_options,
     auto & options_cases_pc_num) {
     const auto & cases = instance.cases();
-
     progress_bar<spdlog::level::trace, 50> pb(taken_options.size() *
                                               cases.size());
-
-    auto compute_options_enhanced_pc_num =
+    tbb::parallel_for(
+        tbb::blocked_range2d(cases.begin(), cases.end(), taken_options.begin(),
+                             taken_options.end()),
         [&](const tbb::blocked_range2d<decltype(cases.begin()),
                                        decltype(taken_options.begin())> &
                 cases_options_block) {
@@ -307,18 +258,11 @@ void _compute_options_cases_decr_pc_num(
                         }
                     }
 
-                    if constexpr(parallel) {
-                        options_cases_pc_num[option][instance_case.id()] =
-                            parallel_pc_num(instance_case.graph(), enhanced_qm,
-                                            enhanced_pm);
-                    } else {
-                        options_cases_pc_num[option][instance_case.id()] =
-                            pc_num(instance_case.graph(), enhanced_qm,
-                                   enhanced_pm);
-                    }
+                    options_cases_pc_num[option][instance_case.id()] =
+                        parallel_pc_num(instance_case.graph(), enhanced_qm,
+                                        enhanced_pm);
 
                     pb.tick();
-
                     if(++it == options_block.end()) break;
 
                     for(auto && [u, quality_gain] : vertex_options[option])
@@ -327,40 +271,7 @@ void _compute_options_cases_decr_pc_num(
                         enhanced_pm[a] = current_pm[a];
                 }
             }
-        };
-
-    if constexpr(parallel) {
-        tbb::parallel_for(
-            tbb::blocked_range2d(cases.begin(), cases.end(),
-                                 taken_options.begin(), taken_options.end()),
-            compute_options_enhanced_pc_num);
-    } else {
-        compute_options_enhanced_pc_num(
-            tbb::blocked_range2d(cases.begin(), cases.end(),
-                                 taken_options.begin(), taken_options.end()));
-    }
-}
-}  // namespace detail
-
-template <instance_c I, melon::input_mapping<option_t> S,
-          detail::range_of<option_t> O>
-    requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
-void compute_options_cases_decr_pc_num(
-    const I & instance, const S & current_solution, const O & taken_options,
-    auto && cases_current_qm, auto && cases_current_pm,
-    auto && cases_vertex_options, auto && cases_arc_options,
-    auto & options_cases_pc_num, const bool parallel = false) {
-    if(parallel) {
-        detail::_compute_options_cases_decr_pc_num<true>(
-            instance, current_solution, taken_options, cases_current_qm,
-            cases_current_pm, cases_vertex_options, cases_arc_options,
-            options_cases_pc_num);
-    } else {
-        detail::_compute_options_cases_decr_pc_num<false>(
-            instance, current_solution, taken_options, cases_current_qm,
-            cases_current_pm, cases_vertex_options, cases_arc_options,
-            options_cases_pc_num);
-    }
+        });
 }
 
 }  // namespace gecot

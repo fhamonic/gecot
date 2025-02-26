@@ -21,7 +21,7 @@ public:
         desc.add_options()(
             "resolution",
             po::value<double>(&solver.probability_resolution)
-                ->default_value(0.00000001),
+                ->default_value(1e-8),
             "Sets the resolution of the probabilities used by the "
             "preprocessing algorithm")(
             "nb-mus", po::value<int>(&solver.num_mus)->default_value(0),
@@ -30,7 +30,6 @@ public:
     }
 
     void handle_options(const boost::program_options::variables_map & vm) {
-        solver.parallel = vm.count("parallel") > 0;
         solver.feasability_tol = vm.at("feasability-tolerance").as<double>();
         solver.print_model = vm.count("print-model") > 0;
     }

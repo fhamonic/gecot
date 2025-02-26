@@ -22,8 +22,7 @@ namespace gecot {
 namespace solvers {
 
 struct MIP {
-    bool parallel = false;
-    double feasability_tol = std::numeric_limits<double>::epsilon();
+    double feasability_tol = 0.0;
     bool print_model = false;
 
     template <typename M, typename V>
@@ -105,7 +104,7 @@ struct MIP {
                 compute_generalized_flow_graph(instance_case);
             const auto big_M_map = compute_big_M_map(
                 graph, quality_map, vertex_options_map, probability_map,
-                melon::vertices(graph), parallel);
+                melon::vertices(graph));
 
             const auto F_vars = model.add_variables(
                 graph.num_vertices(),

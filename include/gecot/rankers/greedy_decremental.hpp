@@ -62,12 +62,12 @@ struct GreedyDecremental {
 
         unsigned int rank = options.size();
         double previous_score = compute_score(instance, cases_current_qm,
-                                              cases_current_pm, parallel);
+                                              cases_current_pm);
         while(!options.empty()) {
             compute_options_cases_decr_pc_num(
                 instance, solution, options, cases_current_qm,
                 cases_current_pm, cases_vertex_options, cases_arc_options,
-                options_cases_pc_num, parallel);
+                options_cases_pc_num);
             for(const option_t & option : options) {
                 options_ratios[option] =
                     (previous_score -

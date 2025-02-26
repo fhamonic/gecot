@@ -16,8 +16,7 @@ namespace gecot {
 namespace solvers {
 
 struct GreedyDecremental {
-    bool parallel = false;
-    double feasability_tol = std::numeric_limits<double>::epsilon();
+    double feasability_tol = 0.0;
     bool only_dec = false;
 
     template <instance_c I>
@@ -67,12 +66,11 @@ struct GreedyDecremental {
         spdlog::trace("---------------------------------------------------");
         std::vector<option_t> free_options;
         double previous_score = compute_score(instance, cases_current_qm,
-                                              cases_current_pm, parallel);
+                                              cases_current_pm);
         while(purchased > budget + feasability_tol) {
             compute_options_cases_decr_pc_num(
                 instance, solution, options, cases_current_qm, cases_current_pm,
-                cases_vertex_options, cases_arc_options, options_cases_pc_num,
-                parallel);
+                cases_vertex_options, cases_arc_options, options_cases_pc_num);
             for(const option_t & option : options) {
                 options_ratios[option] =
                     (previous_score -
@@ -118,7 +116,7 @@ struct GreedyDecremental {
 
         if(!only_dec) {
             previous_score = compute_score(instance, cases_current_qm,
-                                           cases_current_pm, parallel);
+                                           cases_current_pm);
             double budget_left = budget - purchased;
             {
                 const auto [first, last] = std::ranges::remove_if(
@@ -141,7 +139,7 @@ struct GreedyDecremental {
                 compute_options_cases_incr_pc_num(
                     instance, free_options, cases_current_qm, cases_current_pm,
                     cases_vertex_options, cases_arc_options,
-                    options_cases_pc_num, parallel);
+                    options_cases_pc_num);
                 for(const option_t & option : free_options) {
                     options_ratios[option] =
                         (instance.eval_criterion(options_cases_pc_num[option]) -

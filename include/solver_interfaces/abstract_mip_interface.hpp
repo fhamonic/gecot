@@ -24,7 +24,7 @@ public:
               get_exec_path().parent_path() /
 #endif
               "cbc") {
-        desc.add_options()("parallel,p", "Use multithreaded version")(
+        desc.add_options()(
             "feasability-tolerance,t", "Tolearnce for rounding errors")(
             "print-model,m", "Print the MIP model")(
             "use-cbc",

@@ -16,8 +16,7 @@ namespace gecot {
 namespace solvers {
 
 struct StaticIncremental {
-    bool parallel = false;
-    double feasability_tol = std::numeric_limits<double>::epsilon();
+    double feasability_tol = 0.0;
 
     template <instance_c I>
     instance_solution_t<I> solve(const I & instance,
@@ -37,7 +36,7 @@ struct StaticIncremental {
         spdlog::trace(
             "--------------------------------------------------------");
 
-        const double base_score = compute_base_score(instance, parallel);
+        const double base_score = compute_base_score(instance);
         auto options_cases_pc_num = instance.create_option_map(
             instance.template create_case_map<double>());
         const auto cases_vertex_options =
@@ -52,8 +51,7 @@ struct StaticIncremental {
             melon::views::map([&cases](auto case_id) -> decltype(auto) {
                 return cases[case_id].arc_probability_map();
             }),
-            cases_vertex_options, cases_arc_options, options_cases_pc_num,
-            parallel);
+            cases_vertex_options, cases_arc_options, options_cases_pc_num);
 
         auto options_ratios = instance.create_option_map(0.0);
         for(const option_t & option : options) {

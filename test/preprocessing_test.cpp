@@ -52,7 +52,6 @@ GTEST_TEST(preprocessing, fuzzy_test) {
     double budget = 0;
     for(auto && o : instance.options()) budget += instance.option_cost(o);
     budget /= 10;
-    const bool parallel = true;
 
     int cpt = 0;
     int cpt_ok = 0;
@@ -74,14 +73,14 @@ GTEST_TEST(preprocessing, fuzzy_test) {
         //*
         const auto [strong_arcs_map, useless_arcs_map] =
             gecot::compute_constrained_strong_and_useless_arcs(
-                instance, instance_case, budget, parallel,
+                instance, instance_case, budget,
                 [&instance, budget](const gecot::option_t & o) {
                     return instance.option_cost(o) <= budget;
                 });
         /*/
         const auto [strong_arcs_map, useless_arcs_map] =
             gecot::compute_strong_and_useless_arcs(
-                instance_case, parallel,
+                instance_case,
                 [&instance, budget](const gecot::option_t & o) {
                     return instance.option_cost(o) <= budget;
                 });

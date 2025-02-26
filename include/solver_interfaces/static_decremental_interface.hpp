@@ -18,8 +18,9 @@ private:
 
 public:
     StaticDecrementalInterface() : desc(name() + " options") {
-        desc.add_options()("parallel,p", "Use multithreaded version")(
-            "feasability-tolerance,t", "Tolearnce for rounding errors")(
+        desc.add_options()(
+            "feasability-tolerance,t", po::value<double>(&solver.feasability_tol)
+                ->default_value(1e-7), "Tolearnce for rounding errors")(
             "only-dec",
             "Do not perform the final incremental steps that ensure that the "
             "entire budget is used");
@@ -34,8 +35,6 @@ public:
             vm);
         po::notify(vm);
 
-        solver.parallel = vm.count("parallel") > 0;
-        solver.feasability_tol = vm.at("feasability-tolerance").as<double>();
         solver.only_dec = vm.count("only-dec") > 0;
     }
 

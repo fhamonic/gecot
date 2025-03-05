@@ -21,7 +21,7 @@ public:
     MIPInterface() : AbstractMIPInterface(name()) {}
 
     void handle_options(const boost::program_options::variables_map & vm) {
-        solver.feasability_tol = vm.at("feasability-tolerance").as<double>();
+        solver.feasability_tol = feasability_tolerance;
         solver.print_model = vm.count("print-model") > 0;
     }
 

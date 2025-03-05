@@ -16,6 +16,8 @@ protected:
     boost::program_options::options_description desc;
     std::filesystem::path cbc_default_path;
 
+    double feasability_tolerance;
+
 public:
     AbstractMIPInterface(const std::string & name)
         : desc(name + " options")
@@ -25,7 +27,7 @@ public:
 #endif
               "cbc") {
         desc.add_options()(
-            "feasability-tolerance,t", po::value<double>()
+            "feasability-tolerance,t", po::value<double>(&feasability_tolerance)
                 ->default_value(1e-7), "Tolearnce for rounding errors")(
             "print-model,m", "Print the MIP model")(
             "use-cbc",

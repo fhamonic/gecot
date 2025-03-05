@@ -18,7 +18,10 @@ tif_matrix = np.array(tif_image)
 # instance_name = "instance_70x70"
 
 instance_name = "instance_30x30"
-tif_matrix = tif_matrix[0:30, 11:41]
+# strat_x = 2
+# start_y = 12
+# tif_matrix = tif_matrix[start_y:start_y+40, strat_x:strat_x+40]
+tif_matrix = tif_matrix[16:46, 16:46]
 
 # instance_name = "instance_40x40"
 # tif_matrix = tif_matrix[0:40, 0:40]
@@ -53,11 +56,11 @@ def cell_option_id(v):
 
 
 colors = {
-    "habitat": (64, 192, 64),
-    "field": (192, 255, 0),
-    "road": (255, 128, 0),
-    "wildlife crossing": (64, 128, 255),
-    "land acquisition": (192, 128, 192),
+    "habitat": (0, 150, 0),
+    "field": (220, 220, 0),
+    "road": (255, 80, 0),
+    "wildlife crossing": (0, 80, 255),
+    "land acquisition": (120, 0, 180),
 }
 quality_map = {
     "habitat": 1,
@@ -82,7 +85,7 @@ cell_cost = {"wildlife crossing": 1, "land acquisition": 0.2}
 
 os.makedirs(root_path / instance_name, exist_ok=True)
 
-(width, height) = tif_matrix.shape
+(height, width) = tif_matrix.shape
 img = Image.new("RGB", (width, height))
 pixels = img.load()
 for idx, value in np.ndenumerate(tif_matrix):

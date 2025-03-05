@@ -13,9 +13,10 @@ tif_matrix = np.array(tif_image)
 # tif_matrix = tif_matrix[0:40, 0:40]
 
 instance_name = "instance_30x30"
-tif_matrix = tif_matrix[0:30, 11:41]
+tif_matrix = tif_matrix[16:46, 16:46]
 
 # instance_name = "instance_70x70"
+
 
 # return the type of a cell as a function of its value
 def cell_type(v):
@@ -42,34 +43,34 @@ def cell_option_id(v):
         return str(v)
     return None
 
-
 colors = {
-    "habitat": (64, 192, 64),
-    "field": (192, 255, 0),
-    "road": (255, 128, 0),
-    "wildlife crossing": (64, 128, 255),
-    "land acquisition": (192, 128, 192),
+    "habitat": (0, 150, 0),
+    "field": (220, 220, 0),
+    "road": (255, 80, 0),
+    "wildlife crossing": (0, 80, 255),
+    "land acquisition": (120, 0, 180),
+    "solution": (0, 0, 0),
 }
 
 solution = {
-        "125": 0,
-        "126": 0,
-        "124": 1,
-        "138": 1,
-        "207": 1,
-        "202": 1,
-        "102": 1,
-        "216": 1,
         "137": 0,
-        "121": 0,
-        "120": 0,
-        "101": 0,
-        "114": 0,
+        "216": 0,
+        "121": 1,
+        "210": 0,
+        "120": 1,
         "128": 0,
         "201": 0,
         "119": 0,
-        "214": 1,
-        "132": 0
+        "214": 0,
+        "132": 0,
+        "127": 0,
+        "122": 1,
+        "131": 0,
+        "209": 0,
+        "208": 0,
+        "113": 0,
+        "129": 0,
+        "112": 1
 }
 
 solution_color = (0, 0, 0)
@@ -92,18 +93,14 @@ ax.imshow(sol_img)
 sol_legend_patches = [
     mpatches.Patch(color=np.array(color) / 255, label=color_id, ec=(0.5, 0.5, 0.5))
     for color_id, color in colors.items()
-] + [
-    mpatches.Patch(
-        color=np.array(solution_color) / 255, label="solution", ec=(0.5, 0.5, 0.5)
-    )
 ]
-ax.legend(
-    handles=sol_legend_patches,
-    fontsize=40,
-    loc="lower left",
-    framealpha=0.9,
-    bbox_to_anchor=(1, 0),
-)
+# ax.legend(
+#     handles=sol_legend_patches,
+#     fontsize=40,
+#     loc="lower left",
+#     framealpha=0.9,
+#     bbox_to_anchor=(1, 0),
+# )
 
 ax.set_xticks([])
 ax.set_yticks([])

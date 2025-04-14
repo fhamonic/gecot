@@ -56,11 +56,11 @@ def cell_option_id(v):
 
 
 colors = {
-    "habitat": (0, 150, 0),
-    "field": (220, 220, 0),
-    "road": (255, 80, 0),
-    "wildlife crossing": (0, 80, 255),
-    "land acquisition": (120, 0, 180),
+    "habitat": (0,136,55),
+    "field": (166,219,160),
+    "road": (123,50,148),
+    "wildlife crossing": (194,165,207),
+    "land acquisition": (247,247,247),
 }
 quality_map = {
     "habitat": 1,

@@ -44,22 +44,42 @@ def cell_option_id(v):
     return None
 
 colors = {
-    "habitat": (0, 150, 0),
-    "field": (220, 220, 0),
-    "road": (255, 80, 0),
-    "wildlife crossing": (0, 80, 255),
-    "land acquisition": (120, 0, 180),
-    "solution": (0, 0, 0),
+    "habitat": (0,136,55),
+    "field": (166,219,160),
+    "road": (123,50,148),
+    "wildlife crossing": (194,165,207),
+    "land acquisition": (247,247,247),
+    "solution": (0,0,0),
 }
 
+# solution = {
+#         "137": 0,
+#         "216": 0,
+#         "121": 1,
+#         "210": 0,
+#         "120": 1,
+#         "128": 0,
+#         "201": 0,
+#         "119": 0,
+#         "214": 0,
+#         "132": 0,
+#         "127": 0,
+#         "122": 1,
+#         "131": 0,
+#         "209": 0,
+#         "208": 0,
+#         "113": 0,
+#         "129": 0,
+#         "112": 1
+# }
 solution = {
         "137": 0,
-        "216": 0,
-        "121": 1,
-        "210": 0,
-        "120": 1,
+        "216": 1,
+        "121": 0,
+        "210": 1,
+        "120": 0,
         "128": 0,
-        "201": 0,
+        "201": 1,
         "119": 0,
         "214": 0,
         "132": 0,
@@ -68,9 +88,9 @@ solution = {
         "131": 0,
         "209": 0,
         "208": 0,
-        "113": 0,
+        "113": 1,
         "129": 0,
-        "112": 1
+        "112": 0
 }
 
 solution_color = (0, 0, 0)
@@ -94,13 +114,13 @@ sol_legend_patches = [
     mpatches.Patch(color=np.array(color) / 255, label=color_id, ec=(0.5, 0.5, 0.5))
     for color_id, color in colors.items()
 ]
-# ax.legend(
-#     handles=sol_legend_patches,
-#     fontsize=40,
-#     loc="lower left",
-#     framealpha=0.9,
-#     bbox_to_anchor=(1, 0),
-# )
+ax.legend(
+    handles=sol_legend_patches,
+    fontsize=40,
+    loc="lower left",
+    framealpha=0.9,
+    bbox_to_anchor=(1, 0),
+)
 
 ax.set_xticks([])
 ax.set_yticks([])

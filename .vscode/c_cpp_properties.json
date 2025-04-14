@@ -1,0 +1,32 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/include",
+                "/home/plaiseek/.conan2/p/b/json-b6e60a426eea4/p/include",
+                "/home/plaiseek/.conan2/p/nlohm0567ffc90cfc1/p/include",
+                "/home/plaiseek/.conan2/p/fast-f3f6a6e2b4c02/p/include",
+                "/home/plaiseek/.conan2/p/fast-f3f6a6e2b4c02/p/include/fast-cpp-csv-parser",
+                "/home/plaiseek/.conan2/p/b/onetb190da5cab07b8/p/include",
+                "/home/plaiseek/.conan2/p/b/boost2d5e24883dbfd/p/include",
+                "/home/plaiseek/.conan2/p/b/libbad5ff09ec8faba/p/include",
+                "/home/plaiseek/.conan2/p/paral181f7804ba0ad/p/include",
+                "/home/plaiseek/.conan2/p/eigen3d88c0279cc26/p/include",
+                "/home/plaiseek/.conan2/p/b/spdlof200ae38987c7/p/include",
+                "/home/plaiseek/.conan2/p/b/melona710f36b746ff/p/include",
+                "/home/plaiseek/.conan2/p/b/fmtb2dc2a966c139/p/include",
+                "/home/plaiseek/.conan2/p/b/mippp0773230b02e9a/p/include",
+                "/home/plaiseek/.conan2/p/rangef4744355d8aba/p/include",
+                "/home/plaiseek/.conan2/p/b/gtestbec640dc73305/p/include"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "clang-x64",
+            "configurationProvider": "ms-vscode.cmake-tools"
+        }
+    ],
+    "version": 4
+}

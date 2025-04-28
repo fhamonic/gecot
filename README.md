@@ -6,15 +6,24 @@ GECOT : https://github.com/fhamonic/gecot
 
 Run the installer named "Gecot-1.0-win64.msi".
 
+The command "gecot_optimze" is now available in the terminal.
+
 ## Linux
 
-For Linux, extract the precompiled binaries contained in "Gecot-1.0-Linux.tar.gz".
+Extract the precompiled binaries contained in "Gecot-1.0-Linux.tar.gz".
 
-The main executable is under "bin/gecot_optimize".
+    tar -xzf Gecot-1.0-Linux.tar.gz
+
+The "gecot_optimize" executable is under "Gecot-1.0-Linux/bin/".
+
+To use the mip and prep_mip algorithms, you will need to instal Cbc with the following command (Ubuntu) :
+
+    apt install coinor-cbc
+
 
 ## Otherwise
 
-Here is a Docker container for running GECOT : https://github.com/fhamonic/gecot_docker
+Here is a Docker container for running GECOT anywhere : https://github.com/fhamonic/gecot_docker
 
 # Usage
 

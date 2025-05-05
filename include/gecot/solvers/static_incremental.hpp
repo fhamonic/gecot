@@ -16,7 +16,7 @@ namespace gecot {
 namespace solvers {
 
 struct StaticIncremental {
-    double feasability_tol = 0.0;
+    double feasibility_tol = 0.0;
 
     template <instance_c I>
     instance_solution_t<I> solve(const I & instance,
@@ -26,7 +26,7 @@ struct StaticIncremental {
         const auto & cases = instance.cases();
         std::vector<option_t> options;
         for(const option_t & option : instance.options()) {
-            if(instance.option_cost(option) > budget + feasability_tol) continue;
+            if(instance.option_cost(option) > budget + feasibility_tol) continue;
             options.emplace_back(option);
         }
 
@@ -67,7 +67,7 @@ struct StaticIncremental {
         double purchased = 0.0;
         for(const option_t & option : options) {
             const double price = instance.option_cost(option);
-            if(purchased + price > budget + feasability_tol) continue;
+            if(purchased + price > budget + feasibility_tol) continue;
             purchased += price;
             solution[option] = true;
             spdlog::trace("{:>20} |  {: #.6e}  | {: #.5e}",

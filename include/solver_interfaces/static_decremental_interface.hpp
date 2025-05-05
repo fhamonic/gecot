@@ -19,7 +19,7 @@ private:
 public:
     StaticDecrementalInterface() : desc(name() + " options") {
         desc.add_options()(
-            "feasability-tolerance,t", po::value<double>(&solver.feasability_tol)
+            "feasibility-tolerance,t", po::value<double>(&solver.feasibility_tol)
                 ->default_value(1e-7), "Tolearnce for rounding errors")(
             "only-dec",
             "Do not perform the final incremental steps that ensure that the "

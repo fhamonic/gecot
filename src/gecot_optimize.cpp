@@ -23,6 +23,7 @@ namespace po = boost::program_options;
 #include "trivial_reformulate.hpp"
 
 #include "solver_interfaces/abstract_solver_interface.hpp"
+#include "solver_interfaces/benders_mip_interface.hpp"
 #include "solver_interfaces/greedy_decremental_interface.hpp"
 #include "solver_interfaces/greedy_incremental_interface.hpp"
 #include "solver_interfaces/mip_interface.hpp"
@@ -45,7 +46,8 @@ static bool process_command_line(
         std::make_unique<GreedyIncrementalInterface>(),
         std::make_unique<GreedyDecrementalInterface>(),
         std::make_unique<MIPInterface>(),
-        std::make_unique<PreprocessedMIPInterface>()};
+        std::make_unique<PreprocessedMIPInterface>(),
+        std::make_unique<BendersMIPInterface>()};
 
     auto print_soft_name = []() {
         fmt::print(

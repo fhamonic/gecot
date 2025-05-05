@@ -6,8 +6,8 @@
 
 #include <spdlog/spdlog.h>
 
-#include "mippp/mip_model.hpp"
 #include "mippp/detail/std_ranges_to_range_v3.hpp"
+#include "mippp/solvers/gurobi/all.hpp"
 
 #include "melon/graph.hpp"
 
@@ -15,14 +15,13 @@
 #include "gecot/helper.hpp"
 #include "gecot/preprocessing/compute_big_M_map.hpp"
 #include "gecot/preprocessing/compute_generalized_flow_graph.hpp"
-#include "gecot/utils/mip_helper.hpp"
 
 namespace fhamonic {
 namespace gecot {
 namespace solvers {
 
 struct MIP {
-    double feasability_tol = 0.0;
+    double feasibility_tol = 0.0;
     bool print_model = false;
 
     template <typename M, typename V>
@@ -41,9 +40,9 @@ struct MIP {
         auto operator()(const criterion_sum & f) {
             using namespace mippp::operators;
             auto var = model.get().add_variable();
-            std::vector<typename M::var> vars;
+            std::vector<typename M::variable> vars;
             for(auto && e : f.values) vars.emplace_back(std::visit(*this, e));
-            model.get().add_constraint(var <= xsum(vars));
+            model.get().add_constraint(var == xsum(vars));
             return var;
         }
         auto operator()(const criterion_product & f) {
@@ -57,7 +56,7 @@ struct MIP {
 
             auto var = model.get().add_variable();
             model.get().add_constraint(
-                var <= std::get<criterion_constant>(f.values[0]) *
+                var == std::get<criterion_constant>(f.values[0]) *
                            std::visit(*this, f.values[1]));
             return var;
         }
@@ -78,20 +77,24 @@ struct MIP {
 
         using namespace mippp;
         using namespace mippp::operators;
-        using mip = mip_model<cli_solver_model_traits>;
-        mip model;
+        gurobi_api api;
+        gurobi_milp model(api);
+        model.set_optimality_tolerance(1e-10);
+        model.set_feasibility_tolerance(feasibility_tol);
 
         const auto C_vars = model.add_variables(
-            instance.cases().size(), [](const case_id_t & id) { return id; },
-            [](const case_id_t & id) { return "C_" + std::to_string(id); });
+            instance.cases().size(), [](const case_id_t & id) { return id; }
+            // ,[](const case_id_t & id) { return "C_" + std::to_string(id); }
+        );
 
-        model.add_to_objective(std::visit(
-            formula_variable_visitor{model, C_vars}, instance.criterion()));
+        model.set_maximization();
+        model.set_objective(std::visit(formula_variable_visitor{model, C_vars},
+                                       instance.criterion()));
 
-        const auto X_vars = model.add_variables(
-            instance.options().size(), [](const option_t & i) { return i; },
-            [](const option_t & i) { return "Y_" + std::to_string(i); },
-            {.upper_bound = 1, .type = mip::var_category::binary});
+        const auto X_vars = model.add_binary_variables(
+            instance.options().size(), [](const option_t & i) { return i; }
+            // ,[](const option_t & i) { return "Y_" + std::to_string(i); }
+        );
 
         model.add_constraint(xsum(instance.options(), [&](auto && o) {
                                  return instance.option_cost(o) * X_vars(o);
@@ -102,32 +105,31 @@ struct MIP {
             const auto [graph, quality_map, vertex_options_map, probability_map,
                         arc_option_map] =
                 compute_generalized_flow_graph(instance_case);
-            const auto big_M_map = compute_big_M_map(
-                graph, quality_map, vertex_options_map, probability_map,
-                melon::vertices(graph));
+            const auto big_M_map =
+                compute_big_M_map(graph, quality_map, vertex_options_map,
+                                  probability_map, melon::vertices(graph));
 
             const auto F_vars = model.add_variables(
                 graph.num_vertices(),
-                [](const melon::vertex_t<instance_graph_t<I>> & v) {
-                    return v;
-                },
-                [case_id](const melon::vertex_t<instance_graph_t<I>> & v) {
-                    return "F_" + std::to_string(v) + "(" +
-                           std::to_string(case_id) + ")";
-                });
-            std::vector<std::pair<variable<int, double>, double>>
+                [](const melon::vertex_t<instance_graph_t<I>> & v) { return v; }
+                // , [case_id](const melon::vertex_t<instance_graph_t<I>> & v) {
+                //     return "F_" + std::to_string(v) + "(" +
+                //            std::to_string(case_id) + ")";
+                // }
+            );
+            std::vector<std::pair<model_variable<int, double>, double>>
                 F_prime_additional_terms;
 
             for(const auto & t : melon::vertices(graph)) {
                 for(const auto & [quality_gain, option] :
                     vertex_options_map[t]) {
                     const auto F_prime_t_var =
-                        model.add_variable("F'_" + std::to_string(t) + "_" +
+                        model.add_variable(/*"F'_" + std::to_string(t) + "_" +
                                            std::to_string(option) + "(" +
-                                           std::to_string(case_id) + ")");
+                                           std::to_string(case_id) + ")"*/);
                     model.add_constraint(F_prime_t_var <= F_vars(t));
                     model.add_constraint(F_prime_t_var <=
-                                         big_M_map[t].value() * X_vars(option));
+                                         big_M_map[t] * X_vars(option));
                     F_prime_additional_terms.emplace_back(F_prime_t_var,
                                                           quality_gain);
                 }
@@ -135,12 +137,14 @@ struct MIP {
                     graph.num_arcs(),
                     [](const melon::arc_t<instance_graph_t<I>> & a) {
                         return a;
-                    },
-                    [t, case_id](const melon::arc_t<instance_graph_t<I>> & a) {
-                        return "P_" + std::to_string(t) + "_" +
-                               std::to_string(a) + "(" +
-                               std::to_string(case_id) + ")";
-                    });
+                    }
+                    // ,[t, case_id](const melon::arc_t<instance_graph_t<I>> &
+                    // a) {
+                    //     return "P_" + std::to_string(t) + "_" +
+                    //            std::to_string(a) + "(" +
+                    //            std::to_string(case_id) + ")";
+                    // }
+                );
                 for(const auto & u : melon::vertices(graph)) {
                     if(u == t) continue;
                     model.add_constraint(
@@ -169,7 +173,7 @@ struct MIP {
                     if(!arc_option_map[a].has_value()) continue;
                     model.add_constraint(
                         Phi_t_vars(a) <=
-                        big_M_map[melon::arc_source(graph, a)].value() *
+                        big_M_map[melon::arc_source(graph, a)] *
                             X_vars(arc_option_map[a].value()));
                 }
             }
@@ -187,24 +191,13 @@ struct MIP {
         spdlog::trace("  {:>10} constraints", model.num_constraints());
         spdlog::trace("  {:>10} entries", model.num_entries());
 
-        auto solver = mip_helper::build_solver(model);
-        solver->set_loglevel(spdlog::get_level() == spdlog::level::trace ? 1
-                                                                         : 0);
-        solver->set_mip_optimality_gap(1e-10);
-        solver->set_feasability_tolerance(feasability_tol);
-        auto ret_code = solver->optimize();
-        if(ret_code != 0)
-            throw std::runtime_error(solver->name() + " failed with code " +
-                                     std::to_string(ret_code) +
-                                     ", see logs at " +
-                                     solver->logs_path().string());
-        const auto solver_solution = solver->get_solution();
+        model.solve();
+        const auto model_solution = model.get_solution();
 
         spdlog::trace("MIP solution found with value: {}",
-                      solver->get_objective_value());
+                      model.get_solution_value());
         for(const auto & i : instance.options()) {
-            solution[i] =
-                solver_solution[static_cast<std::size_t>(X_vars(i).id())];
+            solution[i] = model_solution[X_vars(i)];
         }
 
         return solution;

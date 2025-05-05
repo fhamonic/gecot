@@ -1,6 +1,7 @@
 #ifndef GECOT_COMPUTE_BIG_M_MAP_HPP
 #define GECOT_COMPUTE_BIG_M_MAP_HPP
 
+#include <limits>
 #include <optional>
 
 #include "melon/algorithm/dijkstra.hpp"
@@ -17,7 +18,8 @@ template <typename GR, typename QM, typename VOM, typename PM>
 auto compute_big_M_map(const GR & graph, const QM & quality_map,
                        const VOM & vertex_options_map,
                        const PM & probability_map, auto && vertices) {
-    auto big_M_map = melon::create_vertex_map<std::optional<double>>(graph);
+    auto big_M_map = melon::create_vertex_map<double>(
+        graph, std::numeric_limits<double>::max());
     auto improved_quality_map = quality_map;
     for(const auto & v : melon::vertices(graph)) {
         for(const auto & [quality_gain, option] : vertex_options_map[v])
@@ -43,7 +45,7 @@ auto compute_big_M_map(const GR & graph, const QM & quality_map,
                 for(const auto & [t, t_prob] : algo) {
                     M += t_prob * improved_quality_map[t];
                 }
-                big_M_map[s].emplace(M);
+                big_M_map[s] = M;
             }
         });
 

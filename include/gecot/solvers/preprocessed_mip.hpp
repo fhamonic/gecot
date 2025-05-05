@@ -5,13 +5,13 @@
 #include <stdexcept>
 #include <type_traits>
 
+#include <range/v3/view/filter.hpp>
+#include <range/v3/view/join.hpp>
+
 #include <spdlog/spdlog.h>
 
 #include "mippp/detail/std_ranges_to_range_v3.hpp"
-#include "mippp/mip_model.hpp"
-
-#include <range/v3/view/join.hpp>
-#include <unordered_set>
+#include "mippp/solvers/gurobi/all.hpp"
 
 #include "melon/graph.hpp"
 
@@ -20,14 +20,14 @@
 #include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
 #include "gecot/preprocessing/compute_contracted_generalized_flow_graph.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
-#include "gecot/utils/mip_helper.hpp"
+#include "gecot/utils/chronometer.hpp"
 
 namespace fhamonic {
 namespace gecot {
 namespace solvers {
 
 struct preprocessed_MIP {
-    double feasability_tol = 0.0;
+    double feasibility_tol = 0.0;
     bool print_model = false;
     double probability_resolution;
     int num_mus;
@@ -48,10 +48,9 @@ struct preprocessed_MIP {
         auto operator()(const criterion_sum & f) {
             using namespace fhamonic::mippp::operators;
             auto var = model.get().add_variable();
-            std::vector<typename M::var> vars;
+            std::vector<typename M::variable> vars;
             for(auto && e : f.values) vars.emplace_back(std::visit(*this, e));
-
-            model.get().add_constraint(var <= xsum(vars));
+            model.get().add_constraint(var == xsum(vars));
             return var;
         }
         auto operator()(const criterion_product & f) {
@@ -65,7 +64,7 @@ struct preprocessed_MIP {
 
             auto var = model.get().add_variable();
             model.get().add_constraint(
-                var <= std::get<criterion_constant>(f.values[0]) *
+                var == std::get<criterion_constant>(f.values[0]) *
                            std::visit(*this, f.values[1]));
             return var;
         }
@@ -107,20 +106,24 @@ struct preprocessed_MIP {
 
         using namespace fhamonic::mippp;
         using namespace fhamonic::mippp::operators;
-        using mip = mip_model<cli_solver_model_traits>;
-        mip model;
+        gurobi_api api;
+        gurobi_milp model(api);
+        model.set_optimality_tolerance(1e-10);
+        model.set_feasibility_tolerance(feasibility_tol);
 
         const auto C_vars = model.add_variables(
-            instance.cases().size(), [](const case_id_t & id) { return id; },
-            [](const case_id_t & id) { return "C_" + std::to_string(id); });
+            instance.cases().size(), [](const case_id_t & id) { return id; }
+            // ,[](const case_id_t & id) { return "C_" + std::to_string(id); }
+        );
 
-        model.add_to_objective(std::visit(
-            formula_variable_visitor{model, C_vars}, instance.criterion()));
+        model.set_maximization();
+        model.set_objective(std::visit(formula_variable_visitor{model, C_vars},
+                                       instance.criterion()));
 
-        const auto X_vars = model.add_variables(
-            instance.options().size(), [](const option_t & i) { return i; },
-            [](const option_t & i) { return "Y_" + std::to_string(i); },
-            {.upper_bound = 1, .type = mip::var_category::binary});
+        const auto X_vars = model.add_binary_variables(
+            instance.options().size(), [](const option_t & i) { return i; }
+            // ,[](const option_t & i) { return "Y_" + std::to_string(i); }
+        );
         model.add_constraint(xsum(instance.options(), [&](auto && o) {
                                  return instance.option_cost(o) * X_vars(o);
                              }) <= budget);
@@ -137,13 +140,12 @@ struct preprocessed_MIP {
 
             const auto Xi_vars = model.add_variables(
                 original_graph.num_vertices(),
-                [](const melon::vertex_t<instance_graph_t<I>> & v) {
-                    return v;
-                },
-                [case_id](const melon::vertex_t<instance_graph_t<I>> & v) {
-                    return "Xi_" + std::to_string(v) + "(" +
-                           std::to_string(case_id) + ")";
-                });
+                [](const melon::vertex_t<instance_graph_t<I>> & v) { return v; }
+                // ,[case_id](const melon::vertex_t<instance_graph_t<I>> & v) {
+                //     return "Xi_" + std::to_string(v) + "(" +
+                //            std::to_string(case_id) + ")";
+                // }
+            );
 
             const auto [strong_arcs_map, useless_arcs_map] =
                 _compute_strong_and_useless_arcs(instance, instance_case,
@@ -152,15 +154,15 @@ struct preprocessed_MIP {
             for(const auto & original_t : melon::vertices(original_graph)) {
                 if(original_quality_map[original_t] == 0 &&
                    instance_case.vertex_options_map()[original_t].empty()) {
-                    model.upper_bound(Xi_vars(original_t)) = 0;
+                    model.set_variable_upper_bound(Xi_vars(original_t), 0);
                     continue;
                 }
 
                 const auto F_var =
-                    model.add_variable("F_" + std::to_string(original_t) + "(" +
-                                       std::to_string(case_id) + ")");
+                    model.add_variable(/*"F_" + std::to_string(original_t) + "(" +
+                                       std::to_string(case_id) + ")"*/);
 
-                std::vector<std::pair<variable<int, double>, double>>
+                std::vector<std::pair<model_variable<int, double>, double>>
                     F_prime_additional_terms;
                 // block_first_constraint.emplace_back(model.num_constraints());
 
@@ -186,12 +188,12 @@ struct preprocessed_MIP {
                 for(const auto & [quality_gain, option] :
                     original_vertex_options_map[original_t]) {
                     const auto F_prime_t_var =
-                        model.add_variable("F'_" + std::to_string(original_t) +
+                        model.add_variable(/*"F'_" + std::to_string(original_t) +
                                            "_" + std::to_string(option) + "(" +
-                                           std::to_string(case_id) + ")");
+                                           std::to_string(case_id) + ")"*/);
                     model.add_constraint(F_prime_t_var <= F_var);
                     model.add_constraint(F_prime_t_var <=
-                                         big_M_map[t].value() * X_vars(option));
+                                         big_M_map[t] * X_vars(option));
                     F_prime_additional_terms.emplace_back(F_prime_t_var,
                                                           quality_gain);
                 }
@@ -199,44 +201,57 @@ struct preprocessed_MIP {
                     graph.num_arcs(),
                     [&arc_no_map](const melon::arc_t<Graph> & a) {
                         return arc_no_map[a];
+                    }
+                    // ,[original_t, case_id](const melon::arc_t<Graph> & a) {
+                    //     return "P_" + std::to_string(original_t) + "_" +
+                    //            std::to_string(a) + "(" +
+                    //            std::to_string(case_id) + ")";
+                    // }
+                );
+                // flow conservation constraints
+                model.add_constraints(
+                    melon::vertices(graph),
+                    [&](auto && u) {
+                        return OPT(
+                            (u == t),
+                            F_var + xsum(graph.out_arcs(t), Phi_t_vars) <=
+                                xsum(graph.in_arcs(t),
+                                     [&](auto && a) {
+                                         return probability_map[a] *
+                                                Phi_t_vars(a);
+                                     }) +
+                                    quality_map[t] +
+                                    xsum(vertex_options_map[t],
+                                         [&X_vars](auto && p) {
+                                             return p.first * X_vars(p.second);
+                                         }));
                     },
-                    [original_t, case_id](const melon::arc_t<Graph> & a) {
-                        return "P_" + std::to_string(original_t) + "_" +
-                               std::to_string(a) + "(" +
-                               std::to_string(case_id) + ")";
+                    [&](auto && u) {
+                        return xsum(graph.out_arcs(u), Phi_t_vars) <=
+                               xsum(graph.in_arcs(u),
+                                    [&](auto && a) {
+                                        return probability_map[a] *
+                                               Phi_t_vars(a);
+                                    }) +
+                                   quality_map[u] +
+                                   xsum(vertex_options_map[u],
+                                        [&X_vars](auto && p) {
+                                            return p.first * X_vars(p.second);
+                                        });
                     });
-                for(const auto & u : melon::vertices(graph)) {
-                    if(u == t) continue;
-                    model.add_constraint(
-                        xsum(graph.out_arcs(u), Phi_t_vars) <=
-                        xsum(graph.in_arcs(u),
-                             [&](auto && a) {
-                                 return probability_map[a] * Phi_t_vars(a);
-                             }) +
-                            quality_map[u] +
-                            xsum(vertex_options_map[u], [&X_vars](auto && p) {
-                                return p.first * X_vars(p.second);
-                            }));
-                }
 
-                model.add_constraint(
-                    F_var + xsum(graph.out_arcs(t), Phi_t_vars) <=
-                    xsum(graph.in_arcs(t),
-                         [&](auto && a) {
-                             return probability_map[a] * Phi_t_vars(a);
-                         }) +
-                        quality_map[t] +
-                        xsum(vertex_options_map[t], [&X_vars](auto && p) {
-                            return p.first * X_vars(p.second);
-                        }));
+                model.add_constraints(
+                    ranges::views::filter(
+                        melon::arcs(graph),
+                        [&](auto && a) {
+                            return arc_option_map[a].has_value();
+                        }),
+                    [&](auto && a) {
+                        return Phi_t_vars(a) <=
+                               X_vars(arc_option_map[a].value()) *
+                                   big_M_map[melon::arc_source(graph, a)];
+                    });
 
-                for(const auto & a : melon::arcs(graph)) {
-                    if(!arc_option_map[a].has_value()) continue;
-                    model.add_constraint(
-                        Phi_t_vars(a) <=
-                        X_vars(arc_option_map[a].value()) *
-                            big_M_map[melon::arc_source(graph, a)].value());
-                }
                 model.add_constraint(
                     Xi_vars(original_t) <=
                     original_quality_map[original_t] * F_var +
@@ -247,51 +262,18 @@ struct preprocessed_MIP {
             model.add_constraint(C_vars(instance_case.id()) <= Xi_vars);
         }
 
-        // block_first_constraint.emplace_back(model.num_constraints()-1);
-
-        // std::cout << "blocks " << (block_first_constraint.size() - 1)
-        //           << "\n\nmastervar";
-        // for(auto && v : X_vars.ids())
-        //     std::cout << ' ' << model.column_name()[v].value();
-        // for(auto && v : C_vars.ids())
-        //     std::cout << ' ' << model.column_name()[v].value();
-
-        // for(std::size_t i = 1; i < block_first_constraint.size(); ++i) {
-        //     std::cout << "\n\nblock " << i;
-        //     for(auto && c :
-        //         ranges::iota_view<mip::constraint_id_t,
-        //         mip::constraint_id_t>(
-        //             block_first_constraint[i - 1],
-        //             block_first_constraint[i]))
-        //         std::cout << "\nR" << c;
-        // }
-        // std::cout << std::endl;
-
-        spdlog::trace("MIP model has:");
+        spdlog::trace("prep_MIP model has:");
         spdlog::trace("  {:>10} variables", model.num_variables());
         spdlog::trace("  {:>10} constraints", model.num_constraints());
         spdlog::trace("  {:>10} entries", model.num_entries());
 
-        if(print_model) std::cout << model << std::endl;
+        model.solve();
+        const auto model_solution = model.get_solution();
 
-        auto solver = mip_helper::build_solver(model);
-        solver->set_loglevel(spdlog::get_level() == spdlog::level::trace ? 1
-                                                                         : 0);
-        solver->set_mip_optimality_gap(1e-10);
-        solver->set_feasability_tolerance(feasability_tol);
-        auto ret_code = solver->optimize();
-        if(ret_code != 0)
-            throw std::runtime_error(solver->name() + " failed with code " +
-                                     std::to_string(ret_code) +
-                                     ", see logs at " +
-                                     solver->logs_path().string());
-        const auto solver_solution = solver->get_solution();
-
-        spdlog::trace("MIP solution found with value: {}",
-                      solver->get_objective_value());
+        spdlog::trace("prep_MIP solution found with value: {}",
+                      model.get_solution_value());
         for(const auto & i : instance.options()) {
-            solution[i] =
-                solver_solution[static_cast<std::size_t>(X_vars(i).id())];
+            solution[i] = model_solution[X_vars(i)];
         }
 
         return solution;

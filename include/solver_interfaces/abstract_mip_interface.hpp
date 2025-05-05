@@ -5,8 +5,6 @@
 
 #include <boost/program_options.hpp>
 
-#include "gecot/utils/mip_helper.hpp"
-
 #include "solver_interfaces/abstract_solver_interface.hpp"
 
 namespace fhamonic {
@@ -14,43 +12,16 @@ namespace fhamonic {
 class AbstractMIPInterface : public AbstractSolverInterface {
 protected:
     boost::program_options::options_description desc;
-    std::filesystem::path cbc_default_path;
-
-    double feasability_tolerance;
+    double feasibility_tolerance;
 
 public:
     AbstractMIPInterface(const std::string & name)
-        : desc(name + " options")
-        , cbc_default_path(
-#ifdef WIN32
-              get_exec_path().parent_path() /
-#endif
-              "cbc") {
+        : desc(name + " options") {
         desc.add_options()(
-            "feasability-tolerance,t", po::value<double>(&feasability_tolerance)
-                ->default_value(1e-7), "Tolearnce for rounding errors")(
-            "print-model,m", "Print the MIP model")(
-            "use-cbc",
-            "Prioritizes cbc for solving MIPs\n(default if gurobi_cl and scip "
-            "are not found)")("use-grb",
-                              "Prioritizes cbc for soplving MIPs\n(default "
-                              "if gurobi_cl is found)")(
-            "use-scip",
-            "Prioritizes scip for soplving MIPs\n(warning: scip is for "
-            "academic "
-            "use only)")(
-            "cbc-path",
-            po::value<std::filesystem::path>(&mippp::cli_cbc_solver::exec_path),
-            (std::string("Sets path to cbc executable\n(default: '") +
-             cbc_default_path.string() + "')")
-                .c_str())(
-            "grb-path",
-            po::value<std::filesystem::path>(&mippp::cli_grb_solver::exec_path),
-            "Sets path to gurobi_cl executable")(
-            "scip-path",
-            po::value<std::filesystem::path>(
-                &mippp::cli_scip_solver::exec_path),
-            "Sets path to scip executable");
+            "feasibility-tolerance,t",
+            po::value<double>(&feasibility_tolerance)->default_value(1e-7),
+            "Tolearnce for rounding errors")("print-model,m",
+                                             "Print the MIP model");
     }
 
     void parse(const std::vector<std::string> & args) {
@@ -61,24 +32,6 @@ public:
                 .run(),
             vm);
         po::notify(vm);
-
-        if(vm.count("use-cbc") + vm.count("use-gurobi") + vm.count("use-scip") >
-           1) {
-            throw std::logic_error(
-                "Chose only one solver between 'use-cbc', 'use-gurobi' and "
-                "'use-scip'");
-        }
-        if(!vm.count("cbc-path"))
-            mippp::cli_cbc_solver::exec_path = cbc_default_path;
-        if(vm.count("use-cbc"))
-            gecot::mip_helper::prefered_solver =
-                gecot::mip_helper::solvers::cbc;
-        if(vm.count("use-gurobi"))
-            gecot::mip_helper::prefered_solver =
-                gecot::mip_helper::solvers::grb;
-        if(vm.count("use-scip"))
-            gecot::mip_helper::prefered_solver =
-                gecot::mip_helper::solvers::scip;
 
         handle_options(vm);
     }

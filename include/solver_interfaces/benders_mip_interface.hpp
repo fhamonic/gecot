@@ -1,22 +1,22 @@
-#ifndef GECOT_PREPROCESSED_MIP_INTERFACE_HPP
-#define GECOT_PREPROCESSED_MIP_INTERFACE_HPP
+#ifndef GECOT_BENDERS_MIP_INTERFACE_HPP
+#define GECOT_BENDERS_MIP_INTERFACE_HPP
 
 #include <sstream>
 
 #include <boost/program_options.hpp>
 
-#include "gecot/solvers/preprocessed_mip.hpp"
+#include "gecot/solvers/benders_mip.hpp"
 
 #include "solver_interfaces/abstract_mip_interface.hpp"
 
 namespace fhamonic {
 
-class PreprocessedMIPInterface : public AbstractMIPInterface {
+class BendersMIPInterface : public AbstractMIPInterface {
 private:
-    gecot::solvers::preprocessed_MIP solver;
+    gecot::solvers::benders_MIP solver;
 
 public:
-    PreprocessedMIPInterface() : AbstractMIPInterface(name()) {
+    BendersMIPInterface() : AbstractMIPInterface(name()) {
         desc.add_options()(
             "resolution",
             po::value<double>(&solver.probability_resolution)
@@ -38,7 +38,7 @@ public:
         return solver.solve(instance, B);
     };
 
-    std::string name() const { return "prep_mip"; }
+    std::string name() const { return "benders_mip"; }
     std::string description() const {
         return "MIP formulation with preprocessing, from 'Optimizing the "
                "ecological connectivity of landscapes', F.\u00A0Hamonic, "
@@ -49,4 +49,4 @@ public:
 
 }  // namespace fhamonic
 
-#endif  // GECOT_PREPROCESSED_MIP_INTERFACE_HPP
+#endif  // GECOT_BENDERS_MIP_INTERFACE_HPP

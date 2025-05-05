@@ -19,7 +19,7 @@ class CompressorRecipe(ConanFile):
         # self.requires("gdal/[>=3.8.3]")
 
         self.requires("melon/1.0.0-alpha.1")
-        self.requires("mippp/0.1")
+        self.requires("mippp/0.2")
 
     def build_requirements(self):
         self.requires("gtest/1.14.0")

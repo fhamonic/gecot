@@ -16,7 +16,7 @@ namespace gecot {
 namespace solvers {
 
 struct StaticDecremental {
-    double feasability_tol = 0.0;
+    double feasibility_tol = 0.0;
     bool only_dec = false;
 
     template <instance_c I>
@@ -28,7 +28,7 @@ struct StaticDecremental {
         std::vector<option_t> options;
         double purchased = 0.0;
         for(const option_t & option : instance.options()) {
-            if(instance.option_cost(option) > budget + feasability_tol)
+            if(instance.option_cost(option) > budget + feasibility_tol)
                 continue;
             options.emplace_back(option);
             solution[option] = true;
@@ -94,14 +94,14 @@ struct StaticDecremental {
             spdlog::trace("{:>20} |  {: #.6e}  | {: #.5e}",
                           instance.option_name(option), options_ratios[option],
                           purchased);
-            if(purchased <= budget + feasability_tol) break;
+            if(purchased <= budget + feasibility_tol) break;
         }
 
         if(!only_dec &&
            std::ranges::any_of(
                free_options,
                [&instance, budget_left = budget - purchased +
-                                         feasability_tol](const option_t & o) {
+                                         feasibility_tol](const option_t & o) {
                    return instance.option_cost(o) <= budget_left;
                })) {
             spdlog::trace(
@@ -146,7 +146,7 @@ struct StaticDecremental {
 
             for(const option_t & option : free_options) {
                 const double price = instance.option_cost(option);
-                if(purchased + price > budget + feasability_tol) continue;
+                if(purchased + price > budget + feasibility_tol) continue;
                 purchased += price;
                 solution[option] = true;
                 spdlog::trace("{:>20} |  {: #.6e}  | {: #.5e}",

@@ -25,12 +25,18 @@ class CompressorRecipe(ConanFile):
         self.requires("gtest/1.14.0")
 
     def generate(self):
-        print("conanfile.py: IDE include dirs:")
-        for lib, dep in self.dependencies.items():
-            if not lib.headers:
-                continue
-            for inc in dep.cpp_info.includedirs:
-                print("\t" + inc)
+        print(
+            'conanfile.py: Include directories:\n\t"{}"'.format(
+                '",\n\t"'.join(
+                    [
+                        dir
+                        for lib, dep in self.dependencies.items()
+                        if lib.headers
+                        for dir in dep.cpp_info.includedirs
+                    ]
+                )
+            )
+        )
 
     def cmake_variables(self):
         vars = {}

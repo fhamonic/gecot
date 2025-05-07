@@ -88,7 +88,8 @@ auto compute_strong_and_useless_arcs(
     using log_probability_t = uint64_t;
 
     spdlog::stopwatch prep_sw;
-    spdlog::trace("Preprocessing of the '{}' graph:", instance_case.name());
+    spdlog::trace("Computing strong and useless arcs of the '{}' graph:",
+                  instance_case.name());
 
     auto prob_to_length =
         [probability_resolution](const double p) -> log_probability_t {
@@ -97,7 +98,6 @@ auto compute_strong_and_useless_arcs(
             -std::log(std::max(p, probability_resolution)) /
             std::log1p(probability_resolution));
     };
-
     const auto & graph = instance_case.graph();
     const auto & quality_map = instance_case.vertex_quality_map();
 
@@ -131,7 +131,7 @@ auto compute_strong_and_useless_arcs(
     }
 
     {
-        progress_bar<spdlog::level::trace, 50> pb(2 * arcs_range.size());
+        progress_bar<spdlog::level::trace, 64> pb(2 * arcs_range.size());
 
         tbb::parallel_for(
             tbb::blocked_range(arcs_range.begin(), arcs_range.end()),

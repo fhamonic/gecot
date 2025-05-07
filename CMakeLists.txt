@@ -91,7 +91,7 @@ target_link_libraries(gecot_optimize PUBLIC fast-cpp-csv-parser::fast-cpp-csv-pa
 target_link_libraries(gecot_optimize PUBLIC nlohmann_json::nlohmann_json)
 target_link_libraries(gecot_optimize PUBLIC nlohmann_json_schema_validator)
 target_link_libraries(gecot_optimize PUBLIC phmap)
-target_compile_options(gecot_optimize PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
+# target_compile_options(gecot_optimize PUBLIC -fconcepts-diagnostics-depth=30 -Wall)
 
 # target_compile_options(gecot_optimize PRIVATE -fsanitize=address)
 # target_link_options(gecot_optimize PRIVATE -fsanitize=address -lpthread -static-libasan)

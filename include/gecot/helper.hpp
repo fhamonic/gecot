@@ -165,7 +165,7 @@ void compute_options_cases_incr_pc_num(
     auto && cases_current_pm, auto && cases_vertex_options,
     auto && cases_arc_options, auto & options_cases_pc_num) {
     const auto & cases = instance.cases();
-    progress_bar<spdlog::level::trace, 50> pb(free_options.size() *
+    progress_bar<spdlog::level::trace, 64> pb(free_options.size() *
                                               cases.size());
     tbb::parallel_for(
         tbb::blocked_range2d(cases.begin(), cases.end(), free_options.begin(),
@@ -220,7 +220,7 @@ void compute_options_cases_decr_pc_num(
     auto && cases_vertex_options, auto && cases_arc_options,
     auto & options_cases_pc_num) {
     const auto & cases = instance.cases();
-    progress_bar<spdlog::level::trace, 50> pb(taken_options.size() *
+    progress_bar<spdlog::level::trace, 64> pb(taken_options.size() *
                                               cases.size());
     tbb::parallel_for(
         tbb::blocked_range2d(cases.begin(), cases.end(), taken_options.begin(),

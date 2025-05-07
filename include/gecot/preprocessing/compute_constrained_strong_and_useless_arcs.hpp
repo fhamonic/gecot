@@ -116,7 +116,7 @@ auto compute_constrained_strong_and_useless_arcs(
     }
 
     {
-        progress_bar<spdlog::level::trace, 50> pb(2 * arcs_range.size());
+        progress_bar<spdlog::level::trace, 64> pb(2 * arcs_range.size());
 
         tbb::parallel_for(
             tbb::blocked_range(arcs_range.begin(), arcs_range.end()),

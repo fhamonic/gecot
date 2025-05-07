@@ -94,45 +94,43 @@ struct benders_MIP {
         }
     }
 
-    auto _compute_dual_flow(
-        const auto & instance, const auto & graph, const auto & quality_map,
-        const auto & vertex_options_map, const auto & probability_map,
-        const auto & arc_options_map, const auto & t, const auto & original_t,
-        const auto & original_quality_map,
-        const auto & original_vertex_options_map, const auto & solution) const {
+    template <case_c C>
+    auto _compute_dual_flow(const contracted_graph_data<C> & data,
+                            const auto & solution) const {
         double opt = 0.0;
-        auto rho_values = melon::create_vertex_map<double>(graph, 0.0);
+        auto rho_values = melon::create_vertex_map<double>(data.graph, 0.0);
 
         auto get_quality = [&](auto && u) {
-            double quality = quality_map[u];
-            for(auto && [quality_gain, option] : vertex_options_map[u]) {
+            double quality = data.quality_map[u];
+            for(auto && [quality_gain, option] : data.vertex_options_map[u]) {
                 if(!solution[option]) continue;
                 quality += quality_gain;
             }
             return quality;
         };
-        double t_quality = original_quality_map[original_t];
+        double t_quality =
+            data.instance_case.get().vertex_quality_map()[data.original_t];
         for(auto && [quality_gain, option] :
-            original_vertex_options_map[original_t]) {
+            data.instance_case.get().vertex_options_map()[data.original_t]) {
             if(!solution[option]) continue;
             t_quality += quality_gain;
         }
 
-        const auto & reversed_graph = melon::views::reverse(graph);
-        auto algo = melon::dijkstra(
-            detail::pc_num_dijkstra_traits<decltype(reversed_graph), double>{},
-            reversed_graph, [&](auto && a) {
-                double prob = probability_map[a];
-                for(auto && [improved_prob, option] : arc_options_map[a]) {
-                    if(!solution[option]) continue;
-                    prob = std::max(prob, improved_prob);
-                }
-                return prob;
-            });
-
-        algo.reset();
-        algo.add_source(t);
-        for(const auto & [u, prob] : algo) {
+        const auto & reversed_graph = melon::views::reverse(data.graph);
+        for(const auto & [u, prob] : melon::dijkstra(
+                detail::pc_num_dijkstra_traits<decltype(reversed_graph),
+                                               double>{},
+                reversed_graph,
+                [&](auto && a) {
+                    double prob = data.probability_map[a];
+                    for(auto && [improved_prob, option] :
+                        data.arc_options_map[a]) {
+                        if(!solution[option]) continue;
+                        prob = std::max(prob, improved_prob);
+                    }
+                    return prob;
+                },
+                data.t)) {
             opt += get_quality(u) * prob;
             rho_values[u] = t_quality * prob;
         }
@@ -166,21 +164,11 @@ struct benders_MIP {
         model.add_constraint(xsum(instance.options(), [&](auto && o) {
                                  return instance.option_cost(o) * X_vars(o);
                              }) <= budget);
-        //*
-        using contracted_graph_t = melon::mutable_digraph;
-        using contracted_data_t = std::tuple<
-            contracted_graph_t, melon::vertex_map_t<contracted_graph_t, double>,
-            melon::vertex_map_t<contracted_graph_t,
-                                std::vector<std::pair<double, option_t>>>,
-            melon::arc_map_t<contracted_graph_t, double>,
-            melon::arc_map_t<contracted_graph_t,
-                             std::vector<std::pair<double, option_t>>>,
-            melon::vertex_map_t<contracted_graph_t, double>,
-            melon::vertex_t<contracted_graph_t>,
-            melon::vertex_t<instance_graph_t<I>>>;
 
-        auto cases_contracted_data = instance.template create_case_map<
-            std::vector<std::pair<gurobi_milp::variable, contracted_data_t>>>();
+        auto cases_contracted_data =
+            instance.template create_case_map<std::vector<
+                std::pair<gurobi_milp::variable,
+                          contracted_graph_data<instance_case_t<I>>>>>();
 
         for(auto && instance_case : instance.cases()) {
             const auto case_id = instance_case.id();
@@ -193,218 +181,59 @@ struct benders_MIP {
                 _compute_strong_and_useless_arcs(instance, instance_case,
                                                  budget);
 
-            for(const auto & original_t : melon::vertices(original_graph)) {
-                if(original_quality_map[original_t] == 0 &&
-                   original_vertex_options_map[original_t].empty()) {
-                    continue;
+            spdlog::stopwatch prep_sw;
+            spdlog::trace("Computing contractions and big-Ms of the '{}' graph:",
+                          instance_case.name());
+            {
+                progress_bar<spdlog::level::trace, 64> pb(
+                    original_graph.num_vertices());
+                for(const auto & original_t : melon::vertices(original_graph)) {
+                    if(original_quality_map[original_t] == 0 &&
+                       original_vertex_options_map[original_t].empty()) {
+                        pb.tick();
+                        continue;
+                    }
+                    cases_contracted_data[case_id].emplace_back(
+                        model.add_variable(),
+                        compute_contracted_graph_data(
+                            instance_case, strong_arcs_map[original_t],
+                            useless_arcs_map[original_t], original_t));
+                    pb.tick();
                 }
-                cases_contracted_data[case_id].emplace_back(
-                    model.add_variable(),
-                    compute_contracted_graph(
-                        instance_case, strong_arcs_map[original_t],
-                        useless_arcs_map[original_t], original_t));
             }
-
+            if(spdlog::get_level() == spdlog::level::trace) {
+                std::size_t num_vertices, num_arcs, num_graphs;
+                num_vertices = num_arcs = 0u;
+                num_graphs = cases_contracted_data[instance_case.id()].size();
+                for(const auto & [var, data] :
+                    cases_contracted_data[instance_case.id()]) {
+                    num_vertices += data.graph.num_vertices();
+                    num_arcs += data.graph.num_arcs();
+                }
+                spdlog::trace("  {:>10.2f} vertices on average",
+                              static_cast<double>(num_vertices) /
+                                  static_cast<double>(num_graphs));
+                spdlog::trace("  {:>10.2f} arcs on average",
+                              static_cast<double>(num_arcs) /
+                                  static_cast<double>(num_graphs));
+                spdlog::trace(
+                    "          (took {} ms)",
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        prep_sw.elapsed())
+                        .count());
+            }
             model.add_constraint(
                 C_vars(case_id) <=
                 xsum(std::views::keys(cases_contracted_data[case_id])));
         }
 
-        // // add optimality cuts for empty solution
-        for(auto && instance_case : instance.cases()) {
-            for(auto && [var, contracted_data] :
-                cases_contracted_data[instance_case.id()]) {
-                auto [graph, quality_map, vertex_options_map, probability_map,
-                      arc_options_map, big_M_map, t, original_t] =
-                    contracted_data;
-                auto [opt, rho_values] = _compute_dual_flow(
-                    instance, graph, quality_map, vertex_options_map,
-                    probability_map, arc_options_map, t, original_t,
-                    instance_case.vertex_quality_map(),
-                    instance_case.vertex_options_map(), solution);
-
-                std::vector<melon::vertex_t<contracted_graph_t>> vertices;
-                std::ranges::copy(graph.vertices(),
-                                  std::back_inserter(vertices));
-                std::vector<melon::arc_t<contracted_graph_t>> arcs;
-                std::ranges::copy(graph.arcs(), std::back_inserter(arcs));
-
-                model.add_constraint(
-                    var <=
-                    xsum(vertices, [&](auto && u) {
-                        return (quality_map[u] +
-                                xsum(vertex_options_map[u],
-                                     [&](auto && p) {
-                                         auto && [quality_gain, option] = p;
-                                         return quality_gain * X_vars(option);
-                                     })) *
-                               rho_values[u];
-                    }) + xsum(arcs, [&](auto && a) {
-                        return xsum(arc_options_map[a], [&](auto && p) {
-                            auto && [improved_prob, option] = p;
-                            auto u = graph.arc_source(a);
-                            auto v = graph.arc_target(a);
-                            return big_M_map[u] * X_vars(option) *
-                                   (improved_prob * rho_values[v] -
-                                    rho_values[u]);
-                        });
-                    }) + xsum(vertex_options_map[t], [&](auto && p) {
-                        auto && [quality_gain, option] = p;
-                        return big_M_map[t] * X_vars(option) * quality_gain;
-                    }));
-            }
-        }
-
-        for(;;) {
-            model.solve();
-            const auto master_solution = model.get_solution();
-            for(const auto & i : instance.options())
-                solution[i] = (master_solution[X_vars(i)] > 0.5);
-            ////////////////////////////////////////
-            bool added_cut = false;
-            for(auto && instance_case : instance.cases()) {
-                spdlog::trace("C_{} = {}", instance_case.name(),
-                              master_solution[C_vars(instance_case.id())]);
-                spdlog::trace(
-                    "------------------------------------------------------");
-                spdlog::trace(
-                    " feas. |  theta value  |      opt      |     delta    ");
-                spdlog::trace(
-                    "------------------------------------------------------");
-                for(auto && [var, contracted_data] :
-                    cases_contracted_data[instance_case.id()]) {
-                    auto [graph, quality_map, vertex_options_map,
-                          probability_map, arc_options_map, big_M_map, t,
-                          original_t] = contracted_data;
-                    auto [opt, rho_values] = _compute_dual_flow(
-                        instance, graph, quality_map, vertex_options_map,
-                        probability_map, arc_options_map, t, original_t,
-                        instance_case.vertex_quality_map(),
-                        instance_case.vertex_options_map(), solution);
-
-                    const double violated_amount = master_solution[var] - opt;
-                    const bool feasible =
-                        (violated_amount <= feasibility_tol * opt);
-                    spdlog::trace("   {}   | {:>13.2f} | {:>13.2f} | {:>12.2f}",
-                                  static_cast<int>(feasible),
-                                  master_solution[var], opt, violated_amount);
-
-                    if(feasible) continue;
-
-                    std::vector<melon::vertex_t<contracted_graph_t>> vertices;
-                    std::ranges::copy(graph.vertices(),
-                                      std::back_inserter(vertices));
-                    std::vector<melon::arc_t<contracted_graph_t>> arcs;
-                    std::ranges::copy(graph.arcs(), std::back_inserter(arcs));
-
-                    auto cut =
-                        xsum(vertices,
-                             [&](auto && u) {
-                                 return (quality_map[u] +
-                                         xsum(vertex_options_map[u],
-                                              [&](auto && p) {
-                                                  auto && [quality_gain,
-                                                           option] = p;
-                                                  return quality_gain *
-                                                         X_vars(option);
-                                              })) *
-                                        rho_values[u];
-                             }) +
-                        xsum(
-                            arcs,
-                            [&](auto && a) {
-                                return xsum(arc_options_map[a], [&](auto && p) {
-                                    auto && [improved_prob, option] = p;
-                                    auto u = graph.arc_source(a);
-                                    auto v = graph.arc_target(a);
-                                    auto cai =
-                                        solution[option]
-                                            ? 0.0
-                                            : std::max(0.0,
-                                                       improved_prob *
-                                                               rho_values[v] -
-                                                           rho_values[u]);
-                                    return big_M_map[u] * X_vars(option) * cai;
-                                });
-                            }) +
-                        xsum(vertex_options_map[t], [&](auto && p) {
-                            auto && [quality_gain, option] = p;
-                            auto ri = solution[option] ? 0.0 : quality_gain;
-                            return big_M_map[t] * X_vars(option) * ri;
-                        });
-
-                    model.add_constraint(var <= cut);
-                    added_cut = true;
-                }
-            }
-            if(added_cut) continue;
-            ////////////////////////////////////////
-            break;
-        }
-        return solution;
-        /*/
-        using contracted_graph_t = melon::mutable_digraph;
-        using contracted_data_t = std::tuple<
-            contracted_graph_t, melon::vertex_map_t<contracted_graph_t, double>,
-            melon::vertex_map_t<contracted_graph_t,
-                                std::vector<std::pair<double, option_t>>>,
-            melon::arc_map_t<contracted_graph_t, double>,
-            melon::arc_map_t<contracted_graph_t,
-                             std::vector<std::pair<double, option_t>>>,
-            melon::vertex_map_t<contracted_graph_t, double>,
-            melon::vertex_t<contracted_graph_t>,
-            melon::vertex_t<instance_graph_t<I>>>;
-
-        auto cases_contracted_data =
-            instance.template create_case_map<std::vector<contracted_data_t>>();
-
-        for(auto && instance_case : instance.cases()) {
-            const auto case_id = instance_case.id();
-            const auto & original_graph = instance_case.graph();
-            const auto & original_quality_map =
-                instance_case.vertex_quality_map();
-            const auto & original_vertex_options_map =
-                instance_case.vertex_options_map();
-            const auto [strong_arcs_map, useless_arcs_map] =
-                _compute_strong_and_useless_arcs(instance, instance_case,
-                                                 budget);
-
-            for(const auto & original_t : melon::vertices(original_graph)) {
-                if(original_quality_map[original_t] == 0 &&
-                   original_vertex_options_map[original_t].empty()) {
-                    continue;
-                }
-                cases_contracted_data[case_id].emplace_back(
-                    compute_contracted_graph(
-                        instance_case, strong_arcs_map[original_t],
-                        useless_arcs_map[original_t], original_t));
-            }
-        }
-
-        // add optimality cuts for empty solution
-        for(auto && instance_case : instance.cases()) {
-            mippp::runtime_linear_expression<gurobi_milp::variable, double> cut;
-            for(auto && contracted_data :
-                cases_contracted_data[instance_case.id()]) {
-                auto [graph, quality_map, vertex_options_map, probability_map,
-                      arc_options_map, big_M_map, t, original_t] =
-                    contracted_data;
-                auto [opt, rho_values] = _compute_dual_flow(
-                    instance, graph, quality_map, vertex_options_map,
-                    probability_map, arc_options_map, t, original_t,
-                    instance_case.vertex_quality_map(),
-                    instance_case.vertex_options_map(), solution);
-
-                std::vector<melon::vertex_t<contracted_graph_t>> vertices;
-                std::ranges::copy(graph.vertices(),
-                                  std::back_inserter(vertices));
-                std::vector<melon::arc_t<contracted_graph_t>> arcs;
-                std::ranges::copy(graph.arcs(), std::back_inserter(arcs));
-
-                cut += xsum(vertices,
+        auto get_cut_expression =
+            [&](const contracted_graph_data<instance_case_t<I>> & data,
+                const auto & current_solution, const auto & rho_values) {
+                return xsum(data.graph.vertices(),
                             [&](auto && u) {
-                                return (quality_map[u] +
-                                        xsum(vertex_options_map[u],
+                                return (data.quality_map[u] +
+                                        xsum(data.vertex_options_map[u],
                                              [&](auto && p) {
                                                  auto && [quality_gain,
                                                           option] = p;
@@ -413,117 +242,62 @@ struct benders_MIP {
                                              })) *
                                        rho_values[u];
                             }) +
-                       xsum(arcs,
+                       xsum(data.graph.arcs(),
                             [&](auto && a) {
-                                return xsum(arc_options_map[a], [&](auto && p) {
-                                    auto && [improved_prob, option] = p;
-                                    auto u = graph.arc_source(a);
-                                    auto v = graph.arc_target(a);
-                                    return big_M_map[u] * X_vars(option) *
-                                           (improved_prob * rho_values[v] -
-                                            rho_values[u]);
-                                });
+                                return xsum(
+                                    data.arc_options_map[a], [&, a](auto && p) {
+                                        auto && [improved_prob, option] = p;
+                                        auto u = data.graph.arc_source(a);
+                                        auto v = data.graph.arc_target(a);
+                                        auto cai =
+                                            current_solution[option]
+                                                ? 0.0
+                                                : std::max(
+                                                      0.0,
+                                                      improved_prob *
+                                                              rho_values[v] -
+                                                          rho_values[u]);
+                                        return data.big_M_map[u] *
+                                               X_vars(option) * cai;
+                                    });
                             }) +
-                       xsum(vertex_options_map[t], [&](auto && p) {
+                       xsum(data.vertex_options_map[data.t], [&](auto && p) {
                            auto && [quality_gain, option] = p;
-                           return big_M_map[t] * X_vars(option) * quality_gain;
+                           auto ri =
+                               current_solution[option] ? 0.0 : quality_gain;
+                           return data.big_M_map[data.t] * X_vars(option) * ri;
                        });
+            };
+
+        for(auto && instance_case : instance.cases()) {
+            for(auto && [var, data] :
+                cases_contracted_data[instance_case.id()]) {
+                auto && [opt, rho_values] = _compute_dual_flow(data, solution);
+                model.add_constraint(
+                    var <= get_cut_expression(data, solution, rho_values));
             }
-            model.add_constraint(C_vars(instance_case.id()) <= std::move(cut));
         }
 
-        for(;;) {
-            model.solve();
-            const auto master_solution = model.get_solution();
-            for(const auto & i : instance.options())
-                solution[i] = (master_solution[X_vars(i)] > 0.5);
-            ////////////////////////////////////////
-            bool added_cut = false;
+        model.set_solution_callback([&](gurobi_milp::callback_handle & handle) {
+            const auto master_solution = handle.get_solution();
+            auto sol = melon::views::map(
+                [&](option_t i) { return master_solution[X_vars(i)] > 0.5; });
             for(auto && instance_case : instance.cases()) {
-                double cut_opt = 0.0;
-                mippp::runtime_linear_expression<gurobi_milp::variable, double>
-                    cut;
-                for(auto && contracted_data :
+                for(const auto & [var, data] :
                     cases_contracted_data[instance_case.id()]) {
-                    auto [graph, quality_map, vertex_options_map,
-                          probability_map, arc_options_map, big_M_map, t,
-                          original_t] = contracted_data;
-                    auto [opt, rho_values] = _compute_dual_flow(
-                        instance, graph, quality_map, vertex_options_map,
-                        probability_map, arc_options_map, t, original_t,
-                        instance_case.vertex_quality_map(),
-                        instance_case.vertex_options_map(), solution);
-
-                    std::vector<melon::vertex_t<contracted_graph_t>> vertices;
-                    std::ranges::copy(graph.vertices(),
-                                      std::back_inserter(vertices));
-                    std::vector<melon::arc_t<contracted_graph_t>> arcs;
-                    std::ranges::copy(graph.arcs(), std::back_inserter(arcs));
-
-                    cut_opt += opt;
-                    cut +=
-                        xsum(vertices,
-                             [&](auto && u) {
-                                 return (quality_map[u] +
-                                         xsum(vertex_options_map[u],
-                                              [&](auto && p) {
-                                                  auto && [quality_gain,
-                                                           option] = p;
-                                                  return quality_gain *
-                                                         X_vars(option);
-                                              })) *
-                                        rho_values[u];
-                             }) +
-                        xsum(
-                            arcs,
-                            [&](auto && a) {
-                                return xsum(arc_options_map[a], [&](auto && p) {
-                                    auto && [improved_prob, option] = p;
-                                    auto u = graph.arc_source(a);
-                                    auto v = graph.arc_target(a);
-                                    auto cai =
-                                        solution[option]
-                                            ? 0.0
-                                            : std::max(0.0,
-                                                       improved_prob *
-                                                               rho_values[v] -
-                                                           rho_values[u]);
-                                    return big_M_map[u] * X_vars(option) * cai;
-                                });
-                            }) +
-                        xsum(vertex_options_map[t], [&](auto && p) {
-                            auto && [quality_gain, option] = p;
-                            auto ri = solution[option] ? 0.0 : quality_gain;
-                            return big_M_map[t] * X_vars(option) * ri;
-                        });
+                    auto && [opt, rho_values] = _compute_dual_flow(data, sol);
+                    if(master_solution[var] - opt <= feasibility_tol * opt)
+                        continue;
+                    handle.add_lazy_constraint(
+                        var <= get_cut_expression(data, sol, rho_values));
                 }
-
-                const double violated_amount =
-                    master_solution[C_vars(instance_case.id())] - cut_opt;
-                const bool feasible =
-                    violated_amount < feasibility_tol * cut_opt;
-
-                spdlog::trace(
-                    "------------------------------------------------------");
-                spdlog::trace("   {}   | {:>13.2f} | {:>13.2f} | {:>12.2f}",
-                              static_cast<int>(feasible),
-                              master_solution[C_vars(instance_case.id())],
-                              cut_opt, violated_amount);
-                spdlog::trace(
-                    "------------------------------------------------------");
-
-                if(feasible) continue;
-
-                model.add_constraint(C_vars(instance_case.id()) <=
-                                     std::move(cut));
-                added_cut = true;
             }
-            if(added_cut) continue;
-            ////////////////////////////////////////
-            break;
-        }
+        });
+        model.solve();
+        const auto master_solution = model.get_solution();
+        for(const auto & i : instance.options())
+            solution[i] = (master_solution[X_vars(i)] > 0.5);
         return solution;
-        //*/
     }
 };
 

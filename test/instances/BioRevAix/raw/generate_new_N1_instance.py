@@ -1,5 +1,7 @@
 import csv
 import os
+from math import sqrt
+
 
 def readCSV(file_name, delimiter=","):
     file = csv.DictReader(open(file_name), delimiter=delimiter)
@@ -7,16 +9,18 @@ def readCSV(file_name, delimiter=","):
 
 
 def writeCSV(file_name, columns):
-    file_path = "test/instances/Aix/" + file_name
+    file_path = "test/instances/BioRevAix/" + file_name
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     file = open(file_path, "w")
     file.write(columns + "\n")
     return file
 
 
-hexagons_csv = readCSV("test/instances/Aix/raw/new_N1.csv")
-links_csv = readCSV("test/instances/Aix/raw/AL_N1.csv")
-crossref_stretches_csv = readCSV("test/instances/Aix/raw/croisemt_troncon_hexagN2.txt")
+hexagons_csv = readCSV("test/instances/BioRevAix/raw/new_N1.csv")
+links_csv = readCSV("test/instances/BioRevAix/raw/AL_N1.csv")
+crossref_stretches_csv = readCSV(
+    "test/instances/BioRevAix/raw/croisemt_troncon_hexagN2.txt"
+)
 
 vegetalized_probability = 0.98
 
@@ -44,7 +48,7 @@ for hexagon in hexagons_csv:
     )
     arcs_csv.write(
         "{id}_in_arc,{id}_in,{id},{prob}\n{id}_out_arc,{id},{id}_out,{prob}\n".format(
-            id=id, prob=hexagon["init_prob"]
+            id=id, prob=sqrt(float(hexagon["init_prob"]))
         )
     )
 
@@ -85,8 +89,10 @@ for crossref in crossref_stretches_csv:
             continue
 
         arc_options_csv.write(
-            "{id}_in_arc,{stretch_id},{p}\n".format(
-                id=hexagon["hex_id"], stretch_id=stretch_id, p=vegetalized_probability
+            "{id}_in_arc,{stretch_id},{p}\n{id}_out_arc,{stretch_id},{p}\n".format(
+                id=hexagon["hex_id"],
+                stretch_id=stretch_id,
+                p=sqrt(vegetalized_probability),
             )
         )
 

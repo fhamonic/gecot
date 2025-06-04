@@ -7,7 +7,6 @@
 #include <spdlog/spdlog.h>
 
 #include "mippp/detail/std_ranges_to_range_v3.hpp"
-#include "mippp/solvers/copt/all.hpp"
 #include "mippp/solvers/cplex/all.hpp"
 #include "mippp/solvers/gurobi/all.hpp"
 
@@ -110,6 +109,13 @@ struct benders_MIP {
             }
             return quality;
         };
+        double t_quality =
+            data.instance_case.get().vertex_quality_map()[data.original_t];
+        for(auto && [quality_gain, option] :
+            data.instance_case.get().vertex_options_map()[data.original_t]) {
+            if(!solution[option]) continue;
+            t_quality += quality_gain;
+        }
 
         const auto & reversed_graph = melon::views::reverse(data.graph);
         for(const auto & [u, prob] : melon::dijkstra(
@@ -127,8 +133,9 @@ struct benders_MIP {
                 },
                 data.t)) {
             opt += get_quality(u) * prob;
-            rho_values[u] = prob;
+            rho_values[u] = t_quality * prob;
         }
+        opt *= t_quality;
 
         return std::make_tuple(opt, rho_values);
     }
@@ -147,9 +154,6 @@ struct benders_MIP {
         using model_type = gurobi_milp;
         gurobi_api api;
         model_type model(api);
-        // using model_type = copt_milp;
-        // copt_api api;
-        // model_type model(api);
         model.set_optimality_tolerance(1e-10);
         model.set_feasibility_tolerance(feasibility_tol);
 
@@ -183,8 +187,6 @@ struct benders_MIP {
                 _compute_strong_and_useless_arcs(instance, instance_case,
                                                  budget);
 
-            auto C_constr = model.add_constraint(C_vars(case_id) <= 0);
-
             spdlog::stopwatch prep_sw;
             spdlog::trace(
                 "Computing contractions and big-Ms of the '{}' graph:",
@@ -193,33 +195,16 @@ struct benders_MIP {
                 progress_bar<spdlog::level::trace, 64> pb(
                     original_graph.num_vertices());
                 for(const auto & original_t : melon::vertices(original_graph)) {
-                    const double original_t_quality =
-                        original_quality_map[original_t];
-                    if(original_t_quality == 0 &&
+                    if(original_quality_map[original_t] == 0 &&
                        original_vertex_options_map[original_t].empty()) {
                         pb.tick();
                         continue;
                     }
-                    const auto & [F_var, data] =
-                        cases_contracted_data[case_id].emplace_back(
-                            model.add_column({std::make_pair(
-                                C_constr, -original_t_quality)}),
-                            compute_contracted_graph_data(
-                                instance_case, strong_arcs_map[original_t],
-                                useless_arcs_map[original_t], original_t));
-
-                    for(const auto & [quality_gain, option] :
-                        original_vertex_options_map[original_t]) {
-                        const auto F_prime_t_var = model.add_column(
-                            {std::make_pair(C_constr, -quality_gain)});
-                        model.add_constraint(F_prime_t_var <= F_var);
-                        model.add_constraint(F_prime_t_var <=
-                                             data.big_M_map[data.t] *
-                                                 X_vars(option));
-                        // model.add_indicator_constraint(X_vars(option), false,
-                        //                                F_prime_t_var <= 0);
-                    }
-
+                    cases_contracted_data[case_id].emplace_back(
+                        model.add_variable(),
+                        compute_contracted_graph_data(
+                            instance_case, strong_arcs_map[original_t],
+                            useless_arcs_map[original_t], original_t));
                     pb.tick();
                 }
             }
@@ -244,6 +229,9 @@ struct benders_MIP {
                         prep_sw.elapsed())
                         .count());
             }
+            model.add_constraint(
+                C_vars(case_id) <=
+                xsum(std::views::keys(cases_contracted_data[case_id])));
         }
 
         auto get_cut_expression =
@@ -261,20 +249,30 @@ struct benders_MIP {
                                              })) *
                                        rho_values[u];
                             }) +
-                       xsum(data.graph.arcs(), [&](auto && a) {
-                           return xsum(data.arc_options_map[a], [&,
-                                                                 a](auto && p) {
-                               auto && [improved_prob, option] = p;
-                               auto u = data.graph.arc_source(a);
-                               auto v = data.graph.arc_target(a);
-                               auto cai =
-                                   current_solution[option]
-                                       ? 0.0
-                                       : std::max(0.0, improved_prob *
-                                                               rho_values[v] -
-                                                           rho_values[u]);
-                               return data.big_M_map[u] * X_vars(option) * cai;
-                           });
+                       xsum(data.graph.arcs(),
+                            [&](auto && a) {
+                                return xsum(
+                                    data.arc_options_map[a], [&, a](auto && p) {
+                                        auto && [improved_prob, option] = p;
+                                        auto u = data.graph.arc_source(a);
+                                        auto v = data.graph.arc_target(a);
+                                        auto cai =
+                                            current_solution[option]
+                                                ? 0.0
+                                                : std::max(
+                                                      0.0,
+                                                      improved_prob *
+                                                              rho_values[v] -
+                                                          rho_values[u]);
+                                        return data.big_M_map[u] *
+                                               X_vars(option) * cai;
+                                    });
+                            }) +
+                       xsum(data.vertex_options_map[data.t], [&](auto && p) {
+                           auto && [quality_gain, option] = p;
+                           auto ri =
+                               current_solution[option] ? 0.0 : quality_gain;
+                           return data.big_M_map[data.t] * X_vars(option) * ri;
                        });
             };
 
@@ -284,27 +282,24 @@ struct benders_MIP {
                 auto && [opt, rho_values] = _compute_dual_flow(data, solution);
                 model.add_constraint(
                     var <= get_cut_expression(data, solution, rho_values));
-            }
+            } 
         }
 
-        model.set_candidate_solution_callback(
-            [&](model_type::candidate_solution_callback_handle & handle) {
-                const auto master_solution = handle.get_solution();
-                auto sol = melon::views::map([&](option_t i) {
-                    return master_solution[X_vars(i)] > 0.5;
-                });
-                for(auto && instance_case : instance.cases()) {
-                    for(const auto & [var, data] :
-                        cases_contracted_data[instance_case.id()]) {
-                        auto && [opt, rho_values] =
-                            _compute_dual_flow(data, sol);
-                        if(master_solution[var] - opt <= feasibility_tol * opt)
-                            continue;
-                        handle.add_lazy_constraint(
-                            var <= get_cut_expression(data, sol, rho_values));
-                    }
+        model.set_solution_callback([&](model_type::callback_handle & handle) {
+            const auto master_solution = handle.get_solution();
+            auto sol = melon::views::map(
+                [&](option_t i) { return master_solution[X_vars(i)] > 0.5; });
+            for(auto && instance_case : instance.cases()) {
+                for(const auto & [var, data] :
+                    cases_contracted_data[instance_case.id()]) {
+                    auto && [opt, rho_values] = _compute_dual_flow(data, sol);
+                    if(master_solution[var] - opt <= feasibility_tol * opt)
+                        continue;
+                    handle.add_lazy_constraint(
+                        var <= get_cut_expression(data, sol, rho_values));
                 }
-            });
+            }
+        });
         model.solve();
         const auto master_solution = model.get_solution();
         for(const auto & i : instance.options())

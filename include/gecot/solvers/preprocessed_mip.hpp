@@ -229,7 +229,7 @@ struct preprocessed_MIP {
                     [&](auto && u) {
                         return xsum(graph.out_arcs(u), Phi_t_vars) <=
                                xsum(graph.in_arcs(u),
-                                    [&, u](auto && a) {
+                                    [&](auto && a) {
                                         return probability_map[a] *
                                                Phi_t_vars(a);
                                     }) +

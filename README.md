@@ -50,7 +50,7 @@ Please cite 'GECOT' when using it in publications using:
 
 > Hamonic, F., Vaxès, Y., Couëtoux, B., & Albert, C. H. (2025). GECOT: Graph-based ecological connectivity optimization tool. Methods in Ecology and Evolution, 00, 1–9. https://doi.org/10.1111/2041-210X.70055 
 
-Additionally, releases are automatically published to Zenodo (https://github.com/fhamonic/gecot; https://doi.org/10.5281/zenodo.15295914)
+Additionally, releases are automatically published to Zenodo (https://doi.org/10.5281/zenodo.15295914)
 
 ## Acknowledgments
 This work has been funded by [Region Sud](https://www.maregionsud.fr/) and [Natural Solutions](https://www.natural-solutions.eu/) ([PhD thesis](https://theses.fr/api/v1/document/2023AIXM9063) of François Hamonic), and by the ERC project [SCALED](https://www.scaled-erc.eu/), grant n°949812 (postdoctoral position).

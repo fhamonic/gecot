@@ -35,7 +35,8 @@ auto compute_generalized_flow_graph(const C & instance_case) {
 
     auto [graph, probability_map, arc_options_map] = builder.build();
 
-    return std::make_tuple(graph, instance_case.vertex_quality_map(),
+    return std::make_tuple(graph, instance_case.source_quality_map(),
+                           instance_case.target_quality_map(),
                            instance_case.vertex_options_map(), probability_map,
                            arc_options_map);
 }

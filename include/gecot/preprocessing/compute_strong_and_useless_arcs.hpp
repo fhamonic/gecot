@@ -33,8 +33,8 @@ struct strong_arc_default_traits {
     };
     using heap = melon::updatable_d_ary_heap<
         2, std::pair<melon::vertex_t<_Graph>, entry>, entry_cmp,
-        melon::vertex_map_t<_Graph, std::size_t>, melon::views::get_map<1>,
-        melon::views::get_map<0>>;
+        melon::vertex_map_t<_Graph, std::size_t>, melon::views::element_map<1>,
+        melon::views::element_map<0>>;
 
     static constexpr bool store_distances = false;
     static constexpr bool store_paths = false;
@@ -57,8 +57,8 @@ struct useless_arc_default_traits {
     };
     using heap = melon::updatable_d_ary_heap<
         2, std::pair<melon::vertex_t<_Graph>, entry>, entry_cmp,
-        melon::vertex_map_t<_Graph, std::size_t>, melon::views::get_map<1>,
-        melon::views::get_map<0>>;
+        melon::vertex_map_t<_Graph, std::size_t>, melon::views::element_map<1>,
+        melon::views::element_map<0>>;
 
     static constexpr bool store_distances = false;
     static constexpr bool store_paths = false;
@@ -70,8 +70,8 @@ struct path_dijkstra_traits {
 
     using heap = melon::updatable_d_ary_heap<
         4, std::pair<melon::vertex_t<GR>, V>, typename semiring::less_t,
-        melon::vertex_map_t<GR, std::size_t>, melon::views::get_map<1>,
-        melon::views::get_map<0>>;
+        melon::vertex_map_t<GR, std::size_t>, melon::views::element_map<1>,
+        melon::views::element_map<0>>;
 
     static constexpr bool store_paths = true;
     static constexpr bool store_distances = false;
@@ -93,18 +93,17 @@ auto compute_strong_and_useless_arcs(
 
     auto prob_to_length =
         [probability_resolution](const double p) -> log_probability_t {
-        assert(p != 0);
         return static_cast<log_probability_t>(
             -std::log(std::max(p, probability_resolution)) /
             std::log1p(probability_resolution));
     };
     const auto & graph = instance_case.graph();
-    const auto & quality_map = instance_case.vertex_quality_map();
+    const auto & source_quality_map = instance_case.source_quality_map();
 
     auto useless_vertices_map = melon::create_vertex_map<bool>(graph);
     for(const auto & v : melon::vertices(graph)) {
         useless_vertices_map[v] =
-            (quality_map[v] == 0 &&
+            (source_quality_map[v] == 0 &&
              instance_case.vertex_options_map()[v].empty());
     }
 
@@ -192,7 +191,7 @@ auto compute_strong_and_useless_arcs(
         std::size_t num_strong, num_useless, num_sinks;
         num_strong = num_useless = num_sinks = 0;
         for(auto && v : melon::vertices(graph)) {
-            if(instance_case.vertex_quality_map()[v] == 0 &&
+            if(instance_case.source_quality_map()[v] == 0 &&
                instance_case.vertex_options_map()[v].empty())
                 continue;
             num_strong += strong_arcs_map[v].size();

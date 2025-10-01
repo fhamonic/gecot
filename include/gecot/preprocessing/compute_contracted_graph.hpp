@@ -105,8 +105,8 @@ public:
     original_vertex original_t;
     vertex t;
     graph_t graph;
-    vertex_map<double> quality_map;
-    vertex_map<std::vector<std::pair<double, option_t>>> vertex_options_map;
+    vertex_map<double> source_quality_map;
+    vertex_map<std::vector<std::pair<double, option_t>>> source_options_map;
     arc_map<double> probability_map;
     arc_map<std::vector<std::pair<double, option_t>>> arc_options_map;
     vertex_map<double> big_M_map;
@@ -120,9 +120,9 @@ public:
 
     contracted_graph_data(
         const C & instance_case_, original_vertex original_t_, vertex t_,
-        graph_t && contracted_graph_, vertex_map<double> && quality_map_,
+        graph_t && contracted_graph_, vertex_map<double> && source_quality_map_,
         vertex_map<std::vector<std::pair<double, option_t>>> &&
-            vertex_options_map_,
+            source_options_map_,
         arc_map<double> && probability_map_,
         arc_map<std::vector<std::pair<double, option_t>>> && arc_options_map_,
         vertex_map<double> && big_M_map_)
@@ -130,8 +130,8 @@ public:
         , original_t(original_t_)
         , t(t_)
         , graph(std::move(contracted_graph_))
-        , quality_map(std::move(quality_map_))
-        , vertex_options_map(std::move(vertex_options_map_))
+        , source_quality_map(std::move(source_quality_map_))
+        , source_options_map(std::move(source_options_map_))
         , probability_map(std::move(probability_map_))
         , arc_options_map(std::move(arc_options_map_))
         , big_M_map(std::move(big_M_map_)) {}
@@ -142,7 +142,8 @@ contracted_graph_data<C> compute_contracted_graph_data(
     const C & instance_case, const auto & strong_arcs,
     const auto & useless_arcs, const auto & original_t) {
     const auto & original_graph = instance_case.graph();
-    const auto & original_quality_map = instance_case.vertex_quality_map();
+    const auto & original_source_quality_map =
+        instance_case.source_quality_map();
     const auto & original_vertex_options_map =
         instance_case.vertex_options_map();
 
@@ -154,14 +155,19 @@ contracted_graph_data<C> compute_contracted_graph_data(
     for(const auto & v : melon::vertices(original_graph)) {
         original_to_new_vertex_map[v] = graph.create_vertex();
     }
-    auto quality_map = melon::create_vertex_map<double>(graph);
-    auto vertex_options_map =
+    auto source_quality_map = melon::create_vertex_map<double>(graph);
+    auto source_options_map =
         melon::create_vertex_map<std::vector<std::pair<double, option_t>>>(
             graph);
     for(const auto & v : melon::vertices(original_graph)) {
         auto new_v = original_to_new_vertex_map[v];
-        quality_map[new_v] = original_quality_map[v];
-        vertex_options_map[new_v] = original_vertex_options_map[v];
+        source_quality_map[new_v] = original_source_quality_map[v];
+        std::ranges::transform(
+            original_vertex_options_map[v],
+            std::back_inserter(source_options_map[new_v]), [](auto && e) {
+                auto && [source_quality_gain, tqm, option] = e;
+                return std::make_pair(source_quality_gain, option);
+            });
     }
 
     auto original_to_new_arc_map = melon::create_arc_map<
@@ -177,6 +183,9 @@ contracted_graph_data<C> compute_contracted_graph_data(
         melon::create_arc_map<bool>(original_graph, false);
     for(const auto & a : useless_arcs) arc_uselessness_map[a] = true;
     for(const auto & a : strong_arcs) arc_uselessness_map[a] = false;
+    // add uselessness of outgoing arcs of t
+    for(const auto & a : melon::out_arcs(original_graph, original_t))
+        arc_uselessness_map[a] = true;
 
     // create new arcs
     for(const auto & a : melon::arcs(original_graph)) {
@@ -210,6 +219,8 @@ contracted_graph_data<C> compute_contracted_graph_data(
     // contract strong arcs
     std::vector<melon::arc_t<melon::mutable_digraph>> in_arcs_tmp;
     for(const auto & original_uv : strong_arcs) {
+        if(!original_to_new_arc_map[original_uv].has_value())
+            continue;  // should not be needed (no useless arcs are strong)
         const auto uv = original_to_new_arc_map[original_uv].value();
         if(!graph.is_valid_arc(uv))
             continue;  // if many strong arcs shared the same source
@@ -221,16 +232,16 @@ contracted_graph_data<C> compute_contracted_graph_data(
         in_arcs_tmp.resize(0);
         std::ranges::copy(graph.in_arcs(u), std::back_inserter(in_arcs_tmp));
 
-        if(arc_options_map[uv].empty()) {
+        if(arc_options_map[uv].empty()) { // if uv is not improvable
             for(const auto & wu : in_arcs_tmp) {
                 probability_map[wu] *= uv_prob;
                 for(auto & [enhanced_prob, option] : arc_options_map[wu])
                     enhanced_prob *= uv_prob;
                 graph.change_arc_target(wu, v);
             }
-            quality_map[v] += uv_prob * quality_map[u];
-            for(const auto & [quality_gain, option] : vertex_options_map[u])
-                vertex_options_map[v].emplace_back(uv_prob * quality_gain,
+            source_quality_map[v] += uv_prob * source_quality_map[u];
+            for(const auto & [quality_gain, option] : source_options_map[u])
+                source_options_map[v].emplace_back(uv_prob * quality_gain,
                                                    option);
             graph.remove_vertex(u);
             continue;
@@ -245,10 +256,10 @@ contracted_graph_data<C> compute_contracted_graph_data(
                                    }
                                    return true;
                                }) &&
-           std::ranges::all_of(vertex_options_map[u], [&](auto && p) {
+           std::ranges::all_of(source_options_map[u], [&](auto && p) {
                const auto & [quality_gain, option] = p;
                return (option == uv_option);
-           })) {
+           })) { // if all elements subjects to contraction are subject to the same option
             for(const auto & wu : in_arcs_tmp) {
                 if(arc_options_map[wu].empty()) {
                     arc_options_map[wu].emplace_back(
@@ -260,11 +271,12 @@ contracted_graph_data<C> compute_contracted_graph_data(
                 probability_map[wu] *= uv_prob;
                 graph.change_arc_target(wu, v);
             }
-            quality_map[v] += uv_prob * quality_map[u];
-            vertex_options_map[v].emplace_back(
-                (uv_enhanced_prob - uv_prob) * quality_map[u], uv_option);
-            for(const auto & [quality_gain, option] : vertex_options_map[u])
-                vertex_options_map[v].emplace_back(
+            source_quality_map[v] += uv_prob * source_quality_map[u];
+            source_options_map[v].emplace_back(
+                (uv_enhanced_prob - uv_prob) * source_quality_map[u],
+                uv_option);
+            for(const auto & [quality_gain, option] : source_options_map[u])
+                source_options_map[v].emplace_back(
                     uv_enhanced_prob * quality_gain, option);
             graph.remove_vertex(u);
         }
@@ -273,7 +285,8 @@ contracted_graph_data<C> compute_contracted_graph_data(
     // remove vertices that cannot be traversed by flow
     auto bfs = melon::breadth_first_search(graph);
     for(const auto & v : melon::vertices(graph)) {
-        if(quality_map[v] == 0 && vertex_options_map[v].empty()) continue;
+        if(source_quality_map[v] == 0 && source_options_map[v].empty())
+            continue;
         if(bfs.reached(v)) continue;
         bfs.add_source(v).run();
     }
@@ -295,7 +308,7 @@ contracted_graph_data<C> compute_contracted_graph_data(
                 std::max(improved_probability_map[a], improved_prob);
     }
     auto big_M_map = compute_big_M_map(
-        graph, quality_map, vertex_options_map, improved_probability_map,
+        graph, source_quality_map, source_options_map, improved_probability_map,
         std::views::filter(melon::vertices(graph), [&](auto && u) {
             return u == t || std::ranges::any_of(
                                  melon::out_arcs(graph, u), [&](auto && a) {
@@ -318,22 +331,17 @@ contracted_graph_data<C> compute_contracted_graph_data(
         [&order_map](auto && u, auto && v) {
             return order_map[u] < order_map[v];
         },
-        std::make_tuple(quality_map, vertex_options_map, big_M_map),
+        std::make_tuple(source_quality_map, source_options_map, big_M_map),
         std::make_tuple(probability_map, arc_options_map));
 
-    auto && [squality_map, svertex_options_map, sbig_M_map] = svertex_maps;
+    auto && [ssource_quality_map, ssource_options_map, sbig_M_map] =
+        svertex_maps;
     auto && [sprobability_map, sarc_options_map] = sarc_maps;
-
-    // return std::make_tuple(sgraph, squality_map, svertex_options_map,
-    //                        sprobability_map, sarc_options_map,
-    //                        sbig_M_map,
-    //                        melon::vertex_t<melon::static_digraph>{0},
-    //                        original_t);
 
     return contracted_graph_data(
         instance_case, original_t, melon::vertex_t<melon::static_digraph>{0},
-        std::move(sgraph), std::move(squality_map),
-        std::move(svertex_options_map), std::move(sprobability_map),
+        std::move(sgraph), std::move(ssource_quality_map),
+        std::move(ssource_options_map), std::move(sprobability_map),
         std::move(sarc_options_map), std::move(sbig_M_map));
 }
 

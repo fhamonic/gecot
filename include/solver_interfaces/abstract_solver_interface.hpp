@@ -1,5 +1,4 @@
-#ifndef ABSTRACT_SOLVER_INTERFACE_HPP
-#define ABSTRACT_SOLVER_INTERFACE_HPP
+#pragma once
 
 #include <string>
 #include <vector>
@@ -23,5 +22,3 @@ public:
 };
 
 }  // namespace fhamonic
-
-#endif  // ABSTRACT_SOLVER_INTERFACE_HPP

@@ -20,7 +20,7 @@
 
 using namespace fhamonic;
 
-double compute_original_contribution(auto && graph, auto quality_map,
+double compute_original_contribution(auto && graph, auto source_quality_map,
                                      auto && vertex_option_map,
                                      auto probability_map,
                                      auto && arc_option_map, auto && original_t,
@@ -28,7 +28,7 @@ double compute_original_contribution(auto && graph, auto quality_map,
     for(auto && u : melon::vertices(graph)) {
         for(auto && [quality_gain, option] : vertex_option_map[u]) {
             if(!solution[option]) continue;
-            quality_map[u] += quality_gain;
+            source_quality_map[u] += quality_gain;
         }
     }
     for(auto && a : melon::arcs(graph)) {
@@ -38,15 +38,14 @@ double compute_original_contribution(auto && graph, auto quality_map,
         }
     }
 
-    return gecot::pc_num_vertex_contribution(
-        melon::views::reverse(graph), quality_map, probability_map, original_t);
+    return gecot::pc_num_vertex_in_flow(graph, source_quality_map,
+                                        probability_map, original_t);
 }
 
 GTEST_TEST(preprocessing, fuzzy_test) {
     std::string instance_path = PROJECT_SOURCE_DIR;
     // instance_path.append("/test/instances/aude.json");
-    instance_path.append(
-        "/test/instances/Quebec_438_RASY/instance.json");
+    instance_path.append("/test/instances/Quebec_438_RASY/instance.json");
     // instance_path.append("/test/instances/biorevaix_N1.json");
     Instance instance = parse_instance(instance_path);
     double budget = 0;
@@ -62,36 +61,35 @@ GTEST_TEST(preprocessing, fuzzy_test) {
 
     for(auto && instance_case : instance.cases()) {
         const auto & original_graph = instance_case.graph();
-        const auto & original_quality_map = instance_case.vertex_quality_map();
+        const auto & original_source_quality_map =
+            instance_case.source_quality_map();
         const auto & original_probability_map =
             instance_case.arc_probability_map();
 
-        const auto [graph, quality_map, vertex_options_map, probability_map,
-                    arc_option_map] =
+        const auto [graph, source_quality_map, target_quality_map,
+                    vertex_options_map, probability_map, arc_option_map] =
             gecot::compute_generalized_flow_graph(instance_case);
 
-        //*
+        /*
         const auto [strong_arcs_map, useless_arcs_map] =
             gecot::compute_constrained_strong_and_useless_arcs(
                 instance, instance_case, budget,
                 [&instance, budget](const gecot::option_t & o) {
                     return instance.option_cost(o) <= budget;
-                });
+                }, 1e-7);
         /*/
         const auto [strong_arcs_map, useless_arcs_map] =
             gecot::compute_strong_and_useless_arcs(
-                instance_case,
-                [&instance, budget](const gecot::option_t & o) {
+                instance_case, [&instance, budget](const gecot::option_t & o) {
                     return instance.option_cost(o) <= budget;
                 });
         //*/
 
         for(const auto & original_t : melon::vertices(original_graph)) {
-            const double contribution = gecot::pc_num_vertex_contribution(
-                melon::views::reverse(graph), quality_map, probability_map,
-                original_t);
+            const double contribution = gecot::pc_num_vertex_in_flow(
+                graph, source_quality_map, probability_map, original_t);
 
-            const auto [contracted_graph, contracted_quality_map,
+            const auto [contracted_graph, contracted_source_quality_map,
                         contracted_vertex_options_map, contracted_arc_no_map,
                         contracted_probability_map, contracted_arc_option_map,
                         t] =
@@ -99,10 +97,11 @@ GTEST_TEST(preprocessing, fuzzy_test) {
                     instance_case, strong_arcs_map[original_t],
                     useless_arcs_map[original_t], original_t);
 
-            const double contracted_contribution =
-                gecot::pc_num_vertex_contribution(
-                    melon::views::reverse(contracted_graph),
-                    contracted_quality_map, contracted_probability_map, t);
+            std::cout << "<contracted>" << std::endl;
+            const double contracted_contribution = gecot::pc_num_vertex_in_flow(
+                contracted_graph, contracted_source_quality_map,
+                contracted_probability_map, t);
+            std::cout << "</contracted>" << std::endl;
 
             cpt += 1;
             if(std::abs(contribution - contracted_contribution) <=
@@ -117,7 +116,7 @@ GTEST_TEST(preprocessing, fuzzy_test) {
                           << contracted_contribution << std::endl;
             }
 
-            if(original_quality_map[original_t] > 0 ||
+            if(original_source_quality_map[original_t] > 0 ||
                vertex_options_map[original_t].size() > 0) {
                 num_variables += melon::num_arcs(graph);
                 num_constraints += melon::num_vertices(graph);

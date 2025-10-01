@@ -26,7 +26,7 @@ void print_instance_size(auto && instance,
         for(auto && v : melon::vertices(graph)) {
             num_improvable_vertices +=
                 instance_case.vertex_options_map()[v].size() > 0;
-            num_habitat_vertices += instance_case.vertex_quality_map()[v] > 0;
+            num_habitat_vertices += instance_case.source_quality_map()[v] > 0;
         }
         int num_improvable_arcs = 0;
         for(auto && a : melon::arcs(graph))
@@ -41,7 +41,7 @@ void print_instance_size(auto && instance,
     }
 }
 
-void print_paragraph(std::size_t offset, std::size_t column_width,
+inline void print_paragraph(std::size_t offset, std::size_t column_width,
                      const std::string & str) {
     std::size_t line_start = 0;
     while(str.size() - line_start > column_width) {

@@ -23,12 +23,21 @@ template <typename _Tp>
 using case_graph_t = std::decay_t<decltype(std::declval<_Tp &>().graph())>;
 
 template <typename _Tp>
-using case_quality_map_t =
-    std::decay_t<decltype(std::declval<_Tp &>().vertex_quality_map())>;
+using case_source_quality_map_t =
+    std::decay_t<decltype(std::declval<_Tp &>().source_quality_map())>;
 
 template <typename _Tp>
-using case_quality_t =
-    std::decay_t<melon::mapped_value_t<case_quality_map_t<_Tp>,
+using source_quality_t =
+    std::decay_t<melon::mapped_value_t<case_source_quality_map_t<_Tp>,
+                                       melon::vertex_t<case_graph_t<_Tp>>>>;
+
+template <typename _Tp>
+using case_target_quality_map_t =
+    std::decay_t<decltype(std::declval<_Tp &>().target_quality_map())>;
+
+template <typename _Tp>
+using target_quality_t =
+    std::decay_t<melon::mapped_value_t<case_target_quality_map_t<_Tp>,
                                        melon::vertex_t<case_graph_t<_Tp>>>>;
 
 template <typename _Tp>
@@ -44,7 +53,9 @@ using case_probability_t =
 template <typename _Tp>
 concept case_c = requires(_Tp && ic) {
     { ic.graph() } -> melon::outward_incidence_graph;
-    { ic.vertex_quality_map() } 
+    { ic.source_quality_map() } 
+    -> melon::input_mapping<melon::vertex_t<case_graph_t<_Tp>>>;
+    { ic.target_quality_map() } 
     -> melon::input_mapping<melon::vertex_t<case_graph_t<_Tp>>>;
     { ic.arc_probability_map() } 
     -> melon::input_mapping<melon::arc_t<case_graph_t<_Tp>>>;
@@ -52,7 +63,7 @@ concept case_c = requires(_Tp && ic) {
     -> melon::input_mapping<melon::vertex_t<case_graph_t<_Tp>>>;
     { ic.arc_options_map() } 
     -> melon::input_mapping<melon::arc_t<case_graph_t<_Tp>>>;
-} && std::same_as<case_quality_t<_Tp>, double> 
+} && std::same_as<source_quality_t<_Tp>, double> 
   && std::same_as<case_probability_t<_Tp>, double>;
   // , std::vector<std::pair<double, option_t>>
 
@@ -80,7 +91,7 @@ template <typename _Tp>
 using instance_graph_t = case_graph_t<instance_case_t<_Tp>>;
 
 template <typename _Tp>
-using instance_quality_map_t = case_quality_map_t<instance_case_t<_Tp>>;
+using instance_source_quality_map_t = case_source_quality_map_t<instance_case_t<_Tp>>;
 
 template <typename _Tp>
 using instance_probability_map_t = case_probability_map_t<instance_case_t<_Tp>>;

@@ -23,13 +23,11 @@ namespace po = boost::program_options;
 #include "trivial_reformulate.hpp"
 
 #include "solver_interfaces/abstract_solver_interface.hpp"
-#include "solver_interfaces/benders_mip_interface.hpp"
-#include "solver_interfaces/greedy_decremental_interface.hpp"
-#include "solver_interfaces/greedy_incremental_interface.hpp"
+#include "solver_interfaces/flow_benders_interface.hpp"
 #include "solver_interfaces/mip_interface.hpp"
+#include "solver_interfaces/naive_benders_interface.hpp"
 #include "solver_interfaces/preprocessed_mip_interface.hpp"
-#include "solver_interfaces/static_decremental_interface.hpp"
-#include "solver_interfaces/static_incremental_interface.hpp"
+#include "solver_interfaces/target_benders_interface.hpp"
 
 using namespace fhamonic;
 
@@ -41,13 +39,11 @@ static bool process_command_line(
     std::optional<std::filesystem::path> & opt_output_csv_file,
     std::optional<tbb::global_control> & opt_tbb_global_control) {
     std::vector<std::shared_ptr<AbstractSolverInterface>> solver_interfaces{
-        std::make_unique<StaticIncrementalInterface>(),
-        std::make_unique<StaticDecrementalInterface>(),
-        std::make_unique<GreedyIncrementalInterface>(),
-        std::make_unique<GreedyDecrementalInterface>(),
-        std::make_unique<MIPInterface>(),
-        std::make_unique<PreprocessedMIPInterface>(),
-        std::make_unique<BendersMIPInterface>()};
+        std::make_unique<mipInterface>(),
+        std::make_unique<PreprocessedmipInterface>(),
+        std::make_unique<NaiveBendersInterface>(),
+        std::make_unique<TargetBendersInterface>(),
+        std::make_unique<FlowBendersInterface>()};
 
     auto print_soft_name = []() {
         fmt::print(
@@ -198,7 +194,7 @@ int main(int argc, const char * argv[]) {
     spdlog::set_pattern("[%^%l%$] %v");
     std::string program_state = "Parsing arguments";
 
-    try {
+    // try {
         std::vector<std::string> args(argv + 1, argv + argc);
         if(!process_command_line(args, solver, instances_description_json,
                                  budget, opt_output_json_file,
@@ -364,10 +360,10 @@ int main(int argc, const char * argv[]) {
                          std::filesystem::absolute(opt_output_csv_file.value())
                              .string());
         }
-    } catch(const std::exception & e) {
-        spdlog::error("{}: {}", program_state, e.what());
-        return EXIT_FAILURE;
-    }
+    // } catch(const std::exception & e) {
+    //     spdlog::error("{}: {}", program_state, e.what());
+    //     return EXIT_FAILURE;
+    // }
 
     return EXIT_SUCCESS;
 }

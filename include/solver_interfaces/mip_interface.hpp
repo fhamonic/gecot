@@ -1,5 +1,4 @@
-#ifndef GECOT_MIP_INTERFACE_HPP
-#define GECOT_MIP_INTERFACE_HPP
+#pragma once
 
 #include <filesystem>
 #include <sstream>
@@ -12,12 +11,12 @@
 
 namespace fhamonic {
 
-class MIPInterface : public AbstractMIPInterface {
+class mipInterface : public AbstractMipInterface {
 private:
-    gecot::solvers::MIP solver;
+    gecot::solvers::mip solver;
 
 public:
-    MIPInterface() : AbstractMIPInterface(name()) {}
+    mipInterface() : AbstractMipInterface(name()) {}
 
     void handle_options(const boost::program_options::variables_map & vm) {
         solver.feasibility_tol = feasibility_tolerance;
@@ -31,7 +30,7 @@ public:
 
     std::string name() const { return "mip"; }
     std::string description() const {
-        return "MIP formulation without preprocessing, from 'Optimizing the "
+        return "mip formulation without preprocessing, from 'Optimizing the "
                "ecological connectivity of landscapes', F.\u00A0Hamonic, "
                "C.\u00A0H.\u00A0Albert, B.\u00A0Couëtoux, Y.\u00A0Vaxès";
     }
@@ -39,5 +38,3 @@ public:
 };
 
 }  // namespace fhamonic
-
-#endif  // GECOT_MIP_INTERFACE_HPP

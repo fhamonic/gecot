@@ -1,0 +1,3 @@
+vertex_id,option_id,source_quality_gain,target_quality_gain
+0,0,0,1
+0,1,1,0

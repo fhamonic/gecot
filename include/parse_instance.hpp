@@ -7,7 +7,7 @@
 #include <initializer_list>
 #include <iostream>
 
-#include <fast-cpp-csv-parser/csv.h>
+#include <csv.hpp>
 #include <nlohmann/json-schema.hpp>
 #include <nlohmann/json.hpp>
 

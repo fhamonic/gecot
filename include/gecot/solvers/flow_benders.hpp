@@ -142,7 +142,6 @@ struct flow_benders : public benders_base {
                         // model.add_indicator_constraint(X_vars(option), false,
                         //                                F_prime_t_var <= 0);
                     }
-
                     pb.tick();
                 }
             }

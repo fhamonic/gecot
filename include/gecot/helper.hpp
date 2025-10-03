@@ -4,6 +4,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <optional>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -31,15 +32,17 @@ template <instance_c I>
 auto compute_cases_vertex_options(const I & instance) noexcept {
     auto cases_vertex_options =
         instance.create_case_map(instance.create_option_map(
-            std::vector<
-                std::pair<melon::vertex_t<instance_graph_t<I>>, double>>{}));
+            std::vector<std::tuple<melon::vertex_t<instance_graph_t<I>>, double,
+                                   double>>{}));
 
     for(auto && instance_case : instance.cases()) {
         const auto & vertex_options_map = instance_case.vertex_options_map();
         auto & vertex_options = cases_vertex_options[instance_case.id()];
         for(auto && u : melon::vertices(instance_case.graph())) {
-            for(auto && [quality_gain, option] : vertex_options_map[u]) {
-                vertex_options[option].emplace_back(u, quality_gain);
+            for(auto && [source_quality_gain, target_quality_gain, option] :
+                vertex_options_map[u]) {
+                vertex_options[option].emplace_back(u, source_quality_gain,
+                                                    target_quality_gain);
             }
         }
     }
@@ -71,7 +74,8 @@ auto compute_cases_arc_options(const I & instance) noexcept {
 }
 
 template <instance_c I>
-auto compute_cases_pc_num(const I & instance, const auto & cases_current_qm,
+auto compute_cases_pc_num(const I & instance, const auto & cases_current_sqm,
+                          const auto & cases_current_tqm,
                           const auto & cases_current_pm) noexcept {
     const auto & cases = instance.cases();
     auto cases_pc_num = instance.template create_case_map<double>();
@@ -79,26 +83,32 @@ auto compute_cases_pc_num(const I & instance, const auto & cases_current_qm,
         tbb::blocked_range(cases.begin(), cases.end()),
         [&](const tbb::blocked_range<decltype(cases.begin())> & cases_block) {
             for(auto instance_case : cases_block) {
-                cases_pc_num[instance_case.id()] = pc_num(
-                    instance_case.graph(), cases_current_qm[instance_case.id()],
-                    cases_current_pm[instance_case.id()]);
+                cases_pc_num[instance_case.id()] =
+                    parallel_pc_num(instance_case.graph(),
+                           cases_current_sqm[instance_case.id()],
+                           cases_current_tqm[instance_case.id()],
+                           cases_current_pm[instance_case.id()]);
             }
         });
     return cases_pc_num;
 }
 
 template <instance_c I>
-double compute_score(const I & instance, const auto & cases_current_qm,
+double compute_score(const I & instance, const auto & cases_current_sqm,
+                     const auto & cases_current_tqm,
                      const auto & cases_current_pm) noexcept {
-    return instance.eval_criterion(
-        compute_cases_pc_num(instance, cases_current_qm, cases_current_pm));
+    return instance.eval_criterion(compute_cases_pc_num(
+        instance, cases_current_sqm, cases_current_tqm, cases_current_pm));
 }
 
 template <instance_c I>
 auto compute_base_cases_pc_num(const I & instance) noexcept {
     return compute_cases_pc_num(
         instance, melon::views::map([&](auto && case_id) {
-            return instance.cases()[case_id].vertex_quality_map();
+            return instance.cases()[case_id].source_quality_map();
+        }),
+        melon::views::map([&](auto && case_id) {
+            return instance.cases()[case_id].target_quality_map();
         }),
         melon::views::map([&](auto && case_id) {
             return instance.cases()[case_id].arc_probability_map();
@@ -127,14 +137,26 @@ auto compute_solution_cases_pc_num(const I & instance, const S & solution,
                                    const auto & cases_arc_options) noexcept {
     return compute_cases_pc_num(
         instance, melon::views::map([&](auto && case_id) {
-            auto enhanced_qm = instance.cases()[case_id].vertex_quality_map();
+            auto enhanced_sqm = instance.cases()[case_id].source_quality_map();
             auto && vertex_options = cases_vertex_options[case_id];
             for(auto && option : instance.options()) {
                 if(!solution[option]) continue;
-                for(auto && [u, quality_gain] : vertex_options[option])
-                    enhanced_qm[u] += quality_gain;
+                for(auto && [u, source_quality_gain, _] :
+                    vertex_options[option])
+                    enhanced_sqm[u] += source_quality_gain;
             }
-            return enhanced_qm;
+            return enhanced_sqm;
+        }),
+        melon::views::map([&](auto && case_id) {
+            auto enhanced_tqm = instance.cases()[case_id].target_quality_map();
+            auto && vertex_options = cases_vertex_options[case_id];
+            for(auto && option : instance.options()) {
+                if(!solution[option]) continue;
+                for(auto && [u, _, target_quality_gain] :
+                    vertex_options[option])
+                    enhanced_tqm[u] += target_quality_gain;
+            }
+            return enhanced_tqm;
         }),
         melon::views::map([&](auto && case_id) {
             auto enhanced_pm = instance.cases()[case_id].arc_probability_map();
@@ -161,9 +183,10 @@ auto compute_solution_cases_pc_num(const I & instance,
 
 template <instance_c I, detail::range_of<option_t> O>
 void compute_options_cases_incr_pc_num(
-    const I & instance, const O & free_options, auto && cases_current_qm,
-    auto && cases_current_pm, auto && cases_vertex_options,
-    auto && cases_arc_options, auto & options_cases_pc_num) {
+    const I & instance, const O & free_options, auto && cases_current_sqm,
+    auto && cases_current_tqm, auto && cases_current_pm,
+    auto && cases_vertex_options, auto && cases_arc_options,
+    auto & options_cases_pc_num) {
     const auto & cases = instance.cases();
     progress_bar<spdlog::level::trace, 64> pb(free_options.size() *
                                               cases.size());
@@ -178,32 +201,43 @@ void compute_options_cases_incr_pc_num(
                 if(options_block.begin() == options_block.end()) continue;
 
                 const auto & graph = instance_case.graph();
-                const auto & current_qm = cases_current_qm[instance_case.id()];
+                const auto & current_sqm =
+                    cases_current_sqm[instance_case.id()];
+                const auto & current_tqm =
+                    cases_current_tqm[instance_case.id()];
                 const auto & current_pm = cases_current_pm[instance_case.id()];
                 const auto & vertex_options =
                     cases_vertex_options[instance_case.id()];
                 const auto & arc_options =
                     cases_arc_options[instance_case.id()];
 
-                auto enhanced_qm = current_qm;
+                auto enhanced_sqm = current_sqm;
+                auto enhanced_tqm = current_tqm;
                 auto enhanced_pm = current_pm;
 
                 for(auto it = options_block.begin();;) {
                     option_t option = *it;
-                    for(auto && [u, quality_gain] : vertex_options[option])
-                        enhanced_qm[u] += quality_gain;
+                    for(auto && [u, source_quality_gain, target_quality_gain] :
+                        vertex_options[option]) {
+                        enhanced_sqm[u] += source_quality_gain;
+                        enhanced_tqm[u] += target_quality_gain;
+                    }
                     for(auto && [a, enhanced_prob] : arc_options[option])
                         enhanced_pm[a] =
                             std::max(enhanced_pm[a], enhanced_prob);
 
                     options_cases_pc_num[option][instance_case.id()] =
-                        parallel_pc_num(graph, enhanced_qm, enhanced_pm);
+                        parallel_pc_num(graph, enhanced_sqm, enhanced_tqm,
+                                        enhanced_pm);
 
                     pb.tick();
                     if(++it == options_block.end()) break;
 
-                    for(auto && [u, quality_gain] : vertex_options[option])
-                        enhanced_qm[u] = current_qm[u];
+                    for(auto && [u, source_quality_gain, target_quality_gain] :
+                        vertex_options[option]) {
+                        enhanced_sqm[u] -= source_quality_gain;
+                        enhanced_tqm[u] -= target_quality_gain;
+                    }
                     for(auto && [a, enhanced_prob] : arc_options[option])
                         enhanced_pm[a] = current_pm[a];
                 }
@@ -216,9 +250,9 @@ template <instance_c I, melon::input_mapping<option_t> S,
     requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
 void compute_options_cases_decr_pc_num(
     const I & instance, const S & current_solution, const O & taken_options,
-    auto && cases_current_qm, auto && cases_current_pm,
-    auto && cases_vertex_options, auto && cases_arc_options,
-    auto & options_cases_pc_num) {
+    auto && cases_current_sqm, auto && cases_current_tqm,
+    auto && cases_current_pm, auto && cases_vertex_options,
+    auto && cases_arc_options, auto & options_cases_pc_num) {
     const auto & cases = instance.cases();
     progress_bar<spdlog::level::trace, 64> pb(taken_options.size() *
                                               cases.size());
@@ -232,7 +266,10 @@ void compute_options_cases_decr_pc_num(
                 const auto & options_block = cases_options_block.cols();
                 if(options_block.begin() == options_block.end()) continue;
 
-                const auto & current_qm = cases_current_qm[instance_case.id()];
+                const auto & current_sqm =
+                    cases_current_sqm[instance_case.id()];
+                const auto & current_tqm =
+                    cases_current_tqm[instance_case.id()];
                 const auto & current_pm = cases_current_pm[instance_case.id()];
                 const auto & original_pm = instance_case.arc_probability_map();
                 const auto & vertex_options =
@@ -240,13 +277,17 @@ void compute_options_cases_decr_pc_num(
                 const auto & arc_options =
                     cases_arc_options[instance_case.id()];
 
-                auto enhanced_qm = current_qm;
+                auto enhanced_sqm = current_sqm;
+                auto enhanced_tqm = current_tqm;
                 auto enhanced_pm = current_pm;
 
                 for(auto it = options_block.begin();;) {
                     option_t option = *it;
-                    for(auto && [u, quality_gain] : vertex_options[option])
-                        enhanced_qm[u] -= quality_gain;
+                    for(auto && [u, source_quality_gain, target_quality_gain] :
+                        vertex_options[option]) {
+                        enhanced_sqm[u] -= source_quality_gain;
+                        enhanced_tqm[u] -= target_quality_gain;
+                    }
                     for(auto && [a, _] : arc_options[option]) {
                         enhanced_pm[a] = original_pm[a];
                         for(auto && [current_prob, i] :
@@ -259,14 +300,17 @@ void compute_options_cases_decr_pc_num(
                     }
 
                     options_cases_pc_num[option][instance_case.id()] =
-                        parallel_pc_num(instance_case.graph(), enhanced_qm,
-                                        enhanced_pm);
+                        parallel_pc_num(instance_case.graph(), enhanced_sqm,
+                                        enhanced_tqm, enhanced_pm);
 
                     pb.tick();
                     if(++it == options_block.end()) break;
 
-                    for(auto && [u, quality_gain] : vertex_options[option])
-                        enhanced_qm[u] += quality_gain;
+                    for(auto && [u, source_quality_gain, target_quality_gain] :
+                        vertex_options[option]) {
+                        enhanced_sqm[u] += source_quality_gain;
+                        enhanced_tqm[u] += target_quality_gain;
+                    }
                     for(auto && [a, _] : arc_options[option])
                         enhanced_pm[a] = current_pm[a];
                 }

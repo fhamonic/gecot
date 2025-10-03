@@ -10,8 +10,8 @@ project(
 # set(CMAKE_VERBOSE_MAKEFILE ON)
 
 # ################### Options ####################
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# set(CMAKE_CXX_STANDARD 26)
+# set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(ENABLE_TESTING "Enable unit tests" OFF)
 option(WARNINGS "Enable warnings" OFF)
@@ -45,7 +45,7 @@ if(WIN32)
 endif()
 
 # ################### Packages ####################
-find_package(fast-cpp-csv-parser REQUIRED)
+find_package(vincentlaucsb-csv-parser REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(nlohmann_json_schema_validator REQUIRED)
 find_package(phmap REQUIRED)
@@ -87,7 +87,7 @@ target_link_libraries(gecot INTERFACE mippp::mippp)
 # ################### EXEC target ####################
 add_executable(gecot_optimize src/instance.cpp src/parse_instance.cpp src/gecot_optimize.cpp ${WINDRES_ICON_O})
 target_link_libraries(gecot_optimize PUBLIC gecot)
-target_link_libraries(gecot_optimize PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser)
+target_link_libraries(gecot_optimize PUBLIC vincentlaucsb-csv-parser::vincentlaucsb-csv-parser)
 target_link_libraries(gecot_optimize PUBLIC nlohmann_json::nlohmann_json)
 target_link_libraries(gecot_optimize PUBLIC nlohmann_json_schema_validator)
 target_link_libraries(gecot_optimize PUBLIC phmap)
@@ -98,7 +98,6 @@ target_link_libraries(gecot_optimize PUBLIC phmap)
 
 # add_executable(gecot_rank_options src/rank_options.cpp ${WINDRES_ICON_O})
 # target_link_libraries(gecot_rank_options PUBLIC gecot) 
-# target_link_libraries(gecot_rank_options PUBLIC fast-cpp-csv-parser::fast-cpp-csv-parser) 
 # target_link_libraries(gecot_rank_options PUBLIC nlohmann_json::nlohmann_json) 
 # target_link_libraries(gecot_rank_options PUBLIC nlohmann_json_schema_validator)
 # target_link_libraries(gecot_rank_options PUBLIC phmap)

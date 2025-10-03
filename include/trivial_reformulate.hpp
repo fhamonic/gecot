@@ -45,14 +45,18 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
     using arc_t = melon::arc_t<graph_t>;
 
     const auto & original_graph = instance_case.graph();
-    const auto & original_quality_map = instance_case.vertex_quality_map();
+    const auto & original_source_quality_map =
+        instance_case.source_quality_map();
+    const auto & original_target_quality_map =
+        instance_case.target_quality_map();
     const auto original_probability_map = instance_case.arc_probability_map();
 
     const auto & original_vertex_options_map =
         instance_case.vertex_options_map();
     const auto & original_arc_options_map = instance_case.arc_options_map();
 
-    std::vector<double> vertex_quality_map;
+    std::vector<double> source_quality_map;
+    std::vector<double> target_quality_map;
     std::vector<std::string> vertex_names_map;
     std::vector<std::vector<vertex_t>> components;
     auto component_num_map =
@@ -63,12 +67,14 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
             original_graph, {}, [&original_probability_map](const arc_t & a) {
                 return original_probability_map[a] == 1;
             }))) {
-        vertex_quality_map.push_back(0.0);
+        source_quality_map.push_back(0.0);
+        target_quality_map.push_back(0.0);
         vertex_names_map.emplace_back();
         const std::size_t component_num = components.size();
         components.emplace_back();
         for(const vertex_t & v : component) {
-            vertex_quality_map.back() += original_quality_map[v];
+            source_quality_map.back() += original_source_quality_map[v];
+            target_quality_map.back() += original_target_quality_map[v];
             if(!vertex_names_map.back().empty())
                 vertex_names_map.back().append("+");
             vertex_names_map.back().append(instance_case.vertex_name(v));
@@ -107,21 +113,22 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
     for(arc_t a : melon::arcs(graph)) arc_name_to_id_map[arc_names[a]] = a;
 
     auto & reformulated_case = instance.emplace_case(
-        instance_case.name(), std::move(graph),
-        std::move(vertex_quality_map), std::move(arc_probability_map),
+        instance_case.name(), std::move(graph), std::move(source_quality_map),
+        std::move(target_quality_map), std::move(arc_probability_map),
         std::move(vertex_names_map), std::move(vertex_name_to_id_map),
         std::move(arc_names), std::move(arc_name_to_id_map));
 
     auto vertex_options = melon::create_vertex_map<
-        std::vector<std::pair<double, gecot::option_t>>>(graph, {});
+        std::vector<std::tuple<double, double, gecot::option_t>>>(graph, {});
     for(vertex_t v : melon::vertices(graph)) {
         for(vertex_t original_v : components[v]) {
-            for(const auto & [quality_gain, original_option] :
+            for(const auto & [source_quality_gain, target_quality_gain,
+                              original_option] :
                 original_vertex_options_map[original_v]) {
                 if(!reformulated_option_map[original_option].has_value())
                     continue;
                 vertex_options[v].emplace_back(
-                    quality_gain,
+                    source_quality_gain, target_quality_gain,
                     reformulated_option_map[original_option].value());
             }
         }

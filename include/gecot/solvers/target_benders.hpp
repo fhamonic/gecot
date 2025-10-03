@@ -1,12 +1,10 @@
-#ifndef GECOT_SOLVERS_BENDERS_MIP_HPP
-#define GECOT_SOLVERS_BENDERS_MIP_HPP
+#pragma once
 
 #include <limits>
 #include <stdexcept>
 
 #include <spdlog/spdlog.h>
 
-#include "mippp/detail/std_ranges_to_range_v3.hpp"
 #include "mippp/solvers/copt/all.hpp"
 #include "mippp/solvers/cplex/all.hpp"
 #include "mippp/solvers/gurobi/all.hpp"
@@ -19,83 +17,13 @@
 #include "gecot/preprocessing/compute_contracted_graph.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 
+#include "gecot/solvers/benders_base.hpp"
+
 namespace fhamonic {
 namespace gecot {
 namespace solvers {
 
-struct benders_MIP {
-    double feasibility_tol = 0.0;
-    bool print_model = false;
-    double probability_resolution;
-    int num_mus;
-
-    template <typename M, typename V>
-    struct formula_variable_visitor {
-        std::reference_wrapper<M> model;
-        std::reference_wrapper<const V> C_vars;
-
-        formula_variable_visitor(M & t_model, const V & t_C_vars)
-            : model{t_model}, C_vars{t_C_vars} {}
-
-        auto operator()(const criterion_constant & c) {
-            return model.get().add_variable(
-                {.lower_bound = c, .upper_bound = c});
-        }
-        auto operator()(const criterion_var & v) { return C_vars.get()(v); }
-        auto operator()(const criterion_sum & f) {
-            using namespace mippp::operators;
-            auto var = model.get().add_variable();
-            std::vector<typename M::variable> vars;
-            for(auto && e : f.values) vars.emplace_back(std::visit(*this, e));
-            model.get().add_constraint(var == xsum(vars));
-            return var;
-        }
-        auto operator()(const criterion_product & f) {
-            using namespace mippp::operators;
-            if(!std::holds_alternative<criterion_constant>(f.values[0]) &&
-               f.values.size() != 2)
-                throw std::invalid_argument(
-                    "MIP doesn't support products of variables in the "
-                    "criterion "
-                    "!");
-
-            auto var = model.get().add_variable();
-            model.get().add_constraint(
-                var == std::get<criterion_constant>(f.values[0]) *
-                           std::visit(*this, f.values[1]));
-            return var;
-        }
-        auto operator()(const criterion_min & f) {
-            using namespace mippp::operators;
-            auto var = model.get().add_variable();
-            for(auto && e : f.values) {
-                model.get().add_constraint(var <= std::visit(*this, e));
-            }
-            return var;
-        }
-    };
-
-    template <instance_c I, case_c C>
-    auto _compute_strong_and_useless_arcs(const I & instance,
-                                          const C & instance_case,
-                                          const double budget) const {
-        if(num_mus >= 1) {
-            return compute_constrained_strong_and_useless_arcs(
-                instance, instance_case, budget,
-                [&instance, budget](const option_t & o) {
-                    return instance.option_cost(o) <= budget;
-                },
-                probability_resolution, num_mus);
-        } else {
-            return compute_strong_and_useless_arcs(
-                instance_case,
-                [&instance, budget](const option_t & o) {
-                    return instance.option_cost(o) <= budget;
-                },
-                probability_resolution);
-        }
-    }
-
+struct target_benders : public benders_base {
     template <case_c C>
     auto _compute_dual_flow(const contracted_graph_data<C> & data,
                             const auto & solution) const {
@@ -103,7 +31,7 @@ struct benders_MIP {
         auto rho_values = melon::create_vertex_map<double>(data.graph, 0.0);
 
         auto get_quality = [&](auto && u) {
-            double quality = data.quality_map[u];
+            double quality = data.source_quality_map[u];
             for(auto && [quality_gain, option] : data.vertex_options_map[u]) {
                 if(!solution[option]) continue;
                 quality += quality_gain;
@@ -141,15 +69,9 @@ struct benders_MIP {
         using namespace mippp;
         using namespace mippp::operators;
 
-        // using model_type = cplex_milp;
-        // cplex_api api;
-        // model_type model(api);
-        using model_type = gurobi_milp;
-        gurobi_api api;
+        api_type api;
         model_type model(api);
-        // using model_type = copt_milp;
-        // copt_api api;
-        // model_type model(api);
+        
         model.set_optimality_tolerance(1e-10);
         model.set_feasibility_tolerance(feasibility_tol);
 
@@ -175,8 +97,8 @@ struct benders_MIP {
         for(auto && instance_case : instance.cases()) {
             const auto case_id = instance_case.id();
             const auto & original_graph = instance_case.graph();
-            const auto & original_quality_map =
-                instance_case.vertex_quality_map();
+            const auto & original_source_quality_map =
+                instance_case.source_quality_map();
             const auto & original_vertex_options_map =
                 instance_case.vertex_options_map();
             const auto [strong_arcs_map, useless_arcs_map] =
@@ -194,7 +116,7 @@ struct benders_MIP {
                     original_graph.num_vertices());
                 for(const auto & original_t : melon::vertices(original_graph)) {
                     const double original_t_quality =
-                        original_quality_map[original_t];
+                        original_source_quality_map[original_t];
                     if(original_t_quality == 0 &&
                        original_vertex_options_map[original_t].empty()) {
                         pb.tick();
@@ -251,7 +173,7 @@ struct benders_MIP {
                 const auto & current_solution, const auto & rho_values) {
                 return xsum(data.graph.vertices(),
                             [&](auto && u) {
-                                return (data.quality_map[u] +
+                                return (data.source_quality_map[u] +
                                         xsum(data.vertex_options_map[u],
                                              [&](auto && p) {
                                                  auto && [quality_gain,
@@ -316,5 +238,3 @@ struct benders_MIP {
 }  // namespace solvers
 }  // namespace gecot
 }  // namespace fhamonic
-
-#endif  // GECOT_SOLVERS_BENDERS_MIP_HPP

@@ -19,16 +19,16 @@ struct parallel_pc_num_dijkstra_traits {
     using semiring = melon::most_reliable_path_semiring<V>;
     using heap = melon::updatable_d_ary_heap<
         4, std::pair<melon::vertex_t<GR>, V>, typename semiring::less_t,
-        melon::vertex_map_t<GR, std::size_t>, melon::views::get_map<1>,
-        melon::views::get_map<0>>;
+        melon::vertex_map_t<GR, std::size_t>, melon::views::element_map<1>,
+        melon::views::element_map<0>>;
 
     static constexpr bool store_paths = false;
     static constexpr bool store_distances = false;
 };
 }  // namespace detail
 
-template <typename GR, typename QM, typename PM>
-double parallel_pc_num(const GR & graph, const QM & quality_map,
+template <typename GR, typename SQM, typename TQM, typename PM>
+double parallel_pc_num(const GR & graph, const SQM & source_quality_map, const TQM & target_quality_map,
                        const PM & probability_map) {
     auto vertices_range = melon::vertices(graph);
 
@@ -41,14 +41,14 @@ double parallel_pc_num(const GR & graph, const QM & quality_map,
                 graph, probability_map);
 
             for(auto && s : vertices_subrange) {
-                if(quality_map[s] == 0) continue;
+                if(source_quality_map[s] == 0) continue;
                 double sum = 0.0;
                 algo.reset();
                 algo.add_source(s);
                 for(const auto & [u, prob] : algo) {
-                    sum += quality_map[u] * prob;
+                    sum += target_quality_map[u] * prob;
                 }
-                init += quality_map[s] * sum;
+                init += source_quality_map[s] * sum;
             }
             return init;
         },

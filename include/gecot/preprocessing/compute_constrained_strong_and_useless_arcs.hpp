@@ -34,7 +34,6 @@ auto compute_constrained_strong_and_useless_arcs(
 
     auto prob_to_length =
         [probability_resolution](const double p) -> log_probability_t {
-        assert(p != 0);
         return static_cast<log_probability_t>(
             -std::log(std::max(p, probability_resolution)) /
             std::log1p(probability_resolution));
@@ -45,12 +44,12 @@ auto compute_constrained_strong_and_useless_arcs(
     };
 
     const auto & graph = instance_case.graph();
-    const auto & quality_map = instance_case.vertex_quality_map();
+    const auto & target_quality_map = instance_case.target_quality_map();
 
-    auto useless_vertices_map = melon::create_vertex_map<bool>(graph);
+    auto useless_target_vertices_map = melon::create_vertex_map<bool>(graph);
     for(const auto & v : melon::vertices(graph)) {
-        useless_vertices_map[v] =
-            (quality_map[v] == 0 &&
+        useless_target_vertices_map[v] =
+            (target_quality_map[v] == 0 &&
              instance_case.vertex_options_map()[v].empty());
     }
 
@@ -158,7 +157,7 @@ auto compute_constrained_strong_and_useless_arcs(
                             fiber_map[w] = true;
                             mu_fiber.emplace_back(
                                 w, w_dist.first - budget_penalty);
-                            if(useless_vertices_map[w]) continue;
+                            if(useless_target_vertices_map[w]) continue;
                             strong_arcs_map[w].push_back(uv);
                         }
                         if(mu_fiber.size() == previous_fiber_size) continue;
@@ -209,7 +208,7 @@ auto compute_constrained_strong_and_useless_arcs(
                             fiber_map[w] = true;
                             mu_fiber.emplace_back(
                                 w, w_dist.first - budget_penalty);
-                            if(useless_vertices_map[w]) continue;
+                            if(useless_target_vertices_map[w]) continue;
                             useless_arcs_map[w].push_back(uv);
                         }
                         if(mu_fiber.size() == previous_fiber_size) continue;
@@ -248,7 +247,7 @@ auto compute_constrained_strong_and_useless_arcs(
         std::size_t num_strong, num_useless, num_sinks;
         num_strong = num_useless = num_sinks = 0;
         for(auto && v : melon::vertices(graph)) {
-            if(useless_vertices_map[v]) continue;
+            if(useless_target_vertices_map[v]) continue;
             num_strong += strong_arcs_map[v].size();
             num_useless += useless_arcs_map[v].size();
             ++num_sinks;

@@ -6,6 +6,7 @@
 #include <memory>
 #include <ranges>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -26,12 +27,13 @@ private:
     using vertex_t = melon::vertex_t<graph_t>;
     using arc_t = melon::arc_t<graph_t>;
 
-    using vertex_quality_map_t = std::vector<double>;
+    using source_quality_map_t = std::vector<double>;
+    using target_quality_map_t = std::vector<double>;
     using arc_probability_map_t = std::vector<double>;
 
     using vertex_options_map_t =
         melon::vertex_map_t<graph_t,
-                            std::vector<std::pair<double, gecot::option_t>>>;
+                            std::vector<std::tuple<double, double, gecot::option_t>>>;
     using arc_options_map_t =
         melon::arc_map_t<graph_t,
                          std::vector<std::pair<double, gecot::option_t>>>;
@@ -40,7 +42,8 @@ private:
     std::string _case_name;
     graph_t _graph;
 
-    vertex_quality_map_t _vertex_quality_map;
+    source_quality_map_t _source_quality_map;
+    target_quality_map_t _target_quality_map;
     arc_probability_map_t _arc_probability_map;
 
     std::vector<std::string> _vertex_names;
@@ -55,7 +58,9 @@ public:
     [[nodiscard]] case_id_t id() const noexcept;
     [[nodiscard]] const std::string & name() const noexcept;
     [[nodiscard]] const graph_t & graph() const noexcept;
-    [[nodiscard]] const vertex_quality_map_t & vertex_quality_map()
+    [[nodiscard]] const source_quality_map_t & source_quality_map()
+        const noexcept;
+    [[nodiscard]] const target_quality_map_t & target_quality_map()
         const noexcept;
     [[nodiscard]] const arc_probability_map_t & arc_probability_map()
         const noexcept;
@@ -67,7 +72,8 @@ public:
     [[nodiscard]] InstanceCase(
         case_id_t id, const std::string & case_name,
         fhamonic::melon::static_digraph && graph,
-        vertex_quality_map_t && vertex_quality_map,
+        source_quality_map_t && source_quality_map,
+        target_quality_map_t && target_quality_map,
         arc_probability_map_t && arc_probability_map,
         std::vector<std::string> && vertex_names,
         phmap::node_hash_map<std::string, vertex_t> && vertex_name_to_id_map,

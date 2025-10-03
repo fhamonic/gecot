@@ -62,7 +62,7 @@ colors = {
     "wildlife crossing": (194,165,207),
     "land acquisition": (247,247,247),
 }
-quality_map = {
+source_quality_map = {
     "habitat": 1,
     "field": 0,
     "road": 0,
@@ -149,7 +149,7 @@ offset_for_display = 0.33
 for idx, value in np.ndenumerate(tif_matrix):
     (y, x) = idx
     id = f"{x}:{y}"
-    quality = quality_map[cell_type(value)]
+    quality = source_quality_map[cell_type(value)]
     probability = probability_map[cell_type(value)]
 
     add_vertex(id, quality, x, y)

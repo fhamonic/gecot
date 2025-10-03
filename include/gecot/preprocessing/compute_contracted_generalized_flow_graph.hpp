@@ -19,7 +19,8 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
                                                const auto & useless_arcs,
                                                const auto & original_t) {
     const auto & original_graph = instance_case.graph();
-    const auto & original_quality_map = instance_case.vertex_quality_map();
+    const auto & original_source_quality_map =
+        instance_case.source_quality_map();
     const auto & original_vertex_options_map =
         instance_case.vertex_options_map();
 
@@ -32,14 +33,16 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
     for(const auto & v : melon::vertices(original_graph)) {
         original_to_new_vertex_map[v] = graph.create_vertex();
     }
-    auto quality_map = melon::create_vertex_map<double>(graph);
-    auto vertex_options_map =
+    auto source_quality_map = melon::create_vertex_map<double>(graph);
+    auto source_options_map =
         melon::create_vertex_map<std::vector<std::pair<double, option_t>>>(
             graph);
     for(const auto & v : melon::vertices(original_graph)) {
         auto new_v = original_to_new_vertex_map[v];
-        quality_map[new_v] = original_quality_map[v];
-        vertex_options_map[new_v] = original_vertex_options_map[v];
+        source_quality_map[new_v] = original_source_quality_map[v];
+        for(const auto & [source_quality_gain, tqg, option] :
+            original_vertex_options_map[v])
+            source_options_map[new_v].emplace_back(source_quality_gain, option);
     }
 
     auto original_to_new_arc_map = melon::create_arc_map<
@@ -54,6 +57,9 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
         melon::create_arc_map<bool>(original_graph, false);
     for(const auto & a : useless_arcs) arc_uselessness_map[a] = true;
     for(const auto & a : strong_arcs) arc_uselessness_map[a] = false;
+    // add uselessness of outgoing arcs of t
+    for(const auto & a : melon::out_arcs(original_graph, original_t))
+        arc_uselessness_map[a] = true;
 
     // create new arcs
     for(const auto & a : melon::arcs(original_graph)) {
@@ -73,7 +79,8 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
         }
     }
     auto probability_map = melon::create_arc_map<double>(graph);
-    auto arc_option_map = melon::create_arc_map<std::optional<option_t>>(graph, {});
+    auto arc_option_map =
+        melon::create_arc_map<std::optional<option_t>>(graph, {});
     for(auto && [a, prob, option] : added_arcs) {
         probability_map[a] = prob;
         arc_option_map[a] = option;
@@ -100,16 +107,18 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
             graph.change_arc_target(wu, v);
         }
 
-        quality_map[v] += uv_prob * quality_map[u];
-        for(const auto & [quality_gain, option] : vertex_options_map[u])
-            vertex_options_map[v].emplace_back(uv_prob * quality_gain, option);
+        source_quality_map[v] += uv_prob * source_quality_map[u];
+        for(const auto & [source_quality_gain, option] : source_options_map[u])
+            source_options_map[v].emplace_back(uv_prob * source_quality_gain,
+                                               option);
         graph.remove_vertex(u);
     }
 
     // remove vertices that cannot be traversed by flow
     auto bfs = melon::breadth_first_search(graph);
     for(const auto & v : melon::vertices(graph)) {
-        if(quality_map[v] == 0 && vertex_options_map[v].empty()) continue;
+        if(source_quality_map[v] == 0 && source_options_map[v].empty())
+            continue;
         if(bfs.reached(v)) continue;
         bfs.add_source(v).run();
     }
@@ -128,8 +137,8 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
         arc_no_map[a] = arc_no++;
     }
 
-    return std::make_tuple(graph, quality_map, vertex_options_map, arc_no_map,
-                           probability_map, arc_option_map,
+    return std::make_tuple(graph, source_quality_map, source_options_map,
+                           arc_no_map, probability_map, arc_option_map,
                            original_to_new_vertex_map[original_t]);
 }
 

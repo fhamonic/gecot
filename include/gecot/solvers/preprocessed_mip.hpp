@@ -1,16 +1,11 @@
-#ifndef GECOT_SOLVERS_PREPROCESSED_MIP_HPP
-#define GECOT_SOLVERS_PREPROCESSED_MIP_HPP
+#pragma once
 
 #include <limits>
 #include <stdexcept>
 #include <type_traits>
 
-#include <range/v3/view/filter.hpp>
-#include <range/v3/view/join.hpp>
-
 #include <spdlog/spdlog.h>
 
-#include "mippp/detail/std_ranges_to_range_v3.hpp"
 #include "mippp/solvers/gurobi/all.hpp"
 
 #include "melon/graph.hpp"
@@ -26,7 +21,7 @@ namespace fhamonic {
 namespace gecot {
 namespace solvers {
 
-struct preprocessed_MIP {
+struct preprocessed_mip {
     double feasibility_tol = 0.0;
     bool print_model = false;
     double probability_resolution;
@@ -58,7 +53,7 @@ struct preprocessed_MIP {
             if(!std::holds_alternative<criterion_constant>(f.values[0]) &&
                f.values.size() != 2)
                 throw std::invalid_argument(
-                    "MIP doesn't support products of variables in the "
+                    "mip doesn't support products of variables in the "
                     "criterion "
                     "!");
 
@@ -133,8 +128,8 @@ struct preprocessed_MIP {
         for(auto && instance_case : instance.cases()) {
             const auto case_id = instance_case.id();
             const auto & original_graph = instance_case.graph();
-            const auto & original_quality_map =
-                instance_case.vertex_quality_map();
+            const auto & original_target_quality_map =
+                instance_case.target_quality_map();
             const auto & original_vertex_options_map =
                 instance_case.vertex_options_map();
 
@@ -152,7 +147,7 @@ struct preprocessed_MIP {
                                                  budget);
 
             for(const auto & original_t : melon::vertices(original_graph)) {
-                if(original_quality_map[original_t] == 0 &&
+                if(original_target_quality_map[original_t] == 0 &&
                    instance_case.vertex_options_map()[original_t].empty()) {
                     model.set_variable_upper_bound(Xi_vars(original_t), 0);
                     continue;
@@ -166,14 +161,15 @@ struct preprocessed_MIP {
                     F_prime_additional_terms;
                 // block_first_constraint.emplace_back(model.num_constraints());
 
-                const auto [graph, quality_map, vertex_options_map, arc_no_map,
-                            probability_map, arc_option_map, t] =
+                const auto [graph, source_quality_map, vertex_options_map,
+                            arc_no_map, probability_map, arc_option_map, t] =
                     compute_contracted_generalized_flow_graph(
                         instance_case, strong_arcs_map[original_t],
                         useless_arcs_map[original_t], original_t);
                 using Graph = std::decay_t<decltype(graph)>;
                 const auto big_M_map = compute_big_M_map(
-                    graph, quality_map, vertex_options_map, probability_map,
+                    graph, source_quality_map, vertex_options_map,
+                    probability_map,
                     std::views::filter(
                         melon::vertices(graph),
                         [&graph, &arc_option_map, t](auto && u) {
@@ -185,7 +181,7 @@ struct preprocessed_MIP {
                                        });
                         }));
 
-                for(const auto & [quality_gain, option] :
+                for(const auto & [sqg, target_quality_gain, option] :
                     original_vertex_options_map[original_t]) {
                     const auto F_prime_t_var =
                         model.add_variable(/*"F'_" + std::to_string(original_t) +
@@ -195,7 +191,7 @@ struct preprocessed_MIP {
                     model.add_constraint(F_prime_t_var <=
                                          big_M_map[t] * X_vars(option));
                     F_prime_additional_terms.emplace_back(F_prime_t_var,
-                                                          quality_gain);
+                                                          target_quality_gain);
                 }
                 const auto Phi_t_vars = model.add_variables(
                     graph.num_arcs(),
@@ -220,7 +216,7 @@ struct preprocessed_MIP {
                                          return probability_map[a] *
                                                 Phi_t_vars(a);
                                      }) +
-                                    quality_map[t] +
+                                    source_quality_map[t] +
                                     xsum(vertex_options_map[t],
                                          [&X_vars](auto && p) {
                                              return p.first * X_vars(p.second);
@@ -233,7 +229,7 @@ struct preprocessed_MIP {
                                         return probability_map[a] *
                                                Phi_t_vars(a);
                                     }) +
-                                   quality_map[u] +
+                                   source_quality_map[u] +
                                    xsum(vertex_options_map[u],
                                         [&X_vars](auto && p) {
                                             return p.first * X_vars(p.second);
@@ -241,11 +237,10 @@ struct preprocessed_MIP {
                     });
 
                 model.add_constraints(
-                    ranges::views::filter(
-                        melon::arcs(graph),
-                        [&](auto && a) {
-                            return arc_option_map[a].has_value();
-                        }),
+                    std::views::filter(melon::arcs(graph),
+                                       [&](auto && a) {
+                                           return arc_option_map[a].has_value();
+                                       }),
                     [&](auto && a) {
                         return Phi_t_vars(a) <=
                                X_vars(arc_option_map[a].value()) *
@@ -254,7 +249,7 @@ struct preprocessed_MIP {
 
                 model.add_constraint(
                     Xi_vars(original_t) <=
-                    original_quality_map[original_t] * F_var +
+                    original_target_quality_map[original_t] * F_var +
                         xsum(F_prime_additional_terms, [](const auto & p) {
                             return p.first * p.second;
                         }));
@@ -262,7 +257,7 @@ struct preprocessed_MIP {
             model.add_constraint(C_vars(instance_case.id()) <= Xi_vars);
         }
 
-        spdlog::trace("prep_MIP model has:");
+        spdlog::trace("prep_mip model has:");
         spdlog::trace("  {:>10} variables", model.num_variables());
         spdlog::trace("  {:>10} constraints", model.num_constraints());
         spdlog::trace("  {:>10} entries", model.num_entries());
@@ -270,7 +265,7 @@ struct preprocessed_MIP {
         model.solve();
         const auto model_solution = model.get_solution();
 
-        spdlog::trace("prep_MIP solution found with value: {}",
+        spdlog::trace("prep_mip solution found with value: {}",
                       model.get_solution_value());
         for(const auto & i : instance.options()) {
             solution[i] = model_solution[X_vars(i)];
@@ -283,5 +278,3 @@ struct preprocessed_MIP {
 }  // namespace solvers
 }  // namespace gecot
 }  // namespace fhamonic
-
-#endif  // GECOT_SOLVERS_PREPROCESSED_MIP_HPP

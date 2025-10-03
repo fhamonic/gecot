@@ -70,7 +70,10 @@ static const nlohmann::json instance_schema = R"(
                                                 "id": {
                                                     "type": "string"
                                                 },
-                                                "quality": {
+                                                "source_quality": {
+                                                    "type": "string"
+                                                },
+                                                "target_quality": {
                                                     "type": "string"
                                                 }
                                             },
@@ -90,7 +93,11 @@ static const nlohmann::json instance_schema = R"(
                                             "id": {
                                                 "type": "string"
                                             },
-                                            "quality": {
+                                            "source_quality": {
+                                                "type": "number",
+                                                "minimum": 0
+                                            },
+                                            "target_quality": {
                                                 "type": "number",
                                                 "minimum": 0
                                             }
@@ -172,7 +179,10 @@ static const nlohmann::json instance_schema = R"(
                                                 "option_id": {
                                                     "type": "string"
                                                 },
-                                                "quality_gain": {
+                                                "source_quality_gain": {
+                                                    "type": "string"
+                                                },
+                                                "target_quality_gain": {
                                                     "type": "string"
                                                 }
                                             },
@@ -195,7 +205,11 @@ static const nlohmann::json instance_schema = R"(
                                             "option_id": {
                                                 "type": "string"
                                             },
-                                            "quality_gain": {
+                                            "source_quality_gain": {
+                                                "type": "number",
+                                                "minimum": 0
+                                            },
+                                            "target_quality_gain": {
                                                 "type": "number",
                                                 "minimum": 0
                                             }
@@ -372,17 +386,14 @@ void parse_options(Instance & instance, const nlohmann::json & json_object,
         std::filesystem::path options_csv_path = json_object["csv_file"];
         if(options_csv_path.is_relative())
             options_csv_path = (parent_path / options_csv_path);
-        io::CSVReader<2> options_csv(options_csv_path.string());
         std::string id_column = "id";
         std::string cost_column = "cost";
         parse_columns_aliases(json_object, {id_column, cost_column});
-        options_csv.read_header(io::ignore_extra_column, id_column,
-                                cost_column);
 
-        std::string option_id;
-        double option_cost;
-        while(options_csv.read_row(option_id, option_cost)) {
-            add_option(option_id, option_cost);
+        csv::CSVReader reader(options_csv_path.string());
+        for(auto & row : reader) {
+            add_option(row[id_column].get<std::string>(),
+                       row[cost_column].get<double>());
         }
     } else {
         for(auto && option : json_object) {
@@ -396,14 +407,16 @@ void parse_vertices_options(InstanceCase & instance_case,
                             const std::filesystem::path & parent_path,
                             const Instance & instance) {
     auto vertex_options = melon::create_vertex_map<
-        std::vector<std::pair<double, gecot::option_t>>>(instance_case.graph(),
-                                                         {});
+        std::vector<std::tuple<double, double, gecot::option_t>>>(
+        instance_case.graph(), {});
 
     auto add_vertex_option = [&](const std::string & option_id,
                                  const std::string & vertex_id,
-                                 const double quality_gain) {
+                                 const double source_quality_gain,
+                                 const double target_quality_gain) {
         vertex_options[instance_case.vertex_from_name(vertex_id)].emplace_back(
-            quality_gain, instance.option_from_name(option_id));
+            source_quality_gain, target_quality_gain,
+            instance.option_from_name(option_id));
     };
 
     if(json_object.contains("vertices_improvements")) {
@@ -414,25 +427,24 @@ void parse_vertices_options(InstanceCase & instance_case,
             if(vertex_options_csv_path.is_relative())
                 vertex_options_csv_path =
                     (parent_path / vertex_options_csv_path);
-            io::CSVReader<3> vertex_options_csv(
-                vertex_options_csv_path.string());
             std::string option_id_column = "option_id";
             std::string vertex_id_column = "vertex_id";
-            std::string quality_gain_column = "quality_gain";
+            std::string source_quality_gain_column = "source_quality_gain";
+            std::string target_quality_gain_column = "target_quality_gain";
             parse_columns_aliases(
                 vertex_options_json,
-                {option_id_column, vertex_id_column, quality_gain_column});
-            vertex_options_csv.read_header(io::ignore_extra_column,
-                                           option_id_column, vertex_id_column,
-                                           quality_gain_column);
+                {option_id_column, vertex_id_column, source_quality_gain_column,
+                 target_quality_gain_column});
 
+            csv::CSVReader reader(vertex_options_csv_path.string());
             std::size_t line_no = 2;
             try {
-                std::string option_id, vertex_id;
-                double quality_gain;
-                while(vertex_options_csv.read_row(option_id, vertex_id,
-                                                  quality_gain)) {
-                    add_vertex_option(option_id, vertex_id, quality_gain);
+                for(auto & row : reader) {
+                    add_vertex_option(
+                        row[option_id_column].get<std::string>(),
+                        row[vertex_id_column].get<std::string>(),
+                        row[source_quality_gain_column].get<double>(),
+                        row[target_quality_gain_column].get<double>());
                     ++line_no;
                 }
             } catch(const std::invalid_argument & e) {
@@ -444,7 +456,8 @@ void parse_vertices_options(InstanceCase & instance_case,
             for(auto && vertex_option : vertex_options_json) {
                 add_vertex_option(vertex_option["option_id"],
                                   vertex_option["vertex_id"],
-                                  vertex_option["quality_gain"]);
+                                  vertex_option["source_quality_gain"],
+                                  vertex_option["target_quality_gain"]);
             }
         }
     }
@@ -461,9 +474,9 @@ void parse_arcs_options(InstanceCase & instance_case,
 
     auto add_arc_option = [&](const std::string & option_id,
                               const std::string & arc_id,
-                              const double quality_gain) {
+                              const double improved_probability) {
         arc_options[instance_case.arc_from_name(arc_id)].emplace_back(
-            quality_gain, instance.option_from_name(option_id));
+            improved_probability, instance.option_from_name(option_id));
     };
 
     if(json_object.contains("arcs_improvements")) {
@@ -473,24 +486,21 @@ void parse_arcs_options(InstanceCase & instance_case,
                 arc_options_json["csv_file"];
             if(arc_options_csv_path.is_relative())
                 arc_options_csv_path = (parent_path / arc_options_csv_path);
-            io::CSVReader<3> arc_options_csv(arc_options_csv_path.string());
             std::string option_id_column = "option_id";
             std::string arc_id_column = "arc_id";
             std::string improved_probability_column = "improved_probability";
             parse_columns_aliases(
                 arc_options_json,
                 {option_id_column, arc_id_column, improved_probability_column});
-            arc_options_csv.read_header(io::ignore_extra_column,
-                                        option_id_column, arc_id_column,
-                                        improved_probability_column);
 
+            csv::CSVReader reader(arc_options_csv_path.string());
             std::size_t line_no = 2;
             try {
-                std::string option_id, arc_id;
-                double improved_probability;
-                while(arc_options_csv.read_row(option_id, arc_id,
-                                               improved_probability)) {
-                    add_arc_option(option_id, arc_id, improved_probability);
+                for(auto & row : reader) {
+                    add_arc_option(
+                        row[option_id_column].get<std::string>(),
+                        row[arc_id_column].get<std::string>(),
+                        row[improved_probability_column].get<double>());
                     ++line_no;
                 }
             } catch(const std::invalid_argument & e) {
@@ -512,7 +522,8 @@ InstanceCase & parse_instance_case(const nlohmann::json & json_object,
                                    std::string case_name,
                                    const std::filesystem::path & parent_path,
                                    Instance & instance) {
-    std::vector<double> vertex_quality_map;
+    std::vector<double> source_quality_map;
+    std::vector<double> target_quality_map;
     std::vector<std::string> vertex_names;
     phmap::node_hash_map<std::string, melon::vertex_t<melon::static_digraph>>
         vertex_name_to_id_map;
@@ -521,8 +532,10 @@ InstanceCase & parse_instance_case(const nlohmann::json & json_object,
 
     auto vertices_json = json_object["vertices"];
 
-    auto add_vertex = [&](const std::string & id, double quality) {
-        vertex_quality_map.emplace_back(quality);
+    auto add_vertex = [&](const std::string & id, double source_quality,
+                          double target_quality) {
+        source_quality_map.emplace_back(source_quality);
+        target_quality_map.emplace_back(target_quality);
         vertex_names.emplace_back(id);
         vertex_name_to_id_map[id] =
             static_cast<melon::vertex_t<melon::static_digraph>>(
@@ -533,26 +546,35 @@ InstanceCase & parse_instance_case(const nlohmann::json & json_object,
         std::filesystem::path vertices_csv_path = vertices_json["csv_file"];
         if(vertices_csv_path.is_relative())
             vertices_csv_path = (parent_path / vertices_csv_path);
-        io::CSVReader<2> vertices_csv(vertices_csv_path.string());
         std::string id_column = "id";
-        std::string quality_column = "quality";
-        parse_columns_aliases(vertices_json, {id_column, quality_column});
-        vertices_csv.read_header(io::ignore_extra_column, id_column,
-                                 quality_column);
+        std::string source_quality_column = "source_quality";
+        std::string target_quality_column = "target_quality";
+        parse_columns_aliases(vertices_json, {id_column, source_quality_column,
+                                              target_quality_column});
 
-        std::string vertex_id;
-        double vertex_quality;
-        while(vertices_csv.read_row(vertex_id, vertex_quality)) {
-            add_vertex(vertex_id, vertex_quality);
+        csv::CSVReader reader(vertices_csv_path.string());
+        std::size_t line_no = 2;
+        try {
+            for(auto & row : reader) {
+                add_vertex(row[id_column].get<std::string>(),
+                           row[source_quality_column].get<double>(),
+                           row[target_quality_column].get<double>());
+                ++line_no;
+            }
+        } catch(const std::runtime_error & e) {
+            throw std::invalid_argument(vertices_csv_path.filename().string() +
+                                        " line " + std::to_string(line_no) +
+                                        ": " + e.what());
         }
     } else {
         for(auto && vertex : vertices_json) {
-            add_vertex(vertex["id"], vertex["quality"]);
+            add_vertex(vertex["id"], vertex["source_quality"],
+                       vertex["target_quality"]);
         }
     }
 
     melon::static_digraph_builder<melon::static_digraph, double, std::string>
-        builder(vertex_quality_map.size());
+        builder(source_quality_map.size());
 
     auto add_arc = [&](const std::string & id, const std::string & from,
                        const std::string & to, double probability) {
@@ -568,20 +590,27 @@ InstanceCase & parse_instance_case(const nlohmann::json & json_object,
         std::filesystem::path arcs_csv_path = arcs_json["csv_file"];
         if(arcs_csv_path.is_relative())
             arcs_csv_path = (parent_path / arcs_csv_path);
-        io::CSVReader<4> arcs_csv(arcs_csv_path.string());
         std::string id_column = "id";
         std::string from_column = "from";
         std::string to_column = "to";
         std::string probability_column = "probability";
         parse_columns_aliases(
             arcs_json, {id_column, from_column, to_column, probability_column});
-        arcs_csv.read_header(io::ignore_extra_column, id_column, from_column,
-                             to_column, probability_column);
 
-        std::string arc_id, from, to;
-        double arc_probability;
-        while(arcs_csv.read_row(arc_id, from, to, arc_probability)) {
-            add_arc(arc_id, from, to, arc_probability);
+        csv::CSVReader reader(arcs_csv_path.string());
+        std::size_t line_no = 2;
+        try {
+            for(auto & row : reader) {
+                add_arc(row[id_column].get<std::string>(),
+                        row[from_column].get<std::string>(),
+                        row[to_column].get<std::string>(),
+                        row[probability_column].get<double>());
+                ++line_no;
+            }
+        } catch(const std::runtime_error & e) {
+            throw std::invalid_argument(arcs_csv_path.filename().string() +
+                                        " line " + std::to_string(line_no) +
+                                        ": " + e.what());
         }
     } else {
         for(auto && arc : arcs_json) {
@@ -596,10 +625,10 @@ InstanceCase & parse_instance_case(const nlohmann::json & json_object,
     }
 
     return instance.emplace_case(
-        std::move(case_name), std::move(graph), std::move(vertex_quality_map),
-        std::move(arc_probability_map), std::move(vertex_names),
-        std::move(vertex_name_to_id_map), std::move(arc_names),
-        std::move(arc_name_to_id_map));
+        std::move(case_name), std::move(graph), std::move(source_quality_map),
+        std::move(target_quality_map), std::move(arc_probability_map),
+        std::move(vertex_names), std::move(vertex_name_to_id_map),
+        std::move(arc_names), std::move(arc_name_to_id_map));
 }
 
 criterion_formula parse_formula(Instance & instance,

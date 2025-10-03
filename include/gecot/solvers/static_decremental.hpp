@@ -37,8 +37,12 @@ struct StaticDecremental {
 
         auto options_cases_pc_num = instance.create_option_map(
             instance.template create_case_map<double>());
-        auto cases_current_qm =
-            instance.template create_case_map<instance_quality_map_t<I>>();
+        auto cases_current_sqm =
+            instance
+                .template create_case_map<instance_source_quality_map_t<I>>();
+        auto cases_current_tqm =
+            instance
+                .template create_case_map<instance_target_quality_map_t<I>>();
         auto cases_current_pm =
             instance.template create_case_map<instance_probability_map_t<I>>();
         const auto cases_vertex_options =
@@ -46,16 +50,21 @@ struct StaticDecremental {
         const auto cases_arc_options = compute_cases_arc_options(instance);
 
         for(const auto & instance_case : cases) {
-            auto & current_qm = (cases_current_qm[instance_case.id()] =
-                                     instance_case.vertex_quality_map());
+            auto & current_sqm = (cases_current_sqm[instance_case.id()] =
+                                      instance_case.source_quality_map());
+            auto & current_tqm = (cases_current_tqm[instance_case.id()] =
+                                      instance_case.target_quality_map());
             auto & current_pm = (cases_current_pm[instance_case.id()] =
                                      instance_case.arc_probability_map());
             const auto & vertex_options =
                 cases_vertex_options[instance_case.id()];
             const auto & arc_options = cases_arc_options[instance_case.id()];
             for(auto && option : options) {
-                for(auto && [u, quality_gain] : vertex_options[option])
-                    current_qm[u] += quality_gain;
+                for(auto && [u, source_quality_gain, target_quality_gain] :
+                    vertex_options[option]) {
+                    current_sqm[u] += source_quality_gain;
+                    current_tqm[u] += target_quality_gain;
+                }
                 for(auto && [a, enhanced_prob] : arc_options[option])
                     current_pm[a] = std::max(current_pm[a], enhanced_prob);
             }
@@ -67,11 +76,12 @@ struct StaticDecremental {
         spdlog::trace(
             "--------------------------------------------------------");
 
-        const double max_score =
-            compute_score(instance, cases_current_qm, cases_current_pm);
+        const double max_score = compute_score(
+            instance, cases_current_sqm, cases_current_tqm, cases_current_pm);
         compute_options_cases_decr_pc_num(
-            instance, solution, options, cases_current_qm, cases_current_pm,
-            cases_vertex_options, cases_arc_options, options_cases_pc_num);
+            instance, solution, options, cases_current_sqm, cases_current_tqm,
+            cases_current_pm, cases_vertex_options, cases_arc_options,
+            options_cases_pc_num);
 
         auto options_ratios = instance.create_option_map(0.0);
         for(auto && option : options) {
@@ -112,8 +122,10 @@ struct StaticDecremental {
                 "--------------------------------------------------------");
 
             for(auto instance_case : cases) {
-                auto & current_qm = (cases_current_qm[instance_case.id()] =
-                                         instance_case.vertex_quality_map());
+                auto & current_sqm = (cases_current_sqm[instance_case.id()] =
+                                          instance_case.source_quality_map());
+                auto & current_tqm = (cases_current_tqm[instance_case.id()] =
+                                          instance_case.target_quality_map());
                 auto & current_pm = (cases_current_pm[instance_case.id()] =
                                          instance_case.arc_probability_map());
                 auto && vertex_options =
@@ -121,17 +133,22 @@ struct StaticDecremental {
                 auto && arc_options = cases_arc_options[instance_case.id()];
                 for(auto && option : options) {
                     if(!solution[option]) continue;
-                    for(auto && [u, quality_gain] : vertex_options[option])
-                        current_qm[u] += quality_gain;
+                    for(auto && [u, source_quality_gain, target_quality_gain] :
+                        vertex_options[option]) {
+                        current_sqm[u] += source_quality_gain;
+                        current_tqm[u] += target_quality_gain;
+                    }
                     for(auto && [a, enhanced_prob] : arc_options[option])
                         current_pm[a] = std::max(current_pm[a], enhanced_prob);
                 }
             }
             const double decremental_score =
-                compute_score(instance, cases_current_qm, cases_current_pm);
+                compute_score(instance, cases_current_sqm, cases_current_tqm,
+                              cases_current_pm);
             compute_options_cases_incr_pc_num(
-                instance, free_options, cases_current_qm, cases_current_pm,
-                cases_vertex_options, cases_arc_options, options_cases_pc_num);
+                instance, free_options, cases_current_sqm, cases_current_tqm,
+                cases_current_pm, cases_vertex_options, cases_arc_options,
+                options_cases_pc_num);
 
             for(const option_t & option : free_options) {
                 options_ratios[option] =

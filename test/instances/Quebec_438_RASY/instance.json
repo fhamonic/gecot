@@ -5,7 +5,12 @@
     "cases": {
         "squirrel": {
             "vertices": {
-                "csv_file": "vertices.csv"
+                "csv_file": "vertices.csv",
+                "csv_columns": {
+                    "id": "id",
+                    "source_quality" : "quality",
+                    "target_quality" : "quality2"
+                }
             },
             "arcs": {
                 "csv_file": "arcs.csv"
@@ -15,7 +20,8 @@
                 "csv_columns": {
                     "vertex_id": "vertex_id",
                     "option_id": "option_id",
-                    "quality_gain" : "protected_area"
+                    "source_quality_gain" : "protected_area",
+                    "target_quality_gain" : "protected_area"
                 }
             },
             "arcs_improvements": {

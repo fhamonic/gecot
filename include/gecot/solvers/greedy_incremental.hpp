@@ -33,13 +33,19 @@ struct GreedyIncremental {
 
         auto options_cases_pc_num = instance.create_option_map(
             instance.template create_case_map<double>());
-        auto cases_current_qm =
-            instance.template create_case_map<instance_quality_map_t<I>>();
+        auto cases_current_sqm =
+            instance
+                .template create_case_map<instance_source_quality_map_t<I>>();
+        auto cases_current_tqm =
+            instance
+                .template create_case_map<instance_target_quality_map_t<I>>();
         auto cases_current_pm =
             instance.template create_case_map<instance_probability_map_t<I>>();
         for(const auto & instance_case : cases) {
-            cases_current_qm[instance_case.id()] =
-                instance_case.vertex_quality_map();
+            cases_current_sqm[instance_case.id()] =
+                instance_case.source_quality_map();
+            cases_current_tqm[instance_case.id()] =
+                instance_case.target_quality_map();
             cases_current_pm[instance_case.id()] =
                 instance_case.arc_probability_map();
         }
@@ -56,8 +62,9 @@ struct GreedyIncremental {
         double budget_left = budget;
         while(options.size() > 0) {
             compute_options_cases_incr_pc_num(
-                instance, options, cases_current_qm, cases_current_pm,
-                cases_vertex_options, cases_arc_options, options_cases_pc_num);
+                instance, options, cases_current_sqm, cases_current_tqm,
+                cases_current_pm, cases_vertex_options, cases_arc_options,
+                options_cases_pc_num);
             for(const option_t & option : options) {
                 options_ratios[option] =
                     (instance.eval_criterion(options_cases_pc_num[option]) -
@@ -74,11 +81,14 @@ struct GreedyIncremental {
             budget_left -= best_option_price;
             solution[best_option] = true;
             for(const auto & instance_case : cases) {
-                auto & current_qm = cases_current_qm[instance_case.id()];
+                auto & current_sqm = cases_current_sqm[instance_case.id()];
+                auto & current_tqm = cases_current_tqm[instance_case.id()];
                 auto & current_pm = cases_current_pm[instance_case.id()];
-                for(auto && [u, quality_gain] :
-                    cases_vertex_options[instance_case.id()][best_option])
-                    current_qm[u] += quality_gain;
+                for(auto && [u, source_quality_gain, target_quality_gain] :
+                    cases_vertex_options[instance_case.id()][best_option]) {
+                    current_sqm[u] += source_quality_gain;
+                    current_tqm[u] += target_quality_gain;
+                }
                 for(auto && [a, enhanced_prob] :
                     cases_arc_options[instance_case.id()][best_option])
                     current_pm[a] = std::max(current_pm[a], enhanced_prob);

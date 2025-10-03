@@ -1,22 +1,21 @@
-#ifndef GECOT_BENDERS_MIP_INTERFACE_HPP
-#define GECOT_BENDERS_MIP_INTERFACE_HPP
+#pragma once
 
 #include <sstream>
 
 #include <boost/program_options.hpp>
 
-#include "gecot/solvers/benders_mip.hpp"
+#include "gecot/solvers/naive_benders.hpp"
 
 #include "solver_interfaces/abstract_mip_interface.hpp"
 
 namespace fhamonic {
 
-class BendersMIPInterface : public AbstractMIPInterface {
+class NaiveBendersInterface : public AbstractMipInterface {
 private:
-    gecot::solvers::benders_MIP solver;
+    gecot::solvers::naive_benders solver;
 
 public:
-    BendersMIPInterface() : AbstractMIPInterface(name()) {
+    NaiveBendersInterface() : AbstractMipInterface(name()) {
         desc.add_options()(
             "resolution",
             po::value<double>(&solver.probability_resolution)
@@ -38,15 +37,11 @@ public:
         return solver.solve(instance, B);
     };
 
-    std::string name() const { return "benders_mip"; }
+    std::string name() const { return "naive_benders"; }
     std::string description() const {
-        return "MIP formulation with preprocessing, from 'Optimizing the "
-               "ecological connectivity of landscapes', F.\u00A0Hamonic, "
-               "C.\u00A0H.\u00A0Albert, B.\u00A0Couëtoux, Y.\u00A0Vaxès";
+        return "Benders decomposition accross each landscape graph";
     }
     std::string string() const { return name(); }
 };
 
 }  // namespace fhamonic
-
-#endif  // GECOT_BENDERS_MIP_INTERFACE_HPP

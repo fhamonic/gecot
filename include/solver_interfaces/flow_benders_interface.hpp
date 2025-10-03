@@ -4,18 +4,18 @@
 
 #include <boost/program_options.hpp>
 
-#include "gecot/solvers/preprocessed_mip.hpp"
+#include "gecot/solvers/flow_benders.hpp"
 
 #include "solver_interfaces/abstract_mip_interface.hpp"
 
 namespace fhamonic {
 
-class PreprocessedmipInterface : public AbstractMipInterface {
+class FlowBendersInterface : public AbstractMipInterface {
 private:
-    gecot::solvers::preprocessed_mip solver;
+    gecot::solvers::flow_benders solver;
 
 public:
-    PreprocessedmipInterface() : AbstractMipInterface(name()) {
+    FlowBendersInterface() : AbstractMipInterface(name()) {
         desc.add_options()(
             "resolution",
             po::value<double>(&solver.probability_resolution)
@@ -37,11 +37,11 @@ public:
         return solver.solve(instance, B);
     };
 
-    std::string name() const { return "prep_mip"; }
+    std::string name() const { return "flow_benders"; }
     std::string description() const {
-        return "mip formulation with preprocessing, from 'Optimizing the "
-               "ecological connectivity of landscapes', F.\u00A0Hamonic, "
-               "C.\u00A0H.\u00A0Albert, B.\u00A0Couëtoux, Y.\u00A0Vaxès";
+        return "Benders decomposition accross each generalized flow with non "
+               "linearity of vertex improvements handled by the master "
+               "problem";
     }
     std::string string() const { return name(); }
 };

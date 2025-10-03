@@ -1,5 +1,4 @@
-#ifndef GECOT_ABSTRACT_MIP_INTERFACE_HPP
-#define GECOT_ABSTRACT_MIP_INTERFACE_HPP
+#pragma once
 
 #include <sstream>
 
@@ -9,19 +8,18 @@
 
 namespace fhamonic {
 
-class AbstractMIPInterface : public AbstractSolverInterface {
+class AbstractMipInterface : public AbstractSolverInterface {
 protected:
     boost::program_options::options_description desc;
     double feasibility_tolerance;
 
 public:
-    AbstractMIPInterface(const std::string & name)
-        : desc(name + " options") {
+    AbstractMipInterface(const std::string & name) : desc(name + " options") {
         desc.add_options()(
             "feasibility-tolerance,t",
             po::value<double>(&feasibility_tolerance)->default_value(1e-7),
             "Tolearnce for rounding errors")("print-model,m",
-                                             "Print the MIP model");
+                                             "Print the mip model");
     }
 
     void parse(const std::vector<std::string> & args) {
@@ -53,5 +51,3 @@ public:
 };
 
 }  // namespace fhamonic
-
-#endif  // GECOT_ABSTRACT_MIP_INTERFACE_HPP

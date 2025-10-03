@@ -14,9 +14,13 @@ using namespace fhamonic;
     const noexcept {
     return _graph;
 }
-[[nodiscard]] const InstanceCase::vertex_quality_map_t &
-InstanceCase::vertex_quality_map() const noexcept {
-    return _vertex_quality_map;
+[[nodiscard]] const InstanceCase::source_quality_map_t &
+InstanceCase::source_quality_map() const noexcept {
+    return _source_quality_map;
+}
+[[nodiscard]] const InstanceCase::target_quality_map_t &
+InstanceCase::target_quality_map() const noexcept {
+    return _target_quality_map;
 }
 [[nodiscard]] const InstanceCase::arc_probability_map_t &
 InstanceCase::arc_probability_map() const noexcept {
@@ -34,7 +38,8 @@ InstanceCase::arc_options_map() const noexcept {
 [[nodiscard]] InstanceCase::InstanceCase(
     case_id_t id, const std::string & case_name,
     fhamonic::melon::static_digraph && graph,
-    std::vector<double> && vertex_quality_map,
+    std::vector<double> && source_quality_map,
+    std::vector<double> && target_quality_map,
     std::vector<double> && arc_probability_map,
     std::vector<std::string> && vertex_names,
     phmap::node_hash_map<std::string, vertex_t> && vertex_name_to_id_map,
@@ -43,7 +48,8 @@ InstanceCase::arc_options_map() const noexcept {
     : _case_id(id)
     , _case_name(std::move(case_name))
     , _graph(std::move(graph))
-    , _vertex_quality_map(std::move(vertex_quality_map))
+    , _source_quality_map(std::move(source_quality_map))
+    , _target_quality_map(std::move(target_quality_map))
     , _arc_probability_map(std::move(arc_probability_map))
     , _vertex_names(std::move(vertex_names))
     , _vertex_name_to_id_map(std::move(vertex_name_to_id_map))

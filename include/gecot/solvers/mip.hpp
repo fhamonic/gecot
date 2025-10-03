@@ -1,12 +1,10 @@
-#ifndef GECOT_SOLVERS_MIP_HPP
-#define GECOT_SOLVERS_MIP_HPP
+#pragma once
 
 #include <limits>
 #include <stdexcept>
 
 #include <spdlog/spdlog.h>
 
-#include "mippp/detail/std_ranges_to_range_v3.hpp"
 #include "mippp/solvers/gurobi/all.hpp"
 
 #include "melon/graph.hpp"
@@ -20,7 +18,7 @@ namespace fhamonic {
 namespace gecot {
 namespace solvers {
 
-struct MIP {
+struct mip {
     double feasibility_tol = 0.0;
     bool print_model = false;
 
@@ -50,7 +48,7 @@ struct MIP {
             if(!std::holds_alternative<criterion_constant>(f.values[0]) &&
                f.values.size() != 2)
                 throw std::invalid_argument(
-                    "MIP doesn't support products of variables in the "
+                    "mip doesn't support products of variables in the "
                     "criterion "
                     "!");
 
@@ -102,12 +100,19 @@ struct MIP {
 
         for(auto && instance_case : instance.cases()) {
             const auto case_id = instance_case.id();
-            const auto [graph, quality_map, vertex_options_map, probability_map,
-                        arc_option_map] =
+            const auto [graph, source_quality_map, target_quality_map,
+                        vertex_options_map, probability_map, arc_option_map] =
                 compute_generalized_flow_graph(instance_case);
-            const auto big_M_map =
-                compute_big_M_map(graph, quality_map, vertex_options_map,
-                                  probability_map, melon::vertices(graph));
+            const auto big_M_map = compute_big_M_map(
+                graph, source_quality_map,
+                melon::views::map([&vertex_options_map](auto && u) {
+                    return std::views::transform(
+                        vertex_options_map[u], [](auto && e) {
+                            auto && [source_quality_gain, tqg, option] = e;
+                            return std::make_pair(source_quality_gain, option);
+                        });
+                }),
+                probability_map, melon::vertices(graph));
 
             const auto F_vars = model.add_variables(
                 graph.num_vertices(),
@@ -121,7 +126,7 @@ struct MIP {
                 F_prime_additional_terms;
 
             for(const auto & t : melon::vertices(graph)) {
-                for(const auto & [quality_gain, option] :
+                for(const auto & [sqm, target_quality_gain, option] :
                     vertex_options_map[t]) {
                     const auto F_prime_t_var =
                         model.add_variable(/*"F'_" + std::to_string(t) + "_" +
@@ -131,7 +136,7 @@ struct MIP {
                     model.add_constraint(F_prime_t_var <=
                                          big_M_map[t] * X_vars(option));
                     F_prime_additional_terms.emplace_back(F_prime_t_var,
-                                                          quality_gain);
+                                                          target_quality_gain);
                 }
                 const auto Phi_t_vars = model.add_variables(
                     graph.num_arcs(),
@@ -153,9 +158,10 @@ struct MIP {
                              [&](auto && a) {
                                  return probability_map[a] * Phi_t_vars(a);
                              }) +
-                            quality_map[u] +
-                            xsum(vertex_options_map[u], [&X_vars](auto && p) {
-                                return p.first * X_vars(p.second);
+                            source_quality_map[u] +
+                            xsum(vertex_options_map[u], [&X_vars](auto && e) {
+                                auto && [source_quality_gain, tqg, option] = e;
+                                return source_quality_gain * X_vars(option);
                             }));
                 }
                 model.add_constraint(
@@ -164,9 +170,10 @@ struct MIP {
                          [&](auto && a) {
                              return probability_map[a] * Phi_t_vars(a);
                          }) +
-                        quality_map[t] +
-                        xsum(vertex_options_map[t], [&X_vars](const auto & p) {
-                            return p.first * X_vars(p.second);
+                        source_quality_map[t] +
+                        xsum(vertex_options_map[t], [&X_vars](auto && e) {
+                            auto && [source_quality_gain, tqg, option] = e;
+                            return source_quality_gain * X_vars(option);
                         }));
 
                 for(const auto & a : melon::arcs(graph)) {
@@ -180,13 +187,13 @@ struct MIP {
             model.add_constraint(
                 C_vars(instance_case.id()) <=
                 xsum(melon::vertices(graph), [&](auto && v) {
-                    return quality_map[v] * F_vars(v);
+                    return target_quality_map[v] * F_vars(v);
                 }) + xsum(F_prime_additional_terms, [](auto && p) {
                     return p.first * p.second;
                 }));
         }
 
-        spdlog::trace("MIP model has:");
+        spdlog::trace("mip model has:");
         spdlog::trace("  {:>10} variables", model.num_variables());
         spdlog::trace("  {:>10} constraints", model.num_constraints());
         spdlog::trace("  {:>10} entries", model.num_entries());
@@ -194,7 +201,7 @@ struct MIP {
         model.solve();
         const auto model_solution = model.get_solution();
 
-        spdlog::trace("MIP solution found with value: {}",
+        spdlog::trace("mip solution found with value: {}",
                       model.get_solution_value());
         for(const auto & i : instance.options()) {
             solution[i] = model_solution[X_vars(i)];
@@ -207,5 +214,3 @@ struct MIP {
 }  // namespace solvers
 }  // namespace gecot
 }  // namespace fhamonic
-
-#endif  // GECOT_SOLVERS_MIP_HPP

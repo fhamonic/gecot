@@ -46,7 +46,10 @@ struct StaticIncremental {
         compute_options_cases_incr_pc_num(
             instance, options,
             melon::views::map([&cases](auto case_id) -> decltype(auto) {
-                return cases[case_id].vertex_quality_map();
+                return cases[case_id].source_quality_map();
+            }),
+            melon::views::map([&cases](auto case_id) -> decltype(auto) {
+                return cases[case_id].target_quality_map();
             }),
             melon::views::map([&cases](auto case_id) -> decltype(auto) {
                 return cases[case_id].arc_probability_map();

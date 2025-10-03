@@ -553,10 +553,18 @@ InstanceCase & parse_instance_case(const nlohmann::json & json_object,
                                               target_quality_column});
 
         csv::CSVReader reader(vertices_csv_path.string());
-        for(auto & row : reader) {
-            add_vertex(row[id_column].get<std::string>(),
-                       row[source_quality_column].get<double>(),
-                       row[target_quality_column].get<double>());
+        std::size_t line_no = 2;
+        try {
+            for(auto & row : reader) {
+                add_vertex(row[id_column].get<std::string>(),
+                           row[source_quality_column].get<double>(),
+                           row[target_quality_column].get<double>());
+                ++line_no;
+            }
+        } catch(const std::runtime_error & e) {
+            throw std::invalid_argument(vertices_csv_path.filename().string() +
+                                        " line " + std::to_string(line_no) +
+                                        ": " + e.what());
         }
     } else {
         for(auto && vertex : vertices_json) {
@@ -590,11 +598,19 @@ InstanceCase & parse_instance_case(const nlohmann::json & json_object,
             arcs_json, {id_column, from_column, to_column, probability_column});
 
         csv::CSVReader reader(arcs_csv_path.string());
-        for(auto & row : reader) {
-            add_arc(row[id_column].get<std::string>(),
-                    row[from_column].get<std::string>(),
-                    row[to_column].get<std::string>(),
-                    row[probability_column].get<double>());
+        std::size_t line_no = 2;
+        try {
+            for(auto & row : reader) {
+                add_arc(row[id_column].get<std::string>(),
+                        row[from_column].get<std::string>(),
+                        row[to_column].get<std::string>(),
+                        row[probability_column].get<double>());
+                ++line_no;
+            }
+        } catch(const std::runtime_error & e) {
+            throw std::invalid_argument(arcs_csv_path.filename().string() +
+                                        " line " + std::to_string(line_no) +
+                                        ": " + e.what());
         }
     } else {
         for(auto && arc : arcs_json) {

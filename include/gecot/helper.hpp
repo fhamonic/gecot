@@ -84,7 +84,7 @@ auto compute_cases_pc_num(const I & instance, const auto & cases_current_sqm,
         [&](const tbb::blocked_range<decltype(cases.begin())> & cases_block) {
             for(auto instance_case : cases_block) {
                 cases_pc_num[instance_case.id()] =
-                    pc_num(instance_case.graph(),
+                    parallel_pc_num(instance_case.graph(),
                            cases_current_sqm[instance_case.id()],
                            cases_current_tqm[instance_case.id()],
                            cases_current_pm[instance_case.id()]);

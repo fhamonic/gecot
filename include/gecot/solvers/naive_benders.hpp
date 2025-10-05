@@ -201,13 +201,16 @@ struct naive_benders : public benders_base {
                                                X_vars(option) * cai;
                                     });
                             }) +
-                       xsum(data.source_options_map[data.t], [&](auto && p) {
-                           auto && [source_quality_gain, option] = p;
-                           auto ri = current_solution[option]
-                                         ? 0.0
-                                         : source_quality_gain;
-                           return data.big_M_map[data.t] * X_vars(option) * ri;
-                       });
+                       xsum(data.instance_case.get()
+                                .vertex_options_map()[data.original_t],
+                            [&](auto && p) {
+                                auto && [sqm, target_quality_gain, option] = p;
+                                auto ri = current_solution[option]
+                                              ? 0.0
+                                              : target_quality_gain;
+                                return data.big_M_map[data.t] * X_vars(option) *
+                                       ri;
+                            });
             };
 
         for(auto && instance_case : instance.cases()) {

@@ -8,7 +8,8 @@
                 "csv_file": "stretches.csv",
                 "csv_columns": {
                     "id": "id",
-                    "quality": "length"
+                    "source_quality": "length",
+                    "target_quality": "length"
                 }
             },
             "arcs": {

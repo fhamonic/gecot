@@ -99,10 +99,8 @@ struct naive_benders : public benders_base {
                                  return instance.option_cost(o) * X_vars(o);
                              }) <= budget);
 
-        auto cases_contracted_data =
-            instance.template create_case_map<std::vector<
-                std::pair<model_type::variable,
-                          contracted_graph_data<instance_case_t<I>>>>>();
+        auto cases_contracted_data = instance.template create_case_map<
+            std::vector<contracted_graph_data<instance_case_t<I>>>>();
 
         for(auto && instance_case : instance.cases()) {
             const auto case_id = instance_case.id();
@@ -134,7 +132,6 @@ struct naive_benders : public benders_base {
                         continue;
                     }
                     cases_contracted_data[case_id].emplace_back(
-                        model.add_variable(),
                         compute_contracted_graph_data(
                             instance_case, strong_arcs_map[original_t],
                             useless_arcs_map[original_t], original_t));
@@ -145,7 +142,7 @@ struct naive_benders : public benders_base {
                 std::size_t num_vertices, num_arcs, num_graphs;
                 num_vertices = num_arcs = 0u;
                 num_graphs = cases_contracted_data[instance_case.id()].size();
-                for(const auto & [var, data] :
+                for(const auto & data :
                     cases_contracted_data[instance_case.id()]) {
                     num_vertices += data.graph.num_vertices();
                     num_arcs += data.graph.num_arcs();
@@ -162,9 +159,6 @@ struct naive_benders : public benders_base {
                         prep_sw.elapsed())
                         .count());
             }
-            model.add_constraint(
-                C_vars(case_id) <=
-                xsum(std::views::keys(cases_contracted_data[case_id])));
         }
 
         auto get_cut_expression =
@@ -214,12 +208,14 @@ struct naive_benders : public benders_base {
             };
 
         for(auto && instance_case : instance.cases()) {
-            for(auto && [var, data] :
-                cases_contracted_data[instance_case.id()]) {
-                auto && [opt, rho_values] = _compute_dual_flow(data, solution);
-                model.add_constraint(
-                    var <= get_cut_expression(data, solution, rho_values));
-            }
+            const auto case_id = instance_case.id();
+            model.add_constraint(
+                C_vars(case_id) <=
+                xsum(cases_contracted_data[case_id], [&](auto && data) {
+                    auto && [opt, rho_values] =
+                        _compute_dual_flow(data, solution);
+                    return get_cut_expression(data, solution, rho_values);
+                }));
         }
 
         model.set_candidate_solution_callback(
@@ -229,15 +225,28 @@ struct naive_benders : public benders_base {
                     return master_solution[X_vars(i)] > 0.5;
                 });
                 for(auto && instance_case : instance.cases()) {
-                    for(const auto & [var, data] :
-                        cases_contracted_data[instance_case.id()]) {
-                        auto && [opt, rho_values] =
-                            _compute_dual_flow(data, sol);
-                        if(master_solution[var] - opt <= feasibility_tol * opt)
-                            continue;
-                        handle.add_lazy_constraint(
-                            var <= get_cut_expression(data, sol, rho_values));
-                    }
+                    const auto case_id = instance_case.id();
+                    auto cut_data =
+                        std::ranges::to<std::vector>(std::views::transform(
+                            cases_contracted_data[case_id], [&](auto && data) {
+                                return _compute_dual_flow(data, sol);
+                            }));
+
+                    const double opt = std::ranges::fold_left(
+                        std::views::keys(cut_data), 0.0, std::plus<double>());
+                    if(master_solution[C_vars(case_id)] - opt <=
+                       feasibility_tol * opt)
+                        continue;
+
+                    handle.add_lazy_constraint(
+                        C_vars(case_id) <=
+                        xsum(std::views::zip(cases_contracted_data[case_id],
+                                             std::views::values(cut_data)),
+                             [&](auto && e) {
+                                 auto && [data, rho_values] = e;
+                                 return get_cut_expression(data, sol,
+                                                           rho_values);
+                             }));
                 }
             });
         model.solve();

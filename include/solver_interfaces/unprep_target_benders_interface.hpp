@@ -4,18 +4,18 @@
 
 #include <boost/program_options.hpp>
 
-#include "gecot/solvers/target_benders.hpp"
+#include "gecot/solvers/unprep_target_benders.hpp"
 
 #include "solver_interfaces/abstract_mip_interface.hpp"
 
 namespace fhamonic {
 
-class TargetBendersInterface : public AbstractMipInterface {
+class UnprepTargetBendersInterface : public AbstractMipInterface {
 private:
-    gecot::solvers::target_benders solver;
+    gecot::solvers::unprep_target_benders solver;
 
 public:
-    TargetBendersInterface() : AbstractMipInterface(name()) {
+    UnprepTargetBendersInterface() : AbstractMipInterface(name()) {
         desc.add_options()(
             "resolution",
             po::value<double>(&solver.probability_resolution)
@@ -37,9 +37,9 @@ public:
         return solver.solve(instance, B);
     };
 
-    std::string name() const { return "target_benders"; }
+    std::string name() const { return "unprep_target_benders"; }
     std::string description() const {
-        return "Benders decomposition accross each vertex";
+        return "Benders decomposition accross each vertex without preprocessing (poorer big-M bounds).";
     }
     std::string string() const { return name(); }
 };

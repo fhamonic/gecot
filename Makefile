@@ -1,6 +1,6 @@
 BUILD_DIR = build
-# CONAN_PROFILE = default_c++26
-CONAN_PROFILE = debug_c++26
+CONAN_PROFILE = default_c++26
+# CONAN_PROFILE = debug_c++26
 
 .PHONY: all test clean ${BUILD_DIR}
 

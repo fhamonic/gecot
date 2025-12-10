@@ -167,9 +167,23 @@ struct preprocessed_mip {
                         instance_case, strong_arcs_map[original_t],
                         useless_arcs_map[original_t], original_t);
                 using Graph = std::decay_t<decltype(graph)>;
-                const auto big_M_map = compute_big_M_map(
-                    graph, source_quality_map, vertex_options_map,
-                    probability_map,
+                // const auto big_M_map = compute_big_M_map(
+                //     graph, source_quality_map, vertex_options_map,
+                //     probability_map,
+                //     std::views::filter(
+                //         melon::vertices(graph),
+                //         [&graph, &arc_option_map, t](auto && u) {
+                //             return u == t ||
+                //                    std::ranges::any_of(
+                //                        melon::out_arcs(graph, u),
+                //                        [&arc_option_map](auto && a) {
+                //                            return
+                //                            arc_option_map[a].has_value();
+                //                        });
+                //         }));
+                const auto big_M_map = compute_knapsack_big_M_map(
+                    instance, budget, graph, source_quality_map,
+                    vertex_options_map, probability_map,
                     std::views::filter(
                         melon::vertices(graph),
                         [&graph, &arc_option_map, t](auto && u) {
@@ -188,8 +202,14 @@ struct preprocessed_mip {
                                            "_" + std::to_string(option) + "(" +
                                            std::to_string(case_id) + ")"*/);
                     model.add_constraint(F_prime_t_var <= F_var);
+
+                    //*
                     model.add_constraint(F_prime_t_var <=
                                          big_M_map[t] * X_vars(option));
+                    /*/
+                    model.add_indicator_constraint(X_vars(option), false,
+                                                   F_prime_t_var <= 0);
+                    //*/
                     F_prime_additional_terms.emplace_back(F_prime_t_var,
                                                           target_quality_gain);
                 }
@@ -235,18 +255,59 @@ struct preprocessed_mip {
                                             return p.first * X_vars(p.second);
                                         });
                     });
+                // model.add_constraints(
+                //     std::views::filter(melon::arcs(graph),
+                //                        [&](auto && a) {
+                //                            return
+                //                            arc_option_map[a].has_value();
+                //                        }),
+                //     [&](auto && a) {
+                //         return Phi_t_vars(a) <=
+                //                X_vars(arc_option_map[a].value()) *
+                //                    big_M_map[melon::arc_source(graph, a)];
+                //     });
 
-                model.add_constraints(
-                    std::views::filter(melon::arcs(graph),
-                                       [&](auto && a) {
-                                           return arc_option_map[a].has_value();
-                                       }),
-                    [&](auto && a) {
-                        return Phi_t_vars(a) <=
-                               X_vars(arc_option_map[a].value()) *
-                                   big_M_map[melon::arc_source(graph, a)];
-                    });
+                //*
+                for(auto && a : melon::arcs(graph)) {
+                    if(!arc_option_map[a].has_value()) continue;
+                    model.add_constraint(
+                        Phi_t_vars(a) <=
+                        X_vars(arc_option_map[a].value()) *
+                            big_M_map[melon::arc_source(graph, a)]);
 
+                    for(auto && b :
+                        melon::out_arcs(graph, melon::arc_source(graph, a))) {
+                        if(melon::arc_target(graph, a) ==
+                           melon::arc_target(graph, b))
+                            continue;
+                        if(a == b) continue;
+                        if(probability_map[b] >= probability_map[a]) continue;
+                        model.add_constraint(
+                            Phi_t_vars(b) <=
+                            (1 - X_vars(arc_option_map[a].value())) *
+                                big_M_map[melon::arc_source(graph, a)]);
+                    }
+                }
+                /*/
+                for(auto && a : melon::arcs(graph)) {
+                    if(!arc_option_map[a].has_value()) continue;
+                    model.add_indicator_constraint(
+                        X_vars(arc_option_map[a].value()), false,
+                        Phi_t_vars(a) <= 0);
+
+                    for(auto && b :
+                        melon::out_arcs(graph, melon::arc_source(graph, a))) {
+                        if(melon::arc_target(graph, a) ==
+                           melon::arc_target(graph, b))
+                            continue;
+                        if(a == b) continue;
+                        if(probability_map[b] >= probability_map[a]) continue;
+                        model.add_indicator_constraint(
+                            X_vars(arc_option_map[a].value()), true,
+                            Phi_t_vars(b) <= 0);
+                    }
+                }
+                //*/
                 model.add_constraint(
                     Xi_vars(original_t) <=
                     original_target_quality_map[original_t] * F_var +

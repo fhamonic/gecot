@@ -137,10 +137,11 @@ public:
         , big_M_map(std::move(big_M_map_)) {}
 };
 
-template <case_c C>
+template <instance_c I, case_c C>
 contracted_graph_data<C> compute_contracted_graph_data(
-    const C & instance_case, const auto & strong_arcs,
-    const auto & useless_arcs, const auto & original_t) {
+    const I & instance, const C & instance_case, const double budget,
+    const auto & strong_arcs, const auto & useless_arcs,
+    const auto & original_t) {
     const auto & original_graph = instance_case.graph();
     const auto & original_source_quality_map =
         instance_case.source_quality_map();
@@ -166,20 +167,31 @@ contracted_graph_data<C> compute_contracted_graph_data(
             improved_probability_map[a] =
                 std::max(improved_probability_map[a], improved_prob);
     }
-    auto big_M_map = compute_big_M_map(
-        original_graph, original_source_quality_map, original_source_options_map,
-        improved_probability_map,
+    // auto big_M_map = compute_big_M_map(
+    //     original_graph, original_source_quality_map,
+    //     original_source_options_map, improved_probability_map,
+    //     std::views::filter(melon::vertices(original_graph), [&](auto && u) {
+    //         return u == original_t ||
+    //                std::ranges::any_of(
+    //                    melon::out_arcs(original_graph, u), [&](auto && a) {
+    //                        return original_arc_options_map[a].size() > 0;
+    //                    });
+    //     }));
+    const auto big_M_map = compute_knapsack_big_M_map(
+        instance, budget, original_graph, original_source_quality_map,
+        original_source_options_map, improved_probability_map,
         std::views::filter(melon::vertices(original_graph), [&](auto && u) {
-            return u == original_t || std::ranges::any_of(
-                                 melon::out_arcs(original_graph, u), [&](auto && a) {
-                                     return original_arc_options_map[a].size() > 0;
-                                 });
+            return u == original_t ||
+                   std::ranges::any_of(
+                       melon::out_arcs(original_graph, u), [&](auto && a) {
+                           return original_arc_options_map[a].size() > 0;
+                       });
         }));
 
     auto [sgraph, svertex_maps, sarc_maps] = melon::make_static_digraph(
         original_graph, [](auto && u, auto && v) { return u < v; },
-        std::make_tuple(original_source_quality_map, original_source_options_map,
-                        big_M_map),
+        std::make_tuple(original_source_quality_map,
+                        original_source_options_map, big_M_map),
         std::make_tuple(original_probability_map, original_arc_options_map));
     auto && [ssource_quality_map, ssource_options_map, sbig_M_map] =
         svertex_maps;
@@ -210,7 +222,8 @@ contracted_graph_data<C> compute_contracted_graph_data(
     //     for(auto && [source_quality_gain, tqm, option] :
     //         original_vertex_options_map[v]) {
     //         if(source_quality_gain == 0) continue;
-    //         source_options_map[new_v].emplace_back(source_quality_gain, option);
+    //         source_options_map[new_v].emplace_back(source_quality_gain,
+    //         option);
     //     }
     // }
 
@@ -248,7 +261,8 @@ contracted_graph_data<C> compute_contracted_graph_data(
     // }
     // auto probability_map = melon::create_arc_map<double>(graph);
     // auto arc_options_map =
-    //     melon::create_arc_map<std::vector<std::pair<double, option_t>>>(graph,
+    //     melon::create_arc_map<std::vector<std::pair<double,
+    //     option_t>>>(graph,
     //                                                                     {});
     // for(auto && [a, prob, option] : added_arcs) {
     //     if(!option.has_value()) {
@@ -294,23 +308,27 @@ contracted_graph_data<C> compute_contracted_graph_data(
     //         arc_options_map[uv].front();
     //     if(std::ranges::all_of(in_arcs_tmp,
     //                            [&](auto && wu) {
-    //                                for(const auto & [enhanced_prob, wu_option] :
+    //                                for(const auto & [enhanced_prob,
+    //                                wu_option] :
     //                                    arc_options_map[wu]) {
-    //                                    if(wu_option != uv_option) return false;
+    //                                    if(wu_option != uv_option) return
+    //                                    false;
     //                                }
     //                                return true;
     //                            }) &&
     //        std::ranges::all_of(source_options_map[u], [&](auto && p) {
     //            const auto & [source_quality_gain, option] = p;
     //            return (option == uv_option);
-    //        })) {  // if all elements subjects to contraction are subject to the
+    //        })) {  // if all elements subjects to contraction are subject to
+    //        the
     //               // same option
     //         for(const auto & wu : in_arcs_tmp) {
     //             if(arc_options_map[wu].empty()) {
     //                 arc_options_map[wu].emplace_back(
     //                     probability_map[wu] * uv_enhanced_prob, uv_option);
     //             } else {
-    //                 for(auto & [wu_enhanced_prob, option] : arc_options_map[wu])
+    //                 for(auto & [wu_enhanced_prob, option] :
+    //                 arc_options_map[wu])
     //                     wu_enhanced_prob *= uv_enhanced_prob;
     //             }
     //             probability_map[wu] *= uv_prob;
@@ -356,8 +374,9 @@ contracted_graph_data<C> compute_contracted_graph_data(
     //             std::max(improved_probability_map[a], improved_prob);
     // }
     // auto big_M_map = compute_big_M_map(
-    //     graph, source_quality_map, source_options_map, improved_probability_map,
-    //     std::views::filter(melon::vertices(graph), [&](auto && u) {
+    //     graph, source_quality_map, source_options_map,
+    //     improved_probability_map, std::views::filter(melon::vertices(graph),
+    //     [&](auto && u) {
     //         return u == t || std::ranges::any_of(
     //                              melon::out_arcs(graph, u), [&](auto && a) {
     //                                  return arc_options_map[a].size() > 0;
@@ -376,8 +395,8 @@ contracted_graph_data<C> compute_contracted_graph_data(
     // int order = 0;
     // auto order_map = melon::create_vertex_map<int>(graph);
     // for(const auto & [u, prob] : melon::dijkstra(
-    //         detail::pc_num_dijkstra_traits<decltype(reverse_graph), double>{},
-    //         reverse_graph, probability_map, t)) {
+    //         detail::pc_num_dijkstra_traits<decltype(reverse_graph),
+    //         double>{}, reverse_graph, probability_map, t)) {
     //     order_map[u] = order++;
     // }
     // auto [sgraph, svertex_maps, sarc_maps] = melon::make_static_digraph(

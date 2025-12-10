@@ -133,7 +133,8 @@ struct naive_benders : public benders_base {
                     }
                     cases_contracted_data[case_id].emplace_back(
                         compute_contracted_graph_data(
-                            instance_case, strong_arcs_map[original_t],
+                            instance, instance_case, budget,
+                            strong_arcs_map[original_t],
                             useless_arcs_map[original_t], original_t));
                     pb.tick();
                 }

@@ -128,7 +128,8 @@ struct flow_benders : public benders_base {
                             model.add_column({std::make_pair(
                                 C_constr, -original_t_target_quality)}),
                             compute_contracted_graph_data(
-                                instance_case, strong_arcs_map[original_t],
+                                instance, instance_case, budget,
+                                strong_arcs_map[original_t],
                                 useless_arcs_map[original_t], original_t));
 
                     for(const auto & [sqg, target_quality_gain, option] :

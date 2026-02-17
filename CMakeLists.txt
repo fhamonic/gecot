@@ -56,7 +56,6 @@ find_package(Boost REQUIRED COMPONENTS program_options)
 find_package(fmt REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(Eigen3 REQUIRED)
-# find_package(GDAL REQUIRED)
 
 find_package(melon REQUIRED)
 find_package(mippp REQUIRED)
@@ -103,11 +102,13 @@ target_link_libraries(gecot_optimize PUBLIC phmap)
 # target_link_libraries(gecot_rank_options PUBLIC phmap)
 # target_compile_options(gecot_rank_options PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 
-# add_executable(gecot_hexagonify src/hexagonify.cpp ${WINDRES_ICON_O})
-# target_link_libraries(gecot_hexagonify PUBLIC gecot)
-# target_link_libraries(gecot_hexagonify PUBLIC Boost::headers) # geometry
-# target_link_libraries(gecot_hexagonify PUBLIC GDAL::GDAL)
-# target_compile_options(gecot_hexagonify PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
+
+
+find_package(TIFF REQUIRED)
+add_executable(gecot_hexagonify src/gecot_hexagonify.cpp ${WINDRES_ICON_O})
+target_link_libraries(gecot_hexagonify PUBLIC gecot)
+target_link_libraries(gecot_hexagonify PUBLIC TIFF::TIFF)
+target_compile_options(gecot_hexagonify PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 
 # ################### TESTS ######################
 if(ENABLE_TESTING)

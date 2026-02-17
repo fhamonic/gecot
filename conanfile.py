@@ -57,7 +57,8 @@ class CompressorRecipe(ConanFile):
         self.requires("parallel-hashmap/1.37")
         self.requires("eigen/3.4.0")
         self.requires("spdlog/1.14.0")
-        # self.requires("gdal/[>=3.8.3]")
+
+        self.requires("libtiff/4.7.1")
 
         self.requires("melon/1.0.0-alpha.1")
         self.requires("mippp/0.2")

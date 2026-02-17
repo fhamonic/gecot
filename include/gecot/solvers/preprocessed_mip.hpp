@@ -18,6 +18,7 @@
 #include "gecot/utils/chronometer.hpp"
 
 #include "gecot/solvers/greedy_incremental.hpp"
+#include "gecot/solvers/greedy_decremental.hpp"
 
 namespace fhamonic {
 namespace gecot {
@@ -325,12 +326,19 @@ struct preprocessed_mip {
         spdlog::trace("  {:>10} constraints", model.num_constraints());
         spdlog::trace("  {:>10} entries", model.num_entries());
 
+        // {
+        //     const auto greedy_solution = GreedyIncremental{}.solve(instance, budget);
+        //     model.set_mip_start(
+        //         std::views::transform(instance.options(), [&](auto o) {
+        //             return std::make_pair(X_vars(o), greedy_solution[o]);
+        //         }));
+        // }
         {
-            GreedyIncremental greedy_incr;
-            const auto greedy_solution = greedy_incr.solve(instance, budget);
+            const auto start_solution =
+                GreedyDecremental{}.solve(instance, budget);
             model.set_mip_start(
                 std::views::transform(instance.options(), [&](auto o) {
-                    return std::make_pair(X_vars(o), greedy_solution[o]);
+                    return std::make_pair(X_vars(o), start_solution[o]);
                 }));
         }
 

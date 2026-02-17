@@ -18,6 +18,8 @@
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 
 #include "gecot/solvers/benders_base.hpp"
+#include "gecot/solvers/greedy_incremental.hpp"
+#include "gecot/solvers/greedy_decremental.hpp"
 
 namespace fhamonic {
 namespace gecot {
@@ -228,6 +230,44 @@ struct flow_benders : public benders_base {
                     }
                 }
             });
+
+        {
+            const auto start_solution = GreedyIncremental{}.solve(instance, budget);
+            model.set_mip_start(
+                std::views::transform(instance.options(), [&](auto o) {
+                    return std::make_pair(X_vars(o), start_solution[o]);
+                }));
+
+            for(auto && instance_case : instance.cases()) {
+                for(auto && [var, data] :
+                    cases_contracted_data[instance_case.id()]) {
+                    auto && [opt, rho_values] =
+                        _compute_dual_flow(data, start_solution);
+                    model.add_constraint(
+                        var <=
+                        get_cut_expression(data, start_solution, rho_values));
+                }
+            }
+        }
+
+        {
+            const auto start_solution = GreedyDecremental{}.solve(instance, budget);
+            model.set_mip_start(
+                std::views::transform(instance.options(), [&](auto o) {
+                    return std::make_pair(X_vars(o), start_solution[o]);
+                }));
+
+            for(auto && instance_case : instance.cases()) {
+                for(auto && [var, data] :
+                    cases_contracted_data[instance_case.id()]) {
+                    auto && [opt, rho_values] =
+                        _compute_dual_flow(data, start_solution);
+                    model.add_constraint(
+                        var <=
+                        get_cut_expression(data, start_solution, rho_values));
+                }
+            }
+        }
         model.solve();
         const auto master_solution = model.get_solution();
         for(const auto & i : instance.options())

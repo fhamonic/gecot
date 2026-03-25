@@ -21,6 +21,8 @@
 #include "melon/container/static_digraph.hpp"
 #include "melon/utility/static_digraph_builder.hpp"
 
+using namespace fhamonic::melon;
+
 auto parse_tiff(const std::string & filename) {
     uint32_t width;
     uint32_t height;
@@ -51,8 +53,6 @@ auto parse_tiff(const std::string & filename) {
 
     return std::make_tuple(width, height, data);
 }
-
-using namespace fhamonic::melon;
 
 auto compute_graph(int i, double ratio) {
     auto [width, height, data] = parse_tiff(
@@ -114,24 +114,18 @@ struct dijkstra_traits {
 
 int main() {
     auto landscapes = std::ranges::to<std::vector>(std::views::iota(1, 52));
-    // std::vector<double> matrix_alphas = {200,  400,  800,   1600,
-    //                                      3200, 6400, 12800, 25600};
-    // std::vector<double> habitat_alpha_ratios = {
-    //     1 / 256, 1 / 128, 1 / 64, 1 / 32, 1 / 16, 1 / 8, 1 / 4, 1 / 2, 1,
-    //     2,       4,       8,      16,     32,     64,    128,   256};
 
     const int num_alphas = 32;
     const double growth = 1.25;
     const double begin_matrix_alphas = 400;
-    const double end_matrix_alphas =
-        begin_matrix_alphas * std::pow(growth, num_alphas - 1);
+    const double end_matrix_alphas = 200 * std::pow(growth, num_alphas - 1);
 
-    auto matrix_alphas = std::views::transform(
+    auto matrix_alphas = std::ranges::to<std::vector>(std::views::transform(
         std::views::iota(0, num_alphas),
-        [&](auto i) { return begin_matrix_alphas * std::pow(growth, i); });
-    auto habitat_alpha_ratios =
+        [&](auto i) { return begin_matrix_alphas * std::pow(growth, i); }));
+    auto habitat_alpha_ratios = std::ranges::to<std::vector>(
         std::views::transform(std::views::iota(-num_alphas + 1, num_alphas),
-                              [&](auto i) { return std::pow(growth, i); });
+                              [&](auto i) { return std::pow(growth, i); }));
 
     std::print(std::cerr, "{}\n",
                std::views::transform(matrix_alphas, [](double a) {
@@ -152,6 +146,13 @@ int main() {
                 for(const auto & ratio : landscapes_ratios.cols()) {
                     const auto [graph, habitat_map, length_map] =
                         compute_graph(i, ratio);
+
+                    // int num_habitat_cells = std::ranges::fold_left(
+                    //     std::views::transform(vertices(graph),
+                    //                           [&habitat_map](auto && v) {
+                    //                               return habitat_map[v];
+                    //                           }),
+                    //     0, std::plus<int>{});
 
                     auto algo = dijkstra(dijkstra_traits{}, graph, length_map);
                     auto dists = std::make_unique_for_overwrite<double[]>(
@@ -184,7 +185,8 @@ int main() {
                         eca = (30 * 30) * std::sqrt(eca) / 10000;
 
                         std::lock_guard<std::mutex> guard(print_mutex);
-                        std::print("{},{},{},{},{}\n", i,
+                        std::print("{},{},{},{},{},{}\n", i,
+
                                    std::round(matrix_alpha),
                                    std::round(habitat_alpha), ratio, eca);
                     }
@@ -194,3 +196,54 @@ int main() {
 
     return 0;
 }
+
+// int main() {
+//     // 14,9789,1506,43559,28.925465497599983,762.6384172460022
+//     const double matrix_alpha = 1506;
+//     const double habitat_alpha = 43559;
+
+//     const auto [graph, habitat_map, length_map] =
+//         compute_graph(14, habitat_alpha / matrix_alpha);
+
+//     auto algo = dijkstra(dijkstra_traits{}, graph, length_map);
+
+//     double sum = 0.0;
+//     for(const auto & s : vertices(graph)) {
+//         if(habitat_map[s] == 0) continue;
+//         algo.reset();
+//         algo.add_source(s);
+//         for(const auto & [u, dist] : algo) {
+//             if(!habitat_map[u]) continue;
+//             sum += std::exp(-dist / matrix_alpha);
+//         }
+//     }
+
+//     std::print("ECA = {}\n", std::sqrt(sum) * 0.09);
+
+//     return 0;
+// }
+
+// #include "gecot/indices/pc_num.hpp"
+
+// using namespace fhamonic::gecot;
+
+// int main() {
+//     // 14,9789,1506,43559,28.925465497599983,762.6384172460022
+//     const double matrix_alpha = 1506;
+//     const double habitat_alpha = 43559;
+
+//     const auto [graph, habitat_map, length_map] =
+//         compute_graph(14, habitat_alpha / matrix_alpha);
+
+//     auto prob_map = length_map;
+//     for(auto && a : arcs(graph)) {
+//         prob_map[a] = std::exp(-prob_map[a] / matrix_alpha);
+//     }
+
+//     double sum =
+//         fhamonic::gecot::pc_num(graph, habitat_map, habitat_map, prob_map);
+
+//     std::print("ECA = {}\n", std::sqrt(sum) * 0.09);
+
+//     return 0;
+// }

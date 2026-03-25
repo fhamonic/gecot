@@ -92,7 +92,7 @@ auto compute_graph(int i, double ratio) {
 
     for(const auto & [a, p] : arcs_entries(graph)) {
         const auto & [u, v] = p;
-        dist[a] *= 30 * ((data[u] ? ratio : 1) + (data[v] ? ratio : 1)) / 2;
+        dist[a] *= 30 * ((data[u] ? 1 : ratio) + (data[v] ? ratio : 1)) / 2;
     }
 
     return std::make_tuple(graph, data, dist);
@@ -128,6 +128,15 @@ int main() {
                 for(const auto & ratio : landscapes_ratios.cols()) {
                     const auto [graph, habitat_map, length_map] =
                         compute_graph(i, ratio);
+
+                    {
+                        int sum = 0;
+                        for(const auto & u : vertices(graph)) {
+                            sum += habitat_map[u];
+                        }
+                        std::lock_guard<std::mutex> guard(print_mutex);
+                        std::cout << i << " : " << sum << std::endl;
+                    }
                     auto algo = dijkstra(dijkstra_traits{}, graph, length_map);
                     auto dists = std::make_unique_for_overwrite<double[]>(
                         num_vertices(graph) * num_vertices(graph));

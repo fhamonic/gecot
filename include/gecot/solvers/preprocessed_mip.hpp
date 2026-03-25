@@ -328,7 +328,7 @@ struct preprocessed_mip {
 
         // {
         //     const auto greedy_solution = GreedyIncremental{}.solve(instance, budget);
-        //     model.set_mip_start(
+        //     model.add_mip_start(
         //         std::views::transform(instance.options(), [&](auto o) {
         //             return std::make_pair(X_vars(o), greedy_solution[o]);
         //         }));
@@ -336,7 +336,7 @@ struct preprocessed_mip {
         {
             const auto start_solution =
                 GreedyDecremental{}.solve(instance, budget);
-            model.set_mip_start(
+            model.add_mip_start(
                 std::views::transform(instance.options(), [&](auto o) {
                     return std::make_pair(X_vars(o), start_solution[o]);
                 }));

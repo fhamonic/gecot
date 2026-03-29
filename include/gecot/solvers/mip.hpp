@@ -21,6 +21,7 @@ namespace solvers {
 struct mip {
     double feasibility_tol = 0.0;
     bool print_model = false;
+    std::optional<std::map<std::string, int>> mip_start;
 
     template <typename M, typename V>
     struct formula_variable_visitor {
@@ -197,6 +198,15 @@ struct mip {
         spdlog::trace("  {:>10} variables", model.num_variables());
         spdlog::trace("  {:>10} constraints", model.num_constraints());
         spdlog::trace("  {:>10} entries", model.num_entries());
+
+        if(mip_start.has_value()) {
+            model.add_mip_start(
+                std::views::transform(instance.options(), [&](auto o) {
+                    return std::make_pair(
+                        X_vars(o),
+                        mip_start.value().at(instance.option_name(o)));
+                }));
+        }
 
         model.solve();
         const auto model_solution = model.get_solution();

@@ -17,8 +17,8 @@
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 #include "gecot/utils/chronometer.hpp"
 
-#include "gecot/solvers/greedy_incremental.hpp"
 #include "gecot/solvers/greedy_decremental.hpp"
+#include "gecot/solvers/greedy_incremental.hpp"
 
 namespace fhamonic {
 namespace gecot {
@@ -29,6 +29,7 @@ struct preprocessed_mip {
     bool print_model = false;
     double probability_resolution;
     int num_mus;
+    std::optional<std::map<std::string, int>> mip_start;
 
     template <typename M, typename V>
     struct formula_variable_visitor {
@@ -326,19 +327,12 @@ struct preprocessed_mip {
         spdlog::trace("  {:>10} constraints", model.num_constraints());
         spdlog::trace("  {:>10} entries", model.num_entries());
 
-        // {
-        //     const auto greedy_solution = GreedyIncremental{}.solve(instance, budget);
-        //     model.add_mip_start(
-        //         std::views::transform(instance.options(), [&](auto o) {
-        //             return std::make_pair(X_vars(o), greedy_solution[o]);
-        //         }));
-        // }
-        {
-            const auto start_solution =
-                GreedyDecremental{}.solve(instance, budget);
+        if(mip_start.has_value()) {
             model.add_mip_start(
                 std::views::transform(instance.options(), [&](auto o) {
-                    return std::make_pair(X_vars(o), start_solution[o]);
+                    return std::make_pair(
+                        X_vars(o),
+                        mip_start.value().at(instance.option_name(o)));
                 }));
         }
 

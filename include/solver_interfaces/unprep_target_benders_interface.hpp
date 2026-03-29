@@ -28,7 +28,7 @@ public:
     }
 
     void handle_options(const boost::program_options::variables_map & vm) {
-        solver.feasibility_tol = feasibility_tolerance;
+        solver.feasibility_tol = vm["feasibility-tolerance"].as<double>();
         solver.print_model = vm.count("print-model") > 0;
     }
 

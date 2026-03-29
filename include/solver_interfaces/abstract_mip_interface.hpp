@@ -1,8 +1,12 @@
 #pragma once
 
+#include <fstream>
+#include <optional>
 #include <sstream>
+#include <vector>
 
 #include <boost/program_options.hpp>
+#include <nlohmann/json.hpp>
 
 #include "solver_interfaces/abstract_solver_interface.hpp"
 
@@ -11,15 +15,32 @@ namespace fhamonic {
 class AbstractMipInterface : public AbstractSolverInterface {
 protected:
     boost::program_options::options_description desc;
-    double feasibility_tolerance;
+    std::optional<std::vector<bool>> mip_start;
 
 public:
     AbstractMipInterface(const std::string & name) : desc(name + " options") {
-        desc.add_options()(
-            "feasibility-tolerance,t",
-            po::value<double>(&feasibility_tolerance)->default_value(1e-7),
-            "Tolearnce for rounding errors")("print-model,m",
-                                             "Print the mip model");
+        desc.add_options()("feasibility-tolerance,t",
+                           po::value<double>()->default_value(1e-7),
+                           "Tolearnce for rounding errors")(
+            "print-model,m", "Print the mip model")(
+            "mip-start", po::value<std::filesystem::path>(),
+            "Solution file (JSON) to propose as a MIP start to the solver.");
+    }
+
+    static std::map<std::string, int> parse_mip_start(
+        const std::filesystem::path & solution_path) {
+        if(!std::filesystem::exists(solution_path))
+            throw std::invalid_argument("File '" + solution_path.string() +
+                                        "' does not exists");
+        if(std::filesystem::is_directory(solution_path))
+            throw std::invalid_argument("'" + solution_path.string() +
+                                        "' is a directory");
+
+        std::ifstream instance_stream(solution_path);
+        nlohmann::json solution_json;
+        instance_stream >> solution_json;
+
+        return std::map<std::string, int>(solution_json["solution"]);
     }
 
     void parse(const std::vector<std::string> & args) {

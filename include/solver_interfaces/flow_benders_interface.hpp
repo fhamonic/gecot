@@ -28,8 +28,11 @@ public:
     }
 
     void handle_options(const boost::program_options::variables_map & vm) {
-        solver.feasibility_tol = feasibility_tolerance;
+        solver.feasibility_tol = vm["feasibility-tolerance"].as<double>();
         solver.print_model = vm.count("print-model") > 0;
+        if(vm.count("mip-start"))
+            solver.mip_start =
+                parse_mip_start(vm["mip-start"].as<std::filesystem::path>());
     }
 
     gecot::instance_solution_t<Instance> solve(const Instance & instance,

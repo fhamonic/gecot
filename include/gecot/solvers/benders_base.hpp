@@ -28,6 +28,7 @@ struct benders_base {
     bool print_model = false;
     double probability_resolution;
     int num_mus;
+    std::optional<std::map<std::string, int>> mip_start;
 
     template <typename M, typename V>
     struct formula_variable_visitor {

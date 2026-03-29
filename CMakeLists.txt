@@ -9,13 +9,15 @@ project(
 
 # set(CMAKE_VERBOSE_MAKEFILE ON)
 
+
 # ################### Options ####################
-# set(CMAKE_CXX_STANDARD 26)
-# set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 26)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(ENABLE_TESTING "Enable unit tests" OFF)
 option(WARNINGS "Enable warnings" OFF)
 option(OPTIMIZE_FOR_NATIVE "Build with -march=native" OFF)
+
 
 # ################### Modules ####################
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
@@ -43,6 +45,7 @@ if(WIN32)
     OUTPUT_VARIABLE WINDRES_OUTPUT)
   message(STATUS "WINDRES [${WINDRES_RESULT}]: ${WINDRES_OUTPUT}")
 endif()
+
 
 # ################### Packages ####################
 find_package(vincentlaucsb-csv-parser REQUIRED)
@@ -83,6 +86,7 @@ target_link_libraries(gecot INTERFACE spdlog::spdlog)
 target_link_libraries(gecot INTERFACE melon::melon)
 target_link_libraries(gecot INTERFACE mippp::mippp)
 
+
 # ################### EXEC target ####################
 add_executable(gecot_optimize src/instance.cpp src/parse_instance.cpp src/gecot_optimize.cpp ${WINDRES_ICON_O})
 target_link_libraries(gecot_optimize PUBLIC gecot)
@@ -91,24 +95,9 @@ target_link_libraries(gecot_optimize PUBLIC nlohmann_json::nlohmann_json)
 target_link_libraries(gecot_optimize PUBLIC nlohmann_json_schema_validator)
 target_link_libraries(gecot_optimize PUBLIC phmap)
 # target_compile_options(gecot_optimize PUBLIC -fconcepts-diagnostics-depth=30 -Wall)
-
 # target_compile_options(gecot_optimize PRIVATE -fsanitize=address)
 # target_link_options(gecot_optimize PRIVATE -fsanitize=address -lpthread -static-libasan)
 
-# add_executable(gecot_rank_options src/rank_options.cpp ${WINDRES_ICON_O})
-# target_link_libraries(gecot_rank_options PUBLIC gecot) 
-# target_link_libraries(gecot_rank_options PUBLIC nlohmann_json::nlohmann_json) 
-# target_link_libraries(gecot_rank_options PUBLIC nlohmann_json_schema_validator)
-# target_link_libraries(gecot_rank_options PUBLIC phmap)
-# target_compile_options(gecot_rank_options PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
-
-
-
-find_package(TIFF REQUIRED)
-add_executable(gecot_hexagonify src/gecot_hexagonify.cpp ${WINDRES_ICON_O})
-target_link_libraries(gecot_hexagonify PUBLIC gecot)
-target_link_libraries(gecot_hexagonify PUBLIC TIFF::TIFF)
-target_compile_options(gecot_hexagonify PUBLIC -fconcepts-diagnostics-depth=4 -Wall)
 
 # ################### TESTS ######################
 if(ENABLE_TESTING)
@@ -117,6 +106,7 @@ if(ENABLE_TESTING)
   set_project_warnings(gecot)
   add_subdirectory(test) 
 endif()
+
 
 # ################## INSTALL #####################
 install(TARGETS gecot_optimize RUNTIME DESTINATION bin LIBRARY DESTINATION lib
@@ -143,20 +133,6 @@ if(NOT WIN32)
     endif()
   ]])
 else()
-# install(FILES 
-# "c:/libs/cbc/bin/cbc.exe" 
-# "${CONAN_TBB_LIB_DIR}/../bin/libtbb12.dll" 
-# "${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libgcc_s_seh-1.dll" 
-# "${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libwinpthread-1.dll" 
-# "${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libstdc++-6.dll" 
-# DESTINATION bin)
-# set(CPACK_NSIS_MODIFY_PATH 2)
-# set(CPACK_NSIS_DISPLAY_NAME Gecot)
-# set(CPACK_NSIS_URL_INFO_ABOUT "https://github.com/fhamonic/gecot")
-# set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
-# set(CPACK_NSIS_INSTALLED_ICON_NAME "bin/gecot_optimize.exe")
-# set(CPACK_NSIS_MUI_ICON "${PROJECT_SOURCE_DIR}/misc/gecot.ico")
-# set(CPACK_NSIS_MUI_HEADERIMAGE "${PROJECT_SOURCE_DIR}/misc\\nsis_gecot_header.bmp")
 install(FILES 
 "c:/libs/cbc/bin/cbc.exe" 
 "${CONAN_TBB_LIB_DIR}/../bin/libtbb12.dll" 

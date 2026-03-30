@@ -331,10 +331,11 @@ int main(int argc, const char * argv[]) {
                 raw_instance.options(),
                 [&raw_instance, &instance, &solution](const auto & option) {
                     const auto & option_name = raw_instance.option_name(option);
-                    return std::make_pair(
-                        option_name,
-                        static_cast<int>(
-                            solution[instance.option_from_name(option_name)]));
+                    int value = static_cast<int>(
+                        instance.contains_option(option_name)
+                            ? solution[instance.option_from_name(option_name)]
+                            : false);
+                    return std::make_pair(option_name, value);
                 }));
         out.print("\n}}");
 

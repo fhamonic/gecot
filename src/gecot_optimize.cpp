@@ -278,8 +278,10 @@ int main(int argc, const char * argv[]) {
     }
 
     if(opt_output_json_file.has_value()) {
-        auto out =
-            fmt::output_file(opt_output_json_file.value().string().c_str());
+        auto out = fmt::output_file(
+            std::filesystem::absolute(opt_output_json_file.value())
+                .string()
+                .c_str());
         auto print_property = [&](const std::string & property_name,
                                   auto && pairs_range) {
             out.print("\n    \"{}\": {{", property_name);

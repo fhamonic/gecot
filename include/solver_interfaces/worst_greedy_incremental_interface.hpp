@@ -4,23 +4,22 @@
 
 #include <boost/program_options.hpp>
 
-#include "gecot/solvers/worst_greedy_decremental.hpp"
+#include "gecot/solvers/worst_greedy_incremental.hpp"
 
 #include "solver_interfaces/abstract_solver_interface.hpp"
 
 namespace fhamonic {
 
-class WorstGreedyDecrementalInterface : public AbstractSolverInterface {
+class WorstGreedyIncrementalInterface : public AbstractSolverInterface {
 private:
-    gecot::solvers::WorstGreedyDecremental solver;
+    gecot::solvers::WorstGreedyIncremental solver;
     boost::program_options::options_description desc;
 
 public:
-    WorstGreedyDecrementalInterface() : desc(name() + " options") {
+    WorstGreedyIncrementalInterface() : desc(name() + " options") {
         desc.add_options()(
-            "feasibility-tolerance,t",
-            po::value<double>(&solver.feasibility_tol)->default_value(1e-7),
-            "Tolearnce for rounding errors");
+        "feasibility-tolerance,t", po::value<double>(&solver.feasibility_tol)
+            ->default_value(1e-7), "Tolearnce for rounding errors");
     }
 
     void parse(const std::vector<std::string> & args) {
@@ -38,10 +37,10 @@ public:
         return solver.solve(instance, B);
     };
 
-    std::string name() const { return "worst_greedy_decr"; }
+    std::string name() const { return "worst_greedy_incr"; }
     std::string description() const {
-        return "From the improved landscape, iteratively remove the option "
-               "with the best gain/cost ratio (to minimize connectivity while spending the budget).";
+        return "From the base landscape, iteratively add the option with the "
+               "worst gain/cost ratio (to minimize connectivity while spending the budget).";
     }
     std::string options_description() const {
         std::ostringstream s;

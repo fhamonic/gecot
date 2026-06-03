@@ -127,8 +127,6 @@ struct preprocessed_mip {
                                  return instance.option_cost(o) * X_vars(o);
                              }) <= budget);
 
-        // std::vector<mip::constraint_id_t> block_first_constraint;
-
         for(auto && instance_case : instance.cases()) {
             const auto case_id = instance_case.id();
             const auto & original_graph = instance_case.graph();
@@ -163,7 +161,6 @@ struct preprocessed_mip {
 
                 std::vector<std::pair<model_variable<int, double>, double>>
                     F_prime_additional_terms;
-                // block_first_constraint.emplace_back(model.num_constraints());
 
                 const auto [graph, source_quality_map, vertex_options_map,
                             arc_no_map, probability_map, arc_option_map, t] =

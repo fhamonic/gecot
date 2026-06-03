@@ -10,12 +10,12 @@
 
 namespace fhamonic {
 
-class TreeformulationroundingInterface : public AbstractMipInterface {
+class TreeFormulationRRInterface : public AbstractMipInterface {
 private:
     gecot::solvers::tree_formulation_rr solver;
 
 public:
-    TreeformulationroundingInterface() : AbstractMipInterface(name()) {
+    TreeFormulationRRInterface() : AbstractMipInterface(name()) {
         desc.add_options()(
             "resolution",
             po::value<double>(&solver.probability_resolution)

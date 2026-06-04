@@ -22,37 +22,6 @@
 #include "gecot/solvers/greedy_decremental.hpp"
 #include "gecot/solvers/greedy_incremental.hpp"
 
-// template <typename Key, typename Value,
-//           typename DefaultF = std::function<Value(Key)>,
-//           typename Container = std::flat_map<Key, Value>>
-//     requires std::invocable<DefaultF &, const Key &> &&
-//              std::convertible_to<std::invoke_result_t<DefaultF &, const Key
-//              &>,
-//                                  Value>
-// class lazy_defaulted_map {
-// private:
-//     DefaultF _default_lambda;
-//     Container _map;
-
-// public:
-//     template <typename F>
-//     lazy_defaulted_map(F && f) : _default_lambda(std::forward<F>(f)) {}
-
-//     template <std::convertible_to<Key> K>
-//     Value & operator[](K && key) {
-//         auto it = _map.lower_bound(key);
-
-//         if(it == _map.end() || _map.key_comp()(key, it->first))
-//             return _map
-//                 .emplace_hint(it, std::forward<K>(key), _default_lambda(key))
-//                 ->second;
-
-//         return it->second;
-//     }
-
-//     const Value & operator[](const Key & key) const { return _map.at(key); }
-// };
-
 namespace fhamonic {
 namespace gecot {
 namespace solvers {
@@ -184,6 +153,11 @@ struct tree_formulation_rr {
                     return std::make_pair(i, sub_model.add_binary_variable());
                 }));
 
+            sub_model.add_constraint(xsum(sub_X_vars_map, [&](auto && p) {
+                                         const auto & [o, X] = p;
+                                         return instance.option_cost(o) * X;
+                                     }) <= budget);
+
             const auto big_M_map = compute_knapsack_big_M_map(
                 instance, budget, graph, source_quality_map, vertex_options_map,
                 probability_map,
@@ -268,6 +242,19 @@ struct tree_formulation_rr {
             }
         }
 
+        void generate_initial_column(auto & master_data) {
+            using namespace fhamonic::mippp;
+            using namespace fhamonic::mippp::operators;
+            sub_model.set_objective(default_objective);
+            sub_model.solve();
+            const auto solution = sub_model.get_solution();
+            master_data.add_tree(
+                target, sub_model.get_solution_value(),
+                std::views::filter(sub_X_vars_map.keys(), [&](option_t i) {
+                    return solution[sub_X_vars_map.at(i)] > 0.5;
+                }));
+        }
+
         bool try_generate_column(auto & master_data,
                                  const auto & dual_solution) {
             using namespace fhamonic::mippp;
@@ -280,8 +267,14 @@ struct tree_formulation_rr {
                            sub_X_vars_map.at(i);
                 }));
             sub_model.solve();
-            if((1 + 1e-8) * sub_model.get_solution_value() >
-               dual_solution[master_data.uniqueness_constraint_map.at(target)])
+            spdlog::info(
+                "{} : dual={} vs sub_model={}", target,
+                dual_solution[master_data.uniqueness_constraint_map.at(target)],
+                sub_model.get_solution_value());
+            if((1 + 1e-7) *
+                   dual_solution[master_data.uniqueness_constraint_map.at(
+                       target)] >=
+               sub_model.get_solution_value())
                 return false;
             const auto solution = sub_model.get_solution();
             master_data.add_tree(
@@ -363,15 +356,17 @@ struct tree_formulation_rr {
 
         template <std::ranges::range R>
         void add_tree(const vertex_t & target, const double contribution,
-                      R && taken_options) {
+                      R && used_options) {
             using namespace fhamonic::mippp::operators;
+
+            spdlog::info("add_tree: {} , {}", target, contribution);
+
             master_model.get().add_column(std::views::concat(
                 std::views::single(
                     std::make_pair(contribution_constraint, -contribution)),
                 std::views::single(
                     std::make_pair(uniqueness_constraint_map.at(target), 1.0)),
-                std::views::transform(taken_options, [this,
-                                                      target](option_t i) {
+                std::views::transform(used_options, [this, target](option_t i) {
                     return std::make_pair(
                         purchase_constraints_map.at(std::make_pair(target, i)),
                         1.0);
@@ -405,9 +400,13 @@ struct tree_formulation_rr {
                                                  budget);
 
             assert(master_model_cases.size() == instance_case.id());
-            master_model_cases.emplace_back(model, X_vars, api, instance,
-                                            budget, instance_case,
-                                            strong_arcs_map, useless_arcs_map);
+            auto & master_model_case = master_model_cases.emplace_back(
+                model, X_vars, api, instance, budget, instance_case,
+                strong_arcs_map, useless_arcs_map);
+
+            for(auto & sub_model : master_model_case.sub_models) {
+                sub_model.generate_initial_column(master_model_case);
+            }
         }
 
         model.set_objective(std::visit(
@@ -423,30 +422,45 @@ struct tree_formulation_rr {
         spdlog::trace("  {:>10} constraints", model.num_constraints());
         spdlog::trace("  {:>10} entries", model.num_entries());
 
-        for(;;) {
+        auto log_lambda = [&, option_name_max_length = std::ranges::max(
+                                  std::ranges::views::transform(
+                                      instance.options(), [&](auto && o) {
+                                          return instance.option_name(o).size();
+                                      }))]() {
+            const auto model_solution = model.get_solution();
+            spdlog::info("tree_decomposition relaxation has value: {}",
+                         model.get_solution_value());
+            for(auto && option : instance.options()) {
+                const auto & option_name = instance.option_name(option);
+                spdlog::info("    {:<{}} {}", option_name,
+                             option_name_max_length,
+                             model_solution[X_vars(option)]);
+            }
+        };
+
+        for(bool improving = true; improving;) {
             model.solve();
+
+            log_lambda();
+
             auto dual_solution = model.get_dual_solution();
 
-            if(std::ranges::none_of(
-                   master_model_cases,
-                   [&](master_model_case_data<I> & master_model_case) {
-                       return std::ranges::any_of(
-                           master_model_case.sub_models,
-                           [&](sub_model_data<I> & sub_model) {
-                               return sub_model.try_generate_column(
-                                   master_model_case, dual_solution);
-                           });
-                   }))
-                break;
+            improving = false;
+            for(auto & master_model_case : master_model_cases) {
+                for(auto & sub_model : master_model_case.sub_models) {
+                    improving |= sub_model.try_generate_column(
+                        master_model_case, dual_solution);
+                }
+            }
         }
 
-        spdlog::trace("tree_decomposition relaxation has value: {}",
-                      model.get_solution_value());
-
         const auto model_solution = model.get_solution();
+
         for(const auto & i : instance.options()) {
             solution[i] = model_solution[X_vars(i)];
         }
+
+        log_lambda();
 
         return solution;
     }

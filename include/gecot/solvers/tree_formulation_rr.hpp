@@ -10,6 +10,9 @@
 
 #include "mippp/solvers/gurobi/all.hpp"
 
+#include "mippp/solvers/cbc/all.hpp"
+#include "mippp/solvers/clp/all.hpp"
+
 #include "melon/graph.hpp"
 
 #include "gecot/concepts/instance.hpp"
@@ -21,6 +24,11 @@
 
 #include "gecot/solvers/greedy_decremental.hpp"
 #include "gecot/solvers/greedy_incremental.hpp"
+
+using MODEL_LP_API = fhamonic::mippp::clp_api;
+using MODEL_LP = fhamonic::mippp::clp_lp;
+using MODEL_MILP_API = fhamonic::mippp::cbc_api;
+using MODEL_MILP = fhamonic::mippp::cbc_milp;
 
 namespace fhamonic {
 namespace gecot {
@@ -106,17 +114,17 @@ struct tree_formulation_rr {
     struct sub_model_data {
         using vertex_t = melon::vertex_t<instance_graph_t<I>>;
         vertex_t target;
-        fhamonic::mippp::gurobi_milp sub_model;
+        MODEL_MILP sub_model;
         fhamonic::mippp::runtime_linear_expression<variable_t, double>
             default_objective;
         std::flat_map<option_t, variable_t> sub_X_vars_map;
 
-        sub_model_data(const fhamonic::mippp::gurobi_api & api,
-                       const auto & instance, const double & budget,
-                       const auto & instance_case, const auto & strong_arcs_map,
+        sub_model_data(const MODEL_MILP_API & milp_api, const auto & instance,
+                       const double & budget, const auto & instance_case,
+                       const auto & strong_arcs_map,
                        const auto & useless_arcs_map,
                        const vertex_t & original_t)
-            : target(original_t), sub_model(api), sub_X_vars_map() {
+            : target(original_t), sub_model(milp_api), sub_X_vars_map() {
             using namespace fhamonic::mippp::operators;
             sub_model.set_optimality_tolerance(1e-10);
             sub_model.set_feasibility_tolerance(1e-8);
@@ -230,11 +238,12 @@ struct tree_formulation_rr {
             sub_model.set_objective(default_objective);
             sub_model.solve();
             const auto solution = sub_model.get_solution();
-            master_data.add_tree(
-                target, sub_model.get_solution_value(),
-                std::views::filter(sub_X_vars_map.keys(), [&](option_t i) {
-                    return solution[sub_X_vars_map.at(i)] > 0.5;
-                }));
+            master_data.add_tree(target, sub_model.get_solution_value(),
+                                 std::views::keys(std::views::filter(
+                                     sub_X_vars_map, [&](const auto & e) {
+                                         const auto & [option, X_var] = e;
+                                         return solution[X_var] > 0.5;
+                                     })));
         }
 
         bool try_generate_column(auto & master_data,
@@ -242,11 +251,12 @@ struct tree_formulation_rr {
             using namespace fhamonic::mippp;
             using namespace fhamonic::mippp::operators;
             sub_model.set_objective(
-                default_objective -
-                xsum(sub_X_vars_map.keys(), [&](option_t i) {
+                default_objective - xsum(sub_X_vars_map, [&](const auto & e) {
+                    const auto & [option, X_var] = e;
                     return dual_solution[master_data.purchase_constraints_map
-                                             .at(std::make_pair(target, i))] *
-                           sub_X_vars_map.at(i);
+                                             .at(std::make_pair(target,
+                                                                option))] *
+                           X_var;
                 }));
             sub_model.solve();
             spdlog::info(
@@ -259,11 +269,12 @@ struct tree_formulation_rr {
                sub_model.get_solution_value())
                 return false;
             const auto solution = sub_model.get_solution();
-            master_data.add_tree(
-                target, evaluate(default_objective, solution),
-                std::views::filter(sub_X_vars_map.keys(), [&](option_t i) {
-                    return solution[sub_X_vars_map.at(i)] > 0.5;
-                }));
+            master_data.add_tree(target, evaluate(default_objective, solution),
+                                 std::views::keys(std::views::filter(
+                                     sub_X_vars_map, [&](const auto & e) {
+                                         const auto & [option, X_var] = e;
+                                         return solution[X_var] > 0.5;
+                                     })));
             return true;
         }
     };
@@ -271,7 +282,7 @@ struct tree_formulation_rr {
     template <typename I>
     struct master_model_case_data {
         using vertex_t = melon::vertex_t<instance_graph_t<I>>;
-        std::reference_wrapper<fhamonic::mippp::gurobi_lp> master_model;
+        std::reference_wrapper<MODEL_LP> master_model;
         variable_t contribution_variable;
         constraint_t contribution_constraint;
         std::flat_map<vertex_t, constraint_t> uniqueness_constraint_map;
@@ -279,9 +290,8 @@ struct tree_formulation_rr {
             purchase_constraints_map;
         std::vector<sub_model_data<I>> sub_models;
 
-        master_model_case_data(fhamonic::mippp::gurobi_lp & model,
-                               const auto & X_vars,
-                               const fhamonic::mippp::gurobi_api & api,
+        master_model_case_data(MODEL_LP & model, const auto & X_vars,
+                               const MODEL_MILP_API & milp_api,
                                const auto & instance, const double & budget,
                                const auto & instance_case,
                                const auto & strong_arcs,
@@ -315,8 +325,9 @@ struct tree_formulation_rr {
                 }));
 
             for(const vertex_t target : target_vertices) {
-                sub_models.emplace_back(api, instance, budget, instance_case,
-                                        strong_arcs, useless_arcs, target);
+                sub_models.emplace_back(milp_api, instance, budget,
+                                        instance_case, strong_arcs,
+                                        useless_arcs, target);
             }
 
             purchase_constraints_map.insert_range(
@@ -363,8 +374,9 @@ struct tree_formulation_rr {
 
         using namespace fhamonic::mippp;
         using namespace fhamonic::mippp::operators;
-        gurobi_api api;
-        gurobi_lp model(api);
+        MODEL_LP_API lp_api;
+        MODEL_LP model(lp_api);
+        MODEL_MILP_API milp_api;
         model.set_feasibility_tolerance(feasibility_tol);
         model.set_maximization();
 
@@ -383,7 +395,7 @@ struct tree_formulation_rr {
 
             assert(master_model_cases.size() == instance_case.id());
             auto & master_model_case = master_model_cases.emplace_back(
-                model, X_vars, api, instance, budget, instance_case,
+                model, X_vars, milp_api, instance, budget, instance_case,
                 strong_arcs_map, useless_arcs_map);
 
             for(auto & sub_model : master_model_case.sub_models) {

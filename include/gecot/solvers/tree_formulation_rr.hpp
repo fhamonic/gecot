@@ -341,7 +341,7 @@ struct tree_formulation_rr {
                       R && used_options) {
             using namespace fhamonic::mippp::operators;
 
-            spdlog::info("add_tree: {} , {}", target, contribution);
+            spdlog::info("add_tree: {} , {}, {}", target, contribution, std::format("{}", used_options));
 
             master_model.get().add_column(std::views::concat(
                 std::views::single(

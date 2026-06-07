@@ -153,11 +153,6 @@ struct tree_formulation_rr {
                     return std::make_pair(i, sub_model.add_binary_variable());
                 }));
 
-            sub_model.add_constraint(xsum(sub_X_vars_map, [&](auto && p) {
-                                         const auto & [o, X] = p;
-                                         return instance.option_cost(o) * X;
-                                     }) <= budget);
-
             const auto big_M_map = compute_knapsack_big_M_map(
                 instance, budget, graph, source_quality_map, vertex_options_map,
                 probability_map,
@@ -226,19 +221,6 @@ struct tree_formulation_rr {
                     Phi_vars(a) <=
                     sub_X_vars_map.at(arc_option_map[a].value()) *
                         big_M_map[melon::arc_source(graph, a)]);
-
-                for(const auto & b :
-                    melon::out_arcs(graph, melon::arc_source(graph, a))) {
-                    if(melon::arc_target(graph, a) ==
-                       melon::arc_target(graph, b))
-                        continue;
-                    if(a == b) continue;
-                    if(probability_map[b] >= probability_map[a]) continue;
-                    sub_model.add_constraint(
-                        Phi_vars(b) <=
-                        (1 - sub_X_vars_map.at(arc_option_map[a].value())) *
-                            big_M_map[melon::arc_source(graph, a)]);
-                }
             }
         }
 

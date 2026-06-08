@@ -255,7 +255,7 @@ struct tree_formulation_rr {
             using namespace fhamonic::mippp;
             using namespace fhamonic::mippp::operators;
             sub_model.set_objective(
-                default_objective - xsum(sub_X_vars_map, [&](const auto & e) {
+                /*dual_solution[contribution_constraint] **/ default_objective - xsum(sub_X_vars_map, [&](const auto & e) {
                     const auto & [option, X_var] = e;
                     return dual_solution[master_data.purchase_constraints_map
                                              .at(std::make_pair(target,
@@ -455,7 +455,6 @@ struct tree_formulation_rr {
         }
 
         const auto model_solution = model.get_solution();
-
         for(const auto & i : instance.options()) {
             solution[i] = model_solution[X_vars(i)];
         }

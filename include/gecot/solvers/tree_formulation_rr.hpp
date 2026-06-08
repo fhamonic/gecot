@@ -8,6 +8,9 @@
 
 #include <spdlog/spdlog.h>
 
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
+
 #include "mippp/solvers/gurobi/all.hpp"
 
 #include "mippp/solvers/cbc/all.hpp"
@@ -236,26 +239,14 @@ struct tree_formulation_rr {
             }
         }
 
-        void generate_initial_column(auto & master_data) {
-            using namespace fhamonic::mippp;
-            using namespace fhamonic::mippp::operators;
-            sub_model.set_objective(default_objective);
-            sub_model.solve();
-            const auto solution = sub_model.get_solution();
-            master_data.add_tree(target, sub_model.get_solution_value(),
-                                 std::views::keys(std::views::filter(
-                                     sub_X_vars_map, [&](const auto & e) {
-                                         const auto & [option, X_var] = e;
-                                         return solution[X_var] > 0.5;
-                                     })));
-        }
-
         bool try_generate_column(auto & master_data,
                                  const auto & dual_solution) {
             using namespace fhamonic::mippp;
             using namespace fhamonic::mippp::operators;
             sub_model.set_objective(
-                /*dual_solution[contribution_constraint] **/ default_objective - xsum(sub_X_vars_map, [&](const auto & e) {
+                dual_solution[master_data.contribution_constraint] *
+                    default_objective -
+                xsum(sub_X_vars_map, [&](const auto & e) {
                     const auto & [option, X_var] = e;
                     return dual_solution[master_data.purchase_constraints_map
                                              .at(std::make_pair(target,
@@ -263,10 +254,10 @@ struct tree_formulation_rr {
                            X_var;
                 }));
             sub_model.solve();
-            spdlog::info(
-                "{} : dual={} vs sub_model={}", target,
-                dual_solution[master_data.uniqueness_constraint_map.at(target)],
-                sub_model.get_solution_value());
+            // spdlog::info(
+            //     "{} : dual={} vs sub_model={}", target,
+            //     dual_solution[master_data.uniqueness_constraint_map.at(target)],
+            //     sub_model.get_solution_value());
             if((1 + 1e-7) *
                    dual_solution[master_data.uniqueness_constraint_map.at(
                        target)] >=
@@ -286,6 +277,7 @@ struct tree_formulation_rr {
     template <instance_c I>
     struct master_model_case_data {
         using vertex_t = melon::vertex_t<instance_graph_t<I>>;
+        std::reference_wrapper<std::mutex> master_model_mutex_ref;
         std::reference_wrapper<MODEL_LP> master_model;
         variable_t contribution_variable;
         constraint_t contribution_constraint;
@@ -294,13 +286,15 @@ struct tree_formulation_rr {
             purchase_constraints_map;
         std::vector<sub_model_data<I>> sub_models;
 
-        master_model_case_data(MODEL_LP & model, const auto & X_vars,
+        master_model_case_data(std::mutex & model_mutex, MODEL_LP & model,
+                               const auto & X_vars,
                                const MODEL_MILP_API & milp_api,
                                const auto & instance, const double & budget,
                                const auto & instance_case,
                                const auto & strong_arcs,
                                const auto & useless_arcs)
-            : master_model(model)
+            : master_model_mutex_ref(model_mutex)
+            , master_model(model)
             , contribution_variable(model.add_variable())
             , contribution_constraint(
                   model.add_constraint(fhamonic::mippp::operators::operator<=(
@@ -325,8 +319,7 @@ struct tree_formulation_rr {
                     return std::make_pair(
                         t,
                         model.add_constraint(
-                            empty_linear_expression<variable_t, double> <=
-                            1));
+                            empty_linear_expression<variable_t, double> <= 1));
                 }));
 
             for(const vertex_t target : target_vertices) {
@@ -357,8 +350,10 @@ struct tree_formulation_rr {
                       R && used_options) {
             using namespace fhamonic::mippp::operators;
 
-            spdlog::info("add_tree: {} , {}, {}", target, contribution,
-                         std::format("{}", used_options));
+            // spdlog::info("add_tree: {} , {}, {}", target, contribution,
+            //              std::format("{}", used_options));
+
+            std::lock_guard<std::mutex> guard(master_model_mutex_ref.get());
 
             master_model.get().add_column(std::views::concat(
                 std::views::single(
@@ -380,6 +375,7 @@ struct tree_formulation_rr {
 
         using namespace fhamonic::mippp;
         using namespace fhamonic::mippp::operators;
+        std::mutex master_model_mutex;
         MODEL_LP_API lp_api;
         MODEL_LP model(lp_api);
         MODEL_MILP_API milp_api;
@@ -401,12 +397,8 @@ struct tree_formulation_rr {
 
             assert(master_model_cases.size() == instance_case.id());
             auto & master_model_case = master_model_cases.emplace_back(
-                model, X_vars, milp_api, instance, budget, instance_case,
-                strong_arcs_map, useless_arcs_map);
-
-            for(auto & sub_model : master_model_case.sub_models) {
-                sub_model.generate_initial_column(master_model_case);
-            }
+                master_model_mutex, model, X_vars, milp_api, instance, budget,
+                instance_case, strong_arcs_map, useless_arcs_map);
         }
 
         model.set_objective(std::visit(
@@ -438,20 +430,36 @@ struct tree_formulation_rr {
             }
         };
 
-        for(bool improving = true; improving;) {
+        for(;;) {
             model.solve();
+            auto dual_solution = model.get_dual_solution();
 
             log_lambda();
 
-            auto dual_solution = model.get_dual_solution();
-
-            improving = false;
-            for(auto & master_model_case : master_model_cases) {
-                for(auto & sub_model : master_model_case.sub_models) {
-                    improving |= sub_model.try_generate_column(
-                        master_model_case, dual_solution);
-                }
-            }
+            const bool improving = tbb::parallel_reduce(
+                tbb::blocked_range(master_model_cases.begin(),
+                                   master_model_cases.end()),
+                false,
+                [&](auto & master_model_cases_subrange, bool init) {
+                    for(auto & master_model_case :
+                        master_model_cases_subrange) {
+                        init = tbb::parallel_reduce(
+                            tbb::blocked_range(
+                                master_model_case.sub_models.begin(),
+                                master_model_case.sub_models.end()),
+                            init,
+                            [&](auto && sub_models_subrange, bool init2) {
+                                for(auto & sub_model : sub_models_subrange)
+                                    init2 |= sub_model.try_generate_column(
+                                        master_model_case, dual_solution);
+                                return init2;
+                            },
+                            std::logical_or());
+                    }
+                    return init;
+                },
+                std::logical_or());
+            if(!improving) break;
         }
 
         const auto model_solution = model.get_solution();

@@ -25,10 +25,15 @@
 #include "gecot/solvers/greedy_decremental.hpp"
 #include "gecot/solvers/greedy_incremental.hpp"
 
-using MODEL_LP_API = fhamonic::mippp::clp_api;
-using MODEL_LP = fhamonic::mippp::clp_lp;
-using MODEL_MILP_API = fhamonic::mippp::cbc_api;
-using MODEL_MILP = fhamonic::mippp::cbc_milp;
+// using MODEL_LP_API = fhamonic::mippp::clp_api;
+// using MODEL_LP = fhamonic::mippp::clp_lp;
+// using MODEL_MILP_API = fhamonic::mippp::cbc_api;
+// using MODEL_MILP = fhamonic::mippp::cbc_milp;
+
+using MODEL_LP_API = fhamonic::mippp::gurobi_api;
+using MODEL_LP = fhamonic::mippp::gurobi_lp;
+using MODEL_MILP_API = fhamonic::mippp::gurobi_api;
+using MODEL_MILP = fhamonic::mippp::gurobi_milp;
 
 namespace fhamonic {
 namespace gecot {
@@ -161,9 +166,8 @@ struct tree_formulation_rr {
                     return std::make_pair(i, sub_model.add_binary_variable());
                 }));
 
-            const auto big_M_map = compute_knapsack_big_M_map(
-                instance, budget, graph, source_quality_map, vertex_options_map,
-                probability_map,
+            const auto big_M_map = compute_big_M_map(
+                graph, source_quality_map, vertex_options_map, probability_map,
                 std::views::filter(
                     melon::vertices(graph),
                     [&graph, &arc_option_map, t](const auto & u) {
@@ -279,7 +283,7 @@ struct tree_formulation_rr {
         }
     };
 
-    template <typename I>
+    template <instance_c I>
     struct master_model_case_data {
         using vertex_t = melon::vertex_t<instance_graph_t<I>>;
         std::reference_wrapper<MODEL_LP> master_model;
@@ -321,7 +325,8 @@ struct tree_formulation_rr {
                     return std::make_pair(
                         t,
                         model.add_constraint(
-                            empty_linear_expression<variable_t, double> <= 1));
+                            empty_linear_expression<variable_t, double> <=
+                            1));
                 }));
 
             for(const vertex_t target : target_vertices) {
@@ -352,7 +357,8 @@ struct tree_formulation_rr {
                       R && used_options) {
             using namespace fhamonic::mippp::operators;
 
-            spdlog::info("add_tree: {} , {}, {}", target, contribution, std::format("{}", used_options));
+            spdlog::info("add_tree: {} , {}, {}", target, contribution,
+                         std::format("{}", used_options));
 
             master_model.get().add_column(std::views::concat(
                 std::views::single(

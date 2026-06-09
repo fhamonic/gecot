@@ -41,6 +41,9 @@ Instance parse_instance_json(const nlohmann::json & instance_json,
                              const std::filesystem::path & relative_path = "");
 Instance parse_instance(const std::filesystem::path & instance_path);
 
+gecot::instance_option_map_t<Instance, bool> parse_solution(
+    const std::filesystem::path & solution_path, const Instance & instance);
+
 }  // namespace fhamonic
 
 #endif  // PARSE_INSTANCE_HPP

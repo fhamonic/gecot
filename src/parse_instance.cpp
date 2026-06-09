@@ -689,19 +689,49 @@ Instance parse_instance_json(const nlohmann::json & instance_json,
     return instance;
 }
 
-Instance parse_instance(const std::filesystem::path & instance_path) {
-    if(!std::filesystem::exists(instance_path))
-        throw std::invalid_argument("File '" + instance_path.string() +
+namespace _details {
+void assert_json_exists(const std::filesystem::path & path) {
+    if(!std::filesystem::exists(path))
+        throw std::invalid_argument("File '" + path.string() +
                                     "' does not exists");
-    if(std::filesystem::is_directory(instance_path))
-        throw std::invalid_argument("'" + instance_path.string() +
-                                    "' is a directory");
+    if(std::filesystem::is_directory(path))
+        throw std::invalid_argument("'" + path.string() + "' is a directory");
+    if(path.extension().compare(".json"))
+        throw std::invalid_argument("'" + path.string() +
+                                    "' is not a .json file");
+}
+}  // namespace _details
 
+Instance parse_instance(const std::filesystem::path & instance_path) {
+    _details::assert_json_exists(instance_path);
     std::ifstream instance_stream(instance_path);
     nlohmann::json instance_json;
     instance_stream >> instance_json;
 
     return parse_instance_json(instance_json, instance_path.parent_path());
+}
+
+gecot::instance_option_map_t<Instance, bool> parse_solution(
+    const std::filesystem::path & solution_path, const Instance & instance) {
+    _details::assert_json_exists(solution_path);
+    auto solution = instance.create_option_map(false);
+
+    std::ifstream solution_stream(solution_path);
+    nlohmann::json solution_json;
+    solution_stream >> solution_json;
+
+    if(!solution_json.contains("solution"))
+        throw std::invalid_argument("'" + solution_path.string() +
+                                    "' has no 'solution' field");
+
+    for(auto && [option_name, value] : solution_json["solution"].items()) {
+        if(!instance.contains_option(option_name)) continue;
+
+        solution[instance.option_from_name(option_name)] =
+            value.template get<int>();
+    }
+
+    return solution;
 }
 
 }  // namespace fhamonic

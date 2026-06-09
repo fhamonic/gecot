@@ -15,7 +15,6 @@ namespace fhamonic {
 class AbstractMipInterface : public AbstractSolverInterface {
 protected:
     boost::program_options::options_description desc;
-    std::optional<std::vector<bool>> mip_start;
 
 public:
     AbstractMipInterface(const std::string & name) : desc(name + " options") {
@@ -27,7 +26,7 @@ public:
             "Solution file (JSON) to propose as a MIP start to the solver.");
     }
 
-    static std::map<std::string, int> parse_mip_start(
+    static std::vector<std::string> parse_mip_start(
         const std::filesystem::path & solution_path) {
         if(!std::filesystem::exists(solution_path))
             throw std::invalid_argument("File '" + solution_path.string() +
@@ -40,7 +39,12 @@ public:
         nlohmann::json solution_json;
         instance_stream >> solution_json;
 
-        return std::map<std::string, int>(solution_json["solution"]);
+        std::vector<std::string> taken_option_names;
+        for(auto && [option_name, value] : solution_json["solution"].items()) {
+            if(!value.template get<int>()) continue;
+            taken_option_names.emplace_back(option_name);
+        }
+        return taken_option_names;
     }
 
     void parse(const std::vector<std::string> & args) {

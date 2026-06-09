@@ -252,22 +252,26 @@ struct naive_benders : public benders_base {
             });
 
         if(mip_start.has_value()) {
-            const auto start_solution = melon::views::map([&](option_t o) {
-                return mip_start.value().at(instance.option_name(o));
-            });
-
+            instance_solution_t<I> mip_start_solution =
+                instance.create_option_map(false);
+            for(const std::string & option_name : mip_start.value()) {
+                if(!instance.contains_option(option_name)) continue;
+                const option_t option = instance.option_from_name(option_name);
+                mip_start_solution[option] = true;
+            }
             model.add_mip_start(
                 std::views::transform(instance.options(), [&](auto o) {
-                    return std::make_pair(X_vars(o), start_solution[o]);
+                    return std::make_pair(X_vars(o), mip_start_solution[o]);
                 }));
 
             for(auto && instance_case : instance.cases()) {
                 for(auto && data : cases_contracted_data[instance_case.id()]) {
                     auto && [opt, rho_values] =
-                        _compute_dual_flow(data, start_solution);
-                    model.add_constraint(
-                        C_vars(instance_case.id()) <=
-                        get_cut_expression(data, start_solution, rho_values));
+                        _compute_dual_flow(data, mip_start_solution);
+                    model.add_constraint(C_vars(instance_case.id()) <=
+                                         get_cut_expression(data,
+                                                            mip_start_solution,
+                                                            rho_values));
                 }
             }
         }

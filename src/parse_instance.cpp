@@ -711,7 +711,7 @@ Instance parse_instance(const std::filesystem::path & instance_path) {
     return parse_instance_json(instance_json, instance_path.parent_path());
 }
 
-gecot::instance_option_map_t<Instance, bool> parse_solution(
+gecot::instance_solution_t<Instance> parse_solution(
     const std::filesystem::path & solution_path, const Instance & instance) {
     _details::assert_json_exists(solution_path);
     auto solution = instance.create_option_map(false);
@@ -726,7 +726,6 @@ gecot::instance_option_map_t<Instance, bool> parse_solution(
 
     for(auto && [option_name, value] : solution_json["solution"].items()) {
         if(!instance.contains_option(option_name)) continue;
-
         solution[instance.option_from_name(option_name)] =
             value.template get<int>();
     }

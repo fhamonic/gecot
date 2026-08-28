@@ -18,12 +18,10 @@
 
 #include "gecot/concepts/instance.hpp"
 
-namespace fhamonic {
-
 class InstanceCase {
 private:
     using case_id_t = gecot::case_id_t;
-    using graph_t = fhamonic::melon::static_digraph;
+    using graph_t = melon::static_digraph;
     using vertex_t = melon::vertex_t<graph_t>;
     using arc_t = melon::arc_t<graph_t>;
 
@@ -70,7 +68,7 @@ public:
 public:
     [[nodiscard]] InstanceCase(
         case_id_t id, const std::string & case_name,
-        fhamonic::melon::static_digraph && graph,
+        melon::static_digraph && graph,
         source_quality_map_t && source_quality_map,
         target_quality_map_t && target_quality_map,
         arc_probability_map_t && arc_probability_map,
@@ -171,7 +169,7 @@ public:
     [[nodiscard]] auto create_case_map(V v) const {
         return melon::static_map<gecot::case_id_t, V>(_cases.size(), v);
     }
-    template <melon::input_mapping<gecot::case_id_t> M>
+    template <melon::mapping<gecot::case_id_t> M>
         requires std::convertible_to<melon::mapped_value_t<M, gecot::case_id_t>,
                                      double>
     [[nodiscard]] double eval_criterion(const M & case_values) const noexcept {
@@ -197,7 +195,5 @@ public:
     void set_criterion(const criterion_formula & c);
     gecot::case_id_t case_id_from_name(const std::string & name) const;
 };
-
-}  // namespace fhamonic
 
 #endif  // INSTANCE_HPP

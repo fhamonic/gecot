@@ -7,7 +7,6 @@
 #include "melon/algorithm/dijkstra.hpp"
 #include "melon/views/reverse.hpp"
 
-namespace fhamonic {
 namespace gecot {
 
 namespace detail {
@@ -16,8 +15,8 @@ struct pc_num_dijkstra_traits {
     using semiring = melon::most_reliable_path_semiring<V>;
     using heap = melon::updatable_d_ary_heap<
         4, std::pair<melon::vertex_t<GR>, V>, typename semiring::less_t,
-        melon::vertex_map_t<GR, std::size_t>, melon::views::element_map<1>,
-        melon::views::element_map<0>>;
+        melon::vertex_map_t<GR, std::size_t>, melon::maps::element_map<1>,
+        melon::maps::element_map<0>>;
 
     static constexpr bool store_paths = false;
     static constexpr bool store_distances = false;
@@ -63,6 +62,5 @@ double pc_num_vertex_in_flow(const GR & graph, const SQM & source_quality_map,
 };
 
 }  // namespace gecot
-}  // namespace fhamonic
 
 #endif  // GECOT_INDICES_PC_NUM_HPP

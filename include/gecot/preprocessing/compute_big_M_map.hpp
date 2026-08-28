@@ -12,7 +12,6 @@
 #include "gecot/concepts/instance.hpp"
 #include "gecot/indices/parallel_pc_num.hpp"
 
-namespace fhamonic {
 namespace gecot {
 
 template <typename GR, typename QM, typename VOM, typename PM>
@@ -100,6 +99,5 @@ auto compute_knapsack_big_M_map(const I & instance, const double budget,
 }
 
 }  // namespace gecot
-}  // namespace fhamonic
 
 #endif  // GECOT_COMPUTE_BIG_M_MAP_HPP

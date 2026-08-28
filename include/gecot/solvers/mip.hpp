@@ -14,7 +14,6 @@
 #include "gecot/preprocessing/compute_big_M_map.hpp"
 #include "gecot/preprocessing/compute_generalized_flow_graph.hpp"
 
-namespace fhamonic {
 namespace gecot {
 namespace solvers {
 
@@ -106,7 +105,7 @@ struct mip {
                 compute_generalized_flow_graph(instance_case);
             const auto big_M_map = compute_big_M_map(
                 graph, source_quality_map,
-                melon::views::map([&vertex_options_map](auto && u) {
+                melon::maps::map([&vertex_options_map](auto && u) {
                     return std::views::transform(
                         vertex_options_map[u], [](auto && e) {
                             auto && [source_quality_gain, tqg, option] = e;
@@ -228,4 +227,3 @@ struct mip {
 
 }  // namespace solvers
 }  // namespace gecot
-}  // namespace fhamonic

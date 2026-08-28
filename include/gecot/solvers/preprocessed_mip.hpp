@@ -20,7 +20,6 @@
 #include "gecot/solvers/greedy_decremental.hpp"
 #include "gecot/solvers/greedy_incremental.hpp"
 
-namespace fhamonic {
 namespace gecot {
 namespace solvers {
 
@@ -45,7 +44,7 @@ struct preprocessed_mip {
         }
         auto operator()(const criterion_var & v) { return C_vars.get()(v); }
         auto operator()(const criterion_sum & f) {
-            using namespace fhamonic::mippp::operators;
+            using namespace mippp::operators;
             auto var = model.get().add_variable();
             std::vector<typename M::variable> vars;
             for(auto && e : f.values) vars.emplace_back(std::visit(*this, e));
@@ -53,7 +52,7 @@ struct preprocessed_mip {
             return var;
         }
         auto operator()(const criterion_product & f) {
-            using namespace fhamonic::mippp::operators;
+            using namespace mippp::operators;
             if(!std::holds_alternative<criterion_constant>(f.values[0]) &&
                f.values.size() != 2)
                 throw std::invalid_argument(
@@ -68,7 +67,7 @@ struct preprocessed_mip {
             return var;
         }
         auto operator()(const criterion_min & f) {
-            using namespace fhamonic::mippp::operators;
+            using namespace mippp::operators;
             auto var = model.get().add_variable();
             for(auto && e : f.values) {
                 model.get().add_constraint(var <= std::visit(*this, e));
@@ -103,8 +102,8 @@ struct preprocessed_mip {
                                  const double budget) const {
         auto solution = instance.create_option_map(false);
 
-        using namespace fhamonic::mippp;
-        using namespace fhamonic::mippp::operators;
+        using namespace mippp;
+        using namespace mippp::operators;
         gurobi_api api;
         gurobi_milp model(api);
         model.set_optimality_tolerance(1e-10);
@@ -353,4 +352,3 @@ struct preprocessed_mip {
 
 }  // namespace solvers
 }  // namespace gecot
-}  // namespace fhamonic

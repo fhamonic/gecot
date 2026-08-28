@@ -25,7 +25,6 @@
 
 #include "io_helper.hpp"
 
-namespace fhamonic {
 namespace gecot {
 
 template <instance_c I>
@@ -104,13 +103,13 @@ double compute_score(const I & instance, const auto & cases_current_sqm,
 template <instance_c I>
 auto compute_base_cases_pc_num(const I & instance) noexcept {
     return compute_cases_pc_num(
-        instance, melon::views::map([&](auto && case_id) {
+        instance, melon::maps::map([&](auto && case_id) {
             return instance.cases()[case_id].source_quality_map();
         }),
-        melon::views::map([&](auto && case_id) {
+        melon::maps::map([&](auto && case_id) {
             return instance.cases()[case_id].target_quality_map();
         }),
-        melon::views::map([&](auto && case_id) {
+        melon::maps::map([&](auto && case_id) {
             return instance.cases()[case_id].arc_probability_map();
         }));
 }
@@ -120,7 +119,7 @@ double compute_base_score(const I & instance) noexcept {
     return instance.eval_criterion(compute_base_cases_pc_num(instance));
 }
 
-template <instance_c I, melon::input_mapping<option_t> S>
+template <instance_c I, melon::mapping<option_t> S>
     requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
 double compute_solution_cost(const I & instance, const S & solution) noexcept {
     double sum = 0;
@@ -130,13 +129,13 @@ double compute_solution_cost(const I & instance, const S & solution) noexcept {
     return sum;
 }
 
-template <instance_c I, melon::input_mapping<option_t> S>
+template <instance_c I, melon::mapping<option_t> S>
     requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
 auto compute_solution_cases_pc_num(const I & instance, const S & solution,
                                    const auto & cases_vertex_options,
                                    const auto & cases_arc_options) noexcept {
     return compute_cases_pc_num(
-        instance, melon::views::map([&](auto && case_id) {
+        instance, melon::maps::map([&](auto && case_id) {
             auto enhanced_sqm = instance.cases()[case_id].source_quality_map();
             auto && vertex_options = cases_vertex_options[case_id];
             for(auto && option : instance.options()) {
@@ -147,7 +146,7 @@ auto compute_solution_cases_pc_num(const I & instance, const S & solution,
             }
             return enhanced_sqm;
         }),
-        melon::views::map([&](auto && case_id) {
+        melon::maps::map([&](auto && case_id) {
             auto enhanced_tqm = instance.cases()[case_id].target_quality_map();
             auto && vertex_options = cases_vertex_options[case_id];
             for(auto && option : instance.options()) {
@@ -158,7 +157,7 @@ auto compute_solution_cases_pc_num(const I & instance, const S & solution,
             }
             return enhanced_tqm;
         }),
-        melon::views::map([&](auto && case_id) {
+        melon::maps::map([&](auto && case_id) {
             auto enhanced_pm = instance.cases()[case_id].arc_probability_map();
             auto && arc_options = cases_arc_options[case_id];
             for(auto && option : instance.options()) {
@@ -171,7 +170,7 @@ auto compute_solution_cases_pc_num(const I & instance, const S & solution,
         }));
 }
 
-template <instance_c I, melon::input_mapping<option_t> S>
+template <instance_c I, melon::mapping<option_t> S>
     requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
 auto compute_solution_cases_pc_num(const I & instance,
                                    const S & solution) noexcept {
@@ -245,7 +244,7 @@ void compute_options_cases_incr_pc_num(
         });
 }
 
-template <instance_c I, melon::input_mapping<option_t> S,
+template <instance_c I, melon::mapping<option_t> S,
           detail::range_of<option_t> O>
     requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
 void compute_options_cases_decr_pc_num(
@@ -319,6 +318,5 @@ void compute_options_cases_decr_pc_num(
 }
 
 }  // namespace gecot
-}  // namespace fhamonic
 
 #endif  // GECOT_HELPER_HPP

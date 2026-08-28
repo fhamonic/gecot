@@ -16,8 +16,6 @@
 #include "melon/container/static_digraph.hpp"
 #include "melon/container/static_map.hpp"
 
-namespace fhamonic {
-
 namespace melon {
 template <typename G, typename CMP, typename... VM, typename... AM>
 auto make_static_digraph(G && graph, CMP vertex_cmp,
@@ -419,6 +417,5 @@ contracted_graph_data<C> compute_contracted_graph_data(
 }
 
 }  // namespace gecot
-}  // namespace fhamonic
 
 #endif  // GECOT_COMPUTE_CONTRACTED_GRAPH_HPP

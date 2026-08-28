@@ -10,8 +10,6 @@
 
 #include "solver_interfaces/abstract_solver_interface.hpp"
 
-namespace fhamonic {
-
 class AbstractMipInterface : public AbstractSolverInterface {
 protected:
     boost::program_options::options_description desc;
@@ -74,5 +72,3 @@ public:
     }
     virtual std::string string() const = 0;
 };
-
-}  // namespace fhamonic

@@ -15,8 +15,6 @@
 
 #include "instance.hpp"
 
-namespace fhamonic {
-
 void parse_columns_aliases(
     const nlohmann::json & json_object,
     std::initializer_list<std::reference_wrapper<std::string>> column_names);
@@ -43,7 +41,5 @@ Instance parse_instance(const std::filesystem::path & instance_path);
 
 gecot::instance_solution_t<Instance> parse_solution(
     const std::filesystem::path & solution_path, const Instance & instance);
-
-}  // namespace fhamonic
 
 #endif  // PARSE_INSTANCE_HPP

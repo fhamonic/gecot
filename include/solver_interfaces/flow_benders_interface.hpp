@@ -8,8 +8,6 @@
 
 #include "solver_interfaces/abstract_mip_interface.hpp"
 
-namespace fhamonic {
-
 class FlowBendersInterface : public AbstractMipInterface {
 private:
     gecot::solvers::flow_benders solver;
@@ -48,5 +46,3 @@ public:
     }
     std::string string() const { return name(); }
 };
-
-}  // namespace fhamonic

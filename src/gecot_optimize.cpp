@@ -36,8 +36,6 @@ namespace po = boost::program_options;
 #include "solver_interfaces/worst_greedy_decremental_interface.hpp"
 #include "solver_interfaces/worst_greedy_incremental_interface.hpp"
 
-using namespace fhamonic;
-
 static bool process_command_line(
     const std::vector<std::string> & args,
     std::shared_ptr<AbstractSolverInterface> & solver,

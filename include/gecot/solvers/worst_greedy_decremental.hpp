@@ -10,7 +10,6 @@
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
 
-namespace fhamonic {
 namespace gecot {
 namespace solvers {
 
@@ -205,4 +204,3 @@ struct WorstGreedyDecremental {
 
 }  // namespace solvers
 }  // namespace gecot
-}  // namespace fhamonic

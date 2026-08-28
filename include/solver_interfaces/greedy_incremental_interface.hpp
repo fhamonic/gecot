@@ -9,8 +9,6 @@
 
 #include "solver_interfaces/abstract_solver_interface.hpp"
 
-namespace fhamonic {
-
 class GreedyIncrementalInterface : public AbstractSolverInterface {
 private:
     gecot::solvers::GreedyIncremental solver;
@@ -50,7 +48,5 @@ public:
     }
     std::string string() const { return name(); }
 };
-
-}  // namespace fhamonic
 
 #endif  // GECOT_GREEDY_INCREMENTAL_INTERFACE_HPP

@@ -1,7 +1,5 @@
 #include "parse_instance.hpp"
 
-namespace fhamonic {
-
 static const nlohmann::json instance_schema = R"(
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -732,5 +730,3 @@ gecot::instance_solution_t<Instance> parse_solution(
 
     return solution;
 }
-
-}  // namespace fhamonic

@@ -5,8 +5,6 @@
 
 #include "instance.hpp"
 
-namespace fhamonic {
-
 class AbstractSolverInterface {
 public:
     virtual ~AbstractSolverInterface() {}
@@ -20,5 +18,3 @@ public:
     virtual std::string options_description() const = 0;
     virtual std::string string() const = 0;
 };
-
-}  // namespace fhamonic

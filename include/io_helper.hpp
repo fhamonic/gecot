@@ -9,8 +9,6 @@
 
 #include <spdlog/spdlog.h>
 
-namespace fhamonic {
-
 template <spdlog::level::level_enum LVL>
 void print_instance_size(auto && instance,
                          const std::string & instance_name = "Instance") {
@@ -21,13 +19,25 @@ void print_instance_size(auto && instance,
             instance.cases(), [&](auto && c) { return c.name().size(); }));
     for(auto instance_case : instance.cases()) {
         auto && graph = instance_case.graph();
+        auto && vertex_options_map = instance_case.vertex_options_map();
+
+
+
+
+        std::cout << "print " << melon::num_vertices(graph) << " " << vertex_options_map.size() << std::endl;
+
+
+
+
+        auto && source_quality_map = instance_case.source_quality_map();
+        auto && target_quality_map = instance_case.target_quality_map();
         int num_improvable_vertices = 0;
         int num_habitat_vertices = 0;
         for(auto && v : melon::vertices(graph)) {
             num_improvable_vertices +=
-                instance_case.vertex_options_map()[v].size() > 0;
-            num_habitat_vertices += instance_case.source_quality_map()[v] > 0 ||
-                                    instance_case.target_quality_map()[v] > 0;
+                vertex_options_map[v].size() > 0;
+            num_habitat_vertices += source_quality_map[v] > 0 ||
+                                    target_quality_map[v] > 0;
         }
         int num_improvable_arcs = 0;
         for(auto && a : melon::arcs(graph))
@@ -97,7 +107,5 @@ public:
     }
     void reset() { _current_ticks = 0; }
 };
-
-}  // namespace fhamonic
 
 #endif  // IO_HELPER_HPP

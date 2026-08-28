@@ -11,7 +11,6 @@
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
 
-namespace fhamonic {
 namespace gecot {
 namespace solvers {
 
@@ -180,6 +179,5 @@ struct StaticDecremental {
 
 }  // namespace solvers
 }  // namespace gecot
-}  // namespace fhamonic
 
 #endif  // GECOT_SOLVERS_STATIC_DECREMENTAL_HPP

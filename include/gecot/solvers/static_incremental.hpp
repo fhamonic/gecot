@@ -11,7 +11,6 @@
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
 
-namespace fhamonic {
 namespace gecot {
 namespace solvers {
 
@@ -45,13 +44,13 @@ struct StaticIncremental {
 
         compute_options_cases_incr_pc_num(
             instance, options,
-            melon::views::map([&cases](auto case_id) -> decltype(auto) {
+            melon::maps::map([&cases](auto case_id) -> decltype(auto) {
                 return cases[case_id].source_quality_map();
             }),
-            melon::views::map([&cases](auto case_id) -> decltype(auto) {
+            melon::maps::map([&cases](auto case_id) -> decltype(auto) {
                 return cases[case_id].target_quality_map();
             }),
-            melon::views::map([&cases](auto case_id) -> decltype(auto) {
+            melon::maps::map([&cases](auto case_id) -> decltype(auto) {
                 return cases[case_id].arc_probability_map();
             }),
             cases_vertex_options, cases_arc_options, options_cases_pc_num);
@@ -85,6 +84,5 @@ struct StaticIncremental {
 };
 }  // namespace solvers
 }  // namespace gecot
-}  // namespace fhamonic
 
 #endif  // GECOT_SOLVERS_STATIC_INCREMENTAL_HPP

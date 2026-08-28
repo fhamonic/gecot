@@ -18,7 +18,6 @@
 
 #include "gecot/solvers/benders_base.hpp"
 
-namespace fhamonic {
 namespace gecot {
 namespace solvers {
 
@@ -140,7 +139,7 @@ struct unprep_target_benders : public benders_base {
 
         auto Big_M_map = compute_big_M_map(
             instance_case.graph(), instance_case.source_quality_map(),
-            melon::views::map([&](auto && v) {
+            melon::maps::map([&](auto && v) {
                 return std::views::transform(
                     instance_case.vertex_options_map()[v], [](auto && e) {
                         auto && [source_quality_gain, tqg, option] = e;
@@ -206,7 +205,7 @@ struct unprep_target_benders : public benders_base {
         model.set_candidate_solution_callback(
             [&](model_type::candidate_solution_callback_handle & handle) {
                 const auto master_solution = handle.get_solution();
-                auto sol = melon::views::map([&](option_t i) {
+                auto sol = melon::maps::map([&](option_t i) {
                     return master_solution[X_vars(i)] > 0.5;
                 });
                 for(auto && instance_case : instance.cases()) {
@@ -232,4 +231,3 @@ struct unprep_target_benders : public benders_base {
 
 }  // namespace solvers
 }  // namespace gecot
-}  // namespace fhamonic

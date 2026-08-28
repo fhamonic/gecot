@@ -20,7 +20,6 @@
 
 #include "gecot/solvers/benders_base.hpp"
 
-namespace fhamonic {
 namespace gecot {
 namespace solvers {
 
@@ -222,7 +221,7 @@ struct naive_benders : public benders_base {
         model.set_candidate_solution_callback(
             [&](model_type::candidate_solution_callback_handle & handle) {
                 const auto master_solution = handle.get_solution();
-                auto sol = melon::views::map([&](option_t i) {
+                auto sol = melon::maps::map([&](option_t i) {
                     return master_solution[X_vars(i)] > 0.5;
                 });
                 for(auto && instance_case : instance.cases()) {
@@ -286,4 +285,3 @@ struct naive_benders : public benders_base {
 
 }  // namespace solvers
 }  // namespace gecot
-}  // namespace fhamonic

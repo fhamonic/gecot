@@ -8,7 +8,6 @@
 
 #include "melon/graph.hpp"
 
-namespace fhamonic {
 namespace gecot {
 namespace detail {
 template <typename T, typename V>
@@ -63,15 +62,15 @@ template <typename _Tp>
 concept case_c = requires(_Tp && ic) {
     { ic.graph() } -> melon::outward_incidence_graph;
     { ic.source_quality_map() } 
-    -> melon::input_mapping<melon::vertex_t<case_graph_t<_Tp>>>;
+    -> melon::mapping<melon::vertex_t<case_graph_t<_Tp>>>;
     { ic.target_quality_map() } 
-    -> melon::input_mapping<melon::vertex_t<case_graph_t<_Tp>>>;
+    -> melon::mapping<melon::vertex_t<case_graph_t<_Tp>>>;
     { ic.arc_probability_map() } 
-    -> melon::input_mapping<melon::arc_t<case_graph_t<_Tp>>>;
+    -> melon::mapping<melon::arc_t<case_graph_t<_Tp>>>;
     { ic.vertex_options_map() } 
-    -> melon::input_mapping<melon::vertex_t<case_graph_t<_Tp>>>;
+    -> melon::mapping<melon::vertex_t<case_graph_t<_Tp>>>;
     { ic.arc_options_map() } 
-    -> melon::input_mapping<melon::arc_t<case_graph_t<_Tp>>>;
+    -> melon::mapping<melon::arc_t<case_graph_t<_Tp>>>;
 } && std::same_as<source_quality_t<_Tp>, double>
   && std::same_as<target_quality_t<_Tp>, double> 
   && std::same_as<case_probability_t<_Tp>, double>;
@@ -124,6 +123,5 @@ concept instance_c =
 // clang-format on
 
 }  // namespace gecot
-}  // namespace fhamonic
 
 #endif  // GECOT_CONCEPTS_INSTANCE_CASE_HPP

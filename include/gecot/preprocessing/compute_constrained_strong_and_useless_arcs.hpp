@@ -14,7 +14,6 @@
 
 #include "io_helper.hpp"
 
-namespace fhamonic {
 namespace gecot {
 
 template <instance_c I, case_c C>
@@ -268,6 +267,5 @@ auto compute_constrained_strong_and_useless_arcs(
 }
 
 }  // namespace gecot
-}  // namespace fhamonic
 
 #endif  // GECOT_COMPUTE_CONSTRAINED_STRONG_AND_USELESS_ARCS_HPP

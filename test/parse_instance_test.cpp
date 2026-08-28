@@ -15,8 +15,6 @@
 #include "instance.hpp"
 #include "parse_instance.hpp"
 
-using namespace fhamonic;
-
 // GTEST_TEST(parse_instance, json_test) {
 //     static const nlohmann::json instance_schema = R"(
 // {
@@ -43,7 +41,7 @@ GTEST_TEST(parse_instance, test) {
     for(auto && o : instance.options()) budget += instance.option_cost(o);
     ASSERT_DOUBLE_EQ(budget, 426654.0);
     ASSERT_EQ(budget,
-              gecot::compute_solution_cost(instance, melon::views::true_map{}));
+              gecot::compute_solution_cost(instance, melon::maps::true_map{}));
 
     ASSERT_EQ(std::ranges::size(instance.cases()), 1);
     InstanceCase squirell = *std::ranges::begin(instance.cases());
@@ -75,7 +73,7 @@ GTEST_TEST(parse_instance, test) {
     ASSERT_DOUBLE_EQ(pc_value, 117149420274.53568);
     ASSERT_DOUBLE_EQ(pc_value, gecot::compute_base_score(instance));
     ASSERT_DOUBLE_EQ(pc_value, gecot::compute_solution_cases_pc_num(
-                                   instance, melon::views::false_map{})[0]);
+                                   instance, melon::maps::false_map{})[0]);
 
     auto && vertex_options_map = squirell.vertex_options_map();
     ASSERT_EQ(vertex_options_map.size(), 518);
@@ -96,7 +94,7 @@ GTEST_TEST(parse_instance, test) {
     }
 
     const auto cases_maximum_pc_num = gecot::compute_solution_cases_pc_num(
-        instance, melon::views::true_map{});
+        instance, melon::maps::true_map{});
     auto && maximum_pc_value = instance.eval_criterion(cases_maximum_pc_num);
     ASSERT_DOUBLE_EQ(maximum_pc_value, 150608123477.23215);
 }

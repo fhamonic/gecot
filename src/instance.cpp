@@ -1,7 +1,5 @@
 #include "instance.hpp"
 
-using namespace fhamonic;
-
 // InstanceCase
 
 [[nodiscard]] InstanceCase::case_id_t InstanceCase::id() const noexcept {
@@ -37,7 +35,7 @@ InstanceCase::arc_options_map() const noexcept {
 
 [[nodiscard]] InstanceCase::InstanceCase(
     case_id_t id, const std::string & case_name,
-    fhamonic::melon::static_digraph && graph,
+    melon::static_digraph && graph,
     std::vector<double> && source_quality_map,
     std::vector<double> && target_quality_map,
     std::vector<double> && arc_probability_map,

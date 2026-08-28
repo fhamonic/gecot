@@ -11,8 +11,6 @@
 
 #include "instance.hpp"
 
-namespace fhamonic {
-
 template <gecot::instance_c I>
 auto trivial_reformulate_instance(
     const I & instance, double budget = std::numeric_limits<double>::max()) {
@@ -112,12 +110,6 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
         vertex_name_to_id_map[vertex_names_map[v]] = v;
     for(arc_t a : melon::arcs(graph)) arc_name_to_id_map[arc_names[a]] = a;
 
-    auto & reformulated_case = instance.emplace_case(
-        instance_case.name(), std::move(graph), std::move(source_quality_map),
-        std::move(target_quality_map), std::move(arc_probability_map),
-        std::move(vertex_names_map), std::move(vertex_name_to_id_map),
-        std::move(arc_names), std::move(arc_name_to_id_map));
-
     auto vertex_options = melon::create_vertex_map<
         std::vector<std::tuple<double, double, gecot::option_t>>>(graph, {});
     for(vertex_t v : melon::vertices(graph)) {
@@ -133,8 +125,6 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
             }
         }
     }
-    reformulated_case.set_vertex_options_map(std::move(vertex_options));
-
     auto arc_options =
         melon::create_arc_map<std::vector<std::pair<double, gecot::option_t>>>(
             graph, {});
@@ -147,9 +137,15 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
                 reformulated_option_map[original_option].value());
         }
     }
+
+    auto & reformulated_case = instance.emplace_case(
+        instance_case.name(), std::move(graph), std::move(source_quality_map),
+        std::move(target_quality_map), std::move(arc_probability_map),
+        std::move(vertex_names_map), std::move(vertex_name_to_id_map),
+        std::move(arc_names), std::move(arc_name_to_id_map));
+
+    reformulated_case.set_vertex_options_map(std::move(vertex_options));
     reformulated_case.set_arc_options_map(std::move(arc_options));
 }
-
-}  // namespace fhamonic
 
 #endif  // TRIVIAL_REFORMULATE_HPP

@@ -29,17 +29,16 @@
 #include "gecot/solvers/greedy_decremental.hpp"
 #include "gecot/solvers/greedy_incremental.hpp"
 
-using MODEL_LP_API = fhamonic::mippp::clp_api;
-using MODEL_LP = fhamonic::mippp::clp_lp;
-using MODEL_MILP_API = fhamonic::mippp::cbc_api;
-using MODEL_MILP = fhamonic::mippp::cbc_milp;
+using MODEL_LP_API = mippp::clp_api;
+using MODEL_LP = mippp::clp_lp;
+using MODEL_MILP_API = mippp::cbc_api;
+using MODEL_MILP = mippp::cbc_milp;
 
-// using MODEL_LP_API = fhamonic::mippp::gurobi_api;
-// using MODEL_LP = fhamonic::mippp::gurobi_lp;
-// using MODEL_MILP_API = fhamonic::mippp::gurobi_api;
-// using MODEL_MILP = fhamonic::mippp::gurobi_milp;
+// using MODEL_LP_API = mippp::gurobi_api;
+// using MODEL_LP = mippp::gurobi_lp;
+// using MODEL_MILP_API = mippp::gurobi_api;
+// using MODEL_MILP = mippp::gurobi_milp;
 
-namespace fhamonic {
 namespace gecot {
 namespace solvers {
 
@@ -64,7 +63,7 @@ struct path_formulation_rr {
         }
         auto operator()(const criterion_var & v) { return C_vars.get()(v); }
         auto operator()(const criterion_sum & f) {
-            using namespace fhamonic::mippp::operators;
+            using namespace mippp::operators;
             auto var = model.get().add_variable();
             std::vector<typename M::variable> vars;
             for(auto && e : f.values) vars.emplace_back(std::visit(*this, e));
@@ -72,7 +71,7 @@ struct path_formulation_rr {
             return var;
         }
         auto operator()(const criterion_product & f) {
-            using namespace fhamonic::mippp::operators;
+            using namespace mippp::operators;
             if(!std::holds_alternative<criterion_constant>(f.values[0]) &&
                f.values.size() != 2)
                 throw std::invalid_argument(
@@ -87,7 +86,7 @@ struct path_formulation_rr {
             return var;
         }
         auto operator()(const criterion_min & f) {
-            using namespace fhamonic::mippp::operators;
+            using namespace mippp::operators;
             auto var = model.get().add_variable();
             for(auto && e : f.values) {
                 model.get().add_constraint(var <= std::visit(*this, e));
@@ -117,15 +116,15 @@ struct path_formulation_rr {
         }
     }
 
-    using variable_t = fhamonic::mippp::model_variable<int, double>;
-    using constraint_t = fhamonic::mippp::model_constraint<int>;
+    using variable_t = mippp::model_variable<int, double>;
+    using constraint_t = mippp::model_constraint<int>;
 
     template <instance_c I>
     struct sub_model_data {
         using vertex_t = melon::vertex_t<instance_graph_t<I>>;
         vertex_t target;
         MODEL_MILP sub_model;
-        fhamonic::mippp::runtime_linear_expression<variable_t, double>
+        mippp::runtime_linear_expression<variable_t, double>
             default_objective;
         std::flat_map<option_t, variable_t> sub_X_vars_map;
 
@@ -135,7 +134,7 @@ struct path_formulation_rr {
                        const auto & useless_arcs_map,
                        const vertex_t & original_t)
             : target(original_t), sub_model(milp_api), sub_X_vars_map() {
-            using namespace fhamonic::mippp::operators;
+            using namespace mippp::operators;
             sub_model.set_optimality_tolerance(1e-10);
             sub_model.set_feasibility_tolerance(1e-8);
             sub_model.set_maximization();
@@ -243,8 +242,8 @@ struct path_formulation_rr {
 
         bool try_generate_column(auto & master_data,
                                  const auto & dual_solution) {
-            using namespace fhamonic::mippp;
-            using namespace fhamonic::mippp::operators;
+            using namespace mippp;
+            using namespace mippp::operators;
             sub_model.set_objective(
                 dual_solution[master_data.contribution_constraint] *
                     default_objective -
@@ -299,11 +298,11 @@ struct path_formulation_rr {
             , master_model(model)
             , contribution_variable(model.add_variable())
             , contribution_constraint(
-                  model.add_constraint(fhamonic::mippp::operators::operator<=(
+                  model.add_constraint(mippp::operators::operator<=(
                       contribution_variable, 0)))
             , uniqueness_constraint_map()
             , purchase_constraints_map() {
-            using namespace fhamonic::mippp::operators;
+            using namespace mippp::operators;
             auto target_vertices = std::views::filter(
                 melon::vertices(instance_case.graph()),
                 [&instance_case](const vertex_t & t) {
@@ -321,7 +320,7 @@ struct path_formulation_rr {
                     return std::make_pair(
                         t,
                         model.add_constraint(
-                            empty_linear_expression<variable_t, double> <= 1));
+                            mippp::empty_linear_expression<variable_t, double> <= 1));
                 }));
 
             for(const vertex_t target : target_vertices) {
@@ -340,7 +339,7 @@ struct path_formulation_rr {
                                 return std::make_pair(
                                     std::make_pair(t, i),
                                     model.add_constraint(
-                                        empty_linear_expression<variable_t,
+                                        mippp::empty_linear_expression<variable_t,
                                                                 double> <=
                                         X_vars(i)));
                             });
@@ -350,7 +349,7 @@ struct path_formulation_rr {
         template <std::ranges::range R>
         void add_tree(const vertex_t & target, const double contribution,
                       R && used_options) {
-            using namespace fhamonic::mippp::operators;
+            using namespace mippp::operators;
             // spdlog::info("add_tree: {} , {}, {}", target, contribution,
             //              std::format("{}", used_options));
 
@@ -374,8 +373,8 @@ struct path_formulation_rr {
                                  const double budget) const {
         auto solution = instance.create_option_map(false);
 
-        using namespace fhamonic::mippp;
-        using namespace fhamonic::mippp::operators;
+        using namespace mippp;
+        using namespace mippp::operators;
         std::mutex master_model_mutex;
         MODEL_LP_API lp_api;
         MODEL_LP model(lp_api);
@@ -534,4 +533,3 @@ struct path_formulation_rr {
 
 }  // namespace solvers
 }  // namespace gecot
-}  // namespace fhamonic

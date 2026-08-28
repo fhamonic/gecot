@@ -12,7 +12,6 @@
 #include "gecot/preprocessing/compute_contracted_graph.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 
-namespace fhamonic {
 namespace gecot {
 namespace solvers {
 
@@ -100,4 +99,3 @@ struct benders_base {
 
 }  // namespace solvers
 }  // namespace gecot
-}  // namespace fhamonic

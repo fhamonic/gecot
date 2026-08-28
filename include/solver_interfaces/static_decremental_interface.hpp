@@ -9,8 +9,6 @@
 
 #include "solver_interfaces/abstract_solver_interface.hpp"
 
-namespace fhamonic {
-
 class StaticDecrementalInterface : public AbstractSolverInterface {
 private:
     gecot::solvers::StaticDecremental solver;
@@ -55,7 +53,5 @@ public:
     }
     std::string string() const { return name(); }
 };
-
-}  // namespace fhamonic
 
 #endif  // GECOT_STATIC_DECREMENTAL_INTERFACE_HPP

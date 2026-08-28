@@ -10,7 +10,6 @@
 
 #include "gecot/concepts/instance.hpp"
 
-namespace fhamonic {
 namespace gecot {
 
 template <case_c C>
@@ -143,6 +142,5 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
 }
 
 }  // namespace gecot
-}  // namespace fhamonic
 
 #endif  // GECOT_COMPUTE_CONTRACTED_GENERALIZED_FLOW_GRAPH_HPP

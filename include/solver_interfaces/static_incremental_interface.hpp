@@ -10,8 +10,6 @@
 
 #include "solver_interfaces/abstract_solver_interface.hpp"
 
-namespace fhamonic {
-
 class StaticIncrementalInterface : public AbstractSolverInterface {
 private:
     gecot::solvers::StaticIncremental solver;
@@ -51,7 +49,5 @@ public:
     }
     std::string string() const { return name(); }
 };
-
-}  // namespace fhamonic
 
 #endif  // GECOT_STATIC_INCREMENTAL_INTERFACE_HPP

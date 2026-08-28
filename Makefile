@@ -12,7 +12,7 @@ $(BUILD_DIR):
 
 init-submodules:
 	git submodule update --init --recursive
-	
+
 update-submodules:
 	git submodule update --recursive --remote
 

@@ -9,8 +9,6 @@
 
 #include "solver_interfaces/abstract_mip_interface.hpp"
 
-namespace fhamonic {
-
 class mipInterface : public AbstractMipInterface {
 private:
     gecot::solvers::mip solver;
@@ -39,5 +37,3 @@ public:
     }
     std::string string() const { return name(); }
 };
-
-}  // namespace fhamonic

@@ -43,7 +43,7 @@ namespace fhamonic {
 namespace gecot {
 namespace solvers {
 
-struct tree_formulation_rr {
+struct path_formulation_rr {
     double feasibility_tol = 0.0;
     bool print_model = false;
     double probability_resolution;

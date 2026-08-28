@@ -1,11 +1,15 @@
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
 #include <flat_map>
 #include <functional>
 #include <limits>
 #include <stdexcept>
+#include <tuple>
 #include <type_traits>
+#include <unordered_set>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 
@@ -347,12 +351,39 @@ struct tree_formulation_rr {
                     })));
         }
 
+        using tree_t = std::tuple<vertex_t, double, std::vector<option_t>>;
+
+        // struct tree_hash {
+        //     static void hash_combine(std::size_t & seed, std::size_t value) {
+        //         seed ^=
+        //             value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+        //     }
+        //     std::size_t operator()(const tree_t & t) const {
+        //         std::size_t seed = 0;
+        //         hash_combine(seed, std::hash<vertex_t>{}(std::get<0>(t)));
+        //         hash_combine(seed, std::hash<double>{}(std::get<1>(t)));
+        //         for(const auto & x : std::get<2>(t)) {
+        //             hash_combine(seed, std::hash<option_t>{}(x));
+        //         }
+        //         return seed;
+        //     }
+        // };
+        // std::unordered_set<tree_t, tree_hash> tree_lookup;
+
         template <std::ranges::range R>
         void add_tree(const vertex_t & target, const double contribution,
                       R && used_options) {
             using namespace fhamonic::mippp::operators;
             // spdlog::info("add_tree: {} , {}, {}", target, contribution,
             //              std::format("{}", used_options));
+
+            // auto [it, inserted] = tree_lookup.emplace(
+            //     target, contribution,
+            //     std::ranges::to<std::vector<option_t>>(used_options));
+            // if(!inserted) {
+            //     spdlog::info("skipped add_tree");
+            //     return;
+            // }
 
             std::lock_guard<std::mutex> guard(master_model_mutex_ref.get());
 
@@ -443,6 +474,7 @@ struct tree_formulation_rr {
                 mip_start_solution[option] = true;
             }
 
+            spdlog::info("MIP start with :");
             const auto option_name_max_length =
                 std::ranges::max(std::ranges::views::transform(
                     instance.options(),

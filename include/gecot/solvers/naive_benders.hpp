@@ -209,13 +209,20 @@ struct naive_benders : public benders_base {
 
         for(auto && instance_case : instance.cases()) {
             const auto case_id = instance_case.id();
+            // rho_values must outlive add_constraint: xsum is lazy and its
+            // terms are only walked there
+            auto cut_data = std::ranges::to<std::vector>(std::views::transform(
+                cases_contracted_data[case_id], [&](auto && data) {
+                    return _compute_dual_flow(data, solution);
+                }));
             model.add_constraint(
                 C_vars(case_id) <=
-                xsum(cases_contracted_data[case_id], [&](auto && data) {
-                    auto && [opt, rho_values] =
-                        _compute_dual_flow(data, solution);
-                    return get_cut_expression(data, solution, rho_values);
-                }));
+                xsum(std::views::zip(cases_contracted_data[case_id],
+                                     std::views::values(cut_data)),
+                     [&](auto && e) {
+                         auto && [data, rho_values] = e;
+                         return get_cut_expression(data, solution, rho_values);
+                     }));
         }
 
         model.set_candidate_solution_callback(

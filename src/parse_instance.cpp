@@ -579,8 +579,12 @@ InstanceCase & parse_instance_case(const nlohmann::json & json_object,
         if(probability < 0 || probability > 1)
             throw std::invalid_argument('\'' + std::to_string(probability) +
                                         "' is not a valid probability");
-        builder.add_arc(vertex_name_to_id_map[from], vertex_name_to_id_map[to],
-                        probability, id);
+        if(!vertex_name_to_id_map.contains(from))
+            throw std::invalid_argument("unknown vertex id '" + from + '\'');
+        if(!vertex_name_to_id_map.contains(to))
+            throw std::invalid_argument("unknown vertex id '" + to + '\'');
+        builder.add_arc(vertex_name_to_id_map.at(from),
+                        vertex_name_to_id_map.at(to), probability, id);
     };
 
     auto arcs_json = json_object["arcs"];

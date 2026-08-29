@@ -121,7 +121,7 @@ auto compute_constrained_strong_and_useless_arcs(
             [&](const tbb::blocked_range<decltype(arcs_range.begin())> &
                     arcs_block) {
                 arc_t uv;
-                auto fiber_map = melon::create_arc_map<bool>(graph, false);
+                auto fiber_map = melon::create_vertex_map<bool>(graph, false);
                 auto sgraph = melon::views::subgraph(
                     graph, {}, [&](const arc_t & a) -> bool {
                         return !fiber_map[melon::arc_target(graph, a)] &&
@@ -173,7 +173,7 @@ auto compute_constrained_strong_and_useless_arcs(
             [&](const tbb::blocked_range<decltype(arcs_range.begin())> &
                     arcs_block) {
                 arc_t uv;
-                auto fiber_map = melon::create_arc_map<bool>(graph, false);
+                auto fiber_map = melon::create_vertex_map<bool>(graph, false);
                 auto sgraph = melon::views::subgraph(
                     graph, {}, [&](const arc_t & a) -> bool {
                         return !fiber_map[melon::arc_target(graph, a)] &&

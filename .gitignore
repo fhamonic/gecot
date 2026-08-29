@@ -1,6 +1,8 @@
 .vscode
 /build
 /output
+/CMakeFiles
+/logs
 /test/instances/BioRevAix/N1
 /test/instances/BioRevAix/raw
 *.lp

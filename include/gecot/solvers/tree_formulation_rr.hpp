@@ -76,7 +76,7 @@ struct tree_formulation_rr {
         }
         auto operator()(const criterion_product & f) {
             using namespace mippp::operators;
-            if(!std::holds_alternative<criterion_constant>(f.values[0]) &&
+            if(!std::holds_alternative<criterion_constant>(f.values[0]) ||
                f.values.size() != 2)
                 throw std::invalid_argument(
                     "mip doesn't support products of variables in the "
@@ -128,8 +128,7 @@ struct tree_formulation_rr {
         using vertex_t = melon::vertex_t<instance_graph_t<I>>;
         vertex_t target;
         MODEL_MILP sub_model;
-        mippp::runtime_linear_expression<variable_t, double>
-            default_objective;
+        mippp::runtime_linear_expression<variable_t, double> default_objective;
         std::flat_map<option_t, variable_t> sub_X_vars_map;
 
         sub_model_data(const MODEL_MILP_API & milp_api, const auto & instance,
@@ -301,9 +300,8 @@ struct tree_formulation_rr {
             : master_model_mutex_ref(model_mutex)
             , master_model(model)
             , contribution_variable(model.add_variable())
-            , contribution_constraint(
-                  model.add_constraint(mippp::operators::operator<=(
-                      contribution_variable, 0)))
+            , contribution_constraint(model.add_constraint(
+                  mippp::operators::operator<=(contribution_variable, 0)))
             , uniqueness_constraint_map()
             , purchase_constraints_map() {
             using namespace mippp::operators;
@@ -322,9 +320,9 @@ struct tree_formulation_rr {
             uniqueness_constraint_map.insert_range(std::views::transform(
                 target_vertices, [&model](const vertex_t & t) {
                     return std::make_pair(
-                        t,
-                        model.add_constraint(
-                            mippp::empty_linear_expression<variable_t, double> <= 1));
+                        t, model.add_constraint(
+                               mippp::empty_linear_expression<variable_t,
+                                                              double> <= 1));
                 }));
 
             for(const vertex_t target : target_vertices) {
@@ -343,9 +341,8 @@ struct tree_formulation_rr {
                                 return std::make_pair(
                                     std::make_pair(t, i),
                                     model.add_constraint(
-                                        mippp::empty_linear_expression<variable_t,
-                                                                double> <=
-                                        X_vars(i)));
+                                        mippp::empty_linear_expression<
+                                            variable_t, double> <= X_vars(i)));
                             });
                     })));
         }
@@ -355,7 +352,8 @@ struct tree_formulation_rr {
         // struct tree_hash {
         //     static void hash_combine(std::size_t & seed, std::size_t value) {
         //         seed ^=
-        //             value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+        //             value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >>
+        //             2);
         //     }
         //     std::size_t operator()(const tree_t & t) const {
         //         std::size_t seed = 0;
@@ -391,11 +389,20 @@ struct tree_formulation_rr {
                     std::make_pair(contribution_constraint, -contribution)),
                 std::views::single(
                     std::make_pair(uniqueness_constraint_map.at(target), 1.0)),
-                std::views::transform(used_options, [this, target](option_t i) {
-                    return std::make_pair(
-                        purchase_constraints_map.at(std::make_pair(target, i)),
-                        1.0);
-                })));
+                // mip-start trees may reference options pruned from this
+                // target's contraction, which have no purchase constraint
+                std::views::transform(
+                    std::views::filter(
+                        used_options,
+                        [this, target](option_t i) {
+                            return purchase_constraints_map.contains(
+                                std::make_pair(target, i));
+                        }),
+                    [this, target](option_t i) {
+                        return std::make_pair(purchase_constraints_map.at(
+                                                  std::make_pair(target, i)),
+                                              1.0);
+                    })));
         }
     };
 
@@ -522,7 +529,18 @@ struct tree_formulation_rr {
 
         for(;;) {
             model.solve();
-            auto dual_solution = model.get_dual_solution();
+            // snapshot the duals: get_dual_solution views CLP's internal row
+            // array, which concurrent add_column calls may reallocate
+            std::vector<double> dual_values(model.num_constraints());
+            {
+                const auto raw_duals = model.get_dual_solution();
+                for(std::size_t i = 0; i < dual_values.size(); ++i)
+                    dual_values[i] =
+                        raw_duals[MODEL_LP::constraint(static_cast<int>(i))];
+            }
+            const mippp::entity_mapping<MODEL_LP::constraint,
+                                        std::vector<double>>
+                dual_solution(std::move(dual_values));
 
             log_lambda();
 

@@ -96,6 +96,7 @@ struct StaticDecremental {
 
         std::vector<option_t> free_options;
         for(auto && option : options) {
+            if(purchased <= budget + feasibility_tol) break;
             const double price = instance.option_cost(option);
             purchased -= price;
             solution[option] = false;
@@ -103,7 +104,6 @@ struct StaticDecremental {
             spdlog::trace("{:>20} |  {: #.6e}  | {: #.5e}",
                           instance.option_name(option), options_ratios[option],
                           purchased);
-            if(purchased <= budget + feasibility_tol) break;
         }
 
         if(!only_dec &&
@@ -120,7 +120,7 @@ struct StaticDecremental {
             spdlog::trace(
                 "--------------------------------------------------------");
 
-            for(auto instance_case : cases) {
+            for(const auto & instance_case : cases) {
                 auto & current_sqm = (cases_current_sqm[instance_case.id()] =
                                           instance_case.source_quality_map());
                 auto & current_tqm = (cases_current_tqm[instance_case.id()] =

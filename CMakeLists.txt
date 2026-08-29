@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 3.22)
+# cxx_std_26 requires CMake >= 3.25
+cmake_minimum_required(VERSION 3.25)
 
 project(
   Gecot
@@ -98,6 +99,13 @@ target_link_libraries(gecot_optimize PUBLIC phmap)
 # target_compile_options(gecot_optimize PRIVATE -fsanitize=address)
 # target_link_options(gecot_optimize PRIVATE -fsanitize=address -lpthread -static-libasan)
 
+if(WARNINGS)
+  set_project_warnings(gecot_optimize)
+endif()
+if(OPTIMIZE_FOR_NATIVE)
+  set_project_optimizations(gecot_optimize)
+endif()
+
 
 # ################### TESTS ######################
 if(ENABLE_TESTING)
@@ -133,9 +141,15 @@ if(NOT WIN32)
     endif()
   ]])
 else()
-install(FILES 
-"c:/libs/cbc/bin/cbc.exe" 
-"${CONAN_TBB_LIB_DIR}/../bin/libtbb12.dll" 
+set(CBC_EXE "c:/libs/cbc/bin/cbc.exe" CACHE FILEPATH
+    "cbc solver executable bundled into the Windows installer")
+if(EXISTS "${CBC_EXE}")
+  install(FILES "${CBC_EXE}" DESTINATION bin)
+else()
+  message(WARNING "cbc executable not found at '${CBC_EXE}', not bundled")
+endif()
+install(FILES
+"${CONAN_TBB_LIB_DIR}/../bin/libtbb12.dll"
 "${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libgcc_s_seh-1.dll" 
 "${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libwinpthread-1.dll" 
 "${CONAN_MINGW_LIB_DIR}/../x86_64-w64-mingw32/lib/libstdc++-6.dll" 

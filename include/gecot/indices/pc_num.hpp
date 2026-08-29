@@ -52,7 +52,6 @@ double pc_num_vertex_in_flow(const GR & graph, const SQM & source_quality_map,
     using V = melon::mapped_value_t<PM, melon::arc_t<GR>>;
     V sum = 0.0;
     auto && rgraph = melon::views::reverse(graph);
-    std::cout << t << " " << graph.is_valid_vertex(t) << std::endl;
     for(const auto & [u, prob] :
         melon::dijkstra(detail::pc_num_dijkstra_traits<decltype(rgraph), V>{},
                         rgraph, probability_map, t)) {

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -164,6 +165,8 @@ static bool process_command_line(
     }
 
     po::notify(vm);
+    if(!std::isfinite(budget) || budget < 0)
+        throw std::logic_error("the budget must be a non-negative number");
     if(vm.count("output-json")) {
         opt_output_json_file.emplace(
             vm["output-json"].as<std::filesystem::path>());
@@ -212,6 +215,15 @@ int main(int argc, const char * argv[]) {
                                  budget, opt_output_json_file,
                                  opt_output_csv_file, opt_tbb_global_control))
             return EXIT_SUCCESS;
+        program_state = "Checking output files";
+        for(auto && opt_file : {opt_output_json_file, opt_output_csv_file}) {
+            if(!opt_file.has_value()) continue;
+            const auto parent =
+                std::filesystem::absolute(opt_file.value()).parent_path();
+            if(!std::filesystem::is_directory(parent))
+                throw std::runtime_error("output directory '" +
+                                         parent.string() + "' does not exist");
+        }
         program_state = "Parsing instance";
         Instance raw_instance = parse_instance(instances_description_json);
         spdlog::info(
@@ -222,9 +234,10 @@ int main(int argc, const char * argv[]) {
         double options_total_cost = 0;
         for(auto && o : raw_instance.options())
             options_total_cost += raw_instance.option_cost(o);
-        spdlog::info(
-            "Budget represents {:.2f}% of the total options cost (={:g})",
-            budget / options_total_cost * 100, options_total_cost);
+        if(options_total_cost > 0)
+            spdlog::info(
+                "Budget represents {:.2f}% of the total options cost (={:g})",
+                budget / options_total_cost * 100, options_total_cost);
 
         Instance instance = trivial_reformulate_instance(raw_instance, budget);
         print_instance_size<spdlog::level::trace>(instance,
@@ -267,10 +280,12 @@ int main(int argc, const char * argv[]) {
             }
             fmt::print("Solution:\n");
             const std::size_t option_name_max_length =
-                std::ranges::max(std::ranges::views::transform(
-                    raw_instance.options(), [&](auto && o) {
-                        return raw_instance.option_name(o).size();
-                    }));
+                raw_instance.options().empty()
+                    ? 0
+                    : std::ranges::max(std::ranges::views::transform(
+                          raw_instance.options(), [&](auto && o) {
+                              return raw_instance.option_name(o).size();
+                          }));
             for(auto && option : raw_instance.options()) {
                 const auto & option_name = raw_instance.option_name(option);
                 int value = static_cast<int>(
@@ -292,9 +307,11 @@ int main(int argc, const char * argv[]) {
                                       auto && pairs_range) {
                 out.print("\n    \"{}\": {{", property_name);
                 const std::size_t key_max_length =
-                    std::ranges::max(std::ranges::views::transform(
-                        std::views::keys(pairs_range),
-                        [&](auto && s) { return s.size(); })) +
+                    (std::ranges::empty(pairs_range)
+                         ? 0
+                         : std::ranges::max(std::ranges::views::transform(
+                               std::views::keys(pairs_range),
+                               [&](auto && s) { return s.size(); }))) +
                     3;
                 bool first_line = true;
                 for(const auto & [key, value] : pairs_range) {
@@ -369,10 +386,6 @@ int main(int argc, const char * argv[]) {
                 out.print("\"{}\",{}\n", option_name, value);
             }
             spdlog::info("Solution written to '{}'",
-                         std::filesystem::absolute(opt_output_csv_file.value())
-                             .string());
-
-            spdlog::info("Solution printed to '{}'",
                          std::filesystem::absolute(opt_output_csv_file.value())
                              .string());
         }

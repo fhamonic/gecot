@@ -45,7 +45,7 @@ struct mip {
         }
         auto operator()(const criterion_product & f) {
             using namespace mippp::operators;
-            if(!std::holds_alternative<criterion_constant>(f.values[0]) &&
+            if(!std::holds_alternative<criterion_constant>(f.values[0]) ||
                f.values.size() != 2)
                 throw std::invalid_argument(
                     "mip doesn't support products of variables in the "
@@ -208,7 +208,7 @@ struct mip {
             }
             model.add_mip_start(
                 std::views::transform(instance.options(), [&](auto o) {
-                    return std::make_pair(X_vars(o), mip_start_solution[0]);
+                    return std::make_pair(X_vars(o), mip_start_solution[o]);
                 }));
         }
 

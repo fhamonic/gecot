@@ -33,7 +33,7 @@ static const nlohmann::json instance_schema = R"(
                 },
                 {
                     "type": "array",
-                    "contains": {
+                    "items": {
                         "type": "object",
                         "properties": {
                             "id": {
@@ -43,7 +43,11 @@ static const nlohmann::json instance_schema = R"(
                                 "type": "number",
                                 "minimum": 0
                             }
-                        }
+                        },
+                        "required": [
+                            "id",
+                            "cost"
+                        ]
                     }
                 }
             ]
@@ -85,7 +89,7 @@ static const nlohmann::json instance_schema = R"(
                                 },
                                 {
                                     "type": "array",
-                                    "contains": {
+                                    "items": {
                                         "type": "object",
                                         "properties": {
                                             "id": {
@@ -99,7 +103,12 @@ static const nlohmann::json instance_schema = R"(
                                                 "type": "number",
                                                 "minimum": 0
                                             }
-                                        }
+                                        },
+                                        "required": [
+                                            "id",
+                                            "source_quality",
+                                            "target_quality"
+                                        ]
                                     }
                                 }
                             ]
@@ -138,7 +147,7 @@ static const nlohmann::json instance_schema = R"(
                                 },
                                 {
                                     "type": "array",
-                                    "contains": {
+                                    "items": {
                                         "type": "object",
                                         "properties": {
                                             "id": {
@@ -155,7 +164,13 @@ static const nlohmann::json instance_schema = R"(
                                                 "minimum": 0,
                                                 "maximum": 1
                                             }
-                                        }
+                                        },
+                                        "required": [
+                                            "id",
+                                            "from",
+                                            "to",
+                                            "probability"
+                                        ]
                                     }
                                 }
                             ]
@@ -194,7 +209,7 @@ static const nlohmann::json instance_schema = R"(
                                 },
                                 {
                                     "type": "array",
-                                    "contains": {
+                                    "items": {
                                         "type": "object",
                                         "properties": {
                                             "vertex_id": {
@@ -211,7 +226,13 @@ static const nlohmann::json instance_schema = R"(
                                                 "type": "number",
                                                 "minimum": 0
                                             }
-                                        }
+                                        },
+                                        "required": [
+                                            "vertex_id",
+                                            "option_id",
+                                            "source_quality_gain",
+                                            "target_quality_gain"
+                                        ]
                                     }
                                 }
                             ]
@@ -247,7 +268,7 @@ static const nlohmann::json instance_schema = R"(
                                 },
                                 {
                                     "type": "array",
-                                    "contains": {
+                                    "items": {
                                         "type": "object",
                                         "properties": {
                                             "arc_id": {
@@ -261,7 +282,12 @@ static const nlohmann::json instance_schema = R"(
                                                 "minimum": 0,
                                                 "maximum": 1
                                             }
-                                        }
+                                        },
+                                        "required": [
+                                            "arc_id",
+                                            "option_id",
+                                            "improved_probability"
+                                        ]
                                     }
                                 }
                             ]
@@ -298,6 +324,7 @@ static const nlohmann::json instance_schema = R"(
                 },
                 "linear_term": {
                     "type": "array",
+                    "minItems": 2,
                     "items": [
                         {
                             "$ref": "#/properties/criterion/definitions/constant"
@@ -320,7 +347,8 @@ static const nlohmann::json instance_schema = R"(
                         },
                         "values": {
                             "type": "array",
-                            "contains": {
+                            "minItems": 1,
+                            "items": {
                                 "$ref": "#/properties/criterion/definitions/formula"
                             }
                         }
@@ -375,8 +403,11 @@ void parse_options(Instance & instance, const nlohmann::json & json_object,
     auto add_option = [&](const std::string & option_id,
                           const double option_cost) {
         if(instance.contains_option(option_id))
-            throw std::invalid_argument("Option identifier '" + option_id +
-                                        "' appears multiple times in ");
+            throw std::invalid_argument("option id '" + option_id +
+                                        "' appears multiple times");
+        if(option_cost < 0)
+            throw std::invalid_argument('\'' + std::to_string(option_cost) +
+                                        "' is not a valid cost");
         instance.add_option(option_id, option_cost);
     };
 
@@ -389,9 +420,17 @@ void parse_options(Instance & instance, const nlohmann::json & json_object,
         parse_columns_aliases(json_object, {id_column, cost_column});
 
         csv::CSVReader reader(options_csv_path.string());
-        for(auto & row : reader) {
-            add_option(row[id_column].get<std::string>(),
-                       row[cost_column].get<double>());
+        std::size_t line_no = 2;
+        try {
+            for(auto & row : reader) {
+                add_option(row[id_column].get<std::string>(),
+                           row[cost_column].get<double>());
+                ++line_no;
+            }
+        } catch(const std::exception & e) {
+            throw std::invalid_argument(options_csv_path.filename().string() +
+                                        " line " + std::to_string(line_no) +
+                                        ": " + e.what());
         }
     } else {
         for(auto && option : json_object) {
@@ -412,6 +451,8 @@ void parse_vertices_options(InstanceCase & instance_case,
                                  const std::string & vertex_id,
                                  const double source_quality_gain,
                                  const double target_quality_gain) {
+        if(source_quality_gain < 0 || target_quality_gain < 0)
+            throw std::invalid_argument("quality gains must be non-negative");
         vertex_options[instance_case.vertex_from_name(vertex_id)].emplace_back(
             source_quality_gain, target_quality_gain,
             instance.option_from_name(option_id));
@@ -445,7 +486,7 @@ void parse_vertices_options(InstanceCase & instance_case,
                         row[target_quality_gain_column].get<double>());
                     ++line_no;
                 }
-            } catch(const std::invalid_argument & e) {
+            } catch(const std::exception & e) {
                 throw std::invalid_argument(
                     vertex_options_csv_path.filename().string() + " line " +
                     std::to_string(line_no) + ": " + e.what());
@@ -473,6 +514,10 @@ void parse_arcs_options(InstanceCase & instance_case,
     auto add_arc_option = [&](const std::string & option_id,
                               const std::string & arc_id,
                               const double improved_probability) {
+        if(improved_probability < 0 || improved_probability > 1)
+            throw std::invalid_argument('\'' +
+                                        std::to_string(improved_probability) +
+                                        "' is not a valid probability");
         arc_options[instance_case.arc_from_name(arc_id)].emplace_back(
             improved_probability, instance.option_from_name(option_id));
     };
@@ -501,7 +546,7 @@ void parse_arcs_options(InstanceCase & instance_case,
                         row[improved_probability_column].get<double>());
                     ++line_no;
                 }
-            } catch(const std::invalid_argument & e) {
+            } catch(const std::exception & e) {
                 throw std::invalid_argument(
                     arc_options_csv_path.filename().string() + " line " +
                     std::to_string(line_no) + ": " + e.what());
@@ -532,6 +577,11 @@ InstanceCase & parse_instance_case(const nlohmann::json & json_object,
 
     auto add_vertex = [&](const std::string & id, double source_quality,
                           double target_quality) {
+        if(vertex_name_to_id_map.contains(id))
+            throw std::invalid_argument("vertex id '" + id +
+                                        "' appears multiple times");
+        if(source_quality < 0 || target_quality < 0)
+            throw std::invalid_argument("qualities must be non-negative");
         source_quality_map.emplace_back(source_quality);
         target_quality_map.emplace_back(target_quality);
         vertex_names.emplace_back(id);
@@ -559,7 +609,7 @@ InstanceCase & parse_instance_case(const nlohmann::json & json_object,
                            row[target_quality_column].get<double>());
                 ++line_no;
             }
-        } catch(const std::runtime_error & e) {
+        } catch(const std::exception & e) {
             throw std::invalid_argument(vertices_csv_path.filename().string() +
                                         " line " + std::to_string(line_no) +
                                         ": " + e.what());
@@ -583,6 +633,10 @@ InstanceCase & parse_instance_case(const nlohmann::json & json_object,
             throw std::invalid_argument("unknown vertex id '" + from + '\'');
         if(!vertex_name_to_id_map.contains(to))
             throw std::invalid_argument("unknown vertex id '" + to + '\'');
+        // placeholder entry, the real arc ids are filled in after build()
+        if(!arc_name_to_id_map.try_emplace(id).second)
+            throw std::invalid_argument("arc id '" + id +
+                                        "' appears multiple times");
         builder.add_arc(vertex_name_to_id_map.at(from),
                         vertex_name_to_id_map.at(to), probability, id);
     };
@@ -609,7 +663,7 @@ InstanceCase & parse_instance_case(const nlohmann::json & json_object,
                         row[probability_column].get<double>());
                 ++line_no;
             }
-        } catch(const std::runtime_error & e) {
+        } catch(const std::exception & e) {
             throw std::invalid_argument(arcs_csv_path.filename().string() +
                                         " line " + std::to_string(line_no) +
                                         ": " + e.what());

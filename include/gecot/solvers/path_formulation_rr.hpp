@@ -72,7 +72,7 @@ struct path_formulation_rr {
         }
         auto operator()(const criterion_product & f) {
             using namespace mippp::operators;
-            if(!std::holds_alternative<criterion_constant>(f.values[0]) &&
+            if(!std::holds_alternative<criterion_constant>(f.values[0]) ||
                f.values.size() != 2)
                 throw std::invalid_argument(
                     "mip doesn't support products of variables in the "
@@ -124,8 +124,7 @@ struct path_formulation_rr {
         using vertex_t = melon::vertex_t<instance_graph_t<I>>;
         vertex_t target;
         MODEL_MILP sub_model;
-        mippp::runtime_linear_expression<variable_t, double>
-            default_objective;
+        mippp::runtime_linear_expression<variable_t, double> default_objective;
         std::flat_map<option_t, variable_t> sub_X_vars_map;
 
         sub_model_data(const MODEL_MILP_API & milp_api, const auto & instance,
@@ -297,9 +296,8 @@ struct path_formulation_rr {
             : master_model_mutex_ref(model_mutex)
             , master_model(model)
             , contribution_variable(model.add_variable())
-            , contribution_constraint(
-                  model.add_constraint(mippp::operators::operator<=(
-                      contribution_variable, 0)))
+            , contribution_constraint(model.add_constraint(
+                  mippp::operators::operator<=(contribution_variable, 0)))
             , uniqueness_constraint_map()
             , purchase_constraints_map() {
             using namespace mippp::operators;
@@ -318,9 +316,9 @@ struct path_formulation_rr {
             uniqueness_constraint_map.insert_range(std::views::transform(
                 target_vertices, [&model](const vertex_t & t) {
                     return std::make_pair(
-                        t,
-                        model.add_constraint(
-                            mippp::empty_linear_expression<variable_t, double> <= 1));
+                        t, model.add_constraint(
+                               mippp::empty_linear_expression<variable_t,
+                                                              double> <= 1));
                 }));
 
             for(const vertex_t target : target_vertices) {
@@ -339,9 +337,8 @@ struct path_formulation_rr {
                                 return std::make_pair(
                                     std::make_pair(t, i),
                                     model.add_constraint(
-                                        mippp::empty_linear_expression<variable_t,
-                                                                double> <=
-                                        X_vars(i)));
+                                        mippp::empty_linear_expression<
+                                            variable_t, double> <= X_vars(i)));
                             });
                     })));
         }

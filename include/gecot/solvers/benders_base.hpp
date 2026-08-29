@@ -52,7 +52,7 @@ struct benders_base {
         }
         auto operator()(const criterion_product & f) {
             using namespace mippp::operators;
-            if(!std::holds_alternative<criterion_constant>(f.values[0]) &&
+            if(!std::holds_alternative<criterion_constant>(f.values[0]) ||
                f.values.size() != 2)
                 throw std::invalid_argument(
                     "mip doesn't support products of variables in the "

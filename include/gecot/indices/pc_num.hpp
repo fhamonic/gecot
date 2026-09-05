@@ -15,8 +15,8 @@ struct pc_num_dijkstra_traits {
     using semiring = melon::most_reliable_path_semiring<V>;
     using heap = melon::updatable_d_ary_heap<
         4, std::pair<melon::vertex_t<GR>, V>, typename semiring::less_t,
-        melon::vertex_map_t<GR, std::size_t>, melon::maps::element_map<1>,
-        melon::maps::element_map<0>>;
+        melon::vertex_map_t<GR, std::size_t>, melon::maps::element<1>,
+        melon::maps::element<0>>;
 
     static constexpr bool store_paths = false;
     static constexpr bool store_distances = false;

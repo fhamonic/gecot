@@ -18,8 +18,8 @@ struct parallel_pc_num_dijkstra_traits {
     using semiring = melon::most_reliable_path_semiring<V>;
     using heap = melon::updatable_d_ary_heap<
         4, std::pair<melon::vertex_t<GR>, V>, typename semiring::less_t,
-        melon::vertex_map_t<GR, std::size_t>, melon::maps::element_map<1>,
-        melon::maps::element_map<0>>;
+        melon::vertex_map_t<GR, std::size_t>, melon::maps::element<1>,
+        melon::maps::element<0>>;
 
     static constexpr bool store_paths = false;
     static constexpr bool store_distances = false;
@@ -27,7 +27,8 @@ struct parallel_pc_num_dijkstra_traits {
 }  // namespace detail
 
 template <typename GR, typename SQM, typename TQM, typename PM>
-double parallel_pc_num(const GR & graph, const SQM & source_quality_map, const TQM & target_quality_map,
+double parallel_pc_num(const GR & graph, const SQM & source_quality_map,
+                       const TQM & target_quality_map,
                        const PM & probability_map) {
     auto vertices_range = melon::vertices(graph);
 

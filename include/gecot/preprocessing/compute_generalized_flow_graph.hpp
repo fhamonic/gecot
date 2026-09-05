@@ -20,15 +20,11 @@ auto compute_generalized_flow_graph(const C & instance_case) {
                                   std::optional<option_t>>
         builder(original_graph.num_vertices());
 
-    for(auto && a : melon::arcs(original_graph)) {
-        builder.add_arc(melon::arc_source(original_graph, a),
-                        melon::arc_target(original_graph, a),
-                        original_probability_map[a], std::nullopt);
+    for(auto && [a, uv] : melon::arcs_entries(original_graph)) {
+        builder.add_arc(uv, original_probability_map[a], std::nullopt);
         for(auto && [enhanced_prob, option] :
             instance_case.arc_options_map()[a]) {
-            builder.add_arc(melon::arc_source(original_graph, a),
-                            melon::arc_target(original_graph, a), enhanced_prob,
-                            std::make_optional(option));
+            builder.add_arc(uv, enhanced_prob, std::make_optional(option));
         }
     }
 

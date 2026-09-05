@@ -25,7 +25,8 @@ struct StaticIncremental {
         const auto & cases = instance.cases();
         std::vector<option_t> options;
         for(const option_t & option : instance.options()) {
-            if(instance.option_cost(option) > budget + feasibility_tol) continue;
+            if(instance.option_cost(option) > budget + feasibility_tol)
+                continue;
             options.emplace_back(option);
         }
 
@@ -44,13 +45,13 @@ struct StaticIncremental {
 
         compute_options_cases_incr_pc_num(
             instance, options,
-            melon::maps::map([&cases](auto case_id) -> decltype(auto) {
+            melon::maps::function([&cases](auto case_id) -> decltype(auto) {
                 return cases[case_id].source_quality_map();
             }),
-            melon::maps::map([&cases](auto case_id) -> decltype(auto) {
+            melon::maps::function([&cases](auto case_id) -> decltype(auto) {
                 return cases[case_id].target_quality_map();
             }),
-            melon::maps::map([&cases](auto case_id) -> decltype(auto) {
+            melon::maps::function([&cases](auto case_id) -> decltype(auto) {
                 return cases[case_id].arc_probability_map();
             }),
             cases_vertex_options, cases_arc_options, options_cases_pc_num);

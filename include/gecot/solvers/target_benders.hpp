@@ -225,7 +225,7 @@ struct target_benders : public benders_base {
         model.set_candidate_solution_callback(
             [&](model_type::candidate_solution_callback_handle & handle) {
                 const auto master_solution = handle.get_solution();
-                auto sol = melon::maps::map([&](option_t i) {
+                auto sol = melon::maps::function([&](option_t i) {
                     return master_solution[X_vars(i)] > 0.5;
                 });
                 for(auto && instance_case : instance.cases()) {
@@ -424,7 +424,7 @@ struct target_benders : public benders_base {
                                       const auto & rho_values) {
             auto Big_M_map = compute_big_M_map(
                 instance_case.graph(), instance_case.source_quality_map(),
-                melon::maps::map([&](auto && v) {
+                melon::maps::function([&](auto && v) {
                     return std::views::transform(
                         instance_case.vertex_options_map()[v], [](auto && e) {
                             auto && [source_quality_gain, tqg, option] = e;
@@ -486,7 +486,7 @@ struct target_benders : public benders_base {
         model.set_candidate_solution_callback(
             [&](model_type::candidate_solution_callback_handle & handle) {
                 const auto master_solution = handle.get_solution();
-                auto sol = melon::maps::map([&](option_t i) {
+                auto sol = melon::maps::function([&](option_t i) {
                     return master_solution[X_vars(i)] > 0.5;
                 });
                 for(auto && instance_case : instance.cases()) {

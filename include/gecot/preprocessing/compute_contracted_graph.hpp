@@ -14,76 +14,7 @@
 #include "gecot/preprocessing/compute_big_M_map.hpp"
 
 #include "melon/container/static_digraph.hpp"
-#include "melon/container/static_map.hpp"
-
-namespace melon {
-template <typename G, typename CMP, typename... VM, typename... AM>
-auto make_static_digraph(G && graph, CMP vertex_cmp,
-                         std::tuple<VM...> vertex_maps_tuple,
-                         std::tuple<AM...> arc_maps_tuple) {
-    using SG = static_digraph;
-    std::vector<vertex_t<G>> new_to_old_vertex;
-    std::ranges::copy(graph.vertices(), std::back_inserter(new_to_old_vertex));
-    std::sort(new_to_old_vertex.begin(), new_to_old_vertex.end(), vertex_cmp);
-    auto old_to_new_vertex = melon::create_vertex_map<vertex_t<SG>>(graph);
-    const auto n = new_to_old_vertex.size();
-    for(auto && v :
-        std::views::iota(vertex_t<SG>{0}, static_cast<vertex_t<SG>>(n))) {
-        old_to_new_vertex[new_to_old_vertex[v]] = v;
-    }
-    std::vector<vertex_t<SG>> sources;
-    std::vector<vertex_t<SG>> targets;
-    if constexpr(has_num_arcs<G>) {
-        const auto m = num_arcs(graph);
-        sources.reserve(m);
-        targets.reserve(m);
-    }
-    std::vector<arc_t<G>> new_to_old_arc;
-    for(auto && v :
-        std::views::iota(vertex_t<SG>{0}, static_cast<vertex_t<SG>>(n))) {
-        for(auto && old_a : melon::out_arcs(
-                graph, new_to_old_vertex[static_cast<std::size_t>(v)])) {
-            sources.emplace_back(v);
-            targets.emplace_back(
-                old_to_new_vertex[melon::arc_target(graph, old_a)]);
-            new_to_old_arc.emplace_back(old_a);
-        }
-    }
-    const auto m = new_to_old_arc.size();
-    return std::make_tuple(
-        SG(n, sources, targets),
-        std::apply(
-            [&](VM const &... old_vertex_map) {
-                auto translate_vertex_map = [&](auto && ovm) {
-                    static_map<vertex_t<SG>,
-                               mapped_value_t<decltype(ovm), vertex_t<G>>>
-                        vertex_map(n);
-                    for(auto && v : std::views::iota(
-                            vertex_t<SG>{0}, static_cast<vertex_t<SG>>(n))) {
-                        vertex_map[v] = ovm[new_to_old_vertex[v]];
-                    }
-                    return vertex_map;
-                };
-                return std::make_tuple(translate_vertex_map(old_vertex_map)...);
-            },
-            vertex_maps_tuple),
-        std::apply(
-            [&](AM const &... old_arc_map) {
-                auto translate_vertex_map = [&](auto && oam) {
-                    static_map<arc_t<SG>,
-                               mapped_value_t<decltype(oam), arc_t<G>>>
-                        arc_map(m);
-                    for(auto && a : std::views::iota(
-                            arc_t<SG>{0}, static_cast<arc_t<SG>>(m))) {
-                        arc_map[a] = oam[new_to_old_arc[a]];
-                    }
-                    return arc_map;
-                };
-                return std::make_tuple(translate_vertex_map(old_arc_map)...);
-            },
-            arc_maps_tuple));
-}
-}  // namespace melon
+#include "melon/utility/make_static_digraph.hpp"
 
 namespace gecot {
 
@@ -186,14 +117,13 @@ contracted_graph_data<C> compute_contracted_graph_data(
                        });
         }));
 
-    auto [sgraph, svertex_maps, sarc_maps] = melon::make_static_digraph(
-        original_graph, [](auto && u, auto && v) { return u < v; },
-        std::make_tuple(original_source_quality_map,
-                        original_source_options_map, big_M_map),
-        std::make_tuple(original_probability_map, original_arc_options_map));
-    auto && [ssource_quality_map, ssource_options_map, sbig_M_map] =
-        svertex_maps;
-    auto && [sprobability_map, sarc_options_map] = sarc_maps;
+    auto [sgraph, ssource_quality_map, ssource_options_map, sbig_M_map,
+          sprobability_map, sarc_options_map] =
+        melon::make_static_digraph(
+            original_graph, [](auto && u, auto && v) { return u < v; },
+            std::tie(original_source_quality_map, original_source_options_map,
+                     big_M_map),
+            std::tie(original_probability_map, original_arc_options_map));
 
     return contracted_graph_data(
         instance_case, original_t, original_t, std::move(sgraph),

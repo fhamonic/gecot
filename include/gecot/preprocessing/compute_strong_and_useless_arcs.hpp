@@ -32,8 +32,8 @@ struct strong_arc_default_traits {
     };
     using heap = melon::updatable_d_ary_heap<
         2, std::pair<melon::vertex_t<_Graph>, entry>, entry_cmp,
-        melon::vertex_map_t<_Graph, std::size_t>, melon::maps::element_map<1>,
-        melon::maps::element_map<0>>;
+        melon::vertex_map_t<_Graph, std::size_t>, melon::maps::element<1>,
+        melon::maps::element<0>>;
 
     static constexpr bool store_distances = false;
     static constexpr bool store_paths = false;
@@ -56,8 +56,8 @@ struct useless_arc_default_traits {
     };
     using heap = melon::updatable_d_ary_heap<
         2, std::pair<melon::vertex_t<_Graph>, entry>, entry_cmp,
-        melon::vertex_map_t<_Graph, std::size_t>, melon::maps::element_map<1>,
-        melon::maps::element_map<0>>;
+        melon::vertex_map_t<_Graph, std::size_t>, melon::maps::element<1>,
+        melon::maps::element<0>>;
 
     static constexpr bool store_distances = false;
     static constexpr bool store_paths = false;
@@ -69,8 +69,8 @@ struct path_dijkstra_traits {
 
     using heap = melon::updatable_d_ary_heap<
         4, std::pair<melon::vertex_t<GR>, V>, typename semiring::less_t,
-        melon::vertex_map_t<GR, std::size_t>, melon::maps::element_map<1>,
-        melon::maps::element_map<0>>;
+        melon::vertex_map_t<GR, std::size_t>, melon::maps::element<1>,
+        melon::maps::element<0>>;
 
     static constexpr bool store_paths = true;
     static constexpr bool store_distances = false;

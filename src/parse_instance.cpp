@@ -637,8 +637,9 @@ InstanceCase & parse_instance_case(const nlohmann::json & json_object,
         if(!arc_name_to_id_map.try_emplace(id).second)
             throw std::invalid_argument("arc id '" + id +
                                         "' appears multiple times");
-        builder.add_arc(vertex_name_to_id_map.at(from),
-                        vertex_name_to_id_map.at(to), probability, id);
+        builder.add_arc(
+            {vertex_name_to_id_map.at(from), vertex_name_to_id_map.at(to)},
+            probability, id);
     };
 
     auto arcs_json = json_object["arcs"];

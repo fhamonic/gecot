@@ -5,6 +5,7 @@
 #include <spdlog/stopwatch.h>
 
 #include "melon/mapping.hpp"
+#include "melon/maps/constant.hpp"
 #include "melon/utility/graphviz_printer.hpp"
 #include "melon/views/reverse.hpp"
 
@@ -93,8 +94,8 @@ GTEST_TEST(parse_instance, test) {
         }
     }
 
-    const auto cases_maximum_pc_num = gecot::compute_solution_cases_pc_num(
-        instance, melon::maps::true_map{});
+    const auto cases_maximum_pc_num =
+        gecot::compute_solution_cases_pc_num(instance, melon::maps::true_map{});
     auto && maximum_pc_value = instance.eval_criterion(cases_maximum_pc_num);
     ASSERT_DOUBLE_EQ(maximum_pc_value, 150608123477.23215);
 }

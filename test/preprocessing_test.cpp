@@ -137,7 +137,7 @@ GTEST_TEST(preprocessing, fuzzy_test) {
             //     }
             // }
             // printer
-            //     .set_vertex_color_map(melon::maps::map(
+            //     .set_vertex_color_map(melon::maps::function(
             //         [&](auto && v)
             //             -> std::tuple<unsigned char, unsigned char, unsigned
             //             char> { if(v == original_t)
@@ -145,7 +145,7 @@ GTEST_TEST(preprocessing, fuzzy_test) {
             //             else
             //                 return {255, 255, 255};
             //         }))
-            //     .set_arc_label_map(melon::maps::map([&](auto && a) {
+            //     .set_arc_label_map(melon::maps::function([&](auto && a) {
             //         return "[" + std::to_string(original_probability_map[a])
             //         + "," +
             //                std::to_string(lower_length_map[a]) + "]";
@@ -160,7 +160,7 @@ GTEST_TEST(preprocessing, fuzzy_test) {
 
             // melon::graphviz_printer printer2(contracted_graph);
             // printer2
-            //     .set_vertex_color_map(melon::maps::map(
+            //     .set_vertex_color_map(melon::maps::function(
             //         [&](auto && v)
             //             -> std::tuple<unsigned char, unsigned char, unsigned
             //             char> { if(v == t)
@@ -168,7 +168,7 @@ GTEST_TEST(preprocessing, fuzzy_test) {
             //             else
             //                 return {255, 255, 255};
             //         }))
-            //     .set_arc_label_map(melon::maps::map([&](auto && a) {
+            //     .set_arc_label_map(melon::maps::function([&](auto && a) {
             //         return "[" + std::to_string(probability_map[a]) + "]";
             //     }));
             // printer2.print(std::ostream_iterator<char>(std::cout));

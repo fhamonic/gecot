@@ -90,8 +90,8 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
             for(const arc_t & a : melon::out_arcs(original_graph, v)) {
                 const vertex_t & w = melon::arc_target(original_graph, a);
                 if(i == component_num_map[w]) continue;
-                builder.add_arc(static_cast<vertex_t>(i),
-                                static_cast<vertex_t>(component_num_map[w]),
+                builder.add_arc({static_cast<vertex_t>(i),
+                                 static_cast<vertex_t>(component_num_map[w])},
                                 original_probability_map[a],
                                 instance_case.arc_name(a), a);
             }

@@ -71,8 +71,7 @@ struct flow_benders : public benders_base {
         using namespace mippp;
         using namespace mippp::operators;
 
-        api_type api;
-        model_type model(api);
+        model_type model;
 
         model.set_optimality_tolerance(1e-10);
         model.set_feasibility_tolerance(feasibility_tol);
@@ -93,7 +92,7 @@ struct flow_benders : public benders_base {
 
         auto cases_contracted_data =
             instance.template create_case_map<std::vector<
-                std::pair<model_type::variable,
+                std::pair<mippp::model_variable_t<model_type>,
                           contracted_graph_data<instance_case_t<I>>>>>();
 
         for(auto && instance_case : instance.cases()) {

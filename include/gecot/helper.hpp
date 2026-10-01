@@ -19,6 +19,8 @@
 #include "melon/graph.hpp"
 #include "melon/mapping.hpp"
 
+#define OPT(cond, ...) ((cond) ? std::make_optional(__VA_ARGS__) : std::nullopt)
+
 #include "gecot/concepts/instance.hpp"
 #include "gecot/indices/parallel_pc_num.hpp"
 #include "gecot/indices/pc_num.hpp"

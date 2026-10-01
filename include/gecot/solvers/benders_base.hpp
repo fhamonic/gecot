@@ -16,11 +16,8 @@ namespace gecot {
 namespace solvers {
 
 struct benders_base {
-    using api_type = mippp::gurobi_api;
     using model_type = mippp::gurobi_milp;
-    // using api_type = mippp::cplex_api;
     // using model_type = mippp::cplex_milp;
-    // using api_type = mippp::copt_api;
     // using model_type = mippp::copt_milp;
 
     double feasibility_tol = 0.0;
@@ -45,7 +42,7 @@ struct benders_base {
         auto operator()(const criterion_sum & f) {
             using namespace mippp::operators;
             auto var = model.get().add_variable();
-            std::vector<typename M::variable> vars;
+            std::vector<mippp::model_variable_t<M>> vars;
             for(auto && e : f.values) vars.emplace_back(std::visit(*this, e));
             model.get().add_constraint(var == xsum(vars));
             return var;

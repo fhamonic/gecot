@@ -38,7 +38,7 @@ struct mip {
         auto operator()(const criterion_sum & f) {
             using namespace mippp::operators;
             auto var = model.get().add_variable();
-            std::vector<typename M::variable> vars;
+            std::vector<mippp::model_variable_t<M>> vars;
             for(auto && e : f.values) vars.emplace_back(std::visit(*this, e));
             model.get().add_constraint(var == xsum(vars));
             return var;
@@ -75,8 +75,7 @@ struct mip {
 
         using namespace mippp;
         using namespace mippp::operators;
-        gurobi_api api;
-        gurobi_milp model(api);
+        gurobi_milp model;
         model.set_optimality_tolerance(1e-10);
         model.set_feasibility_tolerance(feasibility_tol);
 
@@ -196,7 +195,7 @@ struct mip {
         spdlog::trace("mip model has:");
         spdlog::trace("  {:>10} variables", model.num_variables());
         spdlog::trace("  {:>10} constraints", model.num_constraints());
-        spdlog::trace("  {:>10} entries", model.num_entries());
+        spdlog::trace("  {:>10} entries", model.num_nonzeros());
 
         if(mip_start) {
             instance_solution_t<I> mip_start_solution =

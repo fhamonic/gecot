@@ -29,14 +29,10 @@
 #include "gecot/solvers/greedy_decremental.hpp"
 #include "gecot/solvers/greedy_incremental.hpp"
 
-using MODEL_LP_API = mippp::clp_api;
 using MODEL_LP = mippp::clp_lp;
-using MODEL_MILP_API = mippp::cbc_api;
 using MODEL_MILP = mippp::cbc_milp;
 
-// using MODEL_LP_API = mippp::gurobi_api;
 // using MODEL_LP = mippp::gurobi_lp;
-// using MODEL_MILP_API = mippp::gurobi_api;
 // using MODEL_MILP = mippp::gurobi_milp;
 
 namespace gecot {
@@ -65,7 +61,7 @@ struct path_formulation_rr {
         auto operator()(const criterion_sum & f) {
             using namespace mippp::operators;
             auto var = model.get().add_variable();
-            std::vector<typename M::variable> vars;
+            std::vector<mippp::model_variable_t<M>> vars;
             for(auto && e : f.values) vars.emplace_back(std::visit(*this, e));
             model.get().add_constraint(var == xsum(vars));
             return var;
@@ -127,12 +123,11 @@ struct path_formulation_rr {
         mippp::runtime_linear_expression<variable_t, double> default_objective;
         std::flat_map<option_t, variable_t> sub_X_vars_map;
 
-        sub_model_data(const MODEL_MILP_API & milp_api, const auto & instance,
-                       const double & budget, const auto & instance_case,
-                       const auto & strong_arcs_map,
+        sub_model_data(const auto & instance, const double & budget,
+                       const auto & instance_case, const auto & strong_arcs_map,
                        const auto & useless_arcs_map,
                        const vertex_t & original_t)
-            : target(original_t), sub_model(milp_api), sub_X_vars_map() {
+            : target(original_t), sub_model(), sub_X_vars_map() {
             using namespace mippp::operators;
             sub_model.set_optimality_tolerance(1e-10);
             sub_model.set_feasibility_tolerance(1e-8);
@@ -287,9 +282,8 @@ struct path_formulation_rr {
         std::vector<sub_model_data<I>> sub_models;
 
         master_model_case_data(std::mutex & model_mutex, MODEL_LP & model,
-                               const auto & X_vars,
-                               const MODEL_MILP_API & milp_api,
-                               const auto & instance, const double & budget,
+                               const auto & X_vars, const auto & instance,
+                               const double & budget,
                                const auto & instance_case,
                                const auto & strong_arcs,
                                const auto & useless_arcs)
@@ -322,9 +316,8 @@ struct path_formulation_rr {
                 }));
 
             for(const vertex_t target : target_vertices) {
-                sub_models.emplace_back(milp_api, instance, budget,
-                                        instance_case, strong_arcs,
-                                        useless_arcs, target);
+                sub_models.emplace_back(instance, budget, instance_case,
+                                        strong_arcs, useless_arcs, target);
             }
 
             purchase_constraints_map.insert_range(
@@ -373,9 +366,7 @@ struct path_formulation_rr {
         using namespace mippp;
         using namespace mippp::operators;
         std::mutex master_model_mutex;
-        MODEL_LP_API lp_api;
-        MODEL_LP model(lp_api);
-        MODEL_MILP_API milp_api;
+        MODEL_LP model;
         model.set_feasibility_tolerance(feasibility_tol);
         model.set_maximization();
 
@@ -394,7 +385,7 @@ struct path_formulation_rr {
 
             assert(master_model_cases.size() == instance_case.id());
             auto & master_model_case = master_model_cases.emplace_back(
-                master_model_mutex, model, X_vars, milp_api, instance, budget,
+                master_model_mutex, model, X_vars, instance, budget,
                 instance_case, strong_arcs_map, useless_arcs_map);
         }
 
@@ -409,7 +400,7 @@ struct path_formulation_rr {
         spdlog::trace("tree decomposition model has:");
         spdlog::trace("  {:>10} variables", model.num_variables());
         spdlog::trace("  {:>10} constraints", model.num_constraints());
-        spdlog::trace("  {:>10} entries", model.num_entries());
+        spdlog::trace("  {:>10} entries", model.num_nonzeros());
 
         auto log_lambda = [&, option_name_max_length = std::ranges::max(
                                   std::ranges::views::transform(

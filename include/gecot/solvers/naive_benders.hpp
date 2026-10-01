@@ -78,8 +78,7 @@ struct naive_benders : public benders_base {
         using namespace mippp;
         using namespace mippp::operators;
 
-        api_type api;
-        model_type model(api);
+        model_type model;
 
         model.set_optimality_tolerance(1e-10);
         model.set_feasibility_tolerance(feasibility_tol);

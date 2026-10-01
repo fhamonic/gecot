@@ -80,8 +80,7 @@ struct unprep_target_benders : public benders_base {
         using namespace mippp;
         using namespace mippp::operators;
 
-        api_type api;
-        model_type model(api);
+        model_type model;
 
         model.set_optimality_tolerance(1e-10);
         model.set_feasibility_tolerance(feasibility_tol);
@@ -100,8 +99,9 @@ struct unprep_target_benders : public benders_base {
                                  return instance.option_cost(o) * X_vars(o);
                              }) <= budget);
 
-        auto cases_contracted_data = instance.template create_case_map<
-            std::vector<std::pair<model_type::variable, unsigned int>>>();
+        auto cases_contracted_data =
+            instance.template create_case_map<std::vector<std::pair<
+                mippp::model_variable_t<model_type>, unsigned int>>>();
 
         for(auto && instance_case : instance.cases()) {
             const auto case_id = instance_case.id();

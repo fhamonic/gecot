@@ -16,6 +16,7 @@ namespace solvers {
 
 struct GreedyIncremental {
     double feasibility_tol = 0.0;
+    bool worst = false;
 
     template <instance_c I>
     instance_solution_t<I> solve(const I & instance,
@@ -70,10 +71,12 @@ struct GreedyIncremental {
                      previous_score) /
                     instance.option_cost(option);
             }
-            auto best_option_it = std::ranges::max_element(
-                options, [&options_ratios](auto && o1, auto && o2) {
-                    return options_ratios[o1] < options_ratios[o2];
-                });
+            const auto by_ratio = [&options_ratios](auto && o1, auto && o2) {
+                return options_ratios[o1] < options_ratios[o2];
+            };
+            auto best_option_it =
+                worst ? std::ranges::min_element(options, by_ratio)
+                      : std::ranges::max_element(options, by_ratio);
             option_t best_option = *best_option_it;
             const double best_option_price = instance.option_cost(best_option);
             previous_score += options_ratios[best_option] * best_option_price;

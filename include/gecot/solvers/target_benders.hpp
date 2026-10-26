@@ -6,6 +6,7 @@
 #include <stdexcept>
 
 #include <spdlog/spdlog.h>
+#include <spdlog/stopwatch.h>
 
 #include "mippp/solvers/cplex/all.hpp"
 #include "mippp/solvers/gurobi/all.hpp"
@@ -18,12 +19,12 @@
 #include "gecot/preprocessing/compute_contracted_graph.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 
-#include "gecot/solvers/benders_base.hpp"
+#include "gecot/solvers/mip_solver_base.hpp"
 
 namespace gecot {
 namespace solvers {
 
-struct target_benders : public benders_base {
+struct target_benders : public mip_solver_base {
     template <case_c C>
     auto _compute_dual_flow(const contracted_graph_data<C> & data,
                             const auto & solution) const {
@@ -109,9 +110,6 @@ struct target_benders : public benders_base {
                 instance_case.target_quality_map();
             const auto & original_vertex_options_map =
                 instance_case.vertex_options_map();
-            const auto [strong_arcs_map, useless_arcs_map] =
-                _compute_strong_and_useless_arcs(instance, instance_case,
-                                                 budget);
 
             spdlog::stopwatch prep_sw;
             spdlog::trace(
@@ -133,10 +131,8 @@ struct target_benders : public benders_base {
                     }
                     cases_contracted_data[case_id].emplace_back(
                         model.add_variable(),
-                        compute_contracted_graph_data(
-                            instance, instance_case, budget,
-                            strong_arcs_map[original_t],
-                            useless_arcs_map[original_t], original_t));
+                        compute_contracted_graph_data(instance, instance_case,
+                                                      budget, original_t));
                     pb.tick();
                 }
             }
@@ -212,6 +208,16 @@ struct target_benders : public benders_base {
                             });
             };
 
+        // seeding cuts at both the empty solution and the mip start makes
+        // gurobi's bound unsound on this ill-conditioned master
+        if(mip_start.has_value()) {
+            solution = _mip_start_solution(instance);
+            model.add_mip_start(
+                std::views::transform(instance.options(), [&](auto o) {
+                    return std::make_pair(X_vars(o), solution[o]);
+                }));
+        }
+
         for(auto && instance_case : instance.cases()) {
             for(auto && [var, data] :
                 cases_contracted_data[instance_case.id()]) {
@@ -240,31 +246,6 @@ struct target_benders : public benders_base {
                 }
             });
 
-        if(mip_start.has_value()) {
-            instance_solution_t<I> mip_start_solution =
-                instance.create_option_map(false);
-            for(const std::string & option_name : mip_start.value()) {
-                if(!instance.contains_option(option_name)) continue;
-                const option_t option = instance.option_from_name(option_name);
-                mip_start_solution[option] = true;
-            }
-            model.add_mip_start(
-                std::views::transform(instance.options(), [&](auto o) {
-                    return std::make_pair(X_vars(o), mip_start_solution[o]);
-                }));
-
-            for(auto && instance_case : instance.cases()) {
-                for(auto && [var, data] :
-                    cases_contracted_data[instance_case.id()]) {
-                    auto && [opt, rho_values] =
-                        _compute_dual_flow(data, mip_start_solution);
-                    model.add_constraint(
-                        var <= get_cut_expression(data, mip_start_solution,
-                                                  rho_values));
-                }
-            }
-        }
-
         model.solve();
         const auto master_solution = model.get_solution();
         for(const auto & i : instance.options())
@@ -284,6 +265,7 @@ struct target_benders : public benders_base {
 #include <stdexcept>
 
 #include <spdlog/spdlog.h>
+#include <spdlog/stopwatch.h>
 
 #include "mippp/solvers/cplex/all.hpp"
 #include "mippp/solvers/gurobi/all.hpp"
@@ -296,12 +278,12 @@ struct target_benders : public benders_base {
 #include "gecot/preprocessing/compute_contracted_graph.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 
-#include "gecot/solvers/benders_base.hpp"
+#include "gecot/solvers/mip_solver_base.hpp"
 
 namespace gecot {
 namespace solvers {
 
-struct target_benders : public benders_base {
+struct target_benders : public mip_solver_base {
     template <case_c C>
     auto _compute_dual_flow(const C & instance_case, const auto & t,
                             const auto & solution) const {

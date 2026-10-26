@@ -21,96 +21,21 @@
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
+#include "gecot/preprocessing/compute_big_M_map.hpp"
 #include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
 #include "gecot/preprocessing/compute_contracted_generalized_flow_graph.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
-#include "gecot/utils/chronometer.hpp"
 
-#include "gecot/solvers/greedy_decremental.hpp"
-#include "gecot/solvers/greedy_incremental.hpp"
-
-using MODEL_LP = mippp::clp_lp;
-using MODEL_MILP = mippp::cbc_milp;
-
-// using MODEL_LP = mippp::gurobi_lp;
-// using MODEL_MILP = mippp::gurobi_milp;
+#include "gecot/solvers/mip_solver_base.hpp"
 
 namespace gecot {
 namespace solvers {
 
-struct path_formulation_rr {
-    double feasibility_tol = 0.0;
-    bool print_model = false;
-    double probability_resolution;
-    int num_mus;
-    std::optional<std::vector<std::string>> mip_start;
-
-    template <typename M, typename V>
-    struct formula_variable_visitor {
-        std::reference_wrapper<M> model;
-        std::reference_wrapper<const V> C_vars;
-
-        formula_variable_visitor(M & t_model, const V & t_C_vars)
-            : model{t_model}, C_vars{t_C_vars} {}
-
-        auto operator()(const criterion_constant & c) {
-            return model.get().add_variable(
-                {.lower_bound = c, .upper_bound = c});
-        }
-        auto operator()(const criterion_var & v) { return C_vars.get()(v); }
-        auto operator()(const criterion_sum & f) {
-            using namespace mippp::operators;
-            auto var = model.get().add_variable();
-            std::vector<mippp::model_variable_t<M>> vars;
-            for(auto && e : f.values) vars.emplace_back(std::visit(*this, e));
-            model.get().add_constraint(var == xsum(vars));
-            return var;
-        }
-        auto operator()(const criterion_product & f) {
-            using namespace mippp::operators;
-            if(!std::holds_alternative<criterion_constant>(f.values[0]) ||
-               f.values.size() != 2)
-                throw std::invalid_argument(
-                    "mip doesn't support products of variables in the "
-                    "criterion "
-                    "!");
-
-            auto var = model.get().add_variable();
-            model.get().add_constraint(
-                var == std::get<criterion_constant>(f.values[0]) *
-                           std::visit(*this, f.values[1]));
-            return var;
-        }
-        auto operator()(const criterion_min & f) {
-            using namespace mippp::operators;
-            auto var = model.get().add_variable();
-            for(auto && e : f.values) {
-                model.get().add_constraint(var <= std::visit(*this, e));
-            }
-            return var;
-        }
-    };
-
-    template <instance_c I, case_c C>
-    auto _compute_strong_and_useless_arcs(const I & instance,
-                                          const C & instance_case,
-                                          const double budget) const {
-        if(num_mus >= 1) {
-            return compute_constrained_strong_and_useless_arcs(
-                instance, instance_case, budget,
-                [&instance, budget](const option_t & o) {
-                    return instance.option_cost(o) <= budget;
-                },
-                probability_resolution, num_mus);
-        } else {
-            return compute_strong_and_useless_arcs(
-                instance_case,
-                [&instance, budget](const option_t & o) {
-                    return instance.option_cost(o) <= budget;
-                },
-                probability_resolution);
-        }
-    }
+struct path_formulation_rr : public mip_solver_base {
+    using lp_model_type = mippp::clp_lp;
+    using milp_model_type = mippp::cbc_milp;
+    // using lp_model_type = mippp::gurobi_lp;
+    // using milp_model_type = mippp::gurobi_milp;
 
     using variable_t = mippp::model_variable<int, double>;
     using constraint_t = mippp::model_constraint<int>;
@@ -119,7 +44,7 @@ struct path_formulation_rr {
     struct sub_model_data {
         using vertex_t = melon::vertex_t<instance_graph_t<I>>;
         vertex_t target;
-        MODEL_MILP sub_model;
+        milp_model_type sub_model;
         mippp::runtime_linear_expression<variable_t, double> default_objective;
         std::flat_map<option_t, variable_t> sub_X_vars_map;
 
@@ -273,7 +198,7 @@ struct path_formulation_rr {
     struct master_model_case_data {
         using vertex_t = melon::vertex_t<instance_graph_t<I>>;
         std::reference_wrapper<std::mutex> master_model_mutex_ref;
-        std::reference_wrapper<MODEL_LP> master_model;
+        std::reference_wrapper<lp_model_type> master_model;
         variable_t contribution_variable;
         constraint_t contribution_constraint;
         std::flat_map<vertex_t, constraint_t> uniqueness_constraint_map;
@@ -281,7 +206,7 @@ struct path_formulation_rr {
             purchase_constraints_map;
         std::vector<sub_model_data<I>> sub_models;
 
-        master_model_case_data(std::mutex & model_mutex, MODEL_LP & model,
+        master_model_case_data(std::mutex & model_mutex, lp_model_type & model,
                                const auto & X_vars, const auto & instance,
                                const double & budget,
                                const auto & instance_case,
@@ -366,7 +291,7 @@ struct path_formulation_rr {
         using namespace mippp;
         using namespace mippp::operators;
         std::mutex master_model_mutex;
-        MODEL_LP model;
+        lp_model_type model;
         model.set_feasibility_tolerance(feasibility_tol);
         model.set_maximization();
 

@@ -4,6 +4,8 @@
 #include <atomic>
 #include <utility>
 
+#include <spdlog/stopwatch.h>
+
 #include <tbb/concurrent_vector.h>
 
 #include "melon/algorithm/competing_dijkstras.hpp"
@@ -12,7 +14,7 @@
 #include "gecot/helper.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 
-#include "io_helper.hpp"
+#include "gecot/utils/progress_bar.hpp"
 
 namespace gecot {
 
@@ -73,6 +75,7 @@ auto compute_constrained_strong_and_useless_arcs(
     double min_mu = std::numeric_limits<double>::max();
     double max_mu = 0;
     for(auto && i : instance.options()) {
+        if(!option_predicate(i)) continue;
         const double arc_cost = instance.option_cost(i) /
                                 static_cast<double>(arcs_options[i].size());
         for(auto && [a, enhanced_prob] : arcs_options[i]) {
@@ -101,6 +104,7 @@ auto compute_constrained_strong_and_useless_arcs(
     for(double mu : mus) {
         auto mu_length_map = base_length_map;
         for(auto && i : instance.options()) {
+            if(!option_predicate(i)) continue;
             const double arc_cost = instance.option_cost(i) /
                                     static_cast<double>(arcs_options[i].size());
             const log_probability_t penalty = cost_to_penatlty(mu, arc_cost);

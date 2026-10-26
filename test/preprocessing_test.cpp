@@ -49,6 +49,9 @@ GTEST_TEST(preprocessing, fuzzy_test) {
     double budget = 0;
     for(auto && o : instance.options()) budget += instance.option_cost(o);
     budget /= 10;
+    const auto option_predicate = [&](const gecot::option_t & o) {
+        return instance.option_cost(o) <= budget;
+    };
 
     int cpt = 0;
     int cpt_ok = 0;
@@ -68,111 +71,110 @@ GTEST_TEST(preprocessing, fuzzy_test) {
                     vertex_options_map, probability_map, arc_option_map] =
             gecot::compute_generalized_flow_graph(instance_case);
 
-        /*
-        const auto [strong_arcs_map, useless_arcs_map] =
-            gecot::compute_constrained_strong_and_useless_arcs(
-                instance, instance_case, budget,
-                [&instance, budget](const gecot::option_t & o) {
-                    return instance.option_cost(o) <= budget;
-                }, 1e-7);
-        /*/
-        const auto [strong_arcs_map, useless_arcs_map] =
-            gecot::compute_strong_and_useless_arcs(
-                instance_case, [&instance, budget](const gecot::option_t & o) {
-                    return instance.option_cost(o) <= budget;
-                });
-        //*/
+        for(const bool constrained : {false, true}) {
+            const auto [strong_arcs_map, useless_arcs_map] =
+                constrained
+                    ? gecot::compute_constrained_strong_and_useless_arcs(
+                          instance, instance_case, budget, option_predicate,
+                          1e-7)
+                    : gecot::compute_strong_and_useless_arcs(instance_case,
+                                                             option_predicate);
 
-        for(const auto & original_t : melon::vertices(original_graph)) {
-            const double contribution = gecot::pc_num_vertex_in_flow(
-                graph, source_quality_map, probability_map, original_t);
+            for(const auto & original_t : melon::vertices(original_graph)) {
+                const double contribution = gecot::pc_num_vertex_in_flow(
+                    graph, source_quality_map, probability_map, original_t);
 
-            const auto [contracted_graph, contracted_source_quality_map,
-                        contracted_vertex_options_map, contracted_arc_no_map,
-                        contracted_probability_map, contracted_arc_option_map,
-                        t] =
-                gecot::compute_contracted_generalized_flow_graph(
-                    instance_case, strong_arcs_map[original_t],
-                    useless_arcs_map[original_t], original_t);
+                const auto [contracted_graph, contracted_source_quality_map,
+                            contracted_vertex_options_map,
+                            contracted_arc_no_map, contracted_probability_map,
+                            contracted_arc_option_map, t] =
+                    gecot::compute_contracted_generalized_flow_graph(
+                        instance_case, strong_arcs_map[original_t],
+                        useless_arcs_map[original_t], original_t);
 
-            std::cout << "<contracted>" << std::endl;
-            const double contracted_contribution = gecot::pc_num_vertex_in_flow(
-                contracted_graph, contracted_source_quality_map,
-                contracted_probability_map, t);
-            std::cout << "</contracted>" << std::endl;
+                std::cout << "<contracted>" << std::endl;
+                const double contracted_contribution =
+                    gecot::pc_num_vertex_in_flow(contracted_graph,
+                                                 contracted_source_quality_map,
+                                                 contracted_probability_map, t);
+                std::cout << "</contracted>" << std::endl;
 
-            cpt += 1;
-            if(std::abs(contribution - contracted_contribution) <=
-               1e-6 * std::min(contribution, contracted_contribution)) {
-                cpt_ok += 1;
-            } else {
-                std::cout << original_t << "\t" << melon::num_vertices(graph)
-                          << "\t" << melon::num_arcs(graph) << "\t"
-                          << contribution << "\t"
-                          << melon::num_vertices(contracted_graph) << "\t"
-                          << melon::num_arcs(contracted_graph) << "\t"
-                          << contracted_contribution << std::endl;
+                cpt += 1;
+                if(std::abs(contribution - contracted_contribution) <=
+                   1e-6 * std::min(contribution, contracted_contribution)) {
+                    cpt_ok += 1;
+                } else {
+                    std::cout << original_t << "\t"
+                              << melon::num_vertices(graph) << "\t"
+                              << melon::num_arcs(graph) << "\t" << contribution
+                              << "\t" << melon::num_vertices(contracted_graph)
+                              << "\t" << melon::num_arcs(contracted_graph)
+                              << "\t" << contracted_contribution << std::endl;
+                }
+
+                if(original_source_quality_map[original_t] > 0 ||
+                   vertex_options_map[original_t].size() > 0) {
+                    num_variables += melon::num_arcs(graph);
+                    num_constraints += melon::num_vertices(graph);
+                    contracted_num_variables +=
+                        melon::num_arcs(contracted_graph);
+                    contracted_num_constraints +=
+                        melon::num_vertices(contracted_graph);
+                }
+                // if(std::ranges::distance(melon::out_arcs(contracted_graph,
+                // t)) == 0)
+                //     continue;
+
+                // melon::graphviz_printer printer(original_graph);
+                // auto lower_length_map = original_probability_map;
+                // const auto & arc_options_map = instance.arc_options_map();
+                // for(const auto & a : melon::arcs(original_graph)) {
+                //     for(const auto & [improved_prob, option] :
+                //     arc_options_map[a]) {
+                //         lower_length_map[a] =
+                //             std::max(lower_length_map[a], improved_prob);
+                //     }
+                // }
+                // printer
+                //     .set_vertex_color_map(melon::maps::function(
+                //         [&](auto && v)
+                //             -> std::tuple<unsigned char, unsigned char,
+                //             unsigned char> { if(v == original_t)
+                //                 return {255, 0, 0};
+                //             else
+                //                 return {255, 255, 255};
+                //         }))
+                //     .set_arc_label_map(melon::maps::function([&](auto && a) {
+                //         return "[" +
+                //         std::to_string(original_probability_map[a])
+                //         + "," +
+                //                std::to_string(lower_length_map[a]) + "]";
+                //     }));
+                // for(auto && a : strong_arcs_map[original_t]) {
+                //     printer.set_arc_color(a, {255, 0, 0});
+                // }
+                // for(auto && a : useless_arcs_map[original_t]) {
+                //     printer.set_arc_color(a, {0, 0, 255});
+                // }
+                // printer.print(std::ostream_iterator<char>(std::cout));
+
+                // melon::graphviz_printer printer2(contracted_graph);
+                // printer2
+                //     .set_vertex_color_map(melon::maps::function(
+                //         [&](auto && v)
+                //             -> std::tuple<unsigned char, unsigned char,
+                //             unsigned char> { if(v == t)
+                //                 return {255, 0, 0};
+                //             else
+                //                 return {255, 255, 255};
+                //         }))
+                //     .set_arc_label_map(melon::maps::function([&](auto && a) {
+                //         return "[" + std::to_string(probability_map[a]) +
+                //         "]";
+                //     }));
+                // printer2.print(std::ostream_iterator<char>(std::cout));
+                // ASSERT_EQ(contribution, contracted_contribution);
             }
-
-            if(original_source_quality_map[original_t] > 0 ||
-               vertex_options_map[original_t].size() > 0) {
-                num_variables += melon::num_arcs(graph);
-                num_constraints += melon::num_vertices(graph);
-                contracted_num_variables += melon::num_arcs(contracted_graph);
-                contracted_num_constraints +=
-                    melon::num_vertices(contracted_graph);
-            }
-            // if(std::ranges::distance(melon::out_arcs(contracted_graph, t)) ==
-            // 0)
-            //     continue;
-
-            // melon::graphviz_printer printer(original_graph);
-            // auto lower_length_map = original_probability_map;
-            // const auto & arc_options_map = instance.arc_options_map();
-            // for(const auto & a : melon::arcs(original_graph)) {
-            //     for(const auto & [improved_prob, option] :
-            //     arc_options_map[a]) {
-            //         lower_length_map[a] =
-            //             std::max(lower_length_map[a], improved_prob);
-            //     }
-            // }
-            // printer
-            //     .set_vertex_color_map(melon::maps::function(
-            //         [&](auto && v)
-            //             -> std::tuple<unsigned char, unsigned char, unsigned
-            //             char> { if(v == original_t)
-            //                 return {255, 0, 0};
-            //             else
-            //                 return {255, 255, 255};
-            //         }))
-            //     .set_arc_label_map(melon::maps::function([&](auto && a) {
-            //         return "[" + std::to_string(original_probability_map[a])
-            //         + "," +
-            //                std::to_string(lower_length_map[a]) + "]";
-            //     }));
-            // for(auto && a : strong_arcs_map[original_t]) {
-            //     printer.set_arc_color(a, {255, 0, 0});
-            // }
-            // for(auto && a : useless_arcs_map[original_t]) {
-            //     printer.set_arc_color(a, {0, 0, 255});
-            // }
-            // printer.print(std::ostream_iterator<char>(std::cout));
-
-            // melon::graphviz_printer printer2(contracted_graph);
-            // printer2
-            //     .set_vertex_color_map(melon::maps::function(
-            //         [&](auto && v)
-            //             -> std::tuple<unsigned char, unsigned char, unsigned
-            //             char> { if(v == t)
-            //                 return {255, 0, 0};
-            //             else
-            //                 return {255, 255, 255};
-            //         }))
-            //     .set_arc_label_map(melon::maps::function([&](auto && a) {
-            //         return "[" + std::to_string(probability_map[a]) + "]";
-            //     }));
-            // printer2.print(std::ostream_iterator<char>(std::cout));
-            // ASSERT_EQ(contribution, contracted_contribution);
         }
     }
 

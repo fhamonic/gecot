@@ -1,9 +1,7 @@
 #ifndef GECOT_STATIC_DECREMENTAL_INTERFACE_HPP
 #define GECOT_STATIC_DECREMENTAL_INTERFACE_HPP
 
-#include <sstream>
-
-#include <boost/program_options.hpp>
+#include <CLI/CLI.hpp>
 
 #include "gecot/solvers/static_decremental.hpp"
 
@@ -12,46 +10,24 @@
 class StaticDecrementalInterface : public AbstractSolverInterface {
 private:
     gecot::solvers::StaticDecremental solver;
-    boost::program_options::options_description desc;
 
 public:
-    StaticDecrementalInterface() : desc(name() + " options") {
-        desc.add_options()(
-            "feasibility-tolerance,t", po::value<double>(&solver.feasibility_tol)
-                ->default_value(1e-7), "Tolearnce for rounding errors")(
-            "only-dec",
-            "Do not perform the final incremental steps that ensure that the "
-            "entire budget is used");
-    }
-
-    void parse(const std::vector<std::string> & args) {
-        boost::program_options::variables_map vm;
-        boost::program_options::store(
-            boost::program_options::command_line_parser(args)
-                .options(desc)
-                .run(),
-            vm);
-        po::notify(vm);
-
-        solver.only_dec = vm.count("only-dec") > 0;
+    StaticDecrementalInterface() : AbstractSolverInterface("static_decr") {
+        add_feasibility_tol_option(solver.feasibility_tol);
+        app.add_flag("--only-dec", solver.only_dec,
+                     "Do not perform the final incremental steps that ensure "
+                     "that the entire budget is used");
     }
 
     gecot::instance_solution_t<Instance> solve(const Instance & instance,
-                                               const double B) const {
+                                               const double B) const override {
         return solver.solve(instance, B);
     };
 
-    std::string name() const { return "static_decr"; }
-    std::string description() const {
+    std::string description() const override {
         return "From the improved landscape, remove the options with the worst "
                "gain/cost ratio.";
     }
-    std::string options_description() const {
-        std::ostringstream s;
-        s << desc;
-        return s.str();
-    }
-    std::string string() const { return name(); }
 };
 
 #endif  // GECOT_STATIC_DECREMENTAL_INTERFACE_HPP

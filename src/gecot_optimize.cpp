@@ -3,10 +3,10 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <optional>
 
-#include <boost/program_options.hpp>
-namespace po = boost::program_options;
+#include <CLI/CLI.hpp>
 
 #include <fmt/core.h>
 #include <fmt/os.h>
@@ -64,16 +64,6 @@ static bool process_command_line(
             "Optimization Tool\nVersion: {} (built on {})\n\n",
             PROJECT_VERSION, __DATE__);
     };
-    auto print_usage = []() {
-        fmt::print(R"(Usage:
-  gecot_optimize --help
-  gecot_optimize --list-algorithms
-  gecot_optimize <algorithm> --list-params
-  gecot_optimize <algorithm> <instance> <budget> [<parameters> ...]
-
-)");
-    };
-
     auto print_available_algorithms = [&solver_interfaces]() {
         fmt::println("Available algorithms:");
         const std::size_t algorithm_name_max_length = std::ranges::max(
@@ -90,53 +80,61 @@ static bool process_command_line(
         return false;
     };
 
-    po::options_description desc("Allowed parameters");
-    desc.add_options()("help,h", "Display this help message")(
-        "list-algorithms,A", "List the available algorithms")(
-        "list-params,P", "List the parameters of the chosen algorithm")(
-        "algorithm,a", po::value<std::string>()->required(),
-        "Algorithm to use")(
-        "instance,i",
-        po::value<std::filesystem::path>(&instances_description_json_file)
-            ->required(),
-        "Instance JSON file")(
-        "budget,B", po::value<double>(&budget)->required(), "Budget value")(
-        "output-json,o", po::value<std::filesystem::path>(),
-        "Output solution data in JSON file")(
-        "output-csv", po::value<std::filesystem::path>(),
-        "Output solution value in CSV file")(
-        "verbose,v", "Enable logging of algorithms trace")(
-        "quiet,q", "Silence all logging except errors")(
-        "max-threads", po::value<std::size_t>(),
-        "Limits the number of threads used");
+    bool help = false, list_algorithms = false, list_params = false,
+         verbose = false, quiet = false;
+    std::string solver_name;
+    std::optional<std::size_t> opt_max_threads;
+    CLI::App app("", "gecot_optimize");
+    app.usage(R"(Usage:
+  gecot_optimize --help
+  gecot_optimize --list-algorithms
+  gecot_optimize <algorithm> --list-params
+  gecot_optimize <algorithm> <instance> <budget> [<parameters> ...])");
+    app.set_help_flag();
+    app.add_flag("-h,--help", help, "Display this help message");
+    app.add_flag("-A,--list-algorithms", list_algorithms,
+                 "List the available algorithms");
+    app.add_flag("-P,--list-params", list_params,
+                 "List the parameters of the chosen algorithm");
+    // a name without dashes also makes the option positional
+    auto * algorithm_opt = app.add_option("algorithm,-a,--algorithm",
+                                          solver_name, "Algorithm to use");
+    auto * instance_opt =
+        app.add_option("instance,-i,--instance",
+                       instances_description_json_file, "Instance JSON file");
+    auto * budget_opt =
+        app.add_option("budget,-B,--budget", budget, "Budget value");
+    app.add_option("-o,--output-json", opt_output_json_file,
+                   "Output solution data in JSON file");
+    app.add_option("--output-csv", opt_output_csv_file,
+                   "Output solution value in CSV file");
+    app.add_flag("-v,--verbose", verbose, "Enable logging of algorithms trace");
+    app.add_flag("-q,--quiet", quiet, "Silence all logging except errors");
+    app.add_option("--max-threads", opt_max_threads,
+                   "Limits the number of threads used")
+        ->check(CLI::Range(std::size_t{1},
+                           std::numeric_limits<std::size_t>::max(),
+                           "POSITIVE"));
+    // unknown options and surplus values are left for solver->parse
+    app.allow_extras();
+    // else on Windows CLI11 takes a '/abs/path' instance for an option
+    app.allow_windows_style_options(false);
+    // CLI::App::parse consumes the args from the back
+    app.parse(std::vector<std::string>(args.rbegin(), args.rend()));
 
-    po::positional_options_description p;
-    p.add("algorithm", 1);
-    p.add("instance", 1);
-    p.add("budget", 1);
-    po::variables_map vm;
-    po::parsed_options parsed = po::basic_command_line_parser(args)
-                                    .options(desc)
-                                    .positional(p)
-                                    .allow_unregistered()
-                                    .run();
-    po::store(parsed, vm);
-
-    if(vm.count("help") || args.empty()) {
+    if(help || args.empty()) {
         print_soft_name();
-        print_usage();
-        std::cout << desc << std::endl;
+        std::cout << app.help() << std::endl;
         return false;
     }
 
-    if(vm.count("list-algorithms")) {
+    if(list_algorithms) {
         print_soft_name();
         print_available_algorithms();
         return false;
     }
 
-    if(vm.count("algorithm")) {
-        auto solver_name = vm["algorithm"].as<std::string>();
+    if(algorithm_opt->count()) {
         bool found = false;
         for(auto & s : solver_interfaces) {
             if(s->name() == solver_name) {
@@ -153,8 +151,8 @@ static bool process_command_line(
         }
     }
 
-    if(vm.count("list-params")) {
-        if(!vm.count("algorithm")) {
+    if(list_params) {
+        if(!algorithm_opt->count()) {
             throw std::logic_error(std::string(
                 "Option '--list-params' requires option '--algorithm'."));
         }
@@ -164,33 +162,28 @@ static bool process_command_line(
         return false;
     }
 
-    po::notify(vm);
+    for(auto * opt : {algorithm_opt, instance_opt, budget_opt})
+        if(!opt->count())
+            throw std::logic_error("the option '" + opt->get_name() +
+                                   "' is required but missing");
     if(!std::isfinite(budget) || budget < 0)
         throw std::logic_error("the budget must be a non-negative number");
-    if(vm.count("output-json")) {
-        opt_output_json_file.emplace(
-            vm["output-json"].as<std::filesystem::path>());
-    }
-    if(vm.count("output-csv")) {
-        opt_output_csv_file.emplace(
-            vm["output-csv"].as<std::filesystem::path>());
-    }
-    if(vm.count("quiet")) {
+    if(quiet) {
         spdlog::set_level(spdlog::level::err);
-    } else if(vm.count("verbose")) {
+    } else if(verbose) {
         spdlog::set_level(spdlog::level::trace);
     } else {
         spdlog::set_level(spdlog::level::info);
     }
-    if(vm.count("max-threads")) {
+    if(opt_max_threads.has_value()) {
         opt_tbb_global_control.emplace(
             tbb::global_control::max_allowed_parallelism,
-            vm.at("max-threads").as<std::size_t>());
+            opt_max_threads.value());
     }
 
-    std::vector<std::string> opts =
-        po::collect_unrecognized(parsed.options, po::exclude_positional);
-    solver->parse(opts);
+    // remaining() is in command line order: the solver would read '-t 1e-5'
+    // as '1e-5 -t'
+    solver->parse(app.remaining_for_passthrough());
 
     return true;
 }

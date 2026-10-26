@@ -4,13 +4,16 @@
 #include <limits>
 #include <optional>
 
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
+
 #include "melon/algorithm/dijkstra.hpp"
 #include "melon/algorithm/knapsack_bnb.hpp"
 #include "melon/graph.hpp"
 #include "melon/views/reverse.hpp"
 
 #include "gecot/concepts/instance.hpp"
-#include "gecot/indices/parallel_pc_num.hpp"
+#include "gecot/indices/pc_num.hpp"
 
 namespace gecot {
 
@@ -34,7 +37,7 @@ auto compute_big_M_map(const GR & graph, const QM & source_quality_map,
         [&](auto && vertices_subrange) {
             auto reversed_graph = melon::views::reverse(graph);
             auto algo = melon::dijkstra(
-                detail::parallel_pc_num_dijkstra_traits<
+                detail::pc_num_dijkstra_traits<
                     decltype(reversed_graph),
                     melon::mapped_value_t<
                         PM, melon::arc_t<decltype(reversed_graph)>>>{},
@@ -69,7 +72,7 @@ auto compute_knapsack_big_M_map(const I & instance, const double budget,
         [&](auto && vertices_subrange) {
             auto reversed_graph = melon::views::reverse(graph);
             auto algo = melon::dijkstra(
-                detail::parallel_pc_num_dijkstra_traits<
+                detail::pc_num_dijkstra_traits<
                     decltype(reversed_graph),
                     melon::mapped_value_t<
                         PM, melon::arc_t<decltype(reversed_graph)>>>{},

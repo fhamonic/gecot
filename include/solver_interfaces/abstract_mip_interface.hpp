@@ -1,28 +1,19 @@
 #pragma once
 
+#include <filesystem>
 #include <fstream>
-#include <optional>
-#include <sstream>
 #include <vector>
 
-#include <boost/program_options.hpp>
+#include <CLI/CLI.hpp>
 #include <nlohmann/json.hpp>
+
+#include "gecot/solvers/mip_solver_base.hpp"
 
 #include "solver_interfaces/abstract_solver_interface.hpp"
 
 class AbstractMipInterface : public AbstractSolverInterface {
-protected:
-    boost::program_options::options_description desc;
-
 public:
-    AbstractMipInterface(const std::string & name) : desc(name + " options") {
-        desc.add_options()("feasibility-tolerance,t",
-                           po::value<double>()->default_value(1e-7),
-                           "Tolearnce for rounding errors")(
-            "print-model,m", "Print the mip model")(
-            "mip-start", po::value<std::filesystem::path>(),
-            "Solution file (JSON) to propose as a MIP start to the solver.");
-    }
+    using AbstractSolverInterface::AbstractSolverInterface;
 
     static std::vector<std::string> parse_mip_start(
         const std::filesystem::path & solution_path) {
@@ -45,30 +36,25 @@ public:
         return taken_option_names;
     }
 
-    void parse(const std::vector<std::string> & args) {
-        boost::program_options::variables_map vm;
-        boost::program_options::store(
-            boost::program_options::command_line_parser(args)
-                .options(desc)
-                .run(),
-            vm);
-        po::notify(vm);
-
-        handle_options(vm);
+protected:
+    void add_mip_options(gecot::solvers::mip_solver_base & solver) {
+        add_feasibility_tol_option(solver.feasibility_tol);
+        app.add_option_function<std::filesystem::path>(
+            "--mip-start",
+            [&solver](const std::filesystem::path & solution_path) {
+                solver.mip_start = parse_mip_start(solution_path);
+            },
+            "Solution file (JSON) to propose as a MIP start to the solver.");
     }
 
-    virtual void handle_options(
-        const boost::program_options::variables_map & vm) = 0;
-
-    virtual gecot::instance_solution_t<Instance> solve(
-        const Instance & instance, const double B) const = 0;
-
-    virtual std::string name() const = 0;
-    virtual std::string description() const = 0;
-    std::string options_description() const {
-        std::ostringstream s;
-        s << desc;
-        return s.str();
+    void add_preprocessing_options(gecot::solvers::mip_solver_base & solver) {
+        app.add_option("--resolution", solver.probability_resolution,
+                       "Sets the resolution of the probabilities used by the "
+                       "preprocessing algorithm")
+            ->default_val(1e-8);
+        app.add_option("--nb-mus", solver.num_mus,
+                       "Sets the number of lagrangian multipliers to test for "
+                       "the constrained preprocessing algorithm (experimental)")
+            ->default_val(0);
     }
-    virtual std::string string() const = 0;
 };

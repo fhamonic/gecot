@@ -22,7 +22,7 @@ Otherwise, [here](https://github.com/fhamonic/gecot_docker) is a Docker containe
 ```
 $ gecot_optimize --help
 GECOT — Graph-based Ecological Connectivity Optimization Tool
-Version: 1.0 (built on Dec  1 2024)
+Version: 1.0 (built on Oct 26 2026)
 
 Usage:
   gecot_optimize --help
@@ -30,17 +30,25 @@ Usage:
   gecot_optimize <algorithm> --list-params
   gecot_optimize <algorithm> <instance> <budget> [<parameters> ...]
 
-Allowed parameters:
-  -h [ --help ]             Display this help message
-  -A [ --list-algorithms ]  List the available algorithms
-  -P [ --list-params ]      List the parameters of the chosen algorithm
-  -a [ --algorithm ] arg    Algorithm to use
-  -i [ --instance ] arg     Instance JSON file
-  -B [ --budget ] arg       Budget value
-  -o [ --output-json ] arg  Output solution data in JSON file
-  --output-csv arg          Output solution value in CSV file
-  -v [ --verbose ]          Enable all logging informations
-  -q [ --quiet ]            Silence all logging except errors
+
+POSITIONALS:
+  algorithm TEXT              Algorithm to use
+  instance TEXT               Instance JSON file
+  budget FLOAT                Budget value
+
+OPTIONS:
+  -h,     --help              Display this help message
+  -A,     --list-algorithms   List the available algorithms
+  -P,     --list-params       List the parameters of the chosen algorithm
+  -a,     --algorithm TEXT    Algorithm to use
+  -i,     --instance TEXT     Instance JSON file
+  -B,     --budget FLOAT      Budget value
+  -o,     --output-json TEXT  Output solution data in JSON file
+          --output-csv TEXT   Output solution value in CSV file
+  -v,     --verbose           Enable logging of algorithms trace
+  -q,     --quiet             Silence all logging except errors
+          --max-threads UINT:POSITIVE
+                              Limits the number of threads used
 ```
 
 

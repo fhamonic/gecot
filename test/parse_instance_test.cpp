@@ -45,7 +45,7 @@ GTEST_TEST(parse_instance, test) {
               gecot::compute_solution_cost(instance, melon::maps::true_map{}));
 
     ASSERT_EQ(std::ranges::size(instance.cases()), 1);
-    InstanceCase squirell = *std::ranges::begin(instance.cases());
+    const auto & squirell = *std::ranges::begin(instance.cases());
     auto && graph = squirell.graph();
     ASSERT_EQ(melon::num_vertices(graph), 518);
     ASSERT_EQ(melon::num_arcs(graph), 1814);

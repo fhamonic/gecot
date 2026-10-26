@@ -3,18 +3,32 @@
 #include <string>
 #include <vector>
 
+#include <CLI/CLI.hpp>
+
 #include "instance.hpp"
 
 class AbstractSolverInterface {
-public:
-    virtual ~AbstractSolverInterface() {}
+protected:
+    CLI::App app;
 
-    virtual void parse(const std::vector<std::string> & args) = 0;
+    void add_feasibility_tol_option(double & feasibility_tol) {
+        app.add_option("-t,--feasibility-tolerance", feasibility_tol,
+                       "Tolerance for rounding errors")
+            ->default_val(1e-7);
+    }
+
+public:
+    explicit AbstractSolverInterface(const std::string & name) : app("", name) {
+        app.set_help_flag();
+    }
+    virtual ~AbstractSolverInterface() = default;
+
+    // args in reverse order, as CLI::App::parse consumes them
+    void parse(std::vector<std::string> args) { app.parse(args); }
+    std::string name() const { return app.get_name(); }
+    std::string options_description() const { return app.help(); }
+
     virtual gecot::instance_solution_t<Instance> solve(
         const Instance & instance, const double B) const = 0;
-
-    virtual std::string name() const = 0;
     virtual std::string description() const = 0;
-    virtual std::string options_description() const = 0;
-    virtual std::string string() const = 0;
 };

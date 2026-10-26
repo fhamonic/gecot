@@ -2,6 +2,7 @@
 #define GECOT_CONCEPTS_INSTANCE_CASE_HPP
 
 #include <concepts>
+#include <string>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -40,15 +41,6 @@ using target_quality_t =
                                        melon::vertex_t<case_graph_t<_Tp>>>>;
 
 template <typename _Tp>
-using case_target_quality_map_t =
-    std::decay_t<decltype(std::declval<_Tp &>().target_quality_map())>;
-
-template <typename _Tp>
-using target_quality_t =
-    std::decay_t<melon::mapped_value_t<case_target_quality_map_t<_Tp>,
-                                       melon::vertex_t<case_graph_t<_Tp>>>>;
-
-template <typename _Tp>
 using case_probability_map_t =
     std::decay_t<decltype(std::declval<_Tp &>().arc_probability_map())>;
 
@@ -60,6 +52,8 @@ using case_probability_t =
 // clang-format off
 template <typename _Tp>
 concept case_c = requires(_Tp && ic) {
+    { ic.id() } -> std::convertible_to<case_id_t>;
+    { ic.name() } -> std::convertible_to<std::string>;
     { ic.graph() } -> melon::outward_incidence_graph;
     { ic.source_quality_map() } 
     -> melon::mapping<melon::vertex_t<case_graph_t<_Tp>>>;
@@ -74,7 +68,6 @@ concept case_c = requires(_Tp && ic) {
 } && std::same_as<source_quality_t<_Tp>, double>
   && std::same_as<target_quality_t<_Tp>, double> 
   && std::same_as<case_probability_t<_Tp>, double>;
-  // , std::vector<std::pair<double, option_t>>
 
 template <typename _Tp, typename _V>
 using instance_option_map_t =
@@ -110,9 +103,13 @@ using instance_probability_map_t = case_probability_map_t<instance_case_t<_Tp>>;
 
 template <typename _Tp>
 concept instance_c =
-    requires(_Tp i, option_t o, instance_case_map_t<_Tp, double> case_values) {
+    requires(_Tp i, option_t o, std::string s,
+             instance_case_map_t<_Tp, double> case_values) {
         { i.options() } -> detail::range_of<option_t>;
         { i.option_cost(o) } -> std::convertible_to<double>;
+        { i.option_name(o) } -> std::convertible_to<std::string>;
+        { i.contains_option(s) } -> std::convertible_to<bool>;
+        { i.option_from_name(s) } -> std::convertible_to<option_t>;
         { i.template create_option_map<int>() } 
         -> melon::output_mapping<option_t>;
         { i.cases() } -> std::ranges::range;

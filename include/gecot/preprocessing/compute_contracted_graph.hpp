@@ -69,7 +69,6 @@ public:
 template <instance_c I, case_c C>
 contracted_graph_data<C> compute_contracted_graph_data(
     const I & instance, const C & instance_case, const double budget,
-    const auto & strong_arcs, const auto & useless_arcs,
     const auto & original_t) {
     const auto & original_graph = instance_case.graph();
     const auto & original_source_quality_map =

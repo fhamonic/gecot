@@ -26,8 +26,6 @@ include(GNUInstallDirs)
 include(CompilerWarnings)
 include(CompilerOptimizations)
 
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}" ${CMAKE_MODULE_PATH})
-
 if(WIN32)
   file(TO_CMAKE_PATH "${CONAN_TBB_INCLUDE_DIR}" CONAN_TBB_INCLUDE_DIR)
   file(TO_CMAKE_PATH "${CONAN_TBB_LIB_DIR}" CONAN_TBB_LIB_DIR)
@@ -35,7 +33,6 @@ if(WIN32)
 endif()
 if(NOT WIN32)
   set(CMAKE_INSTALL_RPATH "\$ORIGIN/../lib")
-  set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
 endif()
 
 if(WIN32)
@@ -56,10 +53,9 @@ find_package(phmap REQUIRED)
 if(NOT WIN32)
   find_package(TBB REQUIRED)
 endif()
-find_package(Boost REQUIRED COMPONENTS program_options)
+find_package(CLI11 REQUIRED)
 find_package(fmt REQUIRED)
 find_package(spdlog REQUIRED)
-find_package(Eigen3 REQUIRED)
 
 find_package(melon REQUIRED)
 find_package(mippp REQUIRED)
@@ -76,11 +72,8 @@ if(WIN32)
   target_link_directories(gecot INTERFACE ${CONAN_TBB_LIB_DIR} "${CONAN_TBB_LIB_DIR}\\..\\bin")
   target_link_libraries(gecot INTERFACE "${CONAN_TBB_LIB_DIR}/../bin/libtbb12.dll")
 else()
-  list(APPEND CMAKE_INSTALL_RPATH ${CONAN_TBB_LIB_DIR})
   target_link_libraries(gecot INTERFACE TBB::tbb)
 endif()
-target_link_libraries(gecot INTERFACE Boost::program_options)
-target_link_libraries(gecot INTERFACE Eigen3::Eigen)
 target_link_libraries(gecot INTERFACE fmt::fmt)
 target_link_libraries(gecot INTERFACE spdlog::spdlog)
 
@@ -95,12 +88,13 @@ target_link_libraries(gecot_optimize PUBLIC vincentlaucsb-csv-parser::vincentlau
 target_link_libraries(gecot_optimize PUBLIC nlohmann_json::nlohmann_json)
 target_link_libraries(gecot_optimize PUBLIC nlohmann_json_schema_validator)
 target_link_libraries(gecot_optimize PUBLIC phmap)
+target_link_libraries(gecot_optimize PUBLIC CLI11::CLI11)
 # target_compile_options(gecot_optimize PUBLIC -fconcepts-diagnostics-depth=30 -Wall)
 # target_compile_options(gecot_optimize PRIVATE -fsanitize=address)
 # target_link_options(gecot_optimize PRIVATE -fsanitize=address -lpthread -static-libasan)
 
 if(WARNINGS)
-  set_project_warnings(gecot_optimize)
+  set_project_warnings(gecot)
 endif()
 if(OPTIMIZE_FOR_NATIVE)
   set_project_optimizations(gecot_optimize)
@@ -121,14 +115,22 @@ install(TARGETS gecot_optimize RUNTIME DESTINATION bin LIBRARY DESTINATION lib
 ARCHIVE DESTINATION lib)
 
 if(NOT WIN32)
+  # GET_RUNTIME_DEPENDENCIES would resolve the older system libstdc++ through ldconfig
+  execute_process(COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libstdc++.so.6
+                  OUTPUT_VARIABLE LIBSTDCXX_PATH
+                  OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libgcc_s.so.1
+                  OUTPUT_VARIABLE LIBGCC_S_PATH
+                  OUTPUT_STRIP_TRAILING_WHITESPACE)
+  install(CODE "set(_cxx_runtime \"${LIBSTDCXX_PATH}\" \"${LIBGCC_S_PATH}\")")
   install(CODE [[
     file(GET_RUNTIME_DEPENDENCIES
       EXECUTABLES $<TARGET_FILE:gecot_optimize>
       RESOLVED_DEPENDENCIES_VAR _r_deps
       UNRESOLVED_DEPENDENCIES_VAR _u_deps
-      DIRECTORIES bin
+      PRE_EXCLUDE_REGEXES "^ld-linux" "^lib(c|m|pthread|dl|rt|stdc\\+\\+|gcc_s)\\.so"
     )
-    foreach(_file ${_r_deps})
+    foreach(_file ${_r_deps} ${_cxx_runtime})
       file(INSTALL
         DESTINATION "${CMAKE_INSTALL_PREFIX}/lib"
         TYPE SHARED_LIBRARY

@@ -17,6 +17,7 @@ namespace solvers {
 struct GreedyDecremental {
     double feasibility_tol = 0.0;
     bool only_dec = false;
+    bool worst = false;  // worst choice in both phases
 
     template <instance_c I>
     instance_solution_t<I> solve(const I & instance,
@@ -86,10 +87,12 @@ struct GreedyDecremental {
                      instance.eval_criterion(options_cases_pc_num[option])) /
                     instance.option_cost(option);
             }
-            auto worst_option_it = std::ranges::min_element(
-                options, [&options_ratios](auto && o1, auto && o2) {
-                    return options_ratios[o1] < options_ratios[o2];
-                });
+            const auto by_ratio = [&options_ratios](auto && o1, auto && o2) {
+                return options_ratios[o1] < options_ratios[o2];
+            };
+            auto worst_option_it =
+                worst ? std::ranges::max_element(options, by_ratio)
+                      : std::ranges::min_element(options, by_ratio);
             option_t worst_option = *worst_option_it;
             const double worst_option_price =
                 instance.option_cost(worst_option);
@@ -159,10 +162,13 @@ struct GreedyDecremental {
                          previous_score) /
                         instance.option_cost(option);
                 }
-                auto best_option_it = std::ranges::max_element(
-                    free_options, [&options_ratios](auto && o1, auto && o2) {
-                        return options_ratios[o1] < options_ratios[o2];
-                    });
+                const auto by_ratio = [&options_ratios](auto && o1,
+                                                        auto && o2) {
+                    return options_ratios[o1] < options_ratios[o2];
+                };
+                auto best_option_it =
+                    worst ? std::ranges::min_element(free_options, by_ratio)
+                          : std::ranges::max_element(free_options, by_ratio);
                 option_t best_option = *best_option_it;
                 const double best_option_price =
                     instance.option_cost(best_option);

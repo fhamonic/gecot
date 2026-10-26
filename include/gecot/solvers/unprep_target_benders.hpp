@@ -4,6 +4,7 @@
 #include <stdexcept>
 
 #include <spdlog/spdlog.h>
+#include <spdlog/stopwatch.h>
 
 #include "mippp/solvers/cplex/all.hpp"
 #include "mippp/solvers/gurobi/all.hpp"
@@ -16,12 +17,12 @@
 #include "gecot/preprocessing/compute_contracted_graph.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 
-#include "gecot/solvers/benders_base.hpp"
+#include "gecot/solvers/mip_solver_base.hpp"
 
 namespace gecot {
 namespace solvers {
 
-struct unprep_target_benders : public benders_base {
+struct unprep_target_benders : public mip_solver_base {
     template <case_c C>
     auto _compute_dual_flow(const C & instance_case, const auto & t,
                             const auto & solution) const {

@@ -25,7 +25,7 @@
 #include "gecot/indices/parallel_pc_num.hpp"
 #include "gecot/indices/pc_num.hpp"
 
-#include "io_helper.hpp"
+#include "gecot/utils/progress_bar.hpp"
 
 namespace gecot {
 

@@ -8,23 +8,10 @@
 #include <tbb/parallel_reduce.h>
 
 #include "melon/algorithm/dijkstra.hpp"
-#include "melon/container/d_ary_heap.hpp"
+
+#include "gecot/indices/pc_num.hpp"
 
 namespace gecot {
-
-namespace detail {
-template <typename GR, typename V>
-struct parallel_pc_num_dijkstra_traits {
-    using semiring = melon::most_reliable_path_semiring<V>;
-    using heap = melon::updatable_d_ary_heap<
-        4, std::pair<melon::vertex_t<GR>, V>, typename semiring::less_t,
-        melon::vertex_map_t<GR, std::size_t>, melon::maps::element<1>,
-        melon::maps::element<0>>;
-
-    static constexpr bool store_paths = false;
-    static constexpr bool store_distances = false;
-};
-}  // namespace detail
 
 template <typename GR, typename SQM, typename TQM, typename PM>
 double parallel_pc_num(const GR & graph, const SQM & source_quality_map,
@@ -36,7 +23,7 @@ double parallel_pc_num(const GR & graph, const SQM & source_quality_map,
         tbb::blocked_range(vertices_range.begin(), vertices_range.end()), 0.0,
         [&](auto && vertices_subrange, double init) {
             auto algo = melon::dijkstra(
-                detail::parallel_pc_num_dijkstra_traits<
+                detail::pc_num_dijkstra_traits<
                     GR, melon::mapped_value_t<PM, melon::arc_t<GR>>>{},
                 graph, probability_map);
 

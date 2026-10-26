@@ -12,50 +12,8 @@ class CompressorRecipe(ConanFile):
         self.requires("json-schema-validator/2.3.0")
         self.requires("vincentlaucsb-csv-parser/2.3.0")
         self.requires("onetbb/2021.12.0")
-        self.requires(
-            "boost/1.88.0",
-            options={
-                "filesystem_use_std_fs": True,
-                "without_atomic": True,
-                "without_charconv": True,
-                "without_chrono": True,
-                "without_cobalt": True,
-                "without_container": True,
-                "without_context": True,
-                "without_contract": True,
-                "without_coroutine": True,
-                "without_date_time": True,
-                "without_exception": True,
-                "without_fiber": True,
-                "without_filesystem": True,
-                "without_graph": True,
-                "without_graph_parallel": True,
-                "without_iostreams": True,
-                "without_json": True,
-                "without_locale": True,
-                "without_log": True,
-                "without_math": True,
-                "without_mpi": True,
-                "without_nowide": True,
-                "without_process": True,
-                "without_program_options": False,
-                "without_python": True,
-                "without_random": True,
-                "without_regex": True,
-                "without_serialization": True,
-                "without_stacktrace": True,
-                "without_system": True,
-                "without_test": True,
-                "without_thread": True,
-                "without_timer": True,
-                "without_type_erasure": True,
-                "without_url": True,
-                "without_wave": True,
-            },
-        )
-
+        self.requires("cli11/2.7.2")
         self.requires("parallel-hashmap/1.37")
-        self.requires("eigen/3.4.0")
         self.requires("spdlog/1.14.0")
 
         self.requires("melon/1.0.0")
@@ -82,9 +40,8 @@ class CompressorRecipe(ConanFile):
         vars = {}
         if self.settings.os != "Windows":
             vars["ENABLE_TESTING"] = "ON"
-        # if self.settings.os == "Windows":
         for lib, dep in self.dependencies.items():
-            if lib.ref.name == "onetbb":
+            if lib.ref.name == "onetbb" and self.settings.os == "Windows":
                 vars["CONAN_TBB_INCLUDE_DIR"] = ";".join(
                     dep.cpp_info.components["libtbb"].includedirs
                 )

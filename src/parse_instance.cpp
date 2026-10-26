@@ -738,7 +738,7 @@ Instance parse_instance_json(const nlohmann::json & instance_json,
             parse_formula(instance, instance_json["criterion"]));
     } else {
         criterion_sum s;
-        for(auto instance_case : instance.cases())
+        for(const auto & instance_case : instance.cases())
             s.values.emplace_back(instance_case.id());
         instance.set_criterion(criterion_formula{s});
     }

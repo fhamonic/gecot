@@ -8,22 +8,21 @@
 
 #include "melon/graph.hpp"
 
+#include "gecot/criterion.hpp"
 #include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
-#include "gecot/preprocessing/compute_contracted_graph.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 
 namespace gecot {
 namespace solvers {
 
-struct benders_base {
+struct mip_solver_base {
     using model_type = mippp::gurobi_milp;
     // using model_type = mippp::cplex_milp;
     // using model_type = mippp::copt_milp;
 
     double feasibility_tol = 0.0;
-    bool print_model = false;
-    double probability_resolution;
-    int num_mus;
+    double probability_resolution = 1e-8;
+    int num_mus = 0;
     std::optional<std::vector<std::string>> mip_start;
 
     template <typename M, typename V>
@@ -91,6 +90,16 @@ struct benders_base {
                 },
                 probability_resolution);
         }
+    }
+
+    template <instance_c I>
+    instance_solution_t<I> _mip_start_solution(const I & instance) const {
+        instance_solution_t<I> solution = instance.create_option_map(false);
+        for(const std::string & option_name : mip_start.value()) {
+            if(!instance.contains_option(option_name)) continue;
+            solution[instance.option_from_name(option_name)] = true;
+        }
+        return solution;
     }
 };
 

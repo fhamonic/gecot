@@ -47,7 +47,7 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
         instance_case.source_quality_map();
     const auto & original_target_quality_map =
         instance_case.target_quality_map();
-    const auto original_probability_map = instance_case.arc_probability_map();
+    const auto & original_probability_map = instance_case.arc_probability_map();
 
     const auto & original_vertex_options_map =
         instance_case.vertex_options_map();

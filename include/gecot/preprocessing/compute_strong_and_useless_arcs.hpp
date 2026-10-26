@@ -3,6 +3,8 @@
 
 #include <utility>
 
+#include <spdlog/stopwatch.h>
+
 #include <tbb/concurrent_vector.h>
 
 #include "melon/algorithm/competing_dijkstras.hpp"
@@ -10,7 +12,7 @@
 
 #include "gecot/helper.hpp"
 
-#include "io_helper.hpp"
+#include "gecot/utils/progress_bar.hpp"
 
 namespace gecot {
 namespace detail {
@@ -97,12 +99,12 @@ auto compute_strong_and_useless_arcs(
             std::log1p(probability_resolution));
     };
     const auto & graph = instance_case.graph();
-    const auto & source_quality_map = instance_case.source_quality_map();
+    const auto & target_quality_map = instance_case.target_quality_map();
 
     auto useless_vertices_map = melon::create_vertex_map<bool>(graph);
     for(const auto & v : melon::vertices(graph)) {
         useless_vertices_map[v] =
-            (source_quality_map[v] == 0 &&
+            (target_quality_map[v] == 0 &&
              instance_case.vertex_options_map()[v].empty());
     }
 
@@ -190,9 +192,7 @@ auto compute_strong_and_useless_arcs(
         std::size_t num_strong, num_useless, num_sinks;
         num_strong = num_useless = num_sinks = 0;
         for(auto && v : melon::vertices(graph)) {
-            if(instance_case.source_quality_map()[v] == 0 &&
-               instance_case.vertex_options_map()[v].empty())
-                continue;
+            if(useless_vertices_map[v]) continue;
             num_strong += strong_arcs_map[v].size();
             num_useless += useless_arcs_map[v].size();
             ++num_sinks;

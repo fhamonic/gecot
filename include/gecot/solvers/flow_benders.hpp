@@ -4,6 +4,7 @@
 #include <stdexcept>
 
 #include <spdlog/spdlog.h>
+#include <spdlog/stopwatch.h>
 
 #include "mippp/solvers/copt/all.hpp"
 #include "mippp/solvers/cplex/all.hpp"
@@ -17,14 +18,12 @@
 #include "gecot/preprocessing/compute_contracted_graph.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 
-#include "gecot/solvers/benders_base.hpp"
-#include "gecot/solvers/greedy_decremental.hpp"
-#include "gecot/solvers/greedy_incremental.hpp"
+#include "gecot/solvers/mip_solver_base.hpp"
 
 namespace gecot {
 namespace solvers {
 
-struct flow_benders : public benders_base {
+struct flow_benders : public mip_solver_base {
     template <case_c C>
     auto _compute_dual_flow(const contracted_graph_data<C> & data,
                             const auto & solution) const {
@@ -102,9 +101,6 @@ struct flow_benders : public benders_base {
                 instance_case.target_quality_map();
             const auto & original_vertex_options_map =
                 instance_case.vertex_options_map();
-            const auto [strong_arcs_map, useless_arcs_map] =
-                _compute_strong_and_useless_arcs(instance, instance_case,
-                                                 budget);
 
             auto C_constr = model.add_constraint(C_vars(case_id) <= 0);
 
@@ -128,9 +124,7 @@ struct flow_benders : public benders_base {
                             model.add_column({std::make_pair(
                                 C_constr, -original_t_target_quality)}),
                             compute_contracted_graph_data(
-                                instance, instance_case, budget,
-                                strong_arcs_map[original_t],
-                                useless_arcs_map[original_t], original_t));
+                                instance, instance_case, budget, original_t));
 
                     for(const auto & [sqg, target_quality_gain, option] :
                         original_vertex_options_map[original_t]) {
@@ -231,12 +225,7 @@ struct flow_benders : public benders_base {
 
         if(mip_start) {
             instance_solution_t<I> mip_start_solution =
-                instance.create_option_map(false);
-            for(const std::string & option_name : mip_start.value()) {
-                if(!instance.contains_option(option_name)) continue;
-                const option_t option = instance.option_from_name(option_name);
-                mip_start_solution[option] = true;
-            }
+                _mip_start_solution(instance);
             model.add_mip_start(
                 std::views::transform(instance.options(), [&](auto o) {
                     return std::make_pair(X_vars(o), mip_start_solution[o]);

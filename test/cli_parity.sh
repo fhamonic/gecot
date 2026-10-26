@@ -105,8 +105,8 @@ case_ R01 static_incr "$I" 10 --output-csv F.csv -q
 case_ R02 static_incr "$I" 10 -o F.json -q
 case_ R03 mip "$I" 10 --mip-start "$START" -q
 case_ R04 mip "$I" 10 --mip-start="$START" -q
-case_ R05 target_benders "$I" 10 --nb-mus 3 -q
-case_ R06 target_benders "$I" 10 --nb-mus=3 -q
+case_ R05 prep_mip "$I" 10 --nb-mus 3 -q
+case_ R06 prep_mip "$I" 10 --nb-mus=3 -q
 case_ R07 static_incr "$I" 10 extra
 case_ R08 -v
 # further extras
@@ -142,14 +142,14 @@ case_ E29 static_decr "$I" 10 --only-dec -q
 case_ E30 worst_greedy_decr -P
 case_ E31 static_incr /nonexistent.json 10 -q
 case_ E32 static_incr "$I" 10 -o /nonexistent_dir/F.json -q
-case_ E33 flow_benders "$I" 10 --nb-mus=2 --resolution=1e-6 -q
+case_ E33 tree_rr "$I" 10 --nb-mus=2 --resolution=1e-6 -q
 case_ E34 naive_benders "$I" 10 -t 1e-6 -m -q
 case_ E35 worst_greedy_incr "$I" 10 -q
 case_ E36 greedy_incr "$I" 10 -q
 # space-separated solver values must reach the option, not a 4th positional
 case_ V01 static_incr "$I" 10 -t abc
 case_ V02 prep_mip "$I" 10 --nb-mus abc
-case_ V03 target_benders "$I" 10 --resolution abc
+case_ V03 tree_rr "$I" 10 --resolution abc
 # abbreviated long options (boost's default style allows guessing)
 case_ G01 static_incr "$I" 10 --quie
 case_ G02 static_incr "$I" 10 --feas=1e-5 -q

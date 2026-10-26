@@ -28,7 +28,8 @@ struct GreedyDecremental {
         std::vector<option_t> options;
         double purchased = 0.0;
         for(const option_t & option : instance.options()) {
-            if(instance.option_cost(option) > budget) continue;
+            if(instance.option_cost(option) > budget + feasibility_tol)
+                continue;
             options.emplace_back(option);
             solution[option] = true;
             purchased += instance.option_cost(option);

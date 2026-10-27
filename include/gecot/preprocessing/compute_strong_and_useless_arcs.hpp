@@ -1,6 +1,7 @@
 #ifndef GECOT_COMPUTE_STRONG_AND_USELESS_ARCS_HPP
 #define GECOT_COMPUTE_STRONG_AND_USELESS_ARCS_HPP
 
+#include <algorithm>
 #include <utility>
 
 #include <spdlog/stopwatch.h>
@@ -186,6 +187,12 @@ auto compute_strong_and_useless_arcs(
                     pb.tick();
                 }
             });
+    }
+    // the parallel loops push in thread order: sorted, the contracted graphs
+    // and the models built on them are the same from run to run
+    for(auto && v : melon::vertices(graph)) {
+        std::sort(strong_arcs_map[v].begin(), strong_arcs_map[v].end());
+        std::sort(useless_arcs_map[v].begin(), useless_arcs_map[v].end());
     }
 
     if(spdlog::get_level() == spdlog::level::trace) {

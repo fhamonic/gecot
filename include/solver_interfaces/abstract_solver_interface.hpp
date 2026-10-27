@@ -11,10 +11,11 @@ class AbstractSolverInterface {
 protected:
     CLI::App app;
 
-    void add_feasibility_tol_option(double & feasibility_tol) {
+    void add_feasibility_tol_option(double & feasibility_tol,
+                                    double default_tol = 1e-7) {
         app.add_option("-t,--feasibility-tolerance", feasibility_tol,
                        "Tolerance for rounding errors")
-            ->default_val(1e-7);
+            ->default_val(default_tol);
     }
 
 public:

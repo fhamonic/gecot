@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
 #include <cstddef>
 #include <flat_map>
 #include <functional>
@@ -389,8 +390,12 @@ struct tree_formulation_rr : public mip_solver_base {
             }
         };
 
-        // Warm start
-        if(mip_start) {
+        // Warm start, only within the budget as the priced trees
+        if(mip_start &&
+           compute_solution_cost(instance, _mip_start_solution(instance)) >
+               budget + feasibility_tol)
+            spdlog::warn("MIP start exceeds the budget: ignored");
+        else if(mip_start) {
             std::vector<option_t> mip_start_options;
             instance_solution_t<I> mip_start_solution =
                 instance.create_option_map(false);
@@ -459,6 +464,8 @@ struct tree_formulation_rr : public mip_solver_base {
 
             log_lambda();
 
+            // a round cut short by the time limit may have priced no column
+            std::atomic<bool> cut_short = false;
             const bool improving = tbb::parallel_reduce(
                 tbb::blocked_range(master_model_cases.begin(),
                                    master_model_cases.end()),
@@ -473,7 +480,10 @@ struct tree_formulation_rr : public mip_solver_base {
                             init,
                             [&](auto && sub_models_subrange, bool init2) {
                                 for(auto & sub_model : sub_models_subrange) {
-                                    if(time_up()) break;
+                                    if(time_up()) {
+                                        cut_short = true;
+                                        break;
+                                    }
                                     init2 |= sub_model.try_generate_column(
                                         master_model_case, dual_solution);
                                 }
@@ -484,16 +494,13 @@ struct tree_formulation_rr : public mip_solver_base {
                     return init;
                 },
                 std::logical_or());
-            // before the convergence test: a round cut short by the time
-            // limit may have priced no column
+            if(!improving && !cut_short) {
+                spdlog::info("Column generation stopped: converged");
+                break;
+            }
             if(time_up()) {
                 spdlog::warn("Column generation stopped: time limit reached");
                 report.status = "time limit reached";
-                break;
-            }
-            if(!improving) {
-                spdlog::info("Column generation stopped: converged");
-                report.best_bound = model.get_solution_value();
                 break;
             }
         }
@@ -507,7 +514,9 @@ struct tree_formulation_rr : public mip_solver_base {
 
         report.stats = {{"iterations", iterations},
                         {"variables", model.num_variables()},
-                        {"constraints", model.num_constraints()}};
+                        {"constraints", model.num_constraints()},
+                        // not a bound: the pricing can miss improving trees
+                        {"relaxation_value", model.get_solution_value()}};
         return {solution, report};
     }
 };

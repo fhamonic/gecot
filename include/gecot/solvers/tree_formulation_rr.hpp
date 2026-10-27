@@ -188,9 +188,12 @@ struct tree_formulation_rr : public mip_solver_base {
             //     "{} : dual={} vs sub_model={}", target,
             //     dual_solution[master_data.uniqueness_constraint_map.at(target)],
             //     sub_model.get_solution_value());
+            // the absolute term, at least the master's dual tolerance, stops
+            // re-adding noise columns when the target's dual is 0
             if((1 + 1e-7) *
-                   dual_solution[master_data.uniqueness_constraint_map.at(
-                       target)] >=
+                       dual_solution[master_data.uniqueness_constraint_map.at(
+                           target)] +
+                   1e-6 >=
                sub_model.get_solution_value())
                 return false;
             const auto solution = sub_model.get_solution();

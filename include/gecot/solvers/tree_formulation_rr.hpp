@@ -500,6 +500,9 @@ struct tree_formulation_rr : public mip_solver_base {
             if(time_up()) {
                 spdlog::warn("Column generation stopped: time limit reached");
                 report.status = "time limit reached";
+                // Gurobi, CPLEX and COPT give no solution for a master
+                // changed since its last solve, HiGHS a zero value
+                if(improving) model.solve();
                 break;
             }
         }

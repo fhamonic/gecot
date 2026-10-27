@@ -122,10 +122,13 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
         bfs.add_source(v).run();
     }
     std::vector<melon::vertex_t<melon::mutable_digraph>> vertices_to_delete_tmp;
-    std::ranges::copy(std::ranges::views::filter(
-                          melon::vertices(graph),
-                          [&bfs](const auto & v) { return !bfs.reached(v); }),
-                      std::back_inserter(vertices_to_delete_tmp));
+    std::ranges::copy(
+        std::ranges::views::filter(
+            melon::vertices(graph),
+            [&bfs, t = original_to_new_vertex_map[original_t]](const auto & v) {
+                return !bfs.reached(v) && v != t;
+            }),
+        std::back_inserter(vertices_to_delete_tmp));
     for(const auto & v : vertices_to_delete_tmp) {
         graph.remove_vertex(v);
     }

@@ -166,7 +166,7 @@ struct mip : public mip_solver_base {
         spdlog::trace("mip solution found with value: {}",
                       model.get_solution_value());
         for(const auto & i : instance.options()) {
-            solution[i] = model_solution[X_vars(i)];
+            solution[i] = model_solution[X_vars(i)] > 0.5;
         }
 
         return solution;

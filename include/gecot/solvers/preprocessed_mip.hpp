@@ -201,19 +201,6 @@ struct preprocessed_mip : public mip_solver_base {
                         Phi_t_vars(a) <=
                         X_vars(arc_option_map[a].value()) *
                             big_M_map[melon::arc_source(graph, a)]);
-
-                    for(auto && b :
-                        melon::out_arcs(graph, melon::arc_source(graph, a))) {
-                        if(melon::arc_target(graph, a) ==
-                           melon::arc_target(graph, b))
-                            continue;
-                        if(a == b) continue;
-                        if(probability_map[b] >= probability_map[a]) continue;
-                        model.add_constraint(
-                            Phi_t_vars(b) <=
-                            (1 - X_vars(arc_option_map[a].value())) *
-                                big_M_map[melon::arc_source(graph, a)]);
-                    }
                 }
                 /*/
                 for(auto && a : melon::arcs(graph)) {
@@ -221,18 +208,6 @@ struct preprocessed_mip : public mip_solver_base {
                     model.add_indicator_constraint(
                         X_vars(arc_option_map[a].value()), false,
                         Phi_t_vars(a) <= 0);
-
-                    for(auto && b :
-                        melon::out_arcs(graph, melon::arc_source(graph, a))) {
-                        if(melon::arc_target(graph, a) ==
-                           melon::arc_target(graph, b))
-                            continue;
-                        if(a == b) continue;
-                        if(probability_map[b] >= probability_map[a]) continue;
-                        model.add_indicator_constraint(
-                            X_vars(arc_option_map[a].value()), true,
-                            Phi_t_vars(b) <= 0);
-                    }
                 }
                 //*/
                 model.add_constraint(
@@ -265,7 +240,7 @@ struct preprocessed_mip : public mip_solver_base {
         spdlog::trace("prep_mip solution found with value: {}",
                       model.get_solution_value());
         for(const auto & i : instance.options()) {
-            solution[i] = model_solution[X_vars(i)];
+            solution[i] = model_solution[X_vars(i)] > 0.5;
         }
 
         return solution;

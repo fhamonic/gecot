@@ -45,6 +45,9 @@ struct tree_formulation_rr : public mip_solver_base {
         MILP sub_model;
         mippp::runtime_linear_expression<variable_t, double> default_objective;
         std::flat_map<option_t, variable_t> sub_X_vars_map;
+        // a pricing depends only on these duals: those of an unproductive
+        // pricing would find no tree again
+        std::vector<double> unproductive_duals;
 
         sub_model_data(const auto & instance, const double & budget,
                        const auto & instance_case, const auto & strong_arcs_map,
@@ -164,10 +167,25 @@ struct tree_formulation_rr : public mip_solver_base {
             }
         }
 
+        std::vector<double> pricing_duals(const auto & master_data,
+                                          const auto & dual_solution) const {
+            std::vector<double> duals{
+                dual_solution[master_data.contribution_constraint],
+                dual_solution[master_data.uniqueness_constraint_map.at(
+                    target)]};
+            for(const option_t o : sub_X_vars_map.keys())
+                duals.push_back(
+                    dual_solution[master_data.purchase_constraints_map.at(
+                        std::make_pair(target, o))]);
+            return duals;
+        }
+
         bool try_generate_column(auto & master_data,
                                  const auto & dual_solution) {
             using namespace mippp;
             using namespace mippp::operators;
+            auto duals = pricing_duals(master_data, dual_solution);
+            if(duals == unproductive_duals) return false;
             sub_model.set_objective(
                 dual_solution[master_data.contribution_constraint] *
                     default_objective -
@@ -189,8 +207,10 @@ struct tree_formulation_rr : public mip_solver_base {
                        dual_solution[master_data.uniqueness_constraint_map.at(
                            target)] +
                    1e-6 >=
-               sub_model.get_solution_value())
+               sub_model.get_solution_value()) {
+                unproductive_duals = std::move(duals);
                 return false;
+            }
             const auto solution = sub_model.get_solution();
             master_data.add_tree(target, evaluate(default_objective, solution),
                                  std::views::keys(std::views::filter(

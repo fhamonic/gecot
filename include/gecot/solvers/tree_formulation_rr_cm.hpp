@@ -61,6 +61,8 @@ struct tree_formulation_rr_cm : public tree_formulation_rr {
                                               const auto & dual_solution) {
         using namespace mippp;
         using namespace mippp::operators;
+        auto duals = sub_model_data.pricing_duals(master_data, dual_solution);
+        if(duals == sub_model_data.unproductive_duals) return std::nullopt;
         const auto t = sub_model_data.target;
         auto & sub_model = sub_model_data.sub_model;
         sub_model.set_objective(
@@ -76,8 +78,10 @@ struct tree_formulation_rr_cm : public tree_formulation_rr {
         if((1 + 1e-7) *
                    dual_solution[master_data.uniqueness_constraint_map.at(t)] +
                1e-6 >=
-           sub_model.get_solution_value())
+           sub_model.get_solution_value()) {
+            sub_model_data.unproductive_duals = std::move(duals);
             return std::nullopt;
+        }
         const auto solution = sub_model.get_solution();
         return tree_seed<I>{
             id, t,

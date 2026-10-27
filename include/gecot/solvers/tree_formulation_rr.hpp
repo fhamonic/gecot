@@ -290,8 +290,8 @@ struct tree_formulation_rr : public mip_solver_base {
         // std::unordered_set<tree_t, tree_hash> tree_lookup;
 
         template <std::ranges::range R>
-        void add_tree(const vertex_t & target, const double contribution,
-                      R && used_options) {
+        variable_t add_tree(const vertex_t & target, const double contribution,
+                            R && used_options) {
             using namespace mippp::operators;
             // spdlog::info("add_tree: {} , {}, {}", target, contribution,
             //              std::format("{}", used_options));
@@ -306,7 +306,7 @@ struct tree_formulation_rr : public mip_solver_base {
 
             std::lock_guard<std::mutex> guard(master_model_mutex_ref.get());
 
-            master_model.get().add_column(std::views::concat(
+            return master_model.get().add_column(std::views::concat(
                 std::views::single(
                     std::make_pair(contribution_constraint, -contribution)),
                 std::views::single(
@@ -327,6 +327,73 @@ struct tree_formulation_rr : public mip_solver_base {
                     })));
         }
     };
+
+    // Warm start, only within the budget as the priced trees: calls
+    // add_tree(case id, target, contribution, options) for the tree of each
+    // target under the --mip-start options
+    template <instance_c I, typename F>
+    void _add_mip_start_trees(const I & instance, const double budget,
+                              const auto & master_model_cases,
+                              F && add_tree) const {
+        if(!mip_start) return;
+        if(compute_solution_cost(instance, _mip_start_solution(instance)) >
+           budget + feasibility_tol) {
+            spdlog::warn("MIP start exceeds the budget: ignored");
+            return;
+        }
+        std::vector<option_t> mip_start_options;
+        instance_solution_t<I> mip_start_solution =
+            instance.create_option_map(false);
+        for(const std::string & option_name : mip_start.value()) {
+            if(!instance.contains_option(option_name)) continue;
+            const option_t option = instance.option_from_name(option_name);
+            mip_start_options.emplace_back(option);
+            mip_start_solution[option] = true;
+        }
+
+        spdlog::info("MIP start with :");
+        const auto option_name_max_length = std::ranges::max(
+            std::ranges::views::transform(instance.options(), [&](auto && o) {
+                return instance.option_name(o).size();
+            }));
+        for(auto && option : instance.options()) {
+            const auto & option_name = instance.option_name(option);
+            spdlog::info("    {:<{}} {}", option_name, option_name_max_length,
+                         mip_start_solution[option]);
+        }
+
+        for(const auto & [instance_case, master_data] :
+            std::views::zip(instance.cases(), master_model_cases)) {
+            const auto & graph = instance_case.graph();
+            auto enhanced_sqm = instance_case.source_quality_map();
+            auto enhanced_tqm = instance_case.target_quality_map();
+            auto enhanced_pm = instance_case.arc_probability_map();
+
+            for(const auto & v : melon::vertices(graph)) {
+                for(const auto & [sqg, tqg, option] :
+                    instance_case.vertex_options_map()[v]) {
+                    if(!mip_start_solution[option]) continue;
+                    enhanced_sqm[v] += sqg;
+                    enhanced_tqm[v] += tqg;
+                }
+            }
+            for(const auto & a : melon::arcs(graph)) {
+                for(const auto & [improved_prob, option] :
+                    instance_case.arc_options_map()[a]) {
+                    if(!mip_start_solution[option]) continue;
+                    enhanced_pm[a] = std::max(enhanced_pm[a], improved_prob);
+                }
+            }
+            for(const auto & sub_model : master_data.sub_models) {
+                const auto & t = sub_model.target;
+                add_tree(
+                    instance_case.id(), t,
+                    enhanced_tqm[t] * pc_num_vertex_in_flow(graph, enhanced_sqm,
+                                                            enhanced_pm, t),
+                    mip_start_options);
+            }
+        }
+    }
 
     template <typename LP, typename MILP, instance_c I>
     solve_result<I> solve(const I & instance, const double budget) const {
@@ -389,68 +456,12 @@ struct tree_formulation_rr : public mip_solver_base {
             }
         };
 
-        // Warm start, only within the budget as the priced trees
-        if(mip_start &&
-           compute_solution_cost(instance, _mip_start_solution(instance)) >
-               budget + feasibility_tol)
-            spdlog::warn("MIP start exceeds the budget: ignored");
-        else if(mip_start) {
-            std::vector<option_t> mip_start_options;
-            instance_solution_t<I> mip_start_solution =
-                instance.create_option_map(false);
-            for(const std::string & option_name : mip_start.value()) {
-                if(!instance.contains_option(option_name)) continue;
-                const option_t option = instance.option_from_name(option_name);
-                mip_start_options.emplace_back(option);
-                mip_start_solution[option] = true;
-            }
-
-            spdlog::info("MIP start with :");
-            const auto option_name_max_length =
-                std::ranges::max(std::ranges::views::transform(
-                    instance.options(),
-                    [&](auto && o) { return instance.option_name(o).size(); }));
-            for(auto && option : instance.options()) {
-                const auto & option_name = instance.option_name(option);
-                spdlog::info("    {:<{}} {}", option_name,
-                             option_name_max_length,
-                             mip_start_solution[option]);
-            }
-
-            for(const auto & [instance_case, master_data] :
-                std::views::zip(instance.cases(), master_model_cases)) {
-                const auto & graph = instance_case.graph();
-                auto enhanced_sqm = instance_case.source_quality_map();
-                auto enhanced_tqm = instance_case.target_quality_map();
-                auto enhanced_pm = instance_case.arc_probability_map();
-
-                for(const auto & v : melon::vertices(graph)) {
-                    for(const auto & [sqg, tqg, option] :
-                        instance_case.vertex_options_map()[v]) {
-                        if(!mip_start_solution[option]) continue;
-                        enhanced_sqm[v] += sqg;
-                        enhanced_tqm[v] += tqg;
-                    }
-                }
-                for(const auto & a : melon::arcs(graph)) {
-                    for(const auto & [improved_prob, option] :
-                        instance_case.arc_options_map()[a]) {
-                        if(!mip_start_solution[option]) continue;
-                        enhanced_pm[a] =
-                            std::max(enhanced_pm[a], improved_prob);
-                    }
-                }
-                for(const auto & sub_model : master_data.sub_models) {
-                    const auto & t = sub_model.target;
-                    master_data.add_tree(
-                        t,
-                        enhanced_tqm[t] * pc_num_vertex_in_flow(graph,
-                                                                enhanced_sqm,
-                                                                enhanced_pm, t),
-                        mip_start_options);
-                }
-            }
-        }
+        _add_mip_start_trees(
+            instance, budget, master_model_cases,
+            [&](const case_id_t id, const auto & t, const double contribution,
+                const auto & options) {
+                master_model_cases[id].add_tree(t, contribution, options);
+            });
 
         solve_report report{"converged"};
         std::size_t iterations = 1;  // LP solves

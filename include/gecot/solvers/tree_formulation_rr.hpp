@@ -450,6 +450,9 @@ struct tree_formulation_rr : public mip_solver_base {
 
         solve_report report{"converged"};
         std::size_t iterations = 1;  // LP solves
+        auto time_up = [&] {
+            return time_limit && sw.elapsed().count() > time_limit.value();
+        };
         for(;; ++iterations) {
             model.solve();
             const auto dual_solution = model.get_dual_solution();
@@ -469,9 +472,11 @@ struct tree_formulation_rr : public mip_solver_base {
                                 master_model_case.sub_models.end()),
                             init,
                             [&](auto && sub_models_subrange, bool init2) {
-                                for(auto & sub_model : sub_models_subrange)
+                                for(auto & sub_model : sub_models_subrange) {
+                                    if(time_up()) break;
                                     init2 |= sub_model.try_generate_column(
                                         master_model_case, dual_solution);
+                                }
                                 return init2;
                             },
                             std::logical_or());
@@ -479,14 +484,16 @@ struct tree_formulation_rr : public mip_solver_base {
                     return init;
                 },
                 std::logical_or());
+            // before the convergence test: a round cut short by the time
+            // limit may have priced no column
+            if(time_up()) {
+                spdlog::warn("Column generation stopped: time limit reached");
+                report.status = "time limit reached";
+                break;
+            }
             if(!improving) {
                 spdlog::info("Column generation stopped: converged");
                 report.best_bound = model.get_solution_value();
-                break;
-            }
-            if(time_limit && sw.elapsed().count() > time_limit.value()) {
-                spdlog::warn("Column generation stopped: time limit reached");
-                report.status = "time limit reached";
                 break;
             }
         }

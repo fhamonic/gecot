@@ -70,8 +70,7 @@ struct naive_benders : public mip_solver_base {
     }
 
     template <instance_c I>
-    instance_solution_t<I> solve(const I & instance,
-                                 const double budget) const {
+    solve_result<I> solve(const I & instance, const double budget) const {
         spdlog::stopwatch sw;
         auto solution = instance.create_option_map(false);
 
@@ -219,6 +218,7 @@ struct naive_benders : public mip_solver_base {
                      }));
         }
 
+        std::size_t num_cuts = 0;
         model.set_candidate_solution_callback(
             [&](model_type::candidate_solution_callback_handle & handle) {
                 const auto master_solution = handle.get_solution();
@@ -239,6 +239,7 @@ struct naive_benders : public mip_solver_base {
                        feasibility_tol * opt)
                         continue;
 
+                    ++num_cuts;
                     handle.add_lazy_constraint(
                         C_vars(case_id) <=
                         xsum(std::views::zip(cases_contracted_data[case_id],
@@ -278,11 +279,13 @@ struct naive_benders : public mip_solver_base {
             }
         }
 
-        if(!_solve(model, sw)) return _fallback_solution(instance, budget);
+        auto [has_solution, report] = _solve(model, sw);
+        report.stats.emplace_back("lazy_constraints", num_cuts);
+        if(!has_solution) return {_fallback_solution(instance, budget), report};
         const auto master_solution = model.get_solution();
         for(const auto & i : instance.options())
             solution[i] = (master_solution[X_vars(i)] > 0.5);
-        return solution;
+        return {solution, report};
     }
 };
 

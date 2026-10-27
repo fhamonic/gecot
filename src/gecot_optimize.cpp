@@ -242,9 +242,12 @@ int main(int argc, const char * argv[]) {
         spdlog::info("Calling algorithm '{}'", solver->name());
         program_state = "Running algorithm '" + solver->name() + '\'';
         spdlog::stopwatch sw;
-        auto solution = instance.num_options() == 0
-                            ? instance.create_option_map(false)
-                            : solver->solve(instance, budget);
+        auto [solution, report] =
+            instance.num_options() == 0
+                ? gecot::solve_result<Instance>{instance.create_option_map(
+                                                    false),
+                                                {"no option left"}}
+                : solver->solve(instance, budget);
         const auto computation_time_ms =
             std::chrono::duration_cast<std::chrono::milliseconds>(sw.elapsed())
                 .count();
@@ -262,6 +265,13 @@ int main(int argc, const char * argv[]) {
             instance.eval_criterion(solution_cases_pc_num);
         const double solution_cost =
             gecot::compute_solution_cost(instance, solution);
+        if(report.best_bound) {
+            const double bound = report.best_bound.value();
+            report.stats.emplace_back("best_bound", bound);
+            if(solution_score > 0)
+                report.stats.emplace_back(
+                    "gap", (bound - solution_score) / solution_score);
+        }
         // free options were bought by trivial_reformulate_instance
         auto option_value = [&](const gecot::option_t & option) {
             const auto & option_name = raw_instance.option_name(option);
@@ -358,7 +368,12 @@ int main(int argc, const char * argv[]) {
                         return std::make_pair(raw_instance.option_name(option),
                                               option_value(option));
                     }));
-            out.print("\n}}");
+            out.print(
+                ",\n    \"algorithm_report\": {{\n        \"status\": \"{}\"",
+                report.status);
+            for(const auto & [key, value] : report.stats)
+                out.print(",\n        \"{}\": {}", key, value);
+            out.print("\n    }}\n}}");
 
             spdlog::info("Solution printed to '{}'",
                          std::filesystem::absolute(opt_output_json_file.value())

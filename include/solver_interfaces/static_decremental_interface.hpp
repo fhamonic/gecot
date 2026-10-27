@@ -19,9 +19,9 @@ public:
                      "that the entire budget is used");
     }
 
-    gecot::instance_solution_t<Instance> solve(const Instance & instance,
-                                               const double B) const override {
-        return solver.solve(instance, B);
+    gecot::solve_result<Instance> solve(const Instance & instance,
+                                        const double B) const override {
+        return {solver.solve(instance, B)};
     };
 
     std::string description() const override {

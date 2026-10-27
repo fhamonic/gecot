@@ -14,8 +14,8 @@ public:
         add_preprocessing_options(solver);
     }
 
-    gecot::instance_solution_t<Instance> solve(const Instance & instance,
-                                               const double B) const override {
+    gecot::solve_result<Instance> solve(const Instance & instance,
+                                        const double B) const override {
         return solver.solve(instance, B);
     };
 

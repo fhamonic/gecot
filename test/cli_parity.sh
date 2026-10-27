@@ -5,7 +5,7 @@
 #       rc old/new | stdout | files
 #       first error line of old / new
 # stdout is compared after dropping timing lines; output files are compared
-# after dropping the computation_time_ms field.
+# after dropping the *_time_ms fields.
 # Usage: cli_parity.sh OLD_BIN NEW_BIN
 set -u
 if [ $# -ne 2 ]; then
@@ -45,8 +45,8 @@ compare_files() { # id
     for f in $(cd "$b" && ls | grep -v -E '^(stdout|stderr|rc)$'); do
         if [ ! -f "$n/$f" ]; then
             res+="$f:missing "
-        elif diff -q <(grep -v computation_time_ms "$b/$f") \
-            <(grep -v computation_time_ms "$n/$f") >/dev/null; then
+        elif diff -q <(grep -v _time_ms "$b/$f") \
+            <(grep -v _time_ms "$n/$f") >/dev/null; then
             res+="$f:same "
         else
             res+="$f:DIFF "
@@ -195,7 +195,7 @@ cross_ E11 B08
 cross_ E15 E16
 cross_ E17 B08
 cross_ E34 X34
-if diff -q --ignore-matching-lines=computation_time_ms \
+if diff -q --ignore-matching-lines=_time_ms \
     "$OUT/E19/new/a b.json" "$OUT/R02/old/F.json" >/dev/null; then
     echo "cross E19(new 'a b.json') vs R02(old F.json): same"
 else

@@ -5,6 +5,8 @@
 
 #include <CLI/CLI.hpp>
 
+#include "gecot/solvers/solve_result.hpp"
+
 #include "instance.hpp"
 
 class AbstractSolverInterface {
@@ -29,7 +31,7 @@ public:
     std::string name() const { return app.get_name(); }
     std::string options_description() const { return app.help(); }
 
-    virtual gecot::instance_solution_t<Instance> solve(
-        const Instance & instance, const double B) const = 0;
+    virtual gecot::solve_result<Instance> solve(const Instance & instance,
+                                                const double B) const = 0;
     virtual std::string description() const = 0;
 };

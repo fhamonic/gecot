@@ -6,6 +6,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 #include <variant>
 
 #include <spdlog/spdlog.h>
@@ -21,6 +22,7 @@
 #include "gecot/helper.hpp"
 #include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
+#include "gecot/solvers/solve_result.hpp"
 
 namespace gecot {
 namespace solvers {
@@ -107,11 +109,13 @@ struct mip_solver_base {
     // returns false if the solver found no solution, the caller then returns
     // _fallback_solution
     template <typename M>
-    bool _solve(M & model, const spdlog::stopwatch & sw) const {
+    std::pair<bool, solve_report> _solve(M & model,
+                                         const spdlog::stopwatch & sw) const {
         namespace status = mippp::status;
+        const auto build_time = sw.elapsed();
         if(time_limit)
             model.set_time_limit(std::chrono::duration<double>(
-                std::max(0.0, time_limit.value() - sw.elapsed().count())));
+                std::max(0.0, time_limit.value() - build_time.count())));
         model.solve();
         const auto & s = model.get_status();
         const std::string_view reason = std::visit(
@@ -137,6 +141,25 @@ struct mip_solver_base {
                     return "unknown status";
             },
             s);
+        solve_report report{
+            std::string(reason),
+            {},
+            {{"variables", model.num_variables()},
+             {"constraints", model.num_constraints()},
+             {"nonzeros", model.num_nonzeros()},
+             {"model_build_time_ms",
+              std::chrono::duration_cast<std::chrono::milliseconds>(build_time)
+                  .count()}}};
+        if constexpr(std::same_as<M, mippp::gurobi_milp>) {
+            const auto & GRB = model.native_api();
+            const auto native_model = model.native_model().second;
+            double value;
+            if(!GRB.getdblattr(native_model, "ObjBound", &value) &&
+               value < model.infinity())
+                report.best_bound = value;
+            if(!GRB.getdblattr(native_model, "NodeCount", &value))
+                report.stats.emplace_back("nodes", value);
+        }
         if(!status::solution_available(s)) {
             if(!mip_start)
                 throw std::runtime_error(fmt::format(
@@ -145,13 +168,13 @@ struct mip_solver_base {
                 "Solver stopped without a solution: {}, returning "
                 "the MIP start",
                 reason);
-            return false;
+            return {false, report};
         }
         spdlog::log(std::holds_alternative<status::optimal>(s)
                         ? spdlog::level::info
                         : spdlog::level::warn,
                     "Solver stopped: {}", reason);
-        return true;
+        return {true, report};
     }
 
     template <instance_c I>

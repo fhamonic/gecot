@@ -330,8 +330,7 @@ struct tree_formulation_rr : public mip_solver_base {
     };
 
     template <instance_c I>
-    instance_solution_t<I> solve(const I & instance,
-                                 const double budget) const {
+    solve_result<I> solve(const I & instance, const double budget) const {
         spdlog::stopwatch sw;
         auto solution = instance.create_option_map(false);
 
@@ -449,7 +448,9 @@ struct tree_formulation_rr : public mip_solver_base {
             }
         }
 
-        for(;;) {
+        solve_report report{"converged"};
+        std::size_t iterations = 1;  // LP solves
+        for(;; ++iterations) {
             model.solve();
             const auto dual_solution = model.get_dual_solution();
 
@@ -480,10 +481,12 @@ struct tree_formulation_rr : public mip_solver_base {
                 std::logical_or());
             if(!improving) {
                 spdlog::info("Column generation stopped: converged");
+                report.best_bound = model.get_solution_value();
                 break;
             }
             if(time_limit && sw.elapsed().count() > time_limit.value()) {
                 spdlog::warn("Column generation stopped: time limit reached");
+                report.status = "time limit reached";
                 break;
             }
         }
@@ -495,7 +498,10 @@ struct tree_formulation_rr : public mip_solver_base {
 
         log_lambda();
 
-        return solution;
+        report.stats = {{"iterations", iterations},
+                        {"variables", model.num_variables()},
+                        {"constraints", model.num_constraints()}};
+        return {solution, report};
     }
 };
 

@@ -22,8 +22,7 @@ namespace solvers {
 
 struct mip : public mip_solver_base {
     template <instance_c I>
-    instance_solution_t<I> solve(const I & instance,
-                                 const double budget) const {
+    solve_result<I> solve(const I & instance, const double budget) const {
         spdlog::stopwatch sw;
         auto solution = instance.create_option_map(false);
 
@@ -160,7 +159,8 @@ struct mip : public mip_solver_base {
                 }));
         }
 
-        if(!_solve(model, sw)) return _fallback_solution(instance, budget);
+        const auto [has_solution, report] = _solve(model, sw);
+        if(!has_solution) return {_fallback_solution(instance, budget), report};
         const auto model_solution = model.get_solution();
 
         spdlog::trace("mip solution found with value: {}",
@@ -169,7 +169,7 @@ struct mip : public mip_solver_base {
             solution[i] = model_solution[X_vars(i)] > 0.5;
         }
 
-        return solution;
+        return {solution, report};
     }
 };
 

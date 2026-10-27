@@ -116,6 +116,11 @@ struct mip_solver_base {
         if(time_limit)
             model.set_time_limit(std::chrono::duration<double>(
                 std::max(0.0, time_limit.value() - build_time.count())));
+        // with scores near 1e11, gurobi's absolute tolerances otherwise prune
+        // better solutions; scaling the models is the real fix
+        if constexpr(std::same_as<M, mippp::gurobi_milp>)
+            model.native_api().setintparam(model.native_model().first,
+                                           "NumericFocus", 1);
         model.solve();
         const auto & s = model.get_status();
         const std::string_view reason = std::visit(

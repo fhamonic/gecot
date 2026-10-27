@@ -45,6 +45,10 @@ protected:
                 solver.mip_start = parse_mip_start(solution_path);
             },
             "Solution file (JSON) to propose as a MIP start to the solver.");
+        app.add_option("--time-limit", solver.time_limit,
+                       "Time limit in seconds, after which the best solution "
+                       "found is returned")
+            ->check(CLI::NonNegativeNumber);
     }
 
     void add_preprocessing_options(gecot::solvers::mip_solver_base & solver) {

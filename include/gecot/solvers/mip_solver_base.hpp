@@ -1,6 +1,15 @@
 #pragma once
 
+#include <algorithm>
+#include <chrono>
+#include <concepts>
+#include <optional>
 #include <stdexcept>
+#include <string_view>
+#include <variant>
+
+#include <spdlog/spdlog.h>
+#include <spdlog/stopwatch.h>
 
 #include "mippp/solvers/copt/all.hpp"
 #include "mippp/solvers/cplex/all.hpp"
@@ -24,6 +33,7 @@ struct mip_solver_base {
     double probability_resolution = 1e-8;
     int num_mus = 0;
     std::optional<std::vector<std::string>> mip_start;
+    std::optional<double> time_limit;
 
     template <typename M, typename V>
     struct formula_variable_visitor {
@@ -90,6 +100,47 @@ struct mip_solver_base {
                 },
                 probability_resolution);
         }
+    }
+
+    // sw starts with solve(): the time limit also counts the preprocessing
+    template <typename M>
+    void _solve(M & model, const spdlog::stopwatch & sw) const {
+        namespace status = mippp::status;
+        if(time_limit)
+            model.set_time_limit(std::chrono::duration<double>(
+                std::max(0.0, time_limit.value() - sw.elapsed().count())));
+        model.solve();
+        const auto & s = model.get_status();
+        const std::string_view reason = std::visit(
+            []<typename S>(const S &) -> std::string_view {
+                if constexpr(std::derived_from<S, status::optimal>)
+                    return "optimal";
+                else if constexpr(std::derived_from<S, status::time_limit>)
+                    return "time limit reached";
+                else if constexpr(std::derived_from<S, status::limit_reached>)
+                    return "limit reached";
+                else if constexpr(std::derived_from<S, status::infeasible>)
+                    return "infeasible model";
+                else if constexpr(std::derived_from<S, status::unbounded>)
+                    return "unbounded model";
+                else if constexpr(std::derived_from<
+                                      S, status::infeasible_or_unbounded>)
+                    return "infeasible or unbounded model";
+                else if constexpr(std::derived_from<S, status::interrupted>)
+                    return "interrupted";
+                else if constexpr(std::derived_from<S, status::failed>)
+                    return "solver failure";
+                else
+                    return "unknown status";
+            },
+            s);
+        if(!status::solution_available(s))
+            throw std::runtime_error(fmt::format(
+                "the solver stopped without a solution: {}", reason));
+        spdlog::log(std::holds_alternative<status::optimal>(s)
+                        ? spdlog::level::info
+                        : spdlog::level::warn,
+                    "Solver stopped: {}", reason);
     }
 
     template <instance_c I>

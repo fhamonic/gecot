@@ -4,6 +4,7 @@
 #include <stdexcept>
 
 #include <spdlog/spdlog.h>
+#include <spdlog/stopwatch.h>
 
 #include "mippp/solvers/gurobi/all.hpp"
 
@@ -23,6 +24,7 @@ struct mip : public mip_solver_base {
     template <instance_c I>
     instance_solution_t<I> solve(const I & instance,
                                  const double budget) const {
+        spdlog::stopwatch sw;
         auto solution = instance.create_option_map(false);
 
         using namespace mippp;
@@ -158,7 +160,7 @@ struct mip : public mip_solver_base {
                 }));
         }
 
-        model.solve();
+        _solve(model, sw);
         const auto model_solution = model.get_solution();
 
         spdlog::trace("mip solution found with value: {}",

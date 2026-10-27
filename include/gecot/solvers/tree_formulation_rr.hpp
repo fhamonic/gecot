@@ -12,6 +12,7 @@
 #include <vector>
 
 #include <spdlog/spdlog.h>
+#include <spdlog/stopwatch.h>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -327,6 +328,7 @@ struct tree_formulation_rr : public mip_solver_base {
     template <instance_c I>
     instance_solution_t<I> solve(const I & instance,
                                  const double budget) const {
+        spdlog::stopwatch sw;
         auto solution = instance.create_option_map(false);
 
         using namespace mippp;
@@ -472,7 +474,14 @@ struct tree_formulation_rr : public mip_solver_base {
                     return init;
                 },
                 std::logical_or());
-            if(!improving) break;
+            if(!improving) {
+                spdlog::info("Column generation stopped: converged");
+                break;
+            }
+            if(time_limit && sw.elapsed().count() > time_limit.value()) {
+                spdlog::warn("Column generation stopped: time limit reached");
+                break;
+            }
         }
 
         const auto model_solution = model.get_solution();

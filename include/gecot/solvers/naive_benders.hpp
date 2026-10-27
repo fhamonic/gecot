@@ -72,6 +72,7 @@ struct naive_benders : public mip_solver_base {
     template <instance_c I>
     instance_solution_t<I> solve(const I & instance,
                                  const double budget) const {
+        spdlog::stopwatch sw;
         auto solution = instance.create_option_map(false);
 
         using namespace mippp;
@@ -277,7 +278,7 @@ struct naive_benders : public mip_solver_base {
             }
         }
 
-        model.solve();
+        _solve(model, sw);
         const auto master_solution = model.get_solution();
         for(const auto & i : instance.options())
             solution[i] = (master_solution[X_vars(i)] > 0.5);

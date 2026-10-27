@@ -18,6 +18,7 @@
 #include "melon/graph.hpp"
 
 #include "gecot/criterion.hpp"
+#include "gecot/helper.hpp"
 #include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 
@@ -103,8 +104,10 @@ struct mip_solver_base {
     }
 
     // sw starts with solve(): the time limit also counts the preprocessing
+    // returns false if the solver found no solution, the caller then returns
+    // _fallback_solution
     template <typename M>
-    void _solve(M & model, const spdlog::stopwatch & sw) const {
+    bool _solve(M & model, const spdlog::stopwatch & sw) const {
         namespace status = mippp::status;
         if(time_limit)
             model.set_time_limit(std::chrono::duration<double>(
@@ -134,13 +137,30 @@ struct mip_solver_base {
                     return "unknown status";
             },
             s);
-        if(!status::solution_available(s))
-            throw std::runtime_error(fmt::format(
-                "the solver stopped without a solution: {}", reason));
+        if(!status::solution_available(s)) {
+            if(!mip_start)
+                throw std::runtime_error(fmt::format(
+                    "the solver stopped without a solution: {}", reason));
+            spdlog::warn(
+                "Solver stopped without a solution: {}, returning "
+                "the MIP start",
+                reason);
+            return false;
+        }
         spdlog::log(std::holds_alternative<status::optimal>(s)
                         ? spdlog::level::info
                         : spdlog::level::warn,
                     "Solver stopped: {}", reason);
+        return true;
+    }
+
+    template <instance_c I>
+    instance_solution_t<I> _fallback_solution(const I & instance,
+                                              const double budget) const {
+        auto solution = _mip_start_solution(instance);
+        if(compute_solution_cost(instance, solution) > budget + feasibility_tol)
+            throw std::runtime_error("the MIP start exceeds the budget");
+        return solution;
     }
 
     template <instance_c I>

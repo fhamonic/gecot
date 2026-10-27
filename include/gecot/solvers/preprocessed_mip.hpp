@@ -259,7 +259,7 @@ struct preprocessed_mip : public mip_solver_base {
                 }));
         }
 
-        _solve(model, sw);
+        if(!_solve(model, sw)) return _fallback_solution(instance, budget);
         const auto model_solution = model.get_solution();
 
         spdlog::trace("prep_mip solution found with value: {}",

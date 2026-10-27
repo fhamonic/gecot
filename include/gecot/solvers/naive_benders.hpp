@@ -278,7 +278,7 @@ struct naive_benders : public mip_solver_base {
             }
         }
 
-        _solve(model, sw);
+        if(!_solve(model, sw)) return _fallback_solution(instance, budget);
         const auto master_solution = model.get_solution();
         for(const auto & i : instance.options())
             solution[i] = (master_solution[X_vars(i)] > 0.5);

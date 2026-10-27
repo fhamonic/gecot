@@ -227,10 +227,6 @@ struct tree_formulation_rr_cm : public tree_formulation_rr {
                                 priced_trees.push_back(std::move(*tree));
                         });
                 });
-            // the pool's order is the activation order: keep runs repeatable
-            std::ranges::sort(priced_trees, {}, [](const seed_t & s) {
-                return std::make_pair(s.case_id, s.target);
-            });
             columns.emplace_pool_columns(priced_trees | std::views::as_rvalue);
             columns.update_columns([&](const seed_t & seed) {
                 return colgen::priced{

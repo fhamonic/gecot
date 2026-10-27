@@ -37,10 +37,9 @@ public:
     }
 
 protected:
-    void add_mip_options(gecot::solvers::mip_solver_base & solver) {
-        // Gurobi's default: below it, Gurobi discards the completed
-        // --mip-start of prep_mip on large instances (residuals ~1e-6)
-        add_feasibility_tol_option(solver.feasibility_tol, 1e-6);
+    void add_mip_options(gecot::solvers::mip_solver_base & solver,
+                         double default_tol = 1e-7) {
+        add_feasibility_tol_option(solver.feasibility_tol, default_tol);
         app.add_option_function<std::filesystem::path>(
             "--mip-start",
             [&solver](const std::filesystem::path & solution_path) {

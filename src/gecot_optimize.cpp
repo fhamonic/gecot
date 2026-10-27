@@ -242,7 +242,9 @@ int main(int argc, const char * argv[]) {
         spdlog::info("Calling algorithm '{}'", solver->name());
         program_state = "Running algorithm '" + solver->name() + '\'';
         spdlog::stopwatch sw;
-        auto solution = solver->solve(instance, budget);
+        auto solution = instance.num_options() == 0
+                            ? instance.create_option_map(false)
+                            : solver->solve(instance, budget);
         const auto computation_time_ms =
             std::chrono::duration_cast<std::chrono::milliseconds>(sw.elapsed())
                 .count();
@@ -251,7 +253,7 @@ int main(int argc, const char * argv[]) {
 
         program_state = "Printing solution";
         const auto initial_cases_pc_num =
-            gecot::compute_base_cases_pc_num(instance);
+            gecot::compute_base_cases_pc_num(raw_instance);
         const double initial_score =
             instance.eval_criterion(initial_cases_pc_num);
         const auto solution_cases_pc_num =
@@ -260,6 +262,14 @@ int main(int argc, const char * argv[]) {
             instance.eval_criterion(solution_cases_pc_num);
         const double solution_cost =
             gecot::compute_solution_cost(instance, solution);
+        // free options were bought by trivial_reformulate_instance
+        auto option_value = [&](const gecot::option_t & option) {
+            const auto & option_name = raw_instance.option_name(option);
+            return static_cast<int>(
+                raw_instance.option_cost(option) == 0 ||
+                (instance.contains_option(option_name) &&
+                 solution[instance.option_from_name(option_name)]));
+        };
 
         if(!opt_output_json_file.has_value() &&
            !opt_output_csv_file.has_value()) {
@@ -280,13 +290,8 @@ int main(int argc, const char * argv[]) {
                               return raw_instance.option_name(o).size();
                           }));
             for(auto && option : raw_instance.options()) {
-                const auto & option_name = raw_instance.option_name(option);
-                int value = static_cast<int>(
-                    instance.contains_option(option_name)
-                        ? solution[instance.option_from_name(option_name)]
-                        : false);
-                fmt::println("    {:<{}} {}", option_name,
-                             option_name_max_length, value);
+                fmt::println("    {:<{}} {}", raw_instance.option_name(option),
+                             option_name_max_length, option_value(option));
             }
             fmt::println("Computation time: {} ms", computation_time_ms);
         }
@@ -349,15 +354,9 @@ int main(int argc, const char * argv[]) {
                 "solution",
                 std::views::transform(
                     raw_instance.options(),
-                    [&raw_instance, &instance, &solution](const auto & option) {
-                        const auto & option_name =
-                            raw_instance.option_name(option);
-                        int value = static_cast<int>(
-                            instance.contains_option(option_name)
-                                ? solution[instance.option_from_name(
-                                      option_name)]
-                                : false);
-                        return std::make_pair(option_name, value);
+                    [&raw_instance, &option_value](const auto & option) {
+                        return std::make_pair(raw_instance.option_name(option),
+                                              option_value(option));
                     }));
             out.print("\n}}");
 
@@ -371,12 +370,8 @@ int main(int argc, const char * argv[]) {
                 fmt::output_file(opt_output_csv_file.value().string().c_str());
             out.print("option_id,value\n");
             for(auto && option : raw_instance.options()) {
-                const auto & option_name = raw_instance.option_name(option);
-                int value = static_cast<int>(
-                    instance.contains_option(option_name)
-                        ? solution[instance.option_from_name(option_name)]
-                        : false);
-                out.print("\"{}\",{}\n", option_name, value);
+                out.print("\"{}\",{}\n", raw_instance.option_name(option),
+                          option_value(option));
             }
             spdlog::info("Solution written to '{}'",
                          std::filesystem::absolute(opt_output_csv_file.value())

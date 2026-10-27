@@ -1,6 +1,7 @@
 #ifndef TRIVIAL_REFORMULATE_HPP
 #define TRIVIAL_REFORMULATE_HPP
 
+#include <algorithm>
 #include <optional>
 #include <utility>
 
@@ -19,9 +20,12 @@ auto trivial_reformulate_instance(
 
     auto reformulated_option_map =
         instance.template create_option_map<std::optional<gecot::option_t>>();
+    // free options are always bought: applied to the cases instead
+    auto free_options = instance.create_option_map(false);
     for(auto && original_option : instance.options()) {
         const double cost = instance.option_cost(original_option);
-        if(cost > budget) continue;
+        free_options[original_option] = (cost == 0);
+        if(cost > budget || cost == 0) continue;
         auto option = reformulated_instance.add_option(
             instance.option_name(original_option), cost);
         reformulated_option_map[original_option].emplace(option);
@@ -29,7 +33,7 @@ auto trivial_reformulate_instance(
 
     for(auto && instance_case : instance.cases()) {
         trivial_reformulate_case(instance_case, reformulated_instance,
-                                 reformulated_option_map);
+                                 reformulated_option_map, free_options);
     }
 
     return reformulated_instance;
@@ -37,21 +41,38 @@ auto trivial_reformulate_instance(
 
 template <gecot::case_c C>
 void trivial_reformulate_case(const C & instance_case, Instance & instance,
-                              auto && reformulated_option_map) {
+                              auto && reformulated_option_map,
+                              const auto & free_options) {
     using graph_t = gecot::case_graph_t<C>;
     using vertex_t = melon::vertex_t<graph_t>;
     using arc_t = melon::arc_t<graph_t>;
 
     const auto & original_graph = instance_case.graph();
-    const auto & original_source_quality_map =
-        instance_case.source_quality_map();
-    const auto & original_target_quality_map =
-        instance_case.target_quality_map();
-    const auto & original_probability_map = instance_case.arc_probability_map();
+    auto original_source_quality_map = instance_case.source_quality_map();
+    auto original_target_quality_map = instance_case.target_quality_map();
+    auto original_probability_map = instance_case.arc_probability_map();
 
     const auto & original_vertex_options_map =
         instance_case.vertex_options_map();
     const auto & original_arc_options_map = instance_case.arc_options_map();
+
+    // before the contraction, as free options can create probability 1 arcs
+    for(const vertex_t & v : melon::vertices(original_graph)) {
+        for(const auto & [source_quality_gain, target_quality_gain, option] :
+            original_vertex_options_map[v]) {
+            if(!free_options[option]) continue;
+            original_source_quality_map[v] += source_quality_gain;
+            original_target_quality_map[v] += target_quality_gain;
+        }
+    }
+    for(const arc_t & a : melon::arcs(original_graph)) {
+        for(const auto & [improved_prob, option] :
+            original_arc_options_map[a]) {
+            if(!free_options[option]) continue;
+            original_probability_map[a] =
+                std::max(original_probability_map[a], improved_prob);
+        }
+    }
 
     std::vector<double> source_quality_map;
     std::vector<double> target_quality_map;

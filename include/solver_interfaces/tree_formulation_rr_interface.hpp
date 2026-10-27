@@ -10,14 +10,12 @@ private:
 
 public:
     TreeFormulationRRInterface() : AbstractMipInterface("tree_rr") {
-        add_mip_options(solver);
+        add_mip_options(solver, 1e-7, thread_safe_solvers);
         add_preprocessing_options(solver);
     }
 
     gecot::solve_result<Instance> solve(const Instance & instance,
-                                        const double B) const override {
-        return solver.solve(instance, B);
-    };
+                                        const double B) const override;
 
     std::string description() const override {
         return "tree formulation relaxation with randomized rounding";

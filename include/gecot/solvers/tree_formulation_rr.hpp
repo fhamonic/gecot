@@ -20,9 +20,6 @@
 
 #include "mippp/solvers/gurobi/all.hpp"
 
-#include "mippp/solvers/cbc/all.hpp"
-#include "mippp/solvers/clp/all.hpp"
-
 #include "melon/graph.hpp"
 
 #include "gecot/concepts/instance.hpp"
@@ -38,19 +35,14 @@ namespace gecot {
 namespace solvers {
 
 struct tree_formulation_rr : public mip_solver_base {
-    using lp_model_type = mippp::clp_lp;
-    using milp_model_type = mippp::cbc_milp;
-    // using lp_model_type = mippp::gurobi_lp;
-    // using milp_model_type = mippp::gurobi_milp;
-
     using variable_t = mippp::model_variable<int, double>;
     using constraint_t = mippp::model_constraint<int>;
 
-    template <instance_c I>
+    template <instance_c I, typename MILP>
     struct sub_model_data {
         using vertex_t = melon::vertex_t<instance_graph_t<I>>;
         vertex_t target;
-        milp_model_type sub_model;
+        MILP sub_model;
         mippp::runtime_linear_expression<variable_t, double> default_objective;
         std::flat_map<option_t, variable_t> sub_X_vars_map;
 
@@ -60,8 +52,11 @@ struct tree_formulation_rr : public mip_solver_base {
                        const vertex_t & original_t)
             : target(original_t) {
             using namespace mippp::operators;
-            sub_model.set_optimality_tolerance(1e-10);
-            sub_model.set_feasibility_tolerance(1e-8);
+            // the sub-models are solved in parallel
+            if constexpr(std::same_as<MILP, mippp::gurobi_milp>)
+                sub_model.native_api().setintparam(
+                    sub_model.native_model().first, "Threads", 1);
+            _set_tolerances(sub_model, 1e-10, 1e-8);
             sub_model.set_maximization();
 
             const auto & original_graph = instance_case.graph();
@@ -207,19 +202,19 @@ struct tree_formulation_rr : public mip_solver_base {
         }
     };
 
-    template <instance_c I>
+    template <instance_c I, typename LP, typename MILP>
     struct master_model_case_data {
         using vertex_t = melon::vertex_t<instance_graph_t<I>>;
         std::reference_wrapper<std::mutex> master_model_mutex_ref;
-        std::reference_wrapper<lp_model_type> master_model;
+        std::reference_wrapper<LP> master_model;
         variable_t contribution_variable;
         constraint_t contribution_constraint;
         std::flat_map<vertex_t, constraint_t> uniqueness_constraint_map;
         std::flat_map<std::pair<vertex_t, option_t>, constraint_t>
             purchase_constraints_map;
-        std::vector<sub_model_data<I>> sub_models;
+        std::vector<sub_model_data<I, MILP>> sub_models;
 
-        master_model_case_data(std::mutex & model_mutex, lp_model_type & model,
+        master_model_case_data(std::mutex & model_mutex, LP & model,
                                const auto & X_vars, const auto & instance,
                                const double & budget,
                                const auto & instance_case,
@@ -333,7 +328,7 @@ struct tree_formulation_rr : public mip_solver_base {
         }
     };
 
-    template <instance_c I>
+    template <typename LP, typename MILP, instance_c I>
     solve_result<I> solve(const I & instance, const double budget) const {
         spdlog::stopwatch sw;
         auto solution = instance.create_option_map(false);
@@ -341,8 +336,9 @@ struct tree_formulation_rr : public mip_solver_base {
         using namespace mippp;
         using namespace mippp::operators;
         std::mutex master_model_mutex;
-        lp_model_type model;
-        model.set_feasibility_tolerance(feasibility_tol);
+        LP model;
+        if constexpr(mippp::has_feasibility_tolerance<LP>)
+            model.set_feasibility_tolerance(feasibility_tol);
         model.set_maximization();
 
         const auto X_vars = model.add_variables(
@@ -351,7 +347,7 @@ struct tree_formulation_rr : public mip_solver_base {
                                  return instance.option_cost(o) * X_vars(o);
                              }) <= budget);
 
-        std::vector<master_model_case_data<I>> master_model_cases;
+        std::vector<master_model_case_data<I, LP, MILP>> master_model_cases;
 
         for(auto && instance_case : instance.cases()) {
             const auto [strong_arcs_map, useless_arcs_map] =

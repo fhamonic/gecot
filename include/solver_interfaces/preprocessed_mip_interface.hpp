@@ -17,9 +17,7 @@ public:
     }
 
     gecot::solve_result<Instance> solve(const Instance & instance,
-                                        const double B) const override {
-        return solver.solve(instance, B);
-    };
+                                        const double B) const override;
 
     std::string description() const override {
         return "mip formulation with preprocessing, from 'Optimizing the "

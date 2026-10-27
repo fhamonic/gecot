@@ -82,7 +82,16 @@ target_link_libraries(gecot INTERFACE mippp::mippp)
 
 
 # ################### EXEC target ####################
-add_executable(gecot_optimize src/instance.cpp src/parse_instance.cpp src/gecot_optimize.cpp ${WINDRES_ICON_O})
+# one translation unit per MIP interface: each instantiates its solver for
+# every mippp backend
+add_executable(gecot_optimize src/instance.cpp src/parse_instance.cpp src/gecot_optimize.cpp
+    src/solver_interfaces/mip_interface.cpp
+    src/solver_interfaces/preprocessed_mip_interface.cpp
+    src/solver_interfaces/naive_benders_interface.cpp
+    src/solver_interfaces/target_benders_interface.cpp
+    src/solver_interfaces/flow_benders_interface.cpp
+    src/solver_interfaces/tree_formulation_rr_interface.cpp
+    ${WINDRES_ICON_O})
 target_link_libraries(gecot_optimize PUBLIC gecot)
 target_link_libraries(gecot_optimize PUBLIC vincentlaucsb-csv-parser::vincentlaucsb-csv-parser)
 target_link_libraries(gecot_optimize PUBLIC nlohmann_json::nlohmann_json)

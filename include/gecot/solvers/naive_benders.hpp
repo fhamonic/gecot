@@ -69,7 +69,7 @@ struct naive_benders : public mip_solver_base {
         return std::make_tuple(opt, rho_values);
     }
 
-    template <instance_c I>
+    template <lazy_constraint_model M, instance_c I>
     solve_result<I> solve(const I & instance, const double budget) const {
         spdlog::stopwatch sw;
         auto solution = instance.create_option_map(false);
@@ -77,7 +77,7 @@ struct naive_benders : public mip_solver_base {
         using namespace mippp;
         using namespace mippp::operators;
 
-        model_type model;
+        M model;
 
         model.set_optimality_tolerance(1e-10);
         model.set_feasibility_tolerance(feasibility_tol);
@@ -220,7 +220,7 @@ struct naive_benders : public mip_solver_base {
 
         std::size_t num_cuts = 0;
         model.set_candidate_solution_callback(
-            [&](model_type::candidate_solution_callback_handle & handle) {
+            [&](typename M::candidate_solution_callback_handle & handle) {
                 const auto master_solution = handle.get_solution();
                 auto sol = melon::maps::function([&](option_t i) {
                     return master_solution[X_vars(i)] > 0.5;

@@ -10,13 +10,11 @@ private:
 
 public:
     FlowBendersInterface() : AbstractMipInterface("flow_benders") {
-        add_mip_options(solver);
+        add_mip_options(solver, 1e-7, lazy_constraint_solvers);
     }
 
     gecot::solve_result<Instance> solve(const Instance & instance,
-                                        const double B) const override {
-        return solver.solve(instance, B);
-    };
+                                        const double B) const override;
 
     std::string description() const override {
         return "Benders decomposition across each generalized flow with non "

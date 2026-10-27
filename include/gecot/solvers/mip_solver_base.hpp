@@ -4,6 +4,7 @@
 #include <chrono>
 #include <concepts>
 #include <optional>
+#include <ranges>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -12,8 +13,7 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 
-#include "mippp/solvers/copt/all.hpp"
-#include "mippp/solvers/cplex/all.hpp"
+#include "mippp/model_concepts.hpp"
 #include "mippp/solvers/gurobi/all.hpp"
 
 #include "melon/graph.hpp"
@@ -27,11 +27,14 @@
 namespace gecot {
 namespace solvers {
 
-struct mip_solver_base {
-    using model_type = mippp::gurobi_milp;
-    // using model_type = mippp::cplex_milp;
-    // using model_type = mippp::copt_milp;
+// backends whose candidate solutions can be cut by lazy constraints (Benders)
+template <typename M>
+concept lazy_constraint_model =
+    mippp::has_candidate_solution_callback<M> &&
+    mippp::has_lazy_constraints<mippp::candidate_solution_callback_handle_t<M>,
+                                M>;
 
+struct mip_solver_base {
     double feasibility_tol = 0.0;
     double probability_resolution = 1e-8;
     int num_mus = 0;
@@ -113,9 +116,14 @@ struct mip_solver_base {
                                          const spdlog::stopwatch & sw) const {
         namespace status = mippp::status;
         const auto build_time = sw.elapsed();
-        if(time_limit)
-            model.set_time_limit(std::chrono::duration<double>(
-                std::max(0.0, time_limit.value() - build_time.count())));
+        if constexpr(mippp::has_time_limit<M>) {
+            if(time_limit)
+                model.set_time_limit(std::chrono::duration<double>(
+                    std::max(0.0, time_limit.value() - build_time.count())));
+        } else if(time_limit)
+            spdlog::warn("This solver has no time limit: --time-limit ignored");
+        if constexpr(!mippp::has_optimality_tolerance<M>)
+            spdlog::warn("This solver keeps its default optimality gap");
         // with scores near 1e11, gurobi's absolute tolerances otherwise prune
         // better solutions; scaling the models is the real fix
         if constexpr(std::same_as<M, mippp::gurobi_milp>)
@@ -189,6 +197,31 @@ struct mip_solver_base {
         if(compute_solution_cost(instance, solution) > budget + feasibility_tol)
             throw std::runtime_error("the MIP start exceeds the budget");
         return solution;
+    }
+
+    // backends without these setters keep their defaults
+    template <typename M>
+    static void _set_tolerances(M & model, const double optimality_tol,
+                                const double feasibility_tol) {
+        if constexpr(mippp::has_optimality_tolerance<M>)
+            model.set_optimality_tolerance(optimality_tol);
+        if constexpr(mippp::has_feasibility_tolerance<M>)
+            model.set_feasibility_tolerance(feasibility_tol);
+    }
+
+    template <typename M, instance_c I>
+    void _add_mip_start(M & model, const I & instance,
+                        const auto & X_vars) const {
+        if(!mip_start) return;
+        if constexpr(mippp::has_mip_start<M>) {
+            instance_solution_t<I> mip_start_solution =
+                _mip_start_solution(instance);
+            model.add_mip_start(
+                std::views::transform(instance.options(), [&](auto o) {
+                    return std::make_pair(X_vars(o), mip_start_solution[o]);
+                }));
+        } else
+            spdlog::warn("This solver has no MIP start: --mip-start ignored");
     }
 
     template <instance_c I>

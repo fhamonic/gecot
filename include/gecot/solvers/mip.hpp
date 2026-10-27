@@ -21,16 +21,15 @@ namespace gecot {
 namespace solvers {
 
 struct mip : public mip_solver_base {
-    template <instance_c I>
+    template <typename M, instance_c I>
     solve_result<I> solve(const I & instance, const double budget) const {
         spdlog::stopwatch sw;
         auto solution = instance.create_option_map(false);
 
         using namespace mippp;
         using namespace mippp::operators;
-        model_type model;
-        model.set_optimality_tolerance(1e-10);
-        model.set_feasibility_tolerance(feasibility_tol);
+        M model;
+        _set_tolerances(model, 1e-10, feasibility_tol);
 
         const auto C_vars = model.add_variables(
             instance.cases().size(), [](const case_id_t & id) { return id; }
@@ -150,14 +149,7 @@ struct mip : public mip_solver_base {
         spdlog::trace("  {:>10} constraints", model.num_constraints());
         spdlog::trace("  {:>10} entries", model.num_nonzeros());
 
-        if(mip_start) {
-            instance_solution_t<I> mip_start_solution =
-                _mip_start_solution(instance);
-            model.add_mip_start(
-                std::views::transform(instance.options(), [&](auto o) {
-                    return std::make_pair(X_vars(o), mip_start_solution[o]);
-                }));
-        }
+        _add_mip_start(model, instance, X_vars);
 
         const auto [has_solution, report] = _solve(model, sw);
         if(!has_solution) return {_fallback_solution(instance, budget), report};

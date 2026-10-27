@@ -11,12 +11,15 @@ private:
 public:
     UnprepTargetBendersInterface()
         : AbstractMipInterface("unprep_target_benders") {
-        add_mip_options(solver);
+        add_mip_options(solver, 1e-7, lazy_constraint_solvers);
     }
 
     gecot::solve_result<Instance> solve(const Instance & instance,
                                         const double B) const override {
-        return solver.solve(instance, B);
+        return with_solver(
+            [&]<typename LP, gecot::solvers::lazy_constraint_model MILP>() {
+                return solver.template solve<MILP>(instance, B);
+            });
     };
 
     std::string description() const override {

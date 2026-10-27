@@ -93,6 +93,10 @@ struct tree_formulation_rr : public mip_solver_base {
                 options_vector, [this](const option_t & i) {
                     return std::make_pair(i, sub_model.add_binary_variable());
                 }));
+            sub_model.add_constraint(xsum(sub_X_vars_map, [&](const auto & p) {
+                                         const auto & [o, X] = p;
+                                         return instance.option_cost(o) * X;
+                                     }) <= budget);
 
             const auto big_M_map = compute_big_M_map(
                 graph, source_quality_map, vertex_options_map, probability_map,

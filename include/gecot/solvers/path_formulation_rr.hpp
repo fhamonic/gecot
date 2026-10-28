@@ -389,7 +389,11 @@ struct path_formulation_rr : public mip_solver_base {
         std::vector<column> columns;  // enumerated, or empty when searched
         double max_value;             // bounds the searched columns
         std::optional<column> start_column;
-        std::vector<double> unproductive_duals = {};
+        // the duals of the pair's last search and what it found, a column of
+        // reduced cost bound or nothing: the same duals give them again
+        std::vector<double> searched_duals = {};
+        double searched_bound = 0;
+        std::optional<column> searched_column = {};
         std::optional<constraint_t> uniqueness_constraint = {};
         std::flat_map<option_t, constraint_t> purchase_constraints = {};
     };
@@ -686,7 +690,14 @@ struct path_formulation_rr : public mip_solver_base {
                                         uniqueness_dual(p, dual_solution)};
                 for(const auto & [o, row] : p.purchase_constraints)
                     key.push_back(dual_solution[row]);
-                if(key == p.unproductive_duals) return;
+                if(key == p.searched_duals) {
+                    if(p.searched_column) {
+                        pricing_bounds[i] = p.searched_bound;
+                        priced_columns.push_back({i, p.searched_column->options,
+                                                  p.searched_column->value});
+                    }
+                    return;
+                }
                 if(time_up()) {
                     cut_short = true;
                     return;
@@ -738,9 +749,9 @@ struct path_formulation_rr : public mip_solver_base {
                             best.emplace(rc, v, label);
                     }
                 }
-                if(!best || std::get<0>(*best) <= margin(p)) {
-                    p.unproductive_duals = std::move(key);
-                } else {
+                p.searched_duals = std::move(key);
+                p.searched_column.reset();
+                if(best && std::get<0>(*best) > margin(p)) {
                     // back through the fronts: each label extends a label
                     // of an in-neighbour exactly
                     auto [rc, v, label] = *best;
@@ -785,6 +796,8 @@ struct path_formulation_rr : public mip_solver_base {
                         seed.options.push_back(static_cast<option_t>(
                             sg.copy_option[v - sg.num_vertices]));
                     std::ranges::sort(seed.options);
+                    p.searched_bound = rc;
+                    p.searched_column = column{seed.value, seed.options};
                     priced_columns.push_back(std::move(seed));
                 }
                 for(const auto & [o, row] : p.purchase_constraints)

@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <flat_map>
 #include <iterator>
+#include <numeric>
 #include <optional>
 #include <queue>
 #include <ranges>
@@ -56,6 +57,9 @@ struct path_formulation_rr : public mip_solver_base {
     // budget, for instances whose options each improve a single vertex
     bool search_pricing = false;
     std::size_t max_activations = 0;  // per round, 0: every improving column
+    // stops once the Lagrangian bound is within this gap of the master's
+    // value, relative to it; 0: at convergence only
+    double relative_gap = 0;
 
     struct column {
         double value;
@@ -631,9 +635,16 @@ struct path_formulation_rr : public mip_solver_base {
         auto time_up = [&] {
             return time_limit && sw.elapsed().count() > time_limit.value();
         };
+        // per pair, a bound on the best reduced cost and 0: with the master's
+        // value, the Lagrangian bound of a complete pricing round
+        std::vector<double> pricing_bounds(pairs.size());
+        // not the report's best_bound: the solution returned, the master's
+        // options cast to bool, can exceed the budget
+        std::optional<double> best_bound;
         for(;; ++iterations) {
             model.solve();
             const auto dual_solution = model.get_dual_solution();
+            const double master_value = model.get_solution_value();
 
             log_lambda();
 
@@ -660,12 +671,16 @@ struct path_formulation_rr : public mip_solver_base {
                             rc -= purchase_dual(p, o, dual_solution);
                         if(!best || rc > best->first) best.emplace(rc, j);
                     }
+                    pricing_bounds[i] = best ? std::max(best->first, 0.0) : 0.0;
                     if(best && best->first > margin(p))
                         priced_columns.push_back(
                             {i, p.columns[best->second].options,
                              p.columns[best->second].value});
                     return;
                 }
+                // what the skips and the stopped searches leave unpriced has
+                // a reduced cost of at most margin(p)
+                pricing_bounds[i] = margin(p);
                 if(pi_c * p.max_value <= threshold(p)) return;
                 std::vector<double> key{pi_c,
                                         uniqueness_dual(p, dual_solution)};
@@ -729,6 +744,7 @@ struct path_formulation_rr : public mip_solver_base {
                     // back through the fronts: each label extends a label
                     // of an in-neighbour exactly
                     auto [rc, v, label] = *best;
+                    pricing_bounds[i] = rc;
                     column_seed seed{i, {}, 0.0};
                     for(const auto & [e, q] : ends)
                         if(e == v) seed.value = label.first * q;
@@ -774,6 +790,22 @@ struct path_formulation_rr : public mip_solver_base {
                 for(const auto & [o, row] : p.purchase_constraints)
                     state.duals[o] = 0.0;
             });
+            if(!cut_short) {
+                const double bound =
+                    master_value + std::accumulate(pricing_bounds.begin(),
+                                                   pricing_bounds.end(), 0.0);
+                spdlog::info("Lagrangian bound: {}", bound);
+                if(!best_bound || bound < best_bound.value())
+                    best_bound = bound;
+                if(relative_gap > 0 && best_bound.value() - master_value <=
+                                           relative_gap * master_value) {
+                    spdlog::info(
+                        "Column generation stopped: relative gap "
+                        "reached");
+                    report.status = "relative gap reached";
+                    break;
+                }
+            }
             columns.emplace_pool_columns(priced_columns |
                                          std::views::as_rvalue);
             columns.update_columns([&](const column_seed & seed) {
@@ -843,6 +875,8 @@ struct path_formulation_rr : public mip_solver_base {
                         {"pool_columns", columns.num_pool_columns()},
                         {"evicted_columns", num_evicted},
                         {"relaxation_value", model.get_solution_value()}};
+        if(best_bound)
+            report.stats.emplace_back("lagrangian_bound", best_bound.value());
         if(search_pricing)
             report.stats.emplace_back("searches", num_searches.load());
         else

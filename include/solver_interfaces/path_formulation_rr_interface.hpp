@@ -29,6 +29,12 @@ public:
                        "Columns entering the master per round, the best ones "
                        "(0: every improving column)")
             ->default_val(0);
+        app.add_option("--relative-gap", solver.relative_gap,
+                       "Stops once the Lagrangian bound is within this gap of "
+                       "the relaxation's value, relative to it (0: at "
+                       "convergence only)")
+            ->check(CLI::NonNegativeNumber)
+            ->default_val(0);
     }
 
     gecot::solve_result<Instance> solve(const Instance & instance,

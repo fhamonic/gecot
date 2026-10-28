@@ -22,7 +22,8 @@ public:
                },
                "enumerate: each pair's columns once, within the budget; "
                "search: a search per pair and round, without the budget, for "
-               "options that each improve a single vertex")
+               "options that each improve a single arc or a single vertex "
+               "and its arcs")
             ->check(CLI::IsMember({"enumerate", "search"}))
             ->default_val("enumerate");
         app.add_option("--max-activations", solver.max_activations,

@@ -54,7 +54,8 @@ struct path_formulation_rr : public mip_solver_base {
     std::size_t evict_age = 0;  // in pricing rounds, 0: never evict
     // false: each pair's columns are enumerated once; true: each round, a
     // biobjective (probability, duals) search prices each pair, without the
-    // budget, for instances whose options each improve a single vertex
+    // budget, for instances whose options each improve a single arc or a
+    // single vertex and its arcs
     bool search_pricing = false;
     std::size_t max_activations = 0;  // per round, 0: every improving column
     // stops once the Lagrangian bound is within this gap of the master's
@@ -184,13 +185,17 @@ struct path_formulation_rr : public mip_solver_base {
     // The case graph plus an improved copy of each vertex that is the center
     // of an option, the copy entered when the option is bought: a path pays
     // the option's dual once, on entering the copy, and leaves it through the
-    // improved arcs. Exact when each option improves only the arcs incident to
-    // one vertex and the qualities of that vertex, which is checked.
+    // improved arcs. An option that improves a single arc and nothing else is
+    // paid on an improved parallel arc instead: a path that takes it twice is
+    // dominated by the path without the cycle. Exact when each other option
+    // improves only the arcs incident to one vertex and the qualities of that
+    // vertex, which is checked.
     struct split_graph {
         std::size_t num_vertices;  // of the case graph
         melon::static_digraph graph;
         std::vector<double> probability;
         std::vector<int> entry_option;   // the option paid on entering, or -1
+        std::vector<int> arc_option;     // of an improved parallel arc, or -1
         std::vector<int> center_option;  // per vertex of the case graph, or -1
         std::vector<vertex> improved_copy;  // per center vertex
         std::vector<int> copy_option;       // per improved copy
@@ -202,7 +207,10 @@ struct path_formulation_rr : public mip_solver_base {
         const std::size_t n = graph.num_vertices();
         std::vector<std::optional<std::vector<std::size_t>>> candidates(
             instance.options().size());
+        // the arcs and vertices that each option improves
+        std::vector<std::size_t> num_improved(instance.options().size(), 0);
         auto restrict_to = [&](const option_t o, std::vector<std::size_t> c) {
+            ++num_improved[o];
             std::ranges::sort(c);
             if(!candidates[o]) {
                 candidates[o] = std::move(c);
@@ -217,7 +225,7 @@ struct path_formulation_rr : public mip_solver_base {
             if(instance_case.arc_options_map()[a].size() > 1)
                 throw std::invalid_argument(
                     "path_rr --pricing search: an arc is improved by several "
-                    "options");
+                    "options, use --pricing enumerate");
             for(const auto & [improved_prob, o] :
                 instance_case.arc_options_map()[a])
                 restrict_to(o, {melon::arc_source(graph, a),
@@ -227,11 +235,20 @@ struct path_formulation_rr : public mip_solver_base {
             for(const auto & [sqg, tqg, o] :
                 instance_case.vertex_options_map()[v])
                 restrict_to(o, {v});
-        split_graph sg{
-            n, {}, {}, {}, std::vector<int>(n, -1), std::vector<vertex>(n, 0),
-            {}};
+        // a single arc, of two distinct endpoints, and nothing else
+        auto on_arc = [&](const option_t o) {
+            return num_improved[o] == 1 && candidates[o]->size() == 2;
+        };
+        split_graph sg{n,
+                       {},
+                       {},
+                       {},
+                       {},
+                       std::vector<int>(n, -1),
+                       std::vector<vertex>(n, 0),
+                       {}};
         for(const option_t o : instance.options()) {
-            if(!candidates[o]) continue;
+            if(!candidates[o] || on_arc(o)) continue;
             const auto it = std::ranges::find_if(
                 *candidates[o],
                 [&](const std::size_t v) { return sg.center_option[v] < 0; });
@@ -239,13 +256,14 @@ struct path_formulation_rr : public mip_solver_base {
                 throw std::invalid_argument(
                     "path_rr --pricing search: option '" +
                     instance.option_name(o) +
-                    "' does not improve a single vertex and its arcs only");
+                    "' improves neither a single arc nor a single vertex and "
+                    "its arcs only, use --pricing enumerate");
             sg.center_option[*it] = static_cast<int>(o);
             sg.improved_copy[*it] =
                 static_cast<vertex>(n + sg.copy_option.size());
             sg.copy_option.push_back(static_cast<int>(o));
         }
-        melon::static_digraph_builder<melon::static_digraph, double, int>
+        melon::static_digraph_builder<melon::static_digraph, double, int, int>
             builder(n + sg.copy_option.size());
         auto copies = [&](const vertex v) {
             std::vector<std::pair<vertex, int>> c{{v, -1}};
@@ -259,13 +277,19 @@ struct path_formulation_rr : public mip_solver_base {
                     copies(melon::arc_target(graph, a))) {
                     double p = instance_case.arc_probability_map()[a];
                     for(const auto & [improved_prob, o] :
-                        instance_case.arc_options_map()[a])
-                        if(static_cast<int>(o) == ou ||
-                           static_cast<int>(o) == ov)
-                            p = improved_prob;
-                    if(p > 0) builder.add_arc({cu, cv}, p, ov);
+                        instance_case.arc_options_map()[a]) {
+                        if(!on_arc(o)) {
+                            if(static_cast<int>(o) == ou ||
+                               static_cast<int>(o) == ov)
+                                p = improved_prob;
+                        } else if(improved_prob > 0)
+                            builder.add_arc({cu, cv}, improved_prob, ov,
+                                            static_cast<int>(o));
+                    }
+                    if(p > 0) builder.add_arc({cu, cv}, p, ov, -1);
                 }
-        std::tie(sg.graph, sg.probability, sg.entry_option) = builder.build();
+        std::tie(sg.graph, sg.probability, sg.entry_option, sg.arc_option) =
+            builder.build();
         return sg;
     }
 
@@ -327,8 +351,10 @@ struct path_formulation_rr : public mip_solver_base {
         auto algo = melon::dijkstra(
             reliability_traits{}, sg.graph,
             melon::maps::function([&sg, &allowed](const auto a) {
-                const int o = sg.entry_option[a];
-                return o < 0 || allowed(o) ? sg.probability[a] : 0.0;
+                auto buyable = [&](const int o) { return o < 0 || allowed(o); };
+                return buyable(sg.entry_option[a]) && buyable(sg.arc_option[a])
+                           ? sg.probability[a]
+                           : 0.0;
             }));
         const auto starts = _starts(instance_case, sg, s, allowed);
         for(const auto & [v, q] : starts) algo.add_source(v, q);
@@ -350,7 +376,11 @@ struct path_formulation_rr : public mip_solver_base {
                            return e.first == u && e.second == algo.dist(u);
                        }))
                         break;
-                    u = algo.pred_vertex(u);
+                    const auto a = algo.pred_arc(u);
+                    if(sg.arc_option[a] >= 0)
+                        c.options.push_back(
+                            static_cast<option_t>(sg.arc_option[a]));
+                    u = melon::arc_source(sg.graph, a);
                 }
                 std::ranges::sort(c.options);
                 best[i] = std::move(c);
@@ -367,19 +397,22 @@ struct path_formulation_rr : public mip_solver_base {
             2, std::pair<melon::vertex_t<melon::static_digraph>, label>,
             typename blue_semiring::less_t, melon::maps::element<1, 0>>;
     };
-    // the dual of the option paid on entering a copy, for the pair priced
-    struct entry_duals {
+    // the duals of the options paid on an arc, on entering a copy or on an
+    // improved parallel arc, for the pair priced
+    struct arc_duals {
         const split_graph * sg;
         const std::vector<double> * duals;
         double operator()(const melon::arc_t<melon::static_digraph> a) const {
-            const int o = sg->entry_option[a];
-            return o < 0 ? 0.0 : (*duals)[static_cast<std::size_t>(o)];
+            auto dual = [this](const int o) {
+                return o < 0 ? 0.0 : (*duals)[static_cast<std::size_t>(o)];
+            };
+            return dual(sg->entry_option[a]) + dual(sg->arc_option[a]);
         }
     };
     using pricing_algorithm = decltype(melon::biobjective_dijkstra(
         pricing_traits{}, std::declval<const melon::static_digraph &>(),
         std::declval<const std::vector<double> &>(),
-        melon::maps::function(std::declval<entry_duals>())));
+        melon::maps::function(std::declval<arc_duals>())));
 
     // the rows of a pair are created with its first columns in the master:
     // until then they hold no column, are redundant and have a zero dual
@@ -713,7 +746,7 @@ struct path_formulation_rr : public mip_solver_base {
                 if(!algo)
                     algo.emplace(
                         pricing_traits{}, sg.graph, sg.probability,
-                        melon::maps::function(entry_duals{&sg, &state.duals}));
+                        melon::maps::function(arc_duals{&sg, &state.duals}));
                 // the search needs lengths that never improve a label, but
                 // the master can return a dual a little below 0 (-7.6e-7 on
                 // Quebec): the labels then go around cycles and the
@@ -781,9 +814,13 @@ struct path_formulation_rr : public mip_solver_base {
                                        l.first, sg.probability[a]) !=
                                        label.first ||
                                    pricing_traits::red_semiring::plus(
-                                       l.second, entry_duals{&sg, &state.duals}(
+                                       l.second, arc_duals{&sg, &state.duals}(
                                                      a)) != label.second)
                                     continue;
+                                if(sg.arc_option[a] >= 0)
+                                    seed.options.push_back(
+                                        static_cast<option_t>(
+                                            sg.arc_option[a]));
                                 v = u;
                                 label = l;
                                 found = true;

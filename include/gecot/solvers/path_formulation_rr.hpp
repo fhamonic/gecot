@@ -41,22 +41,23 @@ namespace solvers {
 // Path formulation relaxation: the contribution of each (source, target) pair
 // is a column, a set of purchased options with the value
 // q_s(S) * q_t(S) * P_st(S), the qualities with their gains and the most
-// reliable path probability under S. By default the columns of a pair are
-// computed once: option costs and duals are nonnegative, so a higher
-// probability with a subset of the options is better whatever the duals. Each
-// round, the pricing subproblem of a pair keeps the column of best reduced
-// cost, among its columns or by a search (search_pricing).
+// reliable path probability under S. Each round, the pricing subproblem of a
+// pair keeps the column of best reduced cost, by default from a search
+// (search_pricing), else among the pair's columns computed once: option costs
+// and duals are nonnegative, so a higher probability with a subset of the
+// options is better whatever the duals.
 struct path_formulation_rr : public mip_solver_base {
     using variable_t = mippp::model_variable<int, double>;
     using constraint_t = mippp::model_constraint<int>;
     using vertex = melon::vertex_t<melon::static_digraph>;
 
     std::size_t evict_age = 0;  // in pricing rounds, 0: never evict
-    // false: each pair's columns are enumerated once; true: each round, a
-    // biobjective (probability, duals) search prices each pair, without the
-    // budget, for instances whose options each improve a single arc or a
-    // single vertex and its arcs
-    bool search_pricing = false;
+    // true: each round, a biobjective (probability, duals) search prices each
+    // pair, without the budget, for instances whose options each improve a
+    // single arc or a single vertex and its arcs; false: each pair's columns
+    // are enumerated once, within the budget, for any options but few of them
+    // per path
+    bool search_pricing = true;
     std::size_t max_activations = 0;  // per round, 0: every improving column
     // stops once the Lagrangian bound is within this gap of the master's
     // value, relative to it; 0: at convergence only

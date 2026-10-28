@@ -714,8 +714,12 @@ struct path_formulation_rr : public mip_solver_base {
                     algo.emplace(
                         pricing_traits{}, sg.graph, sg.probability,
                         melon::maps::function(entry_duals{&sg, &state.duals}));
+                // the search needs lengths that never improve a label, but
+                // the master can return a dual a little below 0 (-7.6e-7 on
+                // Quebec): the labels then go around cycles and the
+                // backtracking below can lose their predecessors
                 for(const auto & [o, row] : p.purchase_constraints)
-                    state.duals[o] = dual_solution[row];
+                    state.duals[o] = std::max(0.0, dual_solution[row]);
                 const auto & instance_case = *std::ranges::next(
                     cases.begin(), static_cast<std::ptrdiff_t>(p.case_id));
                 auto any = [](auto) { return true; };

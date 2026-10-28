@@ -29,6 +29,7 @@
 #include "solver_interfaces/greedy_incremental_interface.hpp"
 #include "solver_interfaces/mip_interface.hpp"
 #include "solver_interfaces/naive_benders_interface.hpp"
+#include "solver_interfaces/path_formulation_rr_interface.hpp"
 #include "solver_interfaces/preprocessed_mip_interface.hpp"
 #include "solver_interfaces/static_decremental_interface.hpp"
 #include "solver_interfaces/static_incremental_interface.hpp"
@@ -57,6 +58,7 @@ static bool process_command_line(
         std::make_unique<FlowBendersInterface>(),
         std::make_unique<TreeFormulationRRInterface>(),
         std::make_unique<TreeFormulationRRCMInterface>(),
+        std::make_unique<PathFormulationRRInterface>(),
         std::make_unique<WorstGreedyIncrementalInterface>(),
         std::make_unique<WorstGreedyDecrementalInterface>()};
 

@@ -164,11 +164,13 @@ struct path_formulation_rr : public mip_solver_base {
         return columns;
     }
 
+    // the rows of a pair are created with its first columns in the master:
+    // until then they hold no column, are redundant and have a zero dual
     struct pair_data {
         case_id_t case_id;
         std::vector<column> columns;
-        constraint_t uniqueness_constraint;
-        std::flat_map<option_t, constraint_t> purchase_constraints;
+        std::optional<constraint_t> uniqueness_constraint = {};
+        std::flat_map<option_t, constraint_t> purchase_constraints = {};
     };
 
     struct column_seed {
@@ -247,18 +249,7 @@ struct path_formulation_rr : public mip_solver_base {
                 constant += value;
             for(auto & columns :
                 std::views::join(std::views::values(source_pairs))) {
-                pair_data & p = pairs.emplace_back(
-                    instance_case.id(), std::move(columns),
-                    model.add_constraint(
-                        empty_linear_expression<variable_t, double> <= 1));
-                for(const auto & c : p.columns)
-                    for(const option_t o : c.options)
-                        if(!p.purchase_constraints.contains(o))
-                            p.purchase_constraints.emplace(
-                                o, model.add_constraint(
-                                       empty_linear_expression<variable_t,
-                                                               double> <=
-                                       X_vars(o)));
+                pairs.emplace_back(instance_case.id(), std::move(columns));
             }
             contribution_vars.push_back(model.add_variable());
             contribution_constraints.push_back(
@@ -293,13 +284,22 @@ struct path_formulation_rr : public mip_solver_base {
             column_seed_hash>
             columns;
         auto add_column = [&](LP &, const column_seed & seed) {
-            const pair_data & p = pairs[seed.pair];
+            pair_data & p = pairs[seed.pair];
             const column & c = p.columns[seed.column];
+            if(!p.uniqueness_constraint)
+                p.uniqueness_constraint = model.add_constraint(
+                    empty_linear_expression<variable_t, double> <= 1);
+            for(const option_t o : c.options)
+                if(!p.purchase_constraints.contains(o))
+                    p.purchase_constraints.emplace(
+                        o, model.add_constraint(
+                               empty_linear_expression<variable_t, double> <=
+                               X_vars(o)));
             return model.add_column(std::views::concat(
                 std::views::single(std::make_pair(
                     contribution_constraints[p.case_id], -c.value)),
                 std::views::single(
-                    std::make_pair(p.uniqueness_constraint, 1.0)),
+                    std::make_pair(*p.uniqueness_constraint, 1.0)),
                 std::views::transform(c.options, [&p](const option_t o) {
                     return std::make_pair(p.purchase_constraints.at(o), 1.0);
                 })));
@@ -330,15 +330,23 @@ struct path_formulation_rr : public mip_solver_base {
             }
         }
 
+        auto uniqueness_dual = [&](const pair_data & p,
+                                   const auto & dual_solution) {
+            return p.uniqueness_constraint
+                       ? dual_solution[*p.uniqueness_constraint]
+                       : 0.0;
+        };
         auto reduced_cost = [&](const column_seed & seed,
                                 const auto & dual_solution) {
             const pair_data & p = pairs[seed.pair];
             const column & c = p.columns[seed.column];
             double rc =
                 dual_solution[contribution_constraints[p.case_id]] * c.value -
-                dual_solution[p.uniqueness_constraint];
+                uniqueness_dual(p, dual_solution);
             for(const option_t o : c.options)
-                rc -= dual_solution[p.purchase_constraints.at(o)];
+                if(const auto it = p.purchase_constraints.find(o);
+                   it != p.purchase_constraints.end())
+                    rc -= dual_solution[it->second];
             return rc;
         };
         // in the master for more than evict_age rounds and unattractive, so
@@ -366,9 +374,9 @@ struct path_formulation_rr : public mip_solver_base {
 
             // the pricing test, at the master's dual tolerance
             auto improving_rc = [&](const column_seed & seed, const double rc) {
-                return rc > 1e-7 * dual_solution[pairs[seed.pair]
-                                                     .uniqueness_constraint] +
-                                1e-6;
+                return rc >
+                       1e-7 * uniqueness_dual(pairs[seed.pair], dual_solution) +
+                           1e-6;
             };
             tbb::concurrent_vector<column_seed> priced_columns;
             tbb::parallel_for(std::size_t{0}, pairs.size(), [&](auto i) {

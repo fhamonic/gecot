@@ -593,9 +593,10 @@ struct path_formulation_rr : public mip_solver_base {
         colgen::column_manager<
             LP, column_seed, colgen::property_list<colgen::reduced_cost>,
             colgen::property_list<colgen::reduced_cost, colgen::age>,
-            column_seed_hash>
+            colgen::no_data, column_seed_hash>
             columns;
-        auto add_column = [&](LP &, const column_seed & seed) {
+        auto add_column = [&](LP &, const auto & entry) {
+            const column_seed & seed = entry.seed;
             pair_data & p = pairs[seed.pair];
             if(!p.uniqueness_constraint)
                 p.uniqueness_constraint = model.add_constraint(
@@ -621,8 +622,7 @@ struct path_formulation_rr : public mip_solver_base {
             if(!pairs[i].start_column) continue;
             column_seed seed{i, pairs[i].start_column->options,
                              pairs[i].start_column->value};
-            const auto var = add_column(model, seed);
-            columns.emplace_master_column(std::move(seed), var);
+            columns.emplace_master_column(model, std::move(seed), add_column);
         }
 
         auto uniqueness_dual = [&](const pair_data & p,
@@ -650,8 +650,8 @@ struct path_formulation_rr : public mip_solver_base {
         };
         // in the master for more than evict_age rounds and unattractive, so
         // nonbasic
-        const colgen::all<colgen::conjunction<
-            colgen::above<colgen::age>, colgen::negative<colgen::reduced_cost>>>
+        const colgen::conjunction<colgen::above<colgen::age>,
+                                  colgen::negative<colgen::reduced_cost>>
             unattractive{colgen::above<colgen::age>{evict_age},
                          colgen::negative<colgen::reduced_cost>{1e-6}};
         if constexpr(!mippp::has_remove_variable<LP>)
@@ -863,11 +863,11 @@ struct path_formulation_rr : public mip_solver_base {
             }
             columns.emplace_pool_columns(priced_columns |
                                          std::views::as_rvalue);
-            columns.update_columns([&](const column_seed & seed) {
-                return colgen::priced{reduced_cost(seed, dual_solution)};
+            columns.update_columns([&](const auto & entry) {
+                return colgen::priced{reduced_cost(entry.seed, dual_solution)};
             });
             columns.purge_pool([](const auto & entry) {
-                return entry.second.template get<colgen::reduced_cost>() <= 0;
+                return entry.state.template get<colgen::reduced_cost>() <= 0;
             });
             auto improving = [&](const auto & entry) {
                 const auto & [seed, state] = entry;
@@ -876,24 +876,17 @@ struct path_formulation_rr : public mip_solver_base {
             };
             const std::size_t num_activated =
                 max_activations
-                    ? columns
-                          .manage_columns(
-                              model,
-                              colgen::at_most_k_best(
-                                  max_activations,
-                                  [](const auto & a, const auto & b) {
-                                      return a.second.template get<
-                                                 colgen::reduced_cost>() >
-                                             b.second.template get<
-                                                 colgen::reduced_cost>();
-                                  },
-                                  improving),
-                              add_column)
-                          .num_activated
-                    : columns
-                          .manage_columns(model, colgen::all{improving},
-                                          add_column)
-                          .num_activated;
+                    ? columns.activate_columns(
+                          model, improving, add_column,
+                          colgen::at_most_k_best(
+                              max_activations,
+                              [](const auto & a, const auto & b) {
+                                  return a.state.template get<
+                                             colgen::reduced_cost>() >
+                                         b.state.template get<
+                                             colgen::reduced_cost>();
+                              }))
+                    : columns.activate_columns(model, improving, add_column);
             if(!num_activated && !cut_short) {
                 spdlog::info("Column generation stopped: converged");
                 break;
@@ -908,10 +901,7 @@ struct path_formulation_rr : public mip_solver_base {
             // only once the master will be solved again, for the same reason
             if constexpr(mippp::has_remove_variable<LP>)
                 if(evict_age)
-                    num_evicted += columns
-                                       .manage_columns(model, colgen::none{},
-                                                       unattractive, add_column)
-                                       .num_evicted;
+                    num_evicted += columns.evict_columns(model, unattractive);
         }
 
         const auto model_solution = model.get_solution();

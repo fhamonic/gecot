@@ -167,11 +167,11 @@ struct tree_formulation_rr_cm : public tree_formulation_rr {
         colgen::column_manager<
             LP, seed_t, colgen::property_list<colgen::reduced_cost>,
             colgen::property_list<colgen::reduced_cost, colgen::age>,
-            tree_seed_hash>
+            colgen::no_data, tree_seed_hash>
             columns;
-        auto add_tree = [&](LP &, const seed_t & seed) {
-            return master_model_cases[seed.case_id].add_tree(
-                seed.target, seed.contribution, seed.options);
+        auto add_tree = [&](LP &, const auto & entry) {
+            return master_model_cases[entry.seed.case_id].add_tree(
+                entry.seed.target, entry.seed.contribution, entry.seed.options);
         };
         _add_mip_start_trees(
             instance, budget, master_model_cases,
@@ -187,13 +187,12 @@ struct tree_formulation_rr_cm : public tree_formulation_rr {
                                 })),
                             contribution};
                 std::ranges::sort(seed.options);
-                const auto var = add_tree(model, seed);
-                columns.emplace_master_column(std::move(seed), var);
+                columns.emplace_master_column(model, std::move(seed), add_tree);
             });
         // in the master for more than evict_age rounds and unattractive, so
         // nonbasic
-        const colgen::all<colgen::conjunction<
-            colgen::above<colgen::age>, colgen::negative<colgen::reduced_cost>>>
+        const colgen::conjunction<colgen::above<colgen::age>,
+                                  colgen::negative<colgen::reduced_cost>>
             unattractive{colgen::above<colgen::age>{evict_age},
                          colgen::negative<colgen::reduced_cost>{1e-6}};
         if constexpr(!mippp::has_remove_variable<LP>)
@@ -232,22 +231,21 @@ struct tree_formulation_rr_cm : public tree_formulation_rr {
                         });
                 });
             columns.emplace_pool_columns(priced_trees | std::views::as_rvalue);
-            columns.update_columns([&](const seed_t & seed) {
-                return colgen::priced{
-                    _reduced_cost(seed, master_model_cases, dual_solution)};
+            columns.update_columns([&](const auto & entry) {
+                return colgen::priced{_reduced_cost(
+                    entry.seed, master_model_cases, dual_solution)};
             });
             // the pricing test, at the master's dual tolerance
-            const colgen::all improving{[&](const auto & entry) {
+            const auto improving = [&](const auto & entry) {
                 const auto & [seed, state] = entry;
                 return state.template get<colgen::reduced_cost>() >
                        1e-7 * dual_solution[master_model_cases[seed.case_id]
                                                 .uniqueness_constraint_map.at(
                                                     seed.target)] +
                            1e-6;
-            }};
+            };
             const std::size_t num_activated =
-                columns.manage_columns(model, improving, add_tree)
-                    .num_activated;
+                columns.activate_columns(model, improving, add_tree);
             if(!num_activated && !cut_short) {
                 spdlog::info("Column generation stopped: converged");
                 break;
@@ -262,10 +260,7 @@ struct tree_formulation_rr_cm : public tree_formulation_rr {
             // only once the master will be solved again, for the same reason
             if constexpr(mippp::has_remove_variable<LP>)
                 if(evict_age)
-                    num_evicted += columns
-                                       .manage_columns(model, colgen::none{},
-                                                       unattractive, add_tree)
-                                       .num_evicted;
+                    num_evicted += columns.evict_columns(model, unattractive);
         }
 
         const auto model_solution = model.get_solution();

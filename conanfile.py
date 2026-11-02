@@ -17,7 +17,7 @@ class CompressorRecipe(ConanFile):
         self.requires("spdlog/1.14.0")
 
         self.requires("melon/1.0.0")
-        self.requires("mippp/1.0.0")
+        self.requires("mippp/1.1.0")
 
     def build_requirements(self):
         self.requires("gtest/1.14.0")

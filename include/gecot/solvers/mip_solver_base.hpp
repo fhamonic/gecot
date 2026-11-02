@@ -167,16 +167,6 @@ struct mip_solver_base {
              {"model_build_time_ms",
               std::chrono::duration_cast<std::chrono::milliseconds>(build_time)
                   .count()}}};
-        if constexpr(std::same_as<M, mippp::gurobi_milp>) {
-            const auto & GRB = model.native_api();
-            const auto native_model = model.native_model().second;
-            double value;
-            if(!GRB.getdblattr(native_model, "ObjBound", &value) &&
-               value < model.infinity())
-                report.best_bound = value;
-            if(!GRB.getdblattr(native_model, "NodeCount", &value))
-                report.stats.emplace_back("nodes", value);
-        }
         if(!status::solution_available(s)) {
             if(!mip_start)
                 throw std::runtime_error(fmt::format(
@@ -187,6 +177,13 @@ struct mip_solver_base {
                 reason);
             return {false, report};
         }
+        // as the solution, defined only after a stop or at the optimum
+        if constexpr(mippp::has_dual_bound<M>)
+            if(const double bound = model.get_dual_bound();
+               bound < model.infinity())
+                report.best_bound = bound;
+        if constexpr(mippp::has_node_count<M>)
+            report.stats.emplace_back("nodes", model.get_node_count());
         spdlog::log(std::holds_alternative<status::optimal>(s)
                         ? spdlog::level::info
                         : spdlog::level::warn,

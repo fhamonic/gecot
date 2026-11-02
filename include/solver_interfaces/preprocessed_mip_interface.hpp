@@ -10,9 +10,7 @@ private:
 
 public:
     PreprocessedmipInterface() : AbstractMipInterface("prep_mip") {
-        // Gurobi's default: below it, Gurobi discards the completed
-        // --mip-start on large instances (residuals ~1e-6)
-        add_mip_options(solver, 1e-6);
+        add_mip_options(solver);
         add_preprocessing_options(solver);
     }
 

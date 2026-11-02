@@ -928,10 +928,11 @@ struct path_formulation_rr : public mip_solver_base {
                         {"constraints", model.num_constraints()},
                         {"pairs", pairs.size()},
                         {"pool_columns", columns.num_pool_columns()},
-                        {"evicted_columns", num_evicted},
-                        {"relaxation_value", model.get_solution_value()}};
+                        {"evicted_columns", num_evicted}};
+        report.score_stats = {{"relaxation_value", model.get_solution_value()}};
         if(best_bound)
-            report.stats.emplace_back("lagrangian_bound", best_bound.value());
+            report.score_stats.emplace_back("lagrangian_bound",
+                                            best_bound.value());
         if(search_pricing)
             report.stats.emplace_back("searches", num_searches.load());
         else

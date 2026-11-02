@@ -279,9 +279,9 @@ struct tree_formulation_rr_cm : public tree_formulation_rr {
                         {"variables", model.num_variables()},
                         {"constraints", model.num_constraints()},
                         {"pool_columns", columns.num_pool_columns()},
-                        {"evicted_columns", num_evicted},
-                        // not a bound: the pricing can miss improving trees
-                        {"relaxation_value", model.get_solution_value()}};
+                        {"evicted_columns", num_evicted}};
+        // not a bound: the pricing can miss improving trees
+        report.score_stats = {{"relaxation_value", model.get_solution_value()}};
         return {solution, report};
     }
 };

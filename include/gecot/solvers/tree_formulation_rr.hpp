@@ -547,9 +547,9 @@ struct tree_formulation_rr : public mip_solver_base {
 
         report.stats = {{"iterations", iterations},
                         {"variables", model.num_variables()},
-                        {"constraints", model.num_constraints()},
-                        // not a bound: the pricing can miss improving trees
-                        {"relaxation_value", model.get_solution_value()}};
+                        {"constraints", model.num_constraints()}};
+        // not a bound: the pricing can miss improving trees
+        report.score_stats = {{"relaxation_value", model.get_solution_value()}};
         return {solution, report};
     }
 };

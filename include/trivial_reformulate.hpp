@@ -2,21 +2,75 @@
 #define TRIVIAL_REFORMULATE_HPP
 
 #include <algorithm>
+#include <cmath>
 #include <optional>
 #include <utility>
+#include <variant>
 
 #include "gecot/concepts/instance.hpp"
+#include "gecot/helper.hpp"
 #include "melon/algorithm/strongly_connected_components.hpp"
 #include "melon/utility/static_digraph_builder.hpp"
 #include "melon/views/subgraph.hpp"
 
 #include "instance.hpp"
 
+// the criterion of the scores divided by s: a product is homogeneous of the
+// degree of its non-constant factors, so [c, f] keeps its weight c
+struct formula_scale_visitor {
+    double s;
+
+    criterion_formula operator()(const criterion_constant & c) { return c / s; }
+    criterion_formula operator()(const criterion_var & v) { return v; }
+    criterion_formula operator()(const criterion_sum & f) {
+        return criterion_sum{scaled(f.values)};
+    }
+    criterion_formula operator()(const criterion_product & f) {
+        criterion_product product;
+        double weight = 1 / s;  // exactly 1 for [c, f], s being a power of 2
+        for(auto && e : f.values) {
+            if(std::holds_alternative<criterion_constant>(e)) {
+                product.values.push_back(e);
+                continue;
+            }
+            product.values.push_back(std::visit(*this, e));
+            weight *= s;
+        }
+        if(weight != 1) product.values.insert(product.values.begin(), weight);
+        return product;
+    }
+    criterion_formula operator()(const criterion_min & f) {
+        return criterion_min{scaled(f.values)};
+    }
+    std::vector<criterion_formula> scaled(
+        const std::vector<criterion_formula> & values) {
+        std::vector<criterion_formula> scaled_values;
+        for(auto && e : values) scaled_values.push_back(std::visit(*this, e));
+        return scaled_values;
+    }
+};
+
+// returns the instance with its qualities divided by the returned power of 2,
+// so its scores are divided by its square. Gurobi's absolute tolerances gave
+// wrong optima on scores near 1e11, and near 1e-2 on bike with its qualities
+// divided by the largest: the largest case score is brought into [1e5, 4e5),
+// and an instance whose cases score less is left unscaled
 template <gecot::instance_c I>
-auto trivial_reformulate_instance(
+std::pair<Instance, double> trivial_reformulate_instance(
     const I & instance, double budget = std::numeric_limits<double>::max()) {
+    // one factor for all cases: a sum or a min criterion weighs them
+    const auto base_cases_pc_num = gecot::compute_base_cases_pc_num(instance);
+    double max_case_score = 0;
+    for(auto && instance_case : instance.cases())
+        max_case_score =
+            std::max(max_case_score, base_cases_pc_num[instance_case.id()]);
+    const double quality_scale = std::exp2(
+        std::max(0.0, std::floor(std::log2(max_case_score / 1e5) / 2)));
+
     Instance reformulated_instance;
-    reformulated_instance.set_criterion(instance.criterion());
+    reformulated_instance.set_criterion(
+        std::visit(formula_scale_visitor{quality_scale * quality_scale},
+                   instance.criterion()));
 
     auto reformulated_option_map =
         instance.template create_option_map<std::optional<gecot::option_t>>();
@@ -33,16 +87,18 @@ auto trivial_reformulate_instance(
 
     for(auto && instance_case : instance.cases()) {
         trivial_reformulate_case(instance_case, reformulated_instance,
-                                 reformulated_option_map, free_options);
+                                 reformulated_option_map, free_options,
+                                 quality_scale);
     }
 
-    return reformulated_instance;
+    return {std::move(reformulated_instance), quality_scale};
 }
 
 template <gecot::case_c C>
 void trivial_reformulate_case(const C & instance_case, Instance & instance,
                               auto && reformulated_option_map,
-                              const auto & free_options) {
+                              const auto & free_options,
+                              const double quality_scale) {
     using graph_t = gecot::case_graph_t<C>;
     using vertex_t = melon::vertex_t<graph_t>;
     using arc_t = melon::arc_t<graph_t>;
@@ -92,8 +148,10 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
         const std::size_t component_num = components.size();
         components.emplace_back();
         for(const vertex_t & v : component) {
-            source_quality_map.back() += original_source_quality_map[v];
-            target_quality_map.back() += original_target_quality_map[v];
+            source_quality_map.back() +=
+                original_source_quality_map[v] / quality_scale;
+            target_quality_map.back() +=
+                original_target_quality_map[v] / quality_scale;
             if(!vertex_names_map.back().empty())
                 vertex_names_map.back().append("+");
             vertex_names_map.back().append(instance_case.vertex_name(v));
@@ -141,7 +199,8 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
                 if(!reformulated_option_map[original_option].has_value())
                     continue;
                 vertex_options[v].emplace_back(
-                    source_quality_gain, target_quality_gain,
+                    source_quality_gain / quality_scale,
+                    target_quality_gain / quality_scale,
                     reformulated_option_map[original_option].value());
             }
         }

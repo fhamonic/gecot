@@ -124,11 +124,15 @@ struct mip_solver_base {
             spdlog::warn("This solver has no time limit: --time-limit ignored");
         if constexpr(!mippp::has_optimality_tolerance<M>)
             spdlog::warn("This solver keeps its default optimality gap");
-        // with scores near 1e11, gurobi's absolute tolerances otherwise prune
-        // better solutions; scaling the models is the real fix
-        if constexpr(std::same_as<M, mippp::gurobi_milp>)
-            model.native_api().setintparam(model.native_model().first,
-                                           "NumericFocus", 1);
+        if constexpr(std::same_as<M, mippp::gurobi_milp>) {
+            const auto & GRB = model.native_api();
+            const auto env = model.native_model().first;
+            // absolute: at its default 1e-6, the bound ended 2e-8 below the
+            // optimum on the scaled scores of trivial_reformulate_instance
+            GRB.setdblparam(env, "OptimalityTol", 1e-9);
+            // pruned better solutions before the scores were scaled
+            GRB.setintparam(env, "NumericFocus", 1);
+        }
         model.solve();
         const auto & s = model.get_status();
         const std::string_view reason = std::visit(

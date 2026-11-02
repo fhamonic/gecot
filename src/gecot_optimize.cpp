@@ -236,12 +236,23 @@ int main(int argc, const char * argv[]) {
                 "Budget represents {:.2f}% of the total options cost (={:g})",
                 budget / options_total_cost * 100, options_total_cost);
 
-        Instance instance = trivial_reformulate_instance(raw_instance, budget);
+        const auto [instance, quality_scale] =
+            trivial_reformulate_instance(raw_instance, budget);
         print_instance_size<spdlog::level::trace>(instance,
                                                   "Simplified instance");
         if(instance.num_options() == 0) {
             spdlog::warn("Budget doesn't allow purchasing any options");
         }
+        // the algorithm's scores, bounds and logs are in this unit
+        const double score_scale = quality_scale * quality_scale;
+        const auto initial_cases_pc_num =
+            gecot::compute_base_cases_pc_num(raw_instance);
+        const double initial_score =
+            raw_instance.eval_criterion(initial_cases_pc_num);
+        spdlog::info(
+            "Qualities divided by {:g}: the algorithm's scores are divided by "
+            "{:g}, its initial score is {:g}",
+            quality_scale, score_scale, initial_score / score_scale);
 
         spdlog::info("Calling algorithm '{}'", solver->name());
         program_state = "Running algorithm '" + solver->name() + '\'';
@@ -259,18 +270,18 @@ int main(int argc, const char * argv[]) {
                      computation_time_ms);
 
         program_state = "Printing solution";
-        const auto initial_cases_pc_num =
-            gecot::compute_base_cases_pc_num(raw_instance);
-        const double initial_score =
-            instance.eval_criterion(initial_cases_pc_num);
-        const auto solution_cases_pc_num =
+        auto solution_cases_pc_num =
             gecot::compute_solution_cases_pc_num(instance, solution);
+        for(const auto & instance_case : instance.cases())
+            solution_cases_pc_num[instance_case.id()] *= score_scale;
         const double solution_score =
-            instance.eval_criterion(solution_cases_pc_num);
+            raw_instance.eval_criterion(solution_cases_pc_num);
         const double solution_cost =
             gecot::compute_solution_cost(instance, solution);
+        for(const auto & [key, value] : report.score_stats)
+            report.stats.emplace_back(key, value * score_scale);
         if(report.best_bound) {
-            const double bound = report.best_bound.value();
+            const double bound = report.best_bound.value() * score_scale;
             report.stats.emplace_back("best_bound", bound);
             if(solution_score > 0)
                 report.stats.emplace_back(

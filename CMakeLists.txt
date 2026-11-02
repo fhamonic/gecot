@@ -91,7 +91,6 @@ add_executable(gecot_optimize src/instance.cpp src/parse_instance.cpp src/gecot_
     src/solver_interfaces/target_benders_interface.cpp
     src/solver_interfaces/flow_benders_interface.cpp
     src/solver_interfaces/tree_formulation_rr_interface.cpp
-    src/solver_interfaces/tree_formulation_rr_cm_interface.cpp
     src/solver_interfaces/path_formulation_rr_interface.cpp
     ${WINDRES_ICON_O})
 target_link_libraries(gecot_optimize PUBLIC gecot)

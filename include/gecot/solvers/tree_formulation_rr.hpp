@@ -4,104 +4,124 @@
 #include <atomic>
 #include <cstddef>
 #include <flat_map>
-#include <functional>
-#include <limits>
-#include <set>
-#include <stdexcept>
-#include <tuple>
-#include <type_traits>
+#include <optional>
+#include <ranges>
+#include <utility>
 #include <vector>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 
-#include <tbb/blocked_range.h>
+#include <tbb/concurrent_vector.h>
 #include <tbb/parallel_for.h>
 
 #include "mippp/solvers/gurobi/all.hpp"
+#include "mippp/utility/column_manager.hpp"
 
 #include "melon/graph.hpp"
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
 #include "gecot/preprocessing/compute_big_M_map.hpp"
-#include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
 #include "gecot/preprocessing/compute_contracted_generalized_flow_graph.hpp"
-#include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 
 #include "gecot/solvers/mip_solver_base.hpp"
 
 namespace gecot {
 namespace solvers {
 
+// The tree formulation relaxation, by column generation.
+//
+// Buying the options X within the budget, c(X) <= B, a case k scores the sum
+// over its targets t of
+//     v_t(X) = q_t(X) Σ_s q_s(X) P_st(X),
+// the target quality with its gains times the source qualities with their
+// gains, each times the probability of its most reliable path to t, and the
+// criterion φ combines the cases' scores. The relaxation lets each target t
+// of case k buy its own set of options S, a tree of value v_tS, as long as it
+// is paid for:
+//
+//     max  φ(z)
+//     s.t. z_k <= Σ_{t∈k} Σ_S v_tS y_tS    π_k   contribution
+//          Σ_S y_tS <= 1                   σ_t   uniqueness
+//          Σ_{S∋o} y_tS <= x_o             λ_to  purchase
+//          Σ_o c_o x_o <= B                μ     budget
+//          x, y >= 0
+//
+// Buying X, the trees y_tX = 1 are feasible. The master starts with each
+// target's tree without options, so that the first duals value every target,
+// and the pricing of a target finds its best reduced cost
+//     rc_tS = π_k v_tS - σ_t - Σ_{o∈S} λ_to
+// among its trees within the budget, which the LP above does not require:
+// this tightens the relaxation. The pricing can miss improving trees, so the
+// relaxation value is not a bound.
 struct tree_formulation_rr : public mip_solver_base {
     using variable_t = mippp::model_variable<int, double>;
     using constraint_t = mippp::model_constraint<int>;
 
+    std::size_t evict_age = 0;  // in pricing rounds, 0: never evict
+
+    // The pricing of a target t of case k, a MILP on the graph contracted for
+    // t, with X_o = 1 if the tree buys o, Φ_a the flow on arc a and F the
+    // flow that reaches t:
+    //     max  π_k v - Σ_o λ_to X_o,    v = q_t F + Σ_o Δq_to F_o
+    //     s.t. F_o <= F,  F_o <= M_t X_o       the target quality gains of t
+    //          [u = t] F + Σ_{a∈δ⁺(u)} Φ_a
+    //              <= Σ_{a∈δ⁻(u)} p_a Φ_a + q_u + Σ_o Δq_uo X_o   ∀ vertex u
+    //          Φ_a <= M_u X_o           ∀ arc a = (u, w) improved by o
+    //          Σ_o c_o X_o <= B
+    // whose value v at the optimum is v_tS, for S = {o : X_o = 1}.
     template <instance_c I, typename MILP>
-    struct sub_model_data {
-        using vertex_t = melon::vertex_t<instance_graph_t<I>>;
-        vertex_t target;
-        MILP sub_model;
-        mippp::runtime_linear_expression<variable_t, double> default_objective;
-        std::flat_map<option_t, variable_t> sub_X_vars_map;
+    struct pricing_model {
+        case_id_t case_id;
+        melon::vertex_t<instance_graph_t<I>> target;
+        MILP model;
+        std::flat_map<option_t, variable_t> X;  // the options that can serve t
+        mippp::runtime_linear_expression<variable_t, double> v;
         // a pricing depends only on these duals: those of an unproductive
         // pricing would find no tree again
         std::vector<double> unproductive_duals;
-        // the options of the trees priced so far: the sub-model's gap lets it
-        // price one again with an equal or slightly larger contribution, which
-        // can leave the master unchanged and come back at every round
-        std::set<std::vector<option_t>> priced_options;
 
-        sub_model_data(const auto & instance, const double & budget,
-                       const auto & instance_case, const auto & strong_arcs_map,
-                       const auto & useless_arcs_map,
-                       const vertex_t & original_t)
-            : target(original_t) {
+        pricing_model(const I & instance, const double budget,
+                      const auto & instance_case, const auto & strong_arcs,
+                      const auto & useless_arcs, const auto original_t)
+            : case_id(instance_case.id()), target(original_t) {
             using namespace mippp::operators;
-            // the sub-models are solved in parallel
+            // the pricing models are solved in parallel
             if constexpr(std::same_as<MILP, mippp::gurobi_milp>)
-                sub_model.native_api().setintparam(
-                    sub_model.native_model().first, "Threads", 1);
-            _set_tolerances(sub_model, 1e-10, 1e-8);
-            sub_model.set_maximization();
-
-            const auto & original_graph = instance_case.graph();
-            const auto & original_target_quality_map =
-                instance_case.target_quality_map();
-            const auto & original_vertex_options_map =
-                instance_case.vertex_options_map();
+                model.native_api().setintparam(model.native_model().first,
+                                               "Threads", 1);
+            _set_tolerances(model, 1e-10, 1e-8);
+            model.set_maximization();
 
             const auto [graph, source_quality_map, vertex_options_map,
                         arc_no_map, probability_map, arc_option_map, t] =
                 compute_contracted_generalized_flow_graph(
-                    instance_case, strong_arcs_map[target],
-                    useless_arcs_map[target], target);
+                    instance_case, strong_arcs, useless_arcs, original_t);
 
-            std::vector<option_t> options_vector;
-            options_vector.append_range(std::views::join(std::views::transform(
-                vertex_options_map, [](const auto & vertex_option) {
-                    return std::views::values(vertex_option);
+            std::vector<option_t> options;
+            options.append_range(std::views::join(std::views::transform(
+                vertex_options_map, [](const auto & vertex_options) {
+                    return std::views::values(vertex_options);
                 })));
-            options_vector.append_range(std::views::transform(
+            options.append_range(std::views::transform(
                 std::views::filter(
                     arc_option_map,
-                    [](auto const & o) { return o.has_value(); }),
+                    [](const auto & o) { return o.has_value(); }),
                 [](const auto & o) { return o.value(); }));
-            std::ranges::sort(options_vector);
-            const auto [first, last] = std::ranges::unique(
-                options_vector.begin(), options_vector.end());
-            options_vector.erase(first, last);
-            sub_X_vars_map.insert_range(std::views::transform(
-                options_vector, [this](const option_t & i) {
-                    return std::make_pair(i, sub_model.add_binary_variable());
+            std::ranges::sort(options);
+            const auto [first, last] = std::ranges::unique(options);
+            options.erase(first, last);
+            X.insert_range(
+                std::views::transform(options, [this](const option_t o) {
+                    return std::make_pair(o, model.add_binary_variable());
                 }));
-            sub_model.add_constraint(xsum(sub_X_vars_map, [&](const auto & p) {
-                                         const auto & [o, X] = p;
-                                         return instance.option_cost(o) * X;
-                                     }) <= budget);
+            model.add_constraint(xsum(X, [&](const auto & e) {
+                                     const auto & [o, X_o] = e;
+                                     return instance.option_cost(o) * X_o;
+                                 }) <= budget);
 
-            const auto big_M_map = compute_big_M_map(
+            const auto M = compute_big_M_map(
                 graph, source_quality_map, vertex_options_map, probability_map,
                 std::views::filter(
                     melon::vertices(graph),
@@ -114,372 +134,127 @@ struct tree_formulation_rr : public mip_solver_base {
                                    });
                     }));
 
-            const auto F_var = sub_model.add_variable();
-            default_objective +=
-                original_target_quality_map[original_t] * F_var;
-
-            for(const auto & [sqg, target_quality_gain, option] :
-                original_vertex_options_map[original_t]) {
-                const auto F_prime_var = sub_model.add_variable();
-                sub_model.add_constraint(F_prime_var <= F_var);
-                sub_model.add_constraint(
-                    F_prime_var <= big_M_map[t] * sub_X_vars_map.at(option));
-                default_objective += target_quality_gain * F_prime_var;
+            const auto F = model.add_variable();
+            v += instance_case.target_quality_map()[original_t] * F;
+            for(const auto & [sqg, tqg, o] :
+                instance_case.vertex_options_map()[original_t]) {
+                const auto F_o = model.add_variable();
+                model.add_constraint(F_o <= F);
+                model.add_constraint(F_o <= M[t] * X.at(o));
+                v += tqg * F_o;
             }
 
-            const auto Phi_vars = sub_model.add_variables(
+            const auto Phi = model.add_variables(
                 graph.num_arcs(),
                 [&arc_no_map](const melon::arc_t<decltype(graph)> & a) {
                     return arc_no_map[a];
                 });
-            sub_model.add_constraints(
-                melon::vertices(graph),
-                [&](const auto & u) {
-                    return OPT(
-                        (u == t),
-                        F_var + xsum(graph.out_arcs(t), Phi_vars) <=
-                            xsum(graph.in_arcs(t),
-                                 [&](const auto & a) {
-                                     return probability_map[a] * Phi_vars(a);
-                                 }) +
-                                source_quality_map[t] +
-                                xsum(vertex_options_map[t],
-                                     [this](const auto & p) {
-                                         return p.first *
-                                                sub_X_vars_map.at(p.second);
-                                     }));
-                },
-                [&](const auto & u) {
-                    return xsum(graph.out_arcs(u), Phi_vars) <=
-                           xsum(graph.in_arcs(u),
-                                [&](const auto & a) {
-                                    return probability_map[a] * Phi_vars(a);
-                                }) +
-                               source_quality_map[u] +
-                               xsum(vertex_options_map[u], [this](
-                                                               const auto & p) {
-                                   return p.first * sub_X_vars_map.at(p.second);
-                               });
-                });
-
-            for(const auto & a : melon::arcs(graph)) {
-                if(!arc_option_map[a].has_value()) continue;
-                sub_model.add_constraint(
-                    Phi_vars(a) <=
-                    sub_X_vars_map.at(arc_option_map[a].value()) *
-                        big_M_map[melon::arc_source(graph, a)]);
+            auto inflow = [&](const auto & u) {
+                return xsum(graph.in_arcs(u),
+                            [&](const auto & a) {
+                                return probability_map[a] * Phi(a);
+                            }) +
+                       source_quality_map[u] +
+                       xsum(vertex_options_map[u], [this](const auto & e) {
+                           const auto & [sqg, o] = e;
+                           return sqg * X.at(o);
+                       });
+            };
+            for(const auto & u : melon::vertices(graph)) {
+                if(u == t)
+                    model.add_constraint(F + xsum(graph.out_arcs(u), Phi) <=
+                                         inflow(u));
+                else
+                    model.add_constraint(xsum(graph.out_arcs(u), Phi) <=
+                                         inflow(u));
             }
-        }
-
-        std::vector<double> pricing_duals(const auto & master_data,
-                                          const auto & dual_solution) const {
-            std::vector<double> duals{
-                dual_solution[master_data.contribution_constraint],
-                dual_solution[master_data.uniqueness_constraint_map.at(
-                    target)]};
-            for(const option_t o : sub_X_vars_map.keys())
-                duals.push_back(
-                    dual_solution[master_data.purchase_constraints_map.at(
-                        std::make_pair(target, o))]);
-            return duals;
-        }
-
-        bool try_generate_column(auto & master_data,
-                                 const auto & dual_solution) {
-            using namespace mippp;
-            using namespace mippp::operators;
-            auto duals = pricing_duals(master_data, dual_solution);
-            if(duals == unproductive_duals) return false;
-            sub_model.set_objective(
-                dual_solution[master_data.contribution_constraint] *
-                    default_objective -
-                xsum(sub_X_vars_map, [&](const auto & e) {
-                    const auto & [option, X_var] = e;
-                    return dual_solution[master_data.purchase_constraints_map
-                                             .at(std::make_pair(target,
-                                                                option))] *
-                           X_var;
-                }));
-            sub_model.solve();
-            // spdlog::info(
-            //     "{} : dual={} vs sub_model={}", target,
-            //     dual_solution[master_data.uniqueness_constraint_map.at(target)],
-            //     sub_model.get_solution_value());
-            // the absolute term, at least the master's dual tolerance, stops
-            // re-adding noise columns when the target's dual is 0
-            if((1 + 1e-7) *
-                       dual_solution[master_data.uniqueness_constraint_map.at(
-                           target)] +
-                   1e-6 >=
-               sub_model.get_solution_value()) {
-                unproductive_duals = std::move(duals);
-                return false;
-            }
-            const auto solution = sub_model.get_solution();
-            const auto [it, inserted] = priced_options.insert(
-                std::ranges::to<std::vector>(std::views::keys(
-                    std::views::filter(sub_X_vars_map, [&](const auto & e) {
-                        const auto & [option, X_var] = e;
-                        return solution[X_var] > 0.5;
-                    }))));
-            if(!inserted) {
-                unproductive_duals = std::move(duals);
-                return false;
-            }
-            master_data.add_tree(target, evaluate(default_objective, solution),
-                                 *it);
-            return true;
+            for(const auto & a : melon::arcs(graph))
+                if(arc_option_map[a].has_value())
+                    model.add_constraint(Phi(a) <=
+                                         X.at(arc_option_map[a].value()) *
+                                             M[melon::arc_source(graph, a)]);
         }
     };
 
-    template <instance_c I, typename LP, typename MILP>
-    struct master_model_case_data {
-        using vertex_t = melon::vertex_t<instance_graph_t<I>>;
-        std::reference_wrapper<std::mutex> master_model_mutex_ref;
-        std::reference_wrapper<LP> master_model;
-        variable_t contribution_variable;
-        constraint_t contribution_constraint;
-        std::flat_map<vertex_t, constraint_t> uniqueness_constraint_map;
-        std::flat_map<std::pair<vertex_t, option_t>, constraint_t>
-            purchase_constraints_map;
-        std::vector<sub_model_data<I, MILP>> sub_models;
-
-        master_model_case_data(std::mutex & model_mutex, LP & model,
-                               const auto & X_vars, const auto & instance,
-                               const double & budget,
-                               const auto & instance_case,
-                               const auto & strong_arcs,
-                               const auto & useless_arcs)
-            : master_model_mutex_ref(model_mutex)
-            , master_model(model)
-            , contribution_variable(model.add_variable())
-            , contribution_constraint(model.add_constraint(
-                  mippp::operators::operator<=(contribution_variable, 0)))
-            , uniqueness_constraint_map()
-            , purchase_constraints_map() {
-            using namespace mippp::operators;
-            auto target_vertices = std::views::filter(
-                melon::vertices(instance_case.graph()),
-                [&instance_case](const vertex_t & t) {
-                    return instance_case.target_quality_map()[t] > 0 ||
-                           std::ranges::any_of(
-                               instance_case.vertex_options_map()[t],
-                               [](const auto & e) {
-                                   const auto & [sqg, target_quality_gain,
-                                                 option] = e;
-                                   return target_quality_gain > 0;
-                               });
-                });
-            uniqueness_constraint_map.insert_range(std::views::transform(
-                target_vertices, [&model](const vertex_t & t) {
-                    return std::make_pair(
-                        t, model.add_constraint(
-                               mippp::empty_linear_expression<variable_t,
-                                                              double> <= 1));
-                }));
-
-            for(const vertex_t target : target_vertices) {
-                sub_models.emplace_back(instance, budget, instance_case,
-                                        strong_arcs, useless_arcs, target);
-            }
-
-            purchase_constraints_map.insert_range(
-                std::views::join(std::views::transform(
-                    sub_models, [&model, &X_vars](const auto & sub_model) {
-                        return std::views::transform(
-                            sub_model.sub_X_vars_map.keys(),
-                            [&model, &X_vars,
-                             t = sub_model.target](const option_t & i) {
-                                return std::make_pair(
-                                    std::make_pair(t, i),
-                                    model.add_constraint(
-                                        mippp::empty_linear_expression<
-                                            variable_t, double> <= X_vars(i)));
-                            });
-                    })));
-        }
-
-        template <std::ranges::range R>
-        variable_t add_tree(const vertex_t & target, const double contribution,
-                            R && used_options) {
-            using namespace mippp::operators;
-            // spdlog::info("add_tree: {} , {}, {}", target, contribution,
-            //              std::format("{}", used_options));
-
-            std::lock_guard<std::mutex> guard(master_model_mutex_ref.get());
-
-            return master_model.get().add_column(std::views::concat(
-                std::views::single(
-                    std::make_pair(contribution_constraint, -contribution)),
-                std::views::single(
-                    std::make_pair(uniqueness_constraint_map.at(target), 1.0)),
-                // mip-start trees may reference options pruned from this
-                // target's contraction, which have no purchase constraint
-                std::views::transform(
-                    std::views::filter(
-                        used_options,
-                        [this, target](option_t i) {
-                            return purchase_constraints_map.contains(
-                                std::make_pair(target, i));
-                        }),
-                    [this, target](option_t i) {
-                        return std::make_pair(purchase_constraints_map.at(
-                                                  std::make_pair(target, i)),
-                                              1.0);
-                    })));
-        }
-    };
-
-    // Gurobi's barrier without crossover for the master: its central duals
-    // halve the rounds, its 1e-8 primal-dual gap is below the pricing test's
-    // 1e-7
+    // Gurobi's algorithm for the master: method 2 the barrier, crossover 0
+    // none, -1 for its defaults
     template <typename LP>
-    static void _use_barrier(LP & model) {
+    static void _set_method(LP & model, const int method, const int crossover) {
         if constexpr(std::same_as<LP, mippp::gurobi_lp>) {
             model.native_api().setintparam(model.native_model().first, "Method",
-                                           2);
+                                           method);
             model.native_api().setintparam(model.native_model().first,
-                                           "Crossover", 0);
-        }
-    }
-    // after the barrier, the solution at a vertex as the simplex gives it
-    template <typename LP>
-    static void _solve_to_vertex(LP & model) {
-        if constexpr(std::same_as<LP, mippp::gurobi_lp>) {
-            model.native_api().setintparam(model.native_model().first, "Method",
-                                           -1);
-            model.native_api().setintparam(model.native_model().first,
-                                           "Crossover", -1);
-            model.solve();
-        }
-    }
-
-    // Warm start: calls add_tree(case id, target, contribution, options) for
-    // each target's tree without options, from the first round the duals then
-    // value every target and not only those of the trees priced so far, and
-    // for its tree under the --mip-start options, only within the budget as
-    // the priced trees
-    template <instance_c I, typename F>
-    void _add_start_trees(const I & instance, const double budget,
-                          const auto & master_model_cases,
-                          F && add_tree) const {
-        for(const auto & [instance_case, master_data] :
-            std::views::zip(instance.cases(), master_model_cases))
-            for(const auto & sub_model : master_data.sub_models)
-                add_tree(instance_case.id(), sub_model.target,
-                         instance_case.target_quality_map()[sub_model.target] *
-                             pc_num_vertex_in_flow(
-                                 instance_case.graph(),
-                                 instance_case.source_quality_map(),
-                                 instance_case.arc_probability_map(),
-                                 sub_model.target),
-                         std::vector<option_t>{});
-        if(!mip_start) return;
-        if(compute_solution_cost(instance, _mip_start_solution(instance)) >
-           budget + feasibility_tol) {
-            spdlog::warn("MIP start exceeds the budget: ignored");
-            return;
-        }
-        std::vector<option_t> mip_start_options;
-        instance_solution_t<I> mip_start_solution =
-            instance.create_option_map(false);
-        for(const std::string & option_name : mip_start.value()) {
-            if(!instance.contains_option(option_name)) continue;
-            const option_t option = instance.option_from_name(option_name);
-            mip_start_options.emplace_back(option);
-            mip_start_solution[option] = true;
-        }
-
-        spdlog::info("MIP start with :");
-        const auto option_name_max_length = std::ranges::max(
-            std::ranges::views::transform(instance.options(), [&](auto && o) {
-                return instance.option_name(o).size();
-            }));
-        for(auto && option : instance.options()) {
-            const auto & option_name = instance.option_name(option);
-            spdlog::info("    {:<{}} {}", option_name, option_name_max_length,
-                         mip_start_solution[option]);
-        }
-
-        for(const auto & [instance_case, master_data] :
-            std::views::zip(instance.cases(), master_model_cases)) {
-            const auto & graph = instance_case.graph();
-            auto enhanced_sqm = instance_case.source_quality_map();
-            auto enhanced_tqm = instance_case.target_quality_map();
-            auto enhanced_pm = instance_case.arc_probability_map();
-
-            for(const auto & v : melon::vertices(graph)) {
-                for(const auto & [sqg, tqg, option] :
-                    instance_case.vertex_options_map()[v]) {
-                    if(!mip_start_solution[option]) continue;
-                    enhanced_sqm[v] += sqg;
-                    enhanced_tqm[v] += tqg;
-                }
-            }
-            for(const auto & a : melon::arcs(graph)) {
-                for(const auto & [improved_prob, option] :
-                    instance_case.arc_options_map()[a]) {
-                    if(!mip_start_solution[option]) continue;
-                    enhanced_pm[a] = std::max(enhanced_pm[a], improved_prob);
-                }
-            }
-            for(const auto & sub_model : master_data.sub_models) {
-                const auto & t = sub_model.target;
-                add_tree(
-                    instance_case.id(), t,
-                    enhanced_tqm[t] * pc_num_vertex_in_flow(graph, enhanced_sqm,
-                                                            enhanced_pm, t),
-                    mip_start_options);
-            }
+                                           "Crossover", crossover);
         }
     }
 
     template <typename LP, typename MILP, instance_c I>
     solve_result<I> solve(const I & instance, const double budget) const {
-        spdlog::stopwatch sw;
-        auto solution = instance.create_option_map(false);
-
+        namespace colgen = mippp::colgen;
         using namespace mippp;
         using namespace mippp::operators;
-        std::mutex master_model_mutex;
+        spdlog::stopwatch sw;
+        auto time_up = [&] {
+            return time_limit && sw.elapsed().count() > time_limit.value();
+        };
+
+        // The master: x, the budget row, and for each case k, z_k with its
+        // contribution row, then the rows of its targets, whose pricing
+        // models are built along.
         LP model;
-        if constexpr(mippp::has_feasibility_tolerance<LP>)
+        if constexpr(has_feasibility_tolerance<LP>)
             model.set_feasibility_tolerance(feasibility_tol);
         model.set_maximization();
-
-        const auto X_vars = model.add_variables(
-            instance.options().size(), [](const option_t & i) { return i; });
+        const auto x = model.add_variables(
+            instance.options().size(), [](const option_t & o) { return o; });
         model.add_constraint(xsum(instance.options(), [&](auto && o) {
-                                 return instance.option_cost(o) * X_vars(o);
+                                 return instance.option_cost(o) * x(o);
                              }) <= budget);
-
-        std::vector<master_model_case_data<I, LP, MILP>> master_model_cases;
-
-        for(auto && instance_case : instance.cases()) {
+        std::vector<variable_t> z;
+        std::vector<constraint_t> contribution_rows;
+        std::vector<pricing_model<I, MILP>> targets;
+        std::vector<constraint_t> uniqueness_rows;
+        std::vector<std::flat_map<option_t, constraint_t>> purchase_rows;
+        for(const auto & instance_case : instance.cases()) {
             const auto [strong_arcs_map, useless_arcs_map] =
                 _compute_strong_and_useless_arcs(instance, instance_case,
                                                  budget);
-
-            assert(master_model_cases.size() == instance_case.id());
-            auto & master_model_case = master_model_cases.emplace_back(
-                master_model_mutex, model, X_vars, instance, budget,
-                instance_case, strong_arcs_map, useless_arcs_map);
+            z.push_back(model.add_variable());
+            contribution_rows.push_back(model.add_constraint(z.back() <= 0));
+            // the vertices of positive quality or quality gain as a target
+            const std::size_t first_target = targets.size();
+            for(const auto & t : std::views::filter(
+                    melon::vertices(instance_case.graph()),
+                    [&instance_case](const auto & t) {
+                        return instance_case.target_quality_map()[t] > 0 ||
+                               std::ranges::any_of(
+                                   instance_case.vertex_options_map()[t],
+                                   [](const auto & e) {
+                                       const auto & [sqg, tqg, o] = e;
+                                       return tqg > 0;
+                                   });
+                    })) {
+                uniqueness_rows.push_back(model.add_constraint(
+                    empty_linear_expression<variable_t, double> <= 1));
+                targets.emplace_back(instance, budget, instance_case,
+                                     strong_arcs_map[t], useless_arcs_map[t],
+                                     t);
+            }
+            for(const auto & p : std::views::drop(targets, first_target)) {
+                auto & rows = purchase_rows.emplace_back();
+                for(const option_t o : p.X.keys())
+                    rows.emplace(
+                        o, model.add_constraint(
+                               empty_linear_expression<variable_t, double> <=
+                               x(o)));
+            }
         }
-
         model.set_objective(std::visit(
-            formula_variable_visitor{
-                model,
-                [&](const case_id_t & i) {
-                    return master_model_cases[i].contribution_variable;
-                }},
+            formula_variable_visitor{model,
+                                     [&](const case_id_t & k) { return z[k]; }},
             instance.criterion()));
 
-        spdlog::trace("tree decomposition model has:");
-        spdlog::trace("  {:>10} variables", model.num_variables());
-        spdlog::trace("  {:>10} constraints", model.num_constraints());
-        spdlog::trace("  {:>10} entries", model.num_nonzeros());
-
-        auto log_lambda = [&, option_name_max_length = std::ranges::max(
+        auto log_master = [&, option_name_max_length = std::ranges::max(
                                   std::ranges::views::transform(
                                       instance.options(), [&](auto && o) {
                                           return instance.option_name(o).size();
@@ -490,61 +265,173 @@ struct tree_formulation_rr : public mip_solver_base {
             for(auto && option : instance.options()) {
                 const auto & option_name = instance.option_name(option);
                 spdlog::info("    {:<{}} {}", option_name,
-                             option_name_max_length,
-                             model_solution[X_vars(option)]);
+                             option_name_max_length, model_solution[x(option)]);
             }
         };
 
-        _add_start_trees(instance, budget, master_model_cases,
-                         [&](const case_id_t id, const auto & t,
-                             const double contribution, const auto & options) {
-                             master_model_cases[id].add_tree(t, contribution,
-                                                             options);
-                         });
-        _use_barrier(model);
+        // a tree y_tS, the key of the column manager: the index t of its
+        // target and its options S, sorted; its value v_tS is the data
+        using tree = std::pair<std::size_t, std::vector<option_t>>;
+        colgen::column_manager<
+            LP, tree, colgen::property_list<colgen::reduced_cost>,
+            colgen::property_list<colgen::reduced_cost, colgen::age>, double>
+            columns;
+        auto add_tree = [&](LP &, const auto & entry) {
+            const auto & [t, S] = entry.seed;
+            return model.add_column(std::views::concat(
+                std::views::single(std::make_pair(
+                    contribution_rows[targets[t].case_id], -entry.data)),
+                std::views::single(std::make_pair(uniqueness_rows[t], 1.0)),
+                std::views::transform(S, [&](const option_t o) {
+                    return std::make_pair(purchase_rows[t].at(o), 1.0);
+                })));
+        };
+        // the tree of each target under the options S, with those it can use
+        auto add_start_trees = [&](const instance_solution_t<I> & S) {
+            for(const auto & instance_case : instance.cases()) {
+                const auto & graph = instance_case.graph();
+                auto source_quality_map = instance_case.source_quality_map();
+                auto target_quality_map = instance_case.target_quality_map();
+                auto probability_map = instance_case.arc_probability_map();
+                for(const auto & u : melon::vertices(graph))
+                    for(const auto & [sqg, tqg, o] :
+                        instance_case.vertex_options_map()[u]) {
+                        if(!S[o]) continue;
+                        source_quality_map[u] += sqg;
+                        target_quality_map[u] += tqg;
+                    }
+                for(const auto & a : melon::arcs(graph))
+                    for(const auto & [improved_prob, o] :
+                        instance_case.arc_options_map()[a])
+                        if(S[o])
+                            probability_map[a] =
+                                std::max(probability_map[a], improved_prob);
+                for(std::size_t t = 0; t < targets.size(); ++t) {
+                    if(targets[t].case_id != instance_case.id()) continue;
+                    const auto u = targets[t].target;
+                    columns.emplace_master_column(
+                        model,
+                        tree{t, std::ranges::to<std::vector>(std::views::filter(
+                                    targets[t].X.keys(),
+                                    [&](const option_t o) { return S[o]; }))},
+                        add_tree,
+                        target_quality_map[u] *
+                            pc_num_vertex_in_flow(graph, source_quality_map,
+                                                  probability_map, u));
+                }
+            }
+        };
+        add_start_trees(instance.create_option_map(false));
+        if(mip_start) {
+            if(compute_solution_cost(instance, _mip_start_solution(instance)) >
+               budget + feasibility_tol)
+                spdlog::warn("MIP start exceeds the budget: ignored");
+            else
+                add_start_trees(_mip_start_solution(instance));
+        }
 
+        // in the master for more than evict_age rounds and unattractive, so
+        // nonbasic
+        const colgen::conjunction<colgen::above<colgen::age>,
+                                  colgen::negative<colgen::reduced_cost>>
+            unattractive{colgen::above<colgen::age>{evict_age},
+                         colgen::negative<colgen::reduced_cost>{1e-6}};
+        if constexpr(!has_remove_variable<LP>)
+            if(evict_age)
+                spdlog::warn(
+                    "This solver cannot remove columns: --evict-age ignored");
+        // Gurobi's barrier without crossover for the master: its central duals
+        // halve the rounds, its 1e-8 primal-dual gap is below the pricing
+        // test's 1e-7. Not with eviction: the central duals move at every
+        // round and the evicted columns come back, in a cycle.
+        const bool barrier = std::same_as<LP, gurobi_lp> && !evict_age;
+        if(barrier) _set_method(model, 2, 0);
+
+        // Column generation.
         solve_report report{"converged"};
         std::size_t iterations = 1;  // LP solves
-        auto time_up = [&] {
-            return time_limit && sw.elapsed().count() > time_limit.value();
-        };
+        std::size_t num_evicted = 0;
         for(;; ++iterations) {
             model.solve();
             const auto dual_solution = model.get_dual_solution();
+            log_master();
 
-            log_lambda();
+            auto pi = [&](const std::size_t t) {
+                return dual_solution[contribution_rows[targets[t].case_id]];
+            };
+            auto sigma = [&](const std::size_t t) {
+                return dual_solution[uniqueness_rows[t]];
+            };
+            auto lambda = [&](const std::size_t t, const option_t o) {
+                return dual_solution[purchase_rows[t].at(o)];
+            };
+            auto reduced_cost = [&](const tree & y, const double v) {
+                const auto & [t, S] = y;
+                double rc = pi(t) * v - sigma(t);
+                for(const option_t o : S) rc -= lambda(t, o);
+                return rc;
+            };
+            // the pricing test, at the master's dual tolerance: rc > margin
+            auto margin = [&](const std::size_t t) {
+                return 1e-7 * sigma(t) + 1e-6;
+            };
 
-            // a round cut short by the time limit may have priced no column
-            std::atomic<bool> cut_short = false;
-            const bool improving = tbb::parallel_reduce(
-                tbb::blocked_range(master_model_cases.begin(),
-                                   master_model_cases.end()),
-                false,
-                [&](auto & master_model_cases_subrange, bool init) {
-                    for(auto & master_model_case :
-                        master_model_cases_subrange) {
-                        init = tbb::parallel_reduce(
-                            tbb::blocked_range(
-                                master_model_case.sub_models.begin(),
-                                master_model_case.sub_models.end()),
-                            init,
-                            [&](auto && sub_models_subrange, bool init2) {
-                                for(auto & sub_model : sub_models_subrange) {
-                                    if(time_up()) {
-                                        cut_short = true;
-                                        break;
-                                    }
-                                    init2 |= sub_model.try_generate_column(
-                                        master_model_case, dual_solution);
-                                }
-                                return init2;
-                            },
-                            std::logical_or());
-                    }
-                    return init;
+            // the best tree of target t, if rc_tS > margin
+            auto price = [&](const std::size_t t)
+                -> std::optional<std::pair<tree, double>> {
+                pricing_model<I, MILP> & p = targets[t];
+                std::vector<double> duals{pi(t), sigma(t)};
+                for(const option_t o : p.X.keys())
+                    duals.push_back(lambda(t, o));
+                if(duals == p.unproductive_duals) return std::nullopt;
+                p.model.set_objective(pi(t) * p.v -
+                                      xsum(p.X, [&](const auto & e) {
+                                          const auto & [o, X_o] = e;
+                                          return lambda(t, o) * X_o;
+                                      }));
+                p.model.solve();
+                if(p.model.get_solution_value() - sigma(t) <= margin(t)) {
+                    p.unproductive_duals = std::move(duals);
+                    return std::nullopt;
+                }
+                const auto solution = p.model.get_solution();
+                return std::pair{
+                    tree{t, std::ranges::to<std::vector>(
+                                std::views::keys(std::views::filter(
+                                    p.X,
+                                    [&](const auto & e) {
+                                        return solution[e.second] > 0.5;
+                                    })))},
+                    evaluate(p.v, solution)};
+            };
+
+            std::atomic<bool> cut_short = false;  // by the time limit
+            tbb::concurrent_vector<std::pair<tree, double>> priced_trees;
+            tbb::parallel_for(std::size_t{0}, targets.size(),
+                              [&](const std::size_t t) {
+                                  if(time_up()) {
+                                      cut_short = true;
+                                      return;
+                                  }
+                                  if(auto y = price(t))
+                                      priced_trees.push_back(std::move(*y));
+                              });
+
+            // the improving trees enter the master. A tree priced again stays
+            // where it is: the pricing's gap can find it improving while its
+            // copy in the master is not, and it would come back every round.
+            columns.emplace_pool_columns(priced_trees | std::views::as_rvalue);
+            columns.update_columns([&](const auto & entry) {
+                return colgen::priced{reduced_cost(entry.seed, entry.data)};
+            });
+            const std::size_t num_activated = columns.activate_columns(
+                model,
+                [&](const auto & entry) {
+                    return entry.state.template get<colgen::reduced_cost>() >
+                           margin(entry.seed.first);
                 },
-                std::logical_or());
-            if(!improving && !cut_short) {
+                add_tree);
+            if(!num_activated && !cut_short) {
                 spdlog::info("Column generation stopped: converged");
                 break;
             }
@@ -553,23 +440,31 @@ struct tree_formulation_rr : public mip_solver_base {
                 report.status = "time limit reached";
                 // Gurobi, CPLEX and COPT give no solution for a master
                 // changed since its last solve, HiGHS a zero value
-                if(improving) model.solve();
+                if(num_activated) model.solve();
                 break;
             }
+            // only once the master will be solved again, for the same reason
+            if constexpr(has_remove_variable<LP>)
+                if(evict_age)
+                    num_evicted += columns.evict_columns(model, unattractive);
         }
-        _solve_to_vertex(model);
+        // the solution at a vertex, as the simplex gives it
+        if(barrier) {
+            _set_method(model, -1, -1);
+            model.solve();
+        }
 
+        auto solution = instance.create_option_map(false);
         const auto model_solution = model.get_solution();
-        for(const auto & i : instance.options()) {
-            solution[i] = model_solution[X_vars(i)];
-        }
-
-        log_lambda();
+        for(const auto & o : instance.options())
+            solution[o] = model_solution[x(o)];
+        log_master();
 
         report.stats = {{"iterations", iterations},
                         {"variables", model.num_variables()},
-                        {"constraints", model.num_constraints()}};
-        // not a bound: the pricing can miss improving trees
+                        {"constraints", model.num_constraints()},
+                        {"pool_columns", columns.num_pool_columns()},
+                        {"evicted_columns", num_evicted}};
         report.score_stats = {{"relaxation_value", model.get_solution_value()}};
         return {solution, report};
     }

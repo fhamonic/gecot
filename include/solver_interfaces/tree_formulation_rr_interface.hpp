@@ -12,6 +12,10 @@ public:
     TreeFormulationRRInterface() : AbstractMipInterface("tree_rr") {
         add_mip_options(solver, 1e-7, thread_safe_solvers);
         add_preprocessing_options(solver);
+        app.add_option("--evict-age", solver.evict_age,
+                       "Pricing rounds a column stays in the master before it "
+                       "can go back to the pool, if unattractive (0: never)")
+            ->default_val(0);
     }
 
     gecot::solve_result<Instance> solve(const Instance & instance,

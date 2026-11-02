@@ -6,10 +6,10 @@
 #include <flat_map>
 #include <functional>
 #include <limits>
+#include <set>
 #include <stdexcept>
 #include <tuple>
 #include <type_traits>
-#include <unordered_set>
 #include <vector>
 
 #include <spdlog/spdlog.h>
@@ -48,6 +48,10 @@ struct tree_formulation_rr : public mip_solver_base {
         // a pricing depends only on these duals: those of an unproductive
         // pricing would find no tree again
         std::vector<double> unproductive_duals;
+        // the options of the trees priced so far: the sub-model's gap lets it
+        // price one again with an equal or slightly larger contribution, which
+        // can leave the master unchanged and come back at every round
+        std::set<std::vector<option_t>> priced_options;
 
         sub_model_data(const auto & instance, const double & budget,
                        const auto & instance_case, const auto & strong_arcs_map,
@@ -212,12 +216,18 @@ struct tree_formulation_rr : public mip_solver_base {
                 return false;
             }
             const auto solution = sub_model.get_solution();
+            const auto [it, inserted] = priced_options.insert(
+                std::ranges::to<std::vector>(std::views::keys(
+                    std::views::filter(sub_X_vars_map, [&](const auto & e) {
+                        const auto & [option, X_var] = e;
+                        return solution[X_var] > 0.5;
+                    }))));
+            if(!inserted) {
+                unproductive_duals = std::move(duals);
+                return false;
+            }
             master_data.add_tree(target, evaluate(default_objective, solution),
-                                 std::views::keys(std::views::filter(
-                                     sub_X_vars_map, [&](const auto & e) {
-                                         const auto & [option, X_var] = e;
-                                         return solution[X_var] > 0.5;
-                                     })));
+                                 *it);
             return true;
         }
     };
@@ -289,40 +299,12 @@ struct tree_formulation_rr : public mip_solver_base {
                     })));
         }
 
-        using tree_t = std::tuple<vertex_t, double, std::vector<option_t>>;
-
-        // struct tree_hash {
-        //     static void hash_combine(std::size_t & seed, std::size_t value) {
-        //         seed ^=
-        //             value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >>
-        //             2);
-        //     }
-        //     std::size_t operator()(const tree_t & t) const {
-        //         std::size_t seed = 0;
-        //         hash_combine(seed, std::hash<vertex_t>{}(std::get<0>(t)));
-        //         hash_combine(seed, std::hash<double>{}(std::get<1>(t)));
-        //         for(const auto & x : std::get<2>(t)) {
-        //             hash_combine(seed, std::hash<option_t>{}(x));
-        //         }
-        //         return seed;
-        //     }
-        // };
-        // std::unordered_set<tree_t, tree_hash> tree_lookup;
-
         template <std::ranges::range R>
         variable_t add_tree(const vertex_t & target, const double contribution,
                             R && used_options) {
             using namespace mippp::operators;
             // spdlog::info("add_tree: {} , {}, {}", target, contribution,
             //              std::format("{}", used_options));
-
-            // auto [it, inserted] = tree_lookup.emplace(
-            //     target, contribution,
-            //     std::ranges::to<std::vector<option_t>>(used_options));
-            // if(!inserted) {
-            //     spdlog::info("skipped add_tree");
-            //     return;
-            // }
 
             std::lock_guard<std::mutex> guard(master_model_mutex_ref.get());
 
@@ -348,13 +330,50 @@ struct tree_formulation_rr : public mip_solver_base {
         }
     };
 
-    // Warm start, only within the budget as the priced trees: calls
-    // add_tree(case id, target, contribution, options) for the tree of each
-    // target under the --mip-start options
+    // Gurobi's barrier without crossover for the master: its central duals
+    // halve the rounds, its 1e-8 primal-dual gap is below the pricing test's
+    // 1e-7
+    template <typename LP>
+    static void _use_barrier(LP & model) {
+        if constexpr(std::same_as<LP, mippp::gurobi_lp>) {
+            model.native_api().setintparam(model.native_model().first, "Method",
+                                           2);
+            model.native_api().setintparam(model.native_model().first,
+                                           "Crossover", 0);
+        }
+    }
+    // after the barrier, the solution at a vertex as the simplex gives it
+    template <typename LP>
+    static void _solve_to_vertex(LP & model) {
+        if constexpr(std::same_as<LP, mippp::gurobi_lp>) {
+            model.native_api().setintparam(model.native_model().first, "Method",
+                                           -1);
+            model.native_api().setintparam(model.native_model().first,
+                                           "Crossover", -1);
+            model.solve();
+        }
+    }
+
+    // Warm start: calls add_tree(case id, target, contribution, options) for
+    // each target's tree without options, from the first round the duals then
+    // value every target and not only those of the trees priced so far, and
+    // for its tree under the --mip-start options, only within the budget as
+    // the priced trees
     template <instance_c I, typename F>
-    void _add_mip_start_trees(const I & instance, const double budget,
-                              const auto & master_model_cases,
-                              F && add_tree) const {
+    void _add_start_trees(const I & instance, const double budget,
+                          const auto & master_model_cases,
+                          F && add_tree) const {
+        for(const auto & [instance_case, master_data] :
+            std::views::zip(instance.cases(), master_model_cases))
+            for(const auto & sub_model : master_data.sub_models)
+                add_tree(instance_case.id(), sub_model.target,
+                         instance_case.target_quality_map()[sub_model.target] *
+                             pc_num_vertex_in_flow(
+                                 instance_case.graph(),
+                                 instance_case.source_quality_map(),
+                                 instance_case.arc_probability_map(),
+                                 sub_model.target),
+                         std::vector<option_t>{});
         if(!mip_start) return;
         if(compute_solution_cost(instance, _mip_start_solution(instance)) >
            budget + feasibility_tol) {
@@ -476,12 +495,13 @@ struct tree_formulation_rr : public mip_solver_base {
             }
         };
 
-        _add_mip_start_trees(
-            instance, budget, master_model_cases,
-            [&](const case_id_t id, const auto & t, const double contribution,
-                const auto & options) {
-                master_model_cases[id].add_tree(t, contribution, options);
-            });
+        _add_start_trees(instance, budget, master_model_cases,
+                         [&](const case_id_t id, const auto & t,
+                             const double contribution, const auto & options) {
+                             master_model_cases[id].add_tree(t, contribution,
+                                                             options);
+                         });
+        _use_barrier(model);
 
         solve_report report{"converged"};
         std::size_t iterations = 1;  // LP solves
@@ -537,6 +557,7 @@ struct tree_formulation_rr : public mip_solver_base {
                 break;
             }
         }
+        _solve_to_vertex(model);
 
         const auto model_solution = model.get_solution();
         for(const auto & i : instance.options()) {

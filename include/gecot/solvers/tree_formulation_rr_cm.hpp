@@ -173,7 +173,7 @@ struct tree_formulation_rr_cm : public tree_formulation_rr {
             return master_model_cases[entry.seed.case_id].add_tree(
                 entry.seed.target, entry.seed.contribution, entry.seed.options);
         };
-        _add_mip_start_trees(
+        _add_start_trees(
             instance, budget, master_model_cases,
             [&](const case_id_t id, const auto & t, const double contribution,
                 const auto & options) {
@@ -199,6 +199,9 @@ struct tree_formulation_rr_cm : public tree_formulation_rr {
             if(evict_age)
                 spdlog::warn(
                     "This solver cannot remove columns: --evict-age ignored");
+        // not with eviction: the barrier's central duals move at every round
+        // and the evicted columns come back, in a cycle
+        if(!evict_age) _use_barrier(model);
 
         solve_report report{"converged"};
         std::size_t iterations = 1;  // LP solves
@@ -262,6 +265,7 @@ struct tree_formulation_rr_cm : public tree_formulation_rr {
                 if(evict_age)
                     num_evicted += columns.evict_columns(model, unattractive);
         }
+        if(!evict_age) _solve_to_vertex(model);
 
         const auto model_solution = model.get_solution();
         for(const auto & i : instance.options()) {

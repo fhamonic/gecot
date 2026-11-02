@@ -20,10 +20,9 @@ public:
                [this](const std::string & p) {
                    solver.search_pricing = p == "search";
                },
-               "search: a search per pair and round, without the budget, for "
-               "options that each improve a single arc or a single vertex "
-               "and its arcs; enumerate: each pair's columns once, within the "
-               "budget, for any options but few of them per path")
+               "search: a search per pair and round, without the budget; "
+               "enumerate: each pair's columns once, within the budget, for "
+               "few options per path")
             ->check(CLI::IsMember({"search", "enumerate"}))
             ->default_val("search");
         app.add_option("--max-activations", solver.max_activations,

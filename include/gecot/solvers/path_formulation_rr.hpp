@@ -5,13 +5,13 @@
 #include <cstddef>
 #include <flat_map>
 #include <iterator>
+#include <limits>
 #include <numeric>
 #include <optional>
 #include <queue>
 #include <ranges>
 #include <stdexcept>
 #include <tuple>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -19,16 +19,12 @@
 #include <spdlog/stopwatch.h>
 
 #include <tbb/concurrent_vector.h>
-#include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 
 #include "mippp/utility/column_manager.hpp"
 
-#include "melon/algorithm/biobjective_dijkstra.hpp"
-#include "melon/algorithm/dijkstra.hpp"
 #include "melon/container/static_digraph.hpp"
 #include "melon/graph.hpp"
-#include "melon/utility/static_digraph_builder.hpp"
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
@@ -38,543 +34,481 @@
 namespace gecot {
 namespace solvers {
 
-// Path formulation relaxation: the contribution of each (source, target) pair
-// is a column, a set of purchased options with the value
-// q_s(S) * q_t(S) * P_st(S), the qualities with their gains and the most
-// reliable path probability under S. Each round, the pricing subproblem of a
-// pair keeps the column of best reduced cost, by default from a search
-// (search_pricing), else among the pair's columns computed once: option costs
-// and duals are nonnegative, so a higher probability with a subset of the
-// options is better whatever the duals.
+// The path formulation relaxation, by column generation.
+//
+// Buying the options X within the budget, c(X) <= B, a case k scores the sum
+// over its pairs of vertices p = (s, t) of
+//     v_p(X) = q_s(X) q_t(X) P_st(X),
+// the source and target qualities with their gains times the probability of
+// the most reliable path from s to t, and the criterion φ combines the cases'
+// scores. The relaxation lets each pair p of case k buy its own set of
+// options S, a column of value v_pS, as long as it is paid for:
+//
+//     max  φ(z)
+//     s.t. z_k <= C_k + Σ_{p∈k} Σ_S v_pS y_pS    π_k   contribution
+//          Σ_S y_pS <= 1                        σ_p   uniqueness
+//          Σ_{S∋o} y_pS <= x_o                  λ_po  purchase
+//          Σ_o c_o x_o <= B                     μ     budget
+//          x, y >= 0
+//
+// with C_k the value of the pairs that no column improves. Buying X, the
+// columns y_pX = 1 are feasible, so the relaxation bounds the optimum.
+//
+// The master holds a few columns per pair, and each row of a pair once a
+// column of the master uses it: until then it is redundant, of dual 0. The
+// pricing of a pair finds its best reduced cost
+//     rc_pS = π_k v_pS - σ_p - Σ_{o∈S} λ_po,    rc_p = max_S rc_pS,
+// and raising each σ_p by max(0, rc_p) makes the master's duals feasible for
+// the relaxation's dual, so after a complete pricing round
+//     L = master_value + Σ_p max(0, rc_p),
+// the Lagrangian bound, bounds the relaxation.
+//
+// Both pricings label the paths to t, backwards from t: a label (S, w, W) is
+// a path to t that buys the options S, of value w = q_t(S) P(S) without the
+// source quality, and W = Σ_{o∈S} of a weight:
+// - search (default): per pair and round, W = Σ_{o∈S} λ_po. Since λ >= 0, a
+//   label a is worth no less than a label b if w_a >= w_b and W_a plus the λ
+//   of the options of b that a lacks and b could use again is at most W_b;
+//   at s, each quality option of s is bought if π_k g_o w > λ_po, g_o its
+//   gain. Like the LP above, it ignores the budget: its columns can cost
+//   more than B.
+// - enumerate: per target, once, W = c(S) <= B, which can tighten the
+//   relaxation: a label is worth no less than those of no more value that
+//   buy at least its options whatever the duals, so each pair keeps the
+//   non-dominated columns, an argmax for any duals.
 struct path_formulation_rr : public mip_solver_base {
     using variable_t = mippp::model_variable<int, double>;
     using constraint_t = mippp::model_constraint<int>;
     using vertex = melon::vertex_t<melon::static_digraph>;
+    using option_set = std::vector<option_t>;  // sorted
+    // the options S of a column of a pair and its value v_pS
+    using valued_set = std::pair<option_set, double>;
 
     std::size_t evict_age = 0;  // in pricing rounds, 0: never evict
-    // true: each round, a biobjective (probability, duals) search prices each
-    // pair, without the budget, for instances whose options each improve a
-    // single arc or a single vertex and its arcs; false: each pair's columns
-    // are enumerated once, within the budget, for any options but few of them
-    // per path
+    // true: the search pricing; false: the enumerate pricing, for few
+    // options per path
     bool search_pricing = true;
     std::size_t max_activations = 0;  // per round, 0: every improving column
-    // stops once the Lagrangian bound is within this gap of the master's
-    // value, relative to it; 0: at convergence only
+    // stops once the least L so far is within this gap of the master's value,
+    // relative to it; 0: at convergence only
     double relative_gap = 0;
 
-    struct column {
-        double value;
-        std::vector<option_t> options;  // sorted
-    };
+    static option_set _union(const option_set & A, const option_set & B) {
+        option_set S;
+        std::ranges::set_union(A, B, std::back_inserter(S));
+        return S;
+    }
+    static auto _in(const option_set & S) {
+        return [&S](const auto o) { return std::ranges::binary_search(S, o); };
+    }
+    // q_v as a source or a target, plus the gains of the options bought
+    template <case_c C>
+    static double _quality(const C & instance_case, const vertex v,
+                           const bool as_source, auto && bought) {
+        double q = as_source ? instance_case.source_quality_map()[v]
+                             : instance_case.target_quality_map()[v];
+        for(const auto & [sqg, tqg, o] : instance_case.vertex_options_map()[v])
+            if(bought(o)) q += as_source ? sqg : tqg;
+        return q;
+    }
+    // the allowed options with a gain for v as a source or a target
+    template <case_c C>
+    static option_set _quality_options(const C & instance_case, const vertex v,
+                                       const bool as_source, auto && allowed) {
+        option_set S;
+        for(const auto & [sqg, tqg, o] : instance_case.vertex_options_map()[v])
+            if((as_source ? sqg : tqg) > 0 && allowed(o)) S.push_back(o);
+        std::ranges::sort(S);
+        S.erase(std::ranges::unique(S).begin(), S.end());
+        return S;
+    }
+    static auto _subsets(const option_set & S) {
+        if(S.size() > 20)
+            throw std::invalid_argument(
+                "path_rr: too many quality options at a vertex");
+        return std::views::iota(std::size_t{0}, std::size_t{1} << S.size()) |
+               std::views::transform([&S](const std::size_t mask) {
+                   option_set A;
+                   for(std::size_t i = 0; i < S.size(); ++i)
+                       if(mask >> i & 1) A.push_back(S[i]);
+                   return A;
+               });
+    }
 
-    // the non-dominated (probability, options) labels of the paths from s,
-    // within the budget, at every vertex
-    template <instance_c I, case_c C>
-    static auto _path_labels(const I & instance, const C & instance_case,
-                             const auto s, const double budget) {
-        struct label {
-            double prob;
-            std::vector<option_t> options;  // sorted
-            double cost;
-            bool alive = true;
-        };
+    // a path to t that buys the options S, of value w = q_t(S) P(S), with
+    // W = Σ_{o∈S} weight(o), and the options of S that it can still use
+    struct label {
+        double value, weight;
+        option_set live;
+    };
+    // The labels of the paths to t that buy allowed options, by decreasing
+    // value, then increasing weight. At t, a label per set of the quality
+    // options of t. Along an arc a, a label takes p_a, or p'_oa > p_a for an
+    // option o, buying o unless it is live; it keeps live the options that
+    // reusable(o, u) accepts at the vertex u it reaches. A label of u is
+    // dropped unless keep(l), or if dominates(e, l, u) for a label e that left
+    // u, and so of no less value, which requires e.weight <= l.weight.
+    // visit(u, l, options) sees each label as it leaves u, options() giving
+    // the options S of its path, and returns whether it goes further.
+    template <case_c C>
+    static void _labels(const C & instance_case, const vertex t,
+                        auto && allowed, auto && weight, auto && reusable,
+                        auto && keep, auto && dominates, auto && visit) {
         const auto & graph = instance_case.graph();
-        const auto & probability_map = instance_case.arc_probability_map();
-        const auto & arc_options_map = instance_case.arc_options_map();
-        auto labels_map = melon::create_vertex_map<std::vector<label>>(graph);
-        std::priority_queue<
-            std::tuple<double, std::remove_cv_t<decltype(s)>, std::size_t>>
-            heap;
-        auto relax = [&](const auto v, label && l) {
-            auto & labels = labels_map[v];
-            for(const auto & e : labels)
-                if(e.alive && e.prob >= l.prob &&
-                   std::ranges::includes(l.options, e.options))
-                    return;
-            for(auto & e : labels)
-                if(e.alive && l.prob >= e.prob &&
-                   std::ranges::includes(e.options, l.options))
-                    e.alive = false;
-            heap.emplace(l.prob, v, labels.size());
-            labels.push_back(std::move(l));
+        // a label at the vertex at, extending the label pred by an arc on
+        // which it bought the options bought, at t without pred
+        struct node {
+            label l;
+            vertex at;
+            std::size_t pred;
+            option_set bought;
         };
-        relax(s, {1.0, {}, 0.0});
+        constexpr std::size_t none = std::numeric_limits<std::size_t>::max();
+        std::vector<node> nodes;
+        // the (weight, node) of the labels that left each vertex, by
+        // decreasing weight: a label that leaves u has the least weight there
+        // when the weights alone decide
+        auto left_map = melon::create_vertex_map<
+            std::vector<std::pair<double, std::size_t>>>(graph);
+        std::priority_queue<std::tuple<double, double, std::size_t>> heap;
+        auto dominated = [&](const label & l, const vertex u) {
+            for(const auto & [w, n] : std::views::reverse(left_map[u])) {
+                if(w > l.weight) return false;
+                if(dominates(nodes[n].l, l, u)) return true;
+            }
+            return false;
+        };
+        auto live_at = [&](const vertex u, const option_set & S) {
+            option_set live;
+            for(const option_t o : S)
+                if(reusable(o, u)) live.push_back(o);
+            return live;
+        };
+        auto relax = [&](const vertex u, label && l, const std::size_t pred,
+                         option_set && bought) {
+            if(l.value <= 0 || !keep(l) || dominated(l, u)) return;
+            heap.emplace(l.value, -l.weight, nodes.size());
+            nodes.push_back({std::move(l), u, pred, std::move(bought)});
+        };
+        const option_set target_options =
+            _quality_options(instance_case, t, false, allowed);
+        for(option_set A : _subsets(target_options)) {
+            label l{_quality(instance_case, t, false, _in(A)), 0.0,
+                    live_at(t, A)};
+            for(const option_t o : A) l.weight += weight(o);
+            relax(t, std::move(l), none, std::move(A));
+        }
         while(!heap.empty()) {
-            const auto [prob, u, i] = heap.top();
+            const std::size_t n = std::get<2>(heap.top());
             heap.pop();
-            if(!labels_map[u][i].alive) continue;
-            const label l = labels_map[u][i];
-            for(const auto & a : melon::out_arcs(graph, u)) {
-                const auto v = melon::arc_target(graph, a);
-                if(probability_map[a] > 0)
-                    relax(v, {l.prob * probability_map[a], l.options, l.cost});
-                for(const auto & [improved_prob, o] : arc_options_map[a]) {
-                    if(std::ranges::binary_search(l.options, o)) {
-                        relax(v, {l.prob * improved_prob, l.options, l.cost});
-                        continue;
-                    }
-                    const double cost = l.cost + instance.option_cost(o);
-                    if(cost > budget) continue;
-                    auto options = l.options;
-                    options.insert(std::ranges::upper_bound(options, o), o);
-                    relax(v,
-                          {l.prob * improved_prob, std::move(options), cost});
+            const vertex v = nodes[n].at;
+            if(dominated(nodes[n].l, v)) continue;
+            const label l = nodes[n].l;  // relax can reallocate
+            auto & left = left_map[v];
+            left.emplace(std::ranges::upper_bound(left, std::pair{l.weight, n},
+                                                  std::ranges::greater{}),
+                         l.weight, n);
+            if(!visit(v, l, [&] {
+                   option_set S;
+                   for(std::size_t m = n; m != none; m = nodes[m].pred)
+                       S = _union(S, nodes[m].bought);
+                   return S;
+               }))
+                continue;
+            for(const auto & a : melon::in_arcs(graph, v)) {
+                const vertex u = melon::arc_source(graph, a);
+                const double p = instance_case.arc_probability_map()[a];
+                relax(u, {l.value * p, l.weight, live_at(u, l.live)}, n, {});
+                for(const auto & [improved_prob, o] :
+                    instance_case.arc_options_map()[a]) {
+                    if(improved_prob <= p || !allowed(o)) continue;
+                    if(std::ranges::binary_search(l.live, o))
+                        relax(u,
+                              {l.value * improved_prob, l.weight,
+                               live_at(u, l.live)},
+                              n, {});
+                    else
+                        relax(u,
+                              {l.value * improved_prob, l.weight + weight(o),
+                               live_at(u, _union(l.live, {o}))},
+                              n, {o});
                 }
             }
         }
-        return labels_map;
     }
 
-    // the non-dominated columns of the pair (s, t): its path labels with each
-    // set of the quality options of s and t, within the budget
+    // Where a label that owns the option o can use it again for free, past
+    // the vertex u it is at: anywhere if the arcs of o share no vertex, else
+    // at most through an in-arc of u at a vertex they all share, since the
+    // label went through those vertices when it bought o.
+    struct option_reach {
+        // the vertices all the arcs of o share, if o improves arcs
+        std::vector<std::optional<std::vector<vertex>>> shared;
+        melon::vertex_map_t<melon::static_digraph, option_set> in_options;
+        bool operator()(const option_t o, const vertex u) const {
+            return shared[o] &&
+                   (shared[o]->empty() ||
+                    (std::ranges::contains(*shared[o], u) &&
+                     std::ranges::binary_search(in_options[u], o)));
+        }
+    };
     template <instance_c I, case_c C>
-    static std::vector<column> _pair_columns(const I & instance,
-                                             const C & instance_case,
-                                             const auto s, const auto t,
-                                             const auto & labels,
-                                             const double budget) {
-        const auto & vertex_options_map = instance_case.vertex_options_map();
-        std::vector<option_t> endpoint_options;
-        for(const auto & [sqg, tqg, o] : vertex_options_map[s])
-            if(sqg > 0) endpoint_options.push_back(o);
-        for(const auto & [sqg, tqg, o] : vertex_options_map[t])
-            if(tqg > 0) endpoint_options.push_back(o);
-        std::ranges::sort(endpoint_options);
-        endpoint_options.erase(std::ranges::unique(endpoint_options).begin(),
-                               endpoint_options.end());
-        if(endpoint_options.size() > 20)
-            throw std::invalid_argument(
-                "path_rr: too many quality options at a vertex");
+    static option_reach _option_reach(const I & instance,
+                                      const C & instance_case) {
+        const auto & graph = instance_case.graph();
+        option_reach reach{std::vector<std::optional<std::vector<vertex>>>(
+                               instance.options().size()),
+                           melon::create_vertex_map<option_set>(graph)};
+        for(const auto & a : melon::arcs(graph))
+            for(const auto & [improved_prob, o] :
+                instance_case.arc_options_map()[a]) {
+                std::vector<vertex> ends{melon::arc_source(graph, a),
+                                         melon::arc_target(graph, a)};
+                std::ranges::sort(ends);
+                auto & shared = reach.shared[o];
+                if(shared)
+                    std::erase_if(*shared, [&ends](const vertex v) {
+                        return !std::ranges::binary_search(ends, v);
+                    });
+                else
+                    shared = std::move(ends);
+                reach.in_options[melon::arc_target(graph, a)].push_back(o);
+            }
+        for(const auto & v : melon::vertices(graph)) {
+            auto & options = reach.in_options[v];
+            std::ranges::sort(options);
+            options.erase(std::ranges::unique(options).begin(), options.end());
+        }
+        return reach;
+    }
 
-        std::vector<column> columns;
-        for(const auto & l : labels) {
-            if(!l.alive) continue;
-            for(std::size_t mask = 0;
-                mask < (std::size_t{1} << endpoint_options.size()); ++mask) {
-                auto options = l.options;
-                for(std::size_t i = 0; i < endpoint_options.size(); ++i)
-                    if(mask >> i & 1) options.push_back(endpoint_options[i]);
-                std::ranges::sort(options);
-                options.erase(std::ranges::unique(options).begin(),
-                              options.end());
-                double cost = 0, qs = instance_case.source_quality_map()[s],
-                       qt = instance_case.target_quality_map()[t];
-                for(const option_t o : options) cost += instance.option_cost(o);
+    // The non-dominated columns of the pair (s, t) within the budget: each
+    // label (S, w) from s to t with each set of the quality options of s.
+    template <instance_c I, case_c C>
+    static std::vector<valued_set> _pair_columns(
+        const I & instance, const C & instance_case, const vertex s,
+        const std::vector<valued_set> & labels, const double budget) {
+        const option_set source_options =
+            _quality_options(instance_case, s, true, [](auto) { return true; });
+        std::vector<valued_set> columns;
+        for(const auto & [S, w] : labels)
+            for(const option_set & A : _subsets(source_options)) {
+                valued_set c{_union(S, A), 0.0};
+                double cost = 0;
+                for(const option_t o : c.first) cost += instance.option_cost(o);
                 if(cost > budget) continue;
-                for(const auto & [sqg, tqg, o] : vertex_options_map[s])
-                    if(std::ranges::binary_search(options, o)) qs += sqg;
-                for(const auto & [sqg, tqg, o] : vertex_options_map[t])
-                    if(std::ranges::binary_search(options, o)) qt += tqg;
-                column c{qs * qt * l.prob, std::move(options)};
-                if(c.value <= 0 ||
-                   std::ranges::any_of(columns, [&c](const column & e) {
-                       return e.value >= c.value &&
-                              std::ranges::includes(c.options, e.options);
+                c.second = _quality(instance_case, s, true, _in(c.first)) * w;
+                if(c.second <= 0 ||
+                   std::ranges::any_of(columns, [&c](const valued_set & e) {
+                       return e.second >= c.second &&
+                              std::ranges::includes(c.first, e.first);
                    }))
                     continue;
-                std::erase_if(columns, [&c](const column & e) {
-                    return c.value >= e.value &&
-                           std::ranges::includes(e.options, c.options);
+                std::erase_if(columns, [&c](const valued_set & e) {
+                    return c.second >= e.second &&
+                           std::ranges::includes(e.first, c.first);
                 });
                 columns.push_back(std::move(c));
             }
-        }
         return columns;
     }
 
-    // The case graph plus an improved copy of each vertex that is the center
-    // of an option, the copy entered when the option is bought: a path pays
-    // the option's dual once, on entering the copy, and leaves it through the
-    // improved arcs. An option that improves a single arc and nothing else is
-    // paid on an improved parallel arc instead: a path that takes it twice is
-    // dominated by the path without the cycle. Exact when each other option
-    // improves only the arcs incident to one vertex and the qualities of that
-    // vertex, which is checked.
-    struct split_graph {
-        std::size_t num_vertices;  // of the case graph
-        melon::static_digraph graph;
-        std::vector<double> probability;
-        std::vector<int> entry_option;   // the option paid on entering, or -1
-        std::vector<int> arc_option;     // of an improved parallel arc, or -1
-        std::vector<int> center_option;  // per vertex of the case graph, or -1
-        std::vector<vertex> improved_copy;  // per center vertex
-        std::vector<int> copy_option;       // per improved copy
-    };
-    template <instance_c I, case_c C>
-    static split_graph _split_graph(const I & instance,
-                                    const C & instance_case) {
-        const auto & graph = instance_case.graph();
-        const std::size_t n = graph.num_vertices();
-        std::vector<std::optional<std::vector<std::size_t>>> candidates(
-            instance.options().size());
-        // the arcs and vertices that each option improves
-        std::vector<std::size_t> num_improved(instance.options().size(), 0);
-        auto restrict_to = [&](const option_t o, std::vector<std::size_t> c) {
-            ++num_improved[o];
-            std::ranges::sort(c);
-            if(!candidates[o]) {
-                candidates[o] = std::move(c);
-                return;
-            }
-            std::vector<std::size_t> both;
-            std::ranges::set_intersection(*candidates[o], c,
-                                          std::back_inserter(both));
-            candidates[o] = std::move(both);
-        };
-        for(const auto & a : melon::arcs(graph)) {
-            if(instance_case.arc_options_map()[a].size() > 1)
-                throw std::invalid_argument(
-                    "path_rr --pricing search: an arc is improved by several "
-                    "options, use --pricing enumerate");
-            for(const auto & [improved_prob, o] :
-                instance_case.arc_options_map()[a])
-                restrict_to(o, {melon::arc_source(graph, a),
-                                melon::arc_target(graph, a)});
-        }
-        for(const auto & v : melon::vertices(graph))
-            for(const auto & [sqg, tqg, o] :
-                instance_case.vertex_options_map()[v])
-                restrict_to(o, {v});
-        // a single arc, of two distinct endpoints, and nothing else
-        auto on_arc = [&](const option_t o) {
-            return num_improved[o] == 1 && candidates[o]->size() == 2;
-        };
-        split_graph sg{n,
-                       {},
-                       {},
-                       {},
-                       {},
-                       std::vector<int>(n, -1),
-                       std::vector<vertex>(n, 0),
-                       {}};
-        for(const option_t o : instance.options()) {
-            if(!candidates[o] || on_arc(o)) continue;
-            const auto it = std::ranges::find_if(
-                *candidates[o],
-                [&](const std::size_t v) { return sg.center_option[v] < 0; });
-            if(it == candidates[o]->end())
-                throw std::invalid_argument(
-                    "path_rr --pricing search: option '" +
-                    instance.option_name(o) +
-                    "' improves neither a single arc nor a single vertex and "
-                    "its arcs only, use --pricing enumerate");
-            sg.center_option[*it] = static_cast<int>(o);
-            sg.improved_copy[*it] =
-                static_cast<vertex>(n + sg.copy_option.size());
-            sg.copy_option.push_back(static_cast<int>(o));
-        }
-        melon::static_digraph_builder<melon::static_digraph, double, int, int>
-            builder(n + sg.copy_option.size());
-        auto copies = [&](const vertex v) {
-            std::vector<std::pair<vertex, int>> c{{v, -1}};
-            if(sg.center_option[v] >= 0)
-                c.emplace_back(sg.improved_copy[v], sg.center_option[v]);
-            return c;
-        };
-        for(const auto & a : melon::arcs(graph))
-            for(const auto & [cu, ou] : copies(melon::arc_source(graph, a)))
-                for(const auto & [cv, ov] :
-                    copies(melon::arc_target(graph, a))) {
-                    double p = instance_case.arc_probability_map()[a];
-                    for(const auto & [improved_prob, o] :
-                        instance_case.arc_options_map()[a]) {
-                        if(!on_arc(o)) {
-                            if(static_cast<int>(o) == ou ||
-                               static_cast<int>(o) == ov)
-                                p = improved_prob;
-                        } else if(improved_prob > 0)
-                            builder.add_arc({cu, cv}, improved_prob, ov,
-                                            static_cast<int>(o));
-                    }
-                    if(p > 0) builder.add_arc({cu, cv}, p, ov, -1);
-                }
-        std::tie(sg.graph, sg.probability, sg.entry_option, sg.arc_option) =
-            builder.build();
-        return sg;
-    }
-
-    // the quality of a vertex as a source or a target, on one of its copies
-    template <case_c C>
-    static double _quality(const C & instance_case, const split_graph & sg,
-                           const vertex v, const bool improved,
-                           const bool as_source) {
-        double q = as_source ? instance_case.source_quality_map()[v]
-                             : instance_case.target_quality_map()[v];
-        if(improved)
-            for(const auto & [sqg, tqg, o] :
-                instance_case.vertex_options_map()[v])
-                if(static_cast<int>(o) == sg.center_option[v])
-                    q += as_source ? sqg : tqg;
-        return q;
-    }
-    // the copies a path from s starts at, with their starting values
-    template <case_c C, typename F>
-    static auto _starts(const C & instance_case, const split_graph & sg,
-                        const vertex s, F && allowed) {
-        std::vector<std::pair<vertex, double>> starts;
-        if(const double q = _quality(instance_case, sg, s, false, true); q > 0)
-            starts.emplace_back(s, q);
-        if(sg.center_option[s] >= 0 && allowed(sg.center_option[s]))
-            if(const double q = _quality(instance_case, sg, s, true, true);
-               q > 0)
-                starts.emplace_back(sg.improved_copy[s], q);
-        return starts;
-    }
-    // the copies a path to t ends at, with their target qualities
-    template <case_c C, typename F>
-    static auto _ends(const C & instance_case, const split_graph & sg,
-                      const vertex t, F && allowed) {
-        std::vector<std::pair<vertex, double>> ends{
-            {t, _quality(instance_case, sg, t, false, false)}};
-        if(sg.center_option[t] >= 0 && allowed(sg.center_option[t]))
-            ends.emplace_back(sg.improved_copy[t],
-                              _quality(instance_case, sg, t, true, false));
-        return ends;
-    }
-
-    struct reliability_traits {
-        using semiring = melon::most_reliable_path_semiring<double>;
-        using heap = melon::updatable_d_ary_heap<
-            4, std::pair<melon::vertex_t<melon::static_digraph>, double>,
-            typename semiring::less_t,
-            melon::vertex_map_t<melon::static_digraph, std::size_t>,
-            melon::maps::element<1>, melon::maps::element<0>>;
-        static constexpr bool store_paths = true;
-        static constexpr bool store_distances = true;
-    };
-    // for each target, the best column from s that buys only options that
-    // allowed(o) accepts
-    template <case_c C, typename F>
-    static std::vector<std::optional<column>> _best_columns(
-        const C & instance_case, const split_graph & sg, const vertex s,
-        const auto & targets, F && allowed) {
-        auto algo = melon::dijkstra(
-            reliability_traits{}, sg.graph,
-            melon::maps::function([&sg, &allowed](const auto a) {
-                auto buyable = [&](const int o) { return o < 0 || allowed(o); };
-                return buyable(sg.entry_option[a]) && buyable(sg.arc_option[a])
-                           ? sg.probability[a]
-                           : 0.0;
-            }));
-        const auto starts = _starts(instance_case, sg, s, allowed);
-        for(const auto & [v, q] : starts) algo.add_source(v, q);
-        algo.run();
-        std::vector<std::optional<column>> best(targets.size());
-        for(std::size_t i = 0; i < targets.size(); ++i) {
-            for(const auto & [v, q] :
-                _ends(instance_case, sg, targets[i], allowed)) {
-                const vertex u0 = v;
-                if(!algo.reached(u0)) continue;
-                const double value = algo.dist(u0) * q;
-                if(value <= 0 || (best[i] && best[i]->value >= value)) continue;
-                column c{value, {}};
-                for(auto u = u0;;) {
-                    if(u >= sg.num_vertices)
-                        c.options.push_back(static_cast<option_t>(
-                            sg.copy_option[u - sg.num_vertices]));
-                    if(std::ranges::any_of(starts, [&](const auto & e) {
-                           return e.first == u && e.second == algo.dist(u);
-                       }))
-                        break;
-                    const auto a = algo.pred_arc(u);
-                    if(sg.arc_option[a] >= 0)
-                        c.options.push_back(
-                            static_cast<option_t>(sg.arc_option[a]));
-                    u = melon::arc_source(sg.graph, a);
-                }
-                std::ranges::sort(c.options);
-                best[i] = std::move(c);
-            }
-        }
-        return best;
-    }
-
-    struct pricing_traits {
-        using blue_semiring = melon::most_reliable_path_semiring<double>;
-        using red_semiring = melon::shortest_path_semiring<double>;
-        using label = std::pair<double, double>;
-        using heap = melon::d_ary_heap<
-            2, std::pair<melon::vertex_t<melon::static_digraph>, label>,
-            typename blue_semiring::less_t, melon::maps::element<1, 0>>;
-    };
-    // the duals of the options paid on an arc, on entering a copy or on an
-    // improved parallel arc, for the pair priced
-    struct arc_duals {
-        const split_graph * sg;
-        const std::vector<double> * duals;
-        double operator()(const melon::arc_t<melon::static_digraph> a) const {
-            auto dual = [this](const int o) {
-                return o < 0 ? 0.0 : (*duals)[static_cast<std::size_t>(o)];
-            };
-            return dual(sg->entry_option[a]) + dual(sg->arc_option[a]);
-        }
-    };
-    using pricing_algorithm = decltype(melon::biobjective_dijkstra(
-        pricing_traits{}, std::declval<const melon::static_digraph &>(),
-        std::declval<const std::vector<double> &>(),
-        melon::maps::function(std::declval<arc_duals>())));
-
-    // the rows of a pair are created with its first columns in the master:
-    // until then they hold no column, are redundant and have a zero dual
+    // a pair p = (s, t) of a case that some column improves
     struct pair_data {
         case_id_t case_id;
         vertex source, target;
-        std::vector<column> columns;  // enumerated, or empty when searched
-        double max_value;             // bounds the searched columns
-        std::optional<column> start_column;
-        // the duals of the pair's last search and what it found, a column of
-        // reduced cost bound or nothing: the same duals give them again
-        std::vector<double> searched_duals = {};
-        double searched_bound = 0;
-        std::optional<column> searched_column = {};
-        std::optional<constraint_t> uniqueness_constraint = {};
-        std::flat_map<option_t, constraint_t> purchase_constraints = {};
+        // its best column with every option, or within the budget for
+        // enumerate, whose value bounds v_pS
+        valued_set max_column;
+        std::vector<valued_set> columns;  // enumerate: the non-dominated
+        // its best columns without options and within the start's options
+        std::vector<valued_set> start_columns;
     };
 
-    struct column_seed {
-        std::size_t pair;
-        std::vector<option_t> options;  // sorted
-        double value;                   // not part of the key
-        bool operator==(const column_seed & other) const {
-            return pair == other.pair && options == other.options;
+    // The pairs of each case, by target, between the vertices of positive
+    // quality or quality gain as a source and as a target, and the C_k: the
+    // sum of the values of the pairs no column improves, whose best column,
+    // with every option or within the budget for enumerate, is worth no more
+    // than their column without.
+    template <instance_c I>
+    std::pair<std::vector<pair_data>, std::vector<double>> _pairs(
+        const I & instance, const double budget,
+        const std::optional<instance_solution_t<I>> & start) const {
+        auto none = [](auto) { return false; };
+        auto all = [](auto) { return true; };
+        auto in_start = [&start](auto o) { return start && (*start)[o]; };
+        std::vector<pair_data> pairs;
+        std::vector<double> constants;
+        for(auto && instance_case : instance.cases()) {
+            const auto & graph = instance_case.graph();
+            auto is_source = melon::create_vertex_map<char>(graph, 0);
+            std::vector<vertex> sources, targets;
+            for(const auto & v : melon::vertices(graph)) {
+                if(_quality(instance_case, v, true, all) > 0) {
+                    is_source[v] = 1;
+                    sources.push_back(v);
+                }
+                if(_quality(instance_case, v, false, all) > 0)
+                    targets.push_back(v);
+            }
+            // per target, the constant pairs' values and the other pairs, kept
+            // in order so the master is the same from run to run
+            std::vector<std::pair<double, std::vector<pair_data>>> target_pairs(
+                targets.size());
+            tbb::parallel_for(std::size_t{0}, targets.size(), [&](auto i) {
+                const vertex t = targets[i];
+                auto & [constant, t_pairs] = target_pairs[i];
+                auto add = [&](const vertex s,
+                               const std::optional<valued_set> & max_column,
+                               std::vector<valued_set> columns,
+                               const std::optional<valued_set> & base,
+                               const std::optional<valued_set> & from_start) {
+                    const double base_value = base ? base->second : 0.0;
+                    if(!max_column || max_column->second <= base_value) {
+                        constant += base_value;
+                        return;
+                    }
+                    std::vector<valued_set> start_columns;
+                    for(const auto & c : {base, from_start})
+                        if(c) start_columns.push_back(*c);
+                    t_pairs.push_back({instance_case.id(), s, t, *max_column,
+                                       std::move(columns),
+                                       std::move(start_columns)});
+                };
+                if(!search_pricing) {
+                    // every option bought stays live
+                    auto labels =
+                        melon::create_vertex_map<std::vector<valued_set>>(
+                            graph);
+                    _labels(
+                        instance_case, t, all,
+                        [&](const option_t o) {
+                            return instance.option_cost(o);
+                        },
+                        [](auto, auto) { return true; },
+                        [budget](const label & l) {
+                            return l.weight <= budget;
+                        },
+                        [](const label & a, const label & b, vertex) {
+                            return a.value >= b.value &&
+                                   std::ranges::includes(b.live, a.live);
+                        },
+                        [&](const vertex u, const label & l, auto && options) {
+                            if(is_source[u])
+                                labels[u].emplace_back(options(), l.value);
+                            return true;
+                        });
+                    for(const vertex s : sources) {
+                        auto columns = _pair_columns(instance, instance_case, s,
+                                                     labels[s], budget);
+                        std::optional<valued_set> max_column, base, from_start;
+                        for(const valued_set & c : columns) {
+                            if(!max_column || c.second > max_column->second)
+                                max_column = c;
+                            if(c.first.empty()) base = c;
+                            if(std::ranges::all_of(c.first, in_start) &&
+                               (!from_start || c.second > from_start->second))
+                                from_start = c;
+                        }
+                        add(s, max_column, std::move(columns), base,
+                            from_start);
+                    }
+                    return;
+                }
+                // per vertex, the best column of its pair with t that buys
+                // allowed options, all free: the first label to reach it,
+                // with the allowed quality options of the source
+                auto best_columns = [&](auto && allowed) {
+                    auto best =
+                        melon::create_vertex_map<std::optional<valued_set>>(
+                            graph);
+                    _labels(
+                        instance_case, t, allowed, [](auto) { return 0.0; },
+                        [](auto, auto) { return false; },
+                        [](const label &) { return true; },
+                        [](const label & a, const label & b, vertex) {
+                            return a.value >= b.value;
+                        },
+                        [&](const vertex u, const label & l, auto && options) {
+                            if(!is_source[u] || best[u]) return true;
+                            option_set S = _union(
+                                options(), _quality_options(instance_case, u,
+                                                            true, allowed));
+                            const double v =
+                                _quality(instance_case, u, true, _in(S)) *
+                                l.value;
+                            if(v > 0) best[u].emplace(std::move(S), v);
+                            return true;
+                        });
+                    return best;
+                };
+                const auto base = best_columns(none);
+                const auto max = best_columns(all);
+                const auto from_start = start ? best_columns(in_start) : base;
+                for(const vertex s : sources)
+                    add(s, max[s], {}, base[s], from_start[s]);
+            });
+            double constant = 0;
+            for(auto & [value, t_pairs] : target_pairs) {
+                constant += value;
+                std::ranges::move(t_pairs, std::back_inserter(pairs));
+            }
+            constants.push_back(constant);
         }
-    };
-    struct column_seed_hash {
-        std::size_t operator()(const column_seed & seed) const noexcept {
-            std::size_t h = seed.pair;
-            for(const option_t o : seed.options)
-                h ^= o + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
-            return h;
-        }
-    };
+        return {std::move(pairs), std::move(constants)};
+    }
 
     template <typename LP, instance_c I>
     solve_result<I> solve(const I & instance, const double budget) const {
         namespace colgen = mippp::colgen;
-        spdlog::stopwatch sw;
-        auto solution = instance.create_option_map(false);
-
         using namespace mippp;
         using namespace mippp::operators;
-        LP model;
-        if constexpr(mippp::has_feasibility_tolerance<LP>)
-            model.set_feasibility_tolerance(feasibility_tol);
-        model.set_maximization();
-
-        const auto X_vars = model.add_variables(
-            instance.options().size(), [](const option_t & i) { return i; });
-        model.add_constraint(xsum(instance.options(), [&](auto && o) {
-                                 return instance.option_cost(o) * X_vars(o);
-                             }) <= budget);
-
-        std::optional<instance_solution_t<I>> start;
-        if(mip_start &&
-           compute_solution_cost(instance, _mip_start_solution(instance)) >
-               budget + feasibility_tol)
-            spdlog::warn("MIP start exceeds the budget: ignored");
-        else if(mip_start)
-            start = _mip_start_solution(instance);
-        auto in_start = [&start](const auto o) {
-            return start && (*start)[static_cast<option_t>(o)];
+        spdlog::stopwatch sw;
+        auto time_up = [&] {
+            return time_limit && sw.elapsed().count() > time_limit.value();
         };
 
-        // the pairs that options can change, the others summed per case
-        const auto & cases = instance.cases();
-        std::vector<pair_data> pairs;
-        std::vector<split_graph> split_graphs;
-        std::vector<variable_t> contribution_vars;
-        std::vector<constraint_t> contribution_constraints;
-        for(auto && instance_case : instance.cases()) {
-            const auto & graph = instance_case.graph();
-            auto endpoint = [&](const auto v, const auto & quality_map,
-                                const bool as_source) {
-                return quality_map[v] > 0 ||
-                       std::ranges::any_of(
-                           instance_case.vertex_options_map()[v],
-                           [as_source](const auto & e) {
-                               const auto & [sqg, tqg, o] = e;
-                               return (as_source ? sqg : tqg) > 0;
-                           });
-            };
-            std::vector<vertex> sources, targets;
-            for(const auto & v : melon::vertices(graph)) {
-                if(endpoint(v, instance_case.source_quality_map(), true))
-                    sources.push_back(v);
-                if(endpoint(v, instance_case.target_quality_map(), false))
-                    targets.push_back(v);
-            }
-            if(search_pricing)
-                split_graphs.push_back(_split_graph(instance, instance_case));
-            // per source, the constant pairs' values and the other pairs, kept
-            // in order so the model is the same from run to run
-            std::vector<std::pair<double, std::vector<pair_data>>> source_pairs(
-                sources.size());
-            tbb::parallel_for(std::size_t{0}, sources.size(), [&](auto i) {
-                const vertex s = sources[i];
-                auto add = [&](const vertex t, std::vector<column> columns,
-                               const double base_value, const double max_value,
-                               std::optional<column> start_column) {
-                    if(max_value <= base_value) {
-                        source_pairs[i].first += base_value;
-                        return;
-                    }
-                    if(!start_column && base_value > 0)
-                        start_column = column{base_value, {}};
-                    source_pairs[i].second.push_back(
-                        {instance_case.id(), s, t, std::move(columns),
-                         max_value, std::move(start_column)});
-                };
-                if(!search_pricing) {
-                    const auto labels_map =
-                        _path_labels(instance, instance_case, s, budget);
-                    for(const vertex t : targets) {
-                        auto columns = _pair_columns(instance, instance_case, s,
-                                                     t, labels_map[t], budget);
-                        double base_value = 0, max_value = 0;
-                        std::optional<column> start_column;
-                        for(const column & c : columns) {
-                            if(c.options.empty()) base_value = c.value;
-                            max_value = std::max(max_value, c.value);
-                            if(std::ranges::all_of(c.options, in_start) &&
-                               (!start_column || c.value > start_column->value))
-                                start_column = c;
-                        }
-                        add(t, std::move(columns), base_value, max_value,
-                            std::move(start_column));
-                    }
-                    return;
-                }
-                const split_graph & sg = split_graphs.back();
-                const auto base = _best_columns(instance_case, sg, s, targets,
-                                                [](auto) { return false; });
-                const auto max = _best_columns(instance_case, sg, s, targets,
-                                               [](auto) { return true; });
-                const auto from_start =
-                    start
-                        ? _best_columns(instance_case, sg, s, targets, in_start)
-                        : std::vector<std::optional<column>>(targets.size());
-                for(std::size_t j = 0; j < targets.size(); ++j)
-                    add(targets[j], {}, base[j] ? base[j]->value : 0.0,
-                        max[j] ? max[j]->value : 0.0, from_start[j]);
-            });
-            double constant = 0;
-            for(auto & [value, case_pairs] : source_pairs) {
-                constant += value;
-                std::ranges::move(case_pairs, std::back_inserter(pairs));
-            }
-            contribution_vars.push_back(model.add_variable());
-            contribution_constraints.push_back(
-                model.add_constraint(contribution_vars.back() <= constant));
+        std::optional<instance_solution_t<I>> start;
+        if(mip_start) {
+            if(compute_solution_cost(instance, _mip_start_solution(instance)) >
+               budget + feasibility_tol)
+                spdlog::warn("MIP start exceeds the budget: ignored");
+            else
+                start = _mip_start_solution(instance);
         }
+        const auto [pairs, constants] = _pairs(instance, budget, start);
+        std::vector<option_reach> reaches;
+        if(search_pricing)
+            for(const auto & instance_case : instance.cases())
+                reaches.push_back(_option_reach(instance, instance_case));
 
+        // The master: x, the budget row, and for each case k, z_k with its
+        // contribution row; the rows of a pair come with the first column
+        // that uses them.
+        LP model;
+        if constexpr(has_feasibility_tolerance<LP>)
+            model.set_feasibility_tolerance(feasibility_tol);
+        model.set_maximization();
+        const auto x = model.add_variables(
+            instance.options().size(), [](const option_t & o) { return o; });
+        model.add_constraint(xsum(instance.options(), [&](auto && o) {
+                                 return instance.option_cost(o) * x(o);
+                             }) <= budget);
+        std::vector<variable_t> z;
+        std::vector<constraint_t> contribution_rows;
+        for(const double C_k : constants) {
+            z.push_back(model.add_variable());
+            contribution_rows.push_back(model.add_constraint(z.back() <= C_k));
+        }
         model.set_objective(std::visit(
-            formula_variable_visitor{
-                model,
-                [&](const case_id_t & i) { return contribution_vars[i]; }},
+            formula_variable_visitor{model,
+                                     [&](const case_id_t & k) { return z[k]; }},
             instance.criterion()));
+        std::vector<std::optional<constraint_t>> uniqueness_rows(pairs.size());
+        std::vector<std::flat_map<option_t, constraint_t>> purchase_rows(
+            pairs.size());
 
-        auto log_lambda = [&, option_name_max_length = std::ranges::max(
+        auto log_master = [&, option_name_max_length = std::ranges::max(
                                   std::ranges::views::transform(
                                       instance.options(), [&](auto && o) {
                                           return instance.option_name(o).size();
@@ -585,151 +519,146 @@ struct path_formulation_rr : public mip_solver_base {
             for(auto && option : instance.options()) {
                 const auto & option_name = instance.option_name(option);
                 spdlog::info("    {:<{}} {}", option_name,
-                             option_name_max_length,
-                             model_solution[X_vars(option)]);
+                             option_name_max_length, model_solution[x(option)]);
             }
         };
 
+        // a column y_pS, the key of the column manager: the index p of its
+        // pair and its options S; its value v_pS is the data
+        using column = std::pair<std::size_t, option_set>;
         colgen::column_manager<
-            LP, column_seed, colgen::property_list<colgen::reduced_cost>,
-            colgen::property_list<colgen::reduced_cost, colgen::age>,
-            colgen::no_data, column_seed_hash>
+            LP, column, colgen::property_list<colgen::reduced_cost>,
+            colgen::property_list<colgen::reduced_cost, colgen::age>, double>
             columns;
         auto add_column = [&](LP &, const auto & entry) {
-            const column_seed & seed = entry.seed;
-            pair_data & p = pairs[seed.pair];
-            if(!p.uniqueness_constraint)
-                p.uniqueness_constraint = model.add_constraint(
+            const auto & [p, S] = entry.seed;
+            if(!uniqueness_rows[p])
+                uniqueness_rows[p] = model.add_constraint(
                     empty_linear_expression<variable_t, double> <= 1);
-            for(const option_t o : seed.options)
-                if(!p.purchase_constraints.contains(o))
-                    p.purchase_constraints.emplace(
+            for(const option_t o : S)
+                if(!purchase_rows[p].contains(o))
+                    purchase_rows[p].emplace(
                         o, model.add_constraint(
                                empty_linear_expression<variable_t, double> <=
-                               X_vars(o)));
+                               x(o)));
             return model.add_column(std::views::concat(
                 std::views::single(std::make_pair(
-                    contribution_constraints[p.case_id], -seed.value)),
-                std::views::single(
-                    std::make_pair(*p.uniqueness_constraint, 1.0)),
-                std::views::transform(seed.options, [&p](const option_t o) {
-                    return std::make_pair(p.purchase_constraints.at(o), 1.0);
+                    contribution_rows[pairs[p].case_id], -entry.data)),
+                std::views::single(std::make_pair(*uniqueness_rows[p], 1.0)),
+                std::views::transform(S, [&](const option_t o) {
+                    return std::make_pair(purchase_rows[p].at(o), 1.0);
                 })));
         };
-        // the master starts with the columns that buy nothing or, with
-        // --mip-start, the best columns within the start's options
-        for(std::size_t i = 0; i < pairs.size(); ++i) {
-            if(!pairs[i].start_column) continue;
-            column_seed seed{i, pairs[i].start_column->options,
-                             pairs[i].start_column->value};
-            columns.emplace_master_column(model, std::move(seed), add_column);
-        }
+        for(std::size_t p = 0; p < pairs.size(); ++p)
+            for(const auto & [S, v] : pairs[p].start_columns)
+                columns.emplace_master_column(model, column{p, S}, add_column,
+                                              v);
 
-        auto uniqueness_dual = [&](const pair_data & p,
-                                   const auto & dual_solution) {
-            return p.uniqueness_constraint
-                       ? dual_solution[*p.uniqueness_constraint]
-                       : 0.0;
-        };
-        auto purchase_dual = [&](const pair_data & p, const option_t o,
-                                 const auto & dual_solution) {
-            const auto it = p.purchase_constraints.find(o);
-            return it == p.purchase_constraints.end()
-                       ? 0.0
-                       : dual_solution[it->second];
-        };
-        auto reduced_cost = [&](const column_seed & seed,
-                                const auto & dual_solution) {
-            const pair_data & p = pairs[seed.pair];
-            double rc = dual_solution[contribution_constraints[p.case_id]] *
-                            seed.value -
-                        uniqueness_dual(p, dual_solution);
-            for(const option_t o : seed.options)
-                rc -= purchase_dual(p, o, dual_solution);
-            return rc;
-        };
         // in the master for more than evict_age rounds and unattractive, so
         // nonbasic
         const colgen::conjunction<colgen::above<colgen::age>,
                                   colgen::negative<colgen::reduced_cost>>
             unattractive{colgen::above<colgen::age>{evict_age},
                          colgen::negative<colgen::reduced_cost>{1e-6}};
-        if constexpr(!mippp::has_remove_variable<LP>)
+        if constexpr(!has_remove_variable<LP>)
             if(evict_age)
                 spdlog::warn(
                     "This solver cannot remove columns: --evict-age ignored");
 
-        // one search algorithm per thread and case, reused across pairs
-        struct pricing_state {
-            std::vector<double> duals;
-            std::vector<std::optional<pricing_algorithm>> algorithms;
+        // per pair, the duals of its last search and the column it found,
+        // which the same duals find again
+        struct last_search {
+            std::vector<double> duals;  // π_k, σ_p and the λ_po of its rows
+            std::optional<std::pair<double, valued_set>> best;  // rc, column
         };
-        tbb::enumerable_thread_specific<pricing_state> pricing_states;
+        std::vector<last_search> searches(pairs.size());
         std::atomic<std::size_t> num_searches = 0;
 
+        // Column generation.
         solve_report report{"converged"};
-        std::size_t iterations = 1;  // LP solves
+        std::size_t iterations = 1;  // pricing rounds
         std::size_t num_evicted = 0;
-        auto time_up = [&] {
-            return time_limit && sw.elapsed().count() > time_limit.value();
-        };
-        // per pair, a bound on the best reduced cost and 0: with the master's
-        // value, the Lagrangian bound of a complete pricing round
+        // per pair, max(0, rc_p) or a bound on it
         std::vector<double> pricing_bounds(pairs.size());
-        // not the report's best_bound: the solution returned, the master's
-        // options cast to bool, can exceed the budget
+        // not the report's best_bound: the solution returned, x cast to bool,
+        // can exceed the budget
         std::optional<double> best_bound;
         for(;; ++iterations) {
             model.solve();
             const auto dual_solution = model.get_dual_solution();
             const double master_value = model.get_solution_value();
+            log_master();
 
-            log_lambda();
+            auto pi = [&](const std::size_t p) {
+                return dual_solution[contribution_rows[pairs[p].case_id]];
+            };
+            auto sigma = [&](const std::size_t p) {
+                return uniqueness_rows[p] ? dual_solution[*uniqueness_rows[p]]
+                                          : 0.0;
+            };
+            auto lambda = [&](const std::size_t p, const option_t o) {
+                const auto it = purchase_rows[p].find(o);
+                return it == purchase_rows[p].end() ? 0.0
+                                                    : dual_solution[it->second];
+            };
+            auto reduced_cost = [&](const std::size_t p, const option_set & S,
+                                    const double v) {
+                double rc = pi(p) * v - sigma(p);
+                for(const option_t o : S) rc -= lambda(p, o);
+                return rc;
+            };
+            // the pricing test, at the master's dual tolerance: rc > margin
+            auto margin = [&](const std::size_t p) {
+                return 1e-7 * sigma(p) + 1e-6;
+            };
 
-            // the pricing test, at the master's dual tolerance: a reduced cost
-            // above margin, a value net of the option duals above threshold
-            auto margin = [&](const pair_data & p) {
-                return 1e-7 * uniqueness_dual(p, dual_solution) + 1e-6;
+            tbb::concurrent_vector<std::pair<column, double>> priced_columns;
+            // the pricing of pair p found the column c, of reduced cost rc
+            auto found = [&](const std::size_t p, const double rc,
+                             const valued_set & c) {
+                pricing_bounds[p] = rc;
+                priced_columns.push_back({column{p, c.first}, c.second});
             };
-            auto threshold = [&](const pair_data & p) {
-                return uniqueness_dual(p, dual_solution) + margin(p);
+            auto enumerate = [&](const std::size_t p) {
+                const valued_set * best = nullptr;
+                double best_rc = 0;
+                for(const valued_set & c : pairs[p].columns)
+                    if(const double rc = reduced_cost(p, c.first, c.second);
+                       !best || rc > best_rc) {
+                        best = &c;
+                        best_rc = rc;
+                    }
+                pricing_bounds[p] = std::max(best_rc, 0.0);
+                if(best && best_rc > margin(p)) found(p, best_rc, *best);
             };
-            std::atomic<bool> cut_short = false;
-            tbb::concurrent_vector<column_seed> priced_columns;
-            tbb::parallel_for(std::size_t{0}, pairs.size(), [&](auto i) {
-                pair_data & p = pairs[i];
-                const double pi_c =
-                    dual_solution[contribution_constraints[p.case_id]];
-                if(!search_pricing) {
-                    std::optional<std::pair<double, std::size_t>> best;
-                    for(std::size_t j = 0; j < p.columns.size(); ++j) {
-                        double rc = pi_c * p.columns[j].value -
-                                    uniqueness_dual(p, dual_solution);
-                        for(const option_t o : p.columns[j].options)
-                            rc -= purchase_dual(p, o, dual_solution);
-                        if(!best || rc > best->first) best.emplace(rc, j);
-                    }
-                    pricing_bounds[i] = best ? std::max(best->first, 0.0) : 0.0;
-                    if(best && best->first > margin(p))
-                        priced_columns.push_back(
-                            {i, p.columns[best->second].options,
-                             p.columns[best->second].value});
-                    return;
-                }
-                // what the skips and the stopped searches leave unpriced has
-                // a reduced cost of at most margin(p)
-                pricing_bounds[i] = margin(p);
-                if(pi_c * p.max_value <= threshold(p)) return;
-                std::vector<double> key{pi_c,
-                                        uniqueness_dual(p, dual_solution)};
-                for(const auto & [o, row] : p.purchase_constraints)
-                    key.push_back(dual_solution[row]);
-                if(key == p.searched_duals) {
-                    if(p.searched_column) {
-                        pricing_bounds[i] = p.searched_bound;
-                        priced_columns.push_back({i, p.searched_column->options,
-                                                  p.searched_column->value});
-                    }
+            std::atomic<bool> cut_short = false;  // by the time limit
+            // The search of pair p. The labels only lose value and gain
+            // weight, so a label is kept while π_k q_s(every option) w - W -
+            // σ_p > margin, which bounds max(0, rc_p) when none is found; so
+            // does the max-value skip. Without a positive purchase dual, the
+            // best column is the one with every option. The master can return
+            // a dual a little below 0 (-7.6e-7 on Quebec), which counts as 0:
+            // the search needs weights that never improve a label.
+            auto search = [&](const std::size_t p) {
+                const pair_data & data = pairs[p];
+                const double pi_p = pi(p), sigma_p = sigma(p),
+                             margin_p = margin(p);
+                pricing_bounds[p] = margin_p;
+                const double max_rc = pi_p * data.max_column.second - sigma_p;
+                if(max_rc <= margin_p) return;
+                auto lambda_plus = [&](const option_t o) {
+                    return std::max(0.0, lambda(p, o));
+                };
+                if(std::ranges::none_of(
+                       std::views::keys(purchase_rows[p]),
+                       [&](const option_t o) { return lambda_plus(o) > 0; }))
+                    return found(p, max_rc, data.max_column);
+                std::vector<double> duals{pi_p, sigma_p};
+                for(const auto & [o, row] : purchase_rows[p])
+                    duals.push_back(dual_solution[row]);
+                if(duals == searches[p].duals) {
+                    if(const auto & best = searches[p].best)
+                        found(p, best->first, best->second);
                     return;
                 }
                 if(time_up()) {
@@ -737,114 +666,82 @@ struct path_formulation_rr : public mip_solver_base {
                     return;
                 }
                 ++num_searches;
-                pricing_state & state = pricing_states.local();
-                const split_graph & sg = split_graphs[p.case_id];
-                if(state.duals.empty())
-                    state.duals.assign(instance.options().size(), 0.0);
-                if(state.algorithms.size() <= p.case_id)
-                    state.algorithms.resize(p.case_id + 1);
-                auto & algo = state.algorithms[p.case_id];
-                if(!algo)
-                    algo.emplace(
-                        pricing_traits{}, sg.graph, sg.probability,
-                        melon::maps::function(arc_duals{&sg, &state.duals}));
-                // the search needs lengths that never improve a label, but
-                // the master can return a dual a little below 0 (-7.6e-7 on
-                // Quebec): the labels then go around cycles and the
-                // backtracking below can lose their predecessors
-                for(const auto & [o, row] : p.purchase_constraints)
-                    state.duals[o] = std::max(0.0, dual_solution[row]);
                 const auto & instance_case = *std::ranges::next(
-                    cases.begin(), static_cast<std::ptrdiff_t>(p.case_id));
-                auto any = [](auto) { return true; };
-                const auto starts = _starts(instance_case, sg, p.source, any);
-                const auto ends = _ends(instance_case, sg, p.target, any);
-                auto start_dual = [&](const std::size_t v) {
-                    return v < sg.num_vertices
-                               ? 0.0
-                               : state.duals[static_cast<std::size_t>(
-                                     sg.copy_option[v - sg.num_vertices])];
-                };
-                algo->reset();
-                for(const auto & [v, q] : starts)
-                    algo->add_source(static_cast<vertex>(v), q, start_dual(v));
-                double q_max = 0;
-                for(const auto & [v, q] : ends) q_max = std::max(q_max, q);
-                // the labels come by decreasing probability and their duals
-                // only grow: none after this bound can improve the master
-                std::optional<
-                    std::tuple<double, vertex, typename pricing_traits::label>>
-                    best;
-                for(; !algo->finished(); algo->advance()) {
-                    const auto [v, label] = algo->current();
-                    if(pi_c * q_max * label.first <= threshold(p)) break;
-                    for(const auto & [e, q] : ends) {
-                        if(e != v) continue;
-                        const double rc = pi_c * label.first * q -
-                                          label.second -
-                                          uniqueness_dual(p, dual_solution);
-                        if(!best || rc > std::get<0>(*best))
-                            best.emplace(rc, v, label);
-                    }
-                }
-                p.searched_duals = std::move(key);
-                p.searched_column.reset();
-                if(best && std::get<0>(*best) > margin(p)) {
-                    // back through the fronts: each label extends a label
-                    // of an in-neighbour exactly
-                    auto [rc, v, label] = *best;
-                    pricing_bounds[i] = rc;
-                    column_seed seed{i, {}, 0.0};
-                    for(const auto & [e, q] : ends)
-                        if(e == v) seed.value = label.first * q;
-                    std::vector<bool> visited(sg.graph.num_vertices(), false);
-                    while(!std::ranges::any_of(starts, [&](const auto & st) {
-                        return st.first == v && st.second == label.first &&
-                               start_dual(v) == label.second;
-                    })) {
-                        if(v >= sg.num_vertices)
-                            seed.options.push_back(static_cast<option_t>(
-                                sg.copy_option[v - sg.num_vertices]));
-                        visited[v] = true;
-                        bool found = false;
-                        for(const auto & a : melon::in_arcs(sg.graph, v)) {
-                            const vertex u = melon::arc_source(sg.graph, a);
-                            if(visited[u]) continue;
-                            for(const auto & l : algo->pareto_front(u)) {
-                                if(pricing_traits::blue_semiring::plus(
-                                       l.first, sg.probability[a]) !=
-                                       label.first ||
-                                   pricing_traits::red_semiring::plus(
-                                       l.second, arc_duals{&sg, &state.duals}(
-                                                     a)) != label.second)
-                                    continue;
-                                if(sg.arc_option[a] >= 0)
-                                    seed.options.push_back(
-                                        static_cast<option_t>(
-                                            sg.arc_option[a]));
-                                v = u;
-                                label = l;
-                                found = true;
-                                break;
+                    instance.cases().begin(),
+                    static_cast<std::ptrdiff_t>(data.case_id));
+                const option_reach & reach = reaches[data.case_id];
+                const vertex s = data.source;
+                auto all = [](auto) { return true; };
+                const option_set source_options =
+                    _quality_options(instance_case, s, true, all);
+                const option_set target_options =
+                    _quality_options(instance_case, data.target, false, all);
+                const double q_max = _quality(instance_case, s, true, all);
+                std::optional<std::pair<double, valued_set>> best;
+                // a label can use again its options of a gain at s, those of
+                // a gain at t, which it can have bought before their arcs,
+                // and those that reach accepts
+                _labels(
+                    instance_case, data.target, all, lambda_plus,
+                    [&](const option_t o, const vertex u) {
+                        return std::ranges::binary_search(source_options, o) ||
+                               std::ranges::binary_search(target_options, o) ||
+                               reach(o, u);
+                    },
+                    [&](const label & l) {
+                        return pi_p * q_max * l.value - l.weight - sigma_p >
+                               margin_p;
+                    },
+                    // the live options of b that a lacks cost a their λ
+                    [&](const label & a, const label & b, vertex) {
+                        if(a.value < b.value || a.weight > b.weight)
+                            return false;
+                        double weight = a.weight;
+                        for(const option_t o : b.live)
+                            if(!std::ranges::binary_search(a.live, o))
+                                weight += lambda_plus(o);
+                        return weight <= b.weight;
+                    },
+                    [&](const vertex u, const label & l, auto && options) {
+                        if(u != s) return true;
+                        // each quality option of s, with all its gains at s
+                        // (an option can have several), if worth its λ
+                        valued_set c{options(), 0.0};
+                        double rc = -sigma_p - l.weight;
+                        for(const option_t o : source_options) {
+                            if(std::ranges::binary_search(l.live, o)) continue;
+                            double gain = 0;
+                            for(const auto & [sqg, tqg, e] :
+                                instance_case.vertex_options_map()[s])
+                                if(e == o) gain += sqg;
+                            if(pi_p * gain * l.value > lambda_plus(o)) {
+                                rc -= lambda_plus(o);
+                                c.first = _union(c.first, {o});
                             }
-                            if(found) break;
                         }
-                        if(!found)
-                            throw std::logic_error(
-                                "path_rr: a pricing label without "
-                                "predecessor");
-                    }
-                    if(v >= sg.num_vertices)
-                        seed.options.push_back(static_cast<option_t>(
-                            sg.copy_option[v - sg.num_vertices]));
-                    std::ranges::sort(seed.options);
-                    p.searched_bound = rc;
-                    p.searched_column = column{seed.value, seed.options};
-                    priced_columns.push_back(std::move(seed));
+                        c.second =
+                            _quality(instance_case, s, true, _in(c.first)) *
+                            l.value;
+                        rc += pi_p * c.second;
+                        if(!best || rc > best->first)
+                            best.emplace(rc, std::move(c));
+                        return false;  // a path through s again has a cycle
+                    });
+                searches[p] = {std::move(duals), {}};
+                if(best && best->first > margin_p) {
+                    searches[p].best = best;
+                    found(p, best->first, best->second);
                 }
-                for(const auto & [o, row] : p.purchase_constraints)
-                    state.duals[o] = 0.0;
-            });
+            };
+            tbb::parallel_for(std::size_t{0}, pairs.size(),
+                              [&](const std::size_t p) {
+                                  if(search_pricing)
+                                      search(p);
+                                  else
+                                      enumerate(p);
+                              });
+
+            // L = master_value + Σ_p max(0, rc_p), after a complete round
             if(!cut_short) {
                 const double bound =
                     master_value + std::accumulate(pricing_bounds.begin(),
@@ -855,24 +752,26 @@ struct path_formulation_rr : public mip_solver_base {
                 if(relative_gap > 0 && best_bound.value() - master_value <=
                                            relative_gap * master_value) {
                     spdlog::info(
-                        "Column generation stopped: relative gap "
-                        "reached");
+                        "Column generation stopped: relative gap reached");
                     report.status = "relative gap reached";
                     break;
                 }
             }
+
+            // the improving columns enter the master, or the max_activations
+            // best of them
             columns.emplace_pool_columns(priced_columns |
                                          std::views::as_rvalue);
             columns.update_columns([&](const auto & entry) {
-                return colgen::priced{reduced_cost(entry.seed, dual_solution)};
+                return colgen::priced{reduced_cost(
+                    entry.seed.first, entry.seed.second, entry.data)};
             });
             columns.purge_pool([](const auto & entry) {
                 return entry.state.template get<colgen::reduced_cost>() <= 0;
             });
             auto improving = [&](const auto & entry) {
-                const auto & [seed, state] = entry;
-                return state.template get<colgen::reduced_cost>() >
-                       margin(pairs[seed.pair]);
+                return entry.state.template get<colgen::reduced_cost>() >
+                       margin(entry.seed.first);
             };
             const std::size_t num_activated =
                 max_activations
@@ -899,17 +798,16 @@ struct path_formulation_rr : public mip_solver_base {
                 break;
             }
             // only once the master will be solved again, for the same reason
-            if constexpr(mippp::has_remove_variable<LP>)
+            if constexpr(has_remove_variable<LP>)
                 if(evict_age)
                     num_evicted += columns.evict_columns(model, unattractive);
         }
 
+        auto solution = instance.create_option_map(false);
         const auto model_solution = model.get_solution();
-        for(const auto & i : instance.options()) {
-            solution[i] = model_solution[X_vars(i)];
-        }
-
-        log_lambda();
+        for(const auto & o : instance.options())
+            solution[o] = model_solution[x(o)];
+        log_master();
 
         std::size_t num_columns = 0;
         for(const pair_data & p : pairs) num_columns += p.columns.size();

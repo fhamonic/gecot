@@ -11,6 +11,15 @@ private:
 public:
     TargetBendersInterface() : AbstractMipInterface("target_benders") {
         add_mip_options(solver, 1e-7, lazy_constraint_solvers);
+        app.add_option_function<std::string>(
+               "--big-m",
+               [this](const std::string & s) {
+                   solver.tight_big_M = s == "tight";
+               },
+               "Experimental: the big-Ms of the knapsack of quality gains, or "
+               "per arc over the sources that can use it")
+            ->check(CLI::IsMember({"knapsack", "tight"}))
+            ->default_val("knapsack");
     }
 
     gecot::solve_result<Instance> solve(const Instance & instance,

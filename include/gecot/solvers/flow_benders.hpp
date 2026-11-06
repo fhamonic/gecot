@@ -24,6 +24,9 @@ namespace gecot {
 namespace solvers {
 
 struct flow_benders : public mip_solver_base {
+    // experimental: compute_tight_big_M_maps' big-Ms
+    bool tight_big_M = false;
+
     template <case_c C>
     auto _compute_dual_flow(const contracted_graph_data<C> & data,
                             const auto & solution) const {
@@ -124,7 +127,8 @@ struct flow_benders : public mip_solver_base {
                             model.add_column({std::make_pair(
                                 C_constr, -original_t_target_quality)}),
                             compute_contracted_graph_data(
-                                instance, instance_case, budget, original_t));
+                                instance, instance_case, budget, original_t,
+                                tight_big_M, feasibility_tol));
 
                     for(const auto & [sqg, target_quality_gain, option] :
                         original_vertex_options_map[original_t]) {
@@ -132,7 +136,7 @@ struct flow_benders : public mip_solver_base {
                             {std::make_pair(C_constr, -target_quality_gain)});
                         model.add_constraint(F_prime_t_var <= F_var);
                         model.add_constraint(F_prime_t_var <=
-                                             data.big_M_map[data.t] *
+                                             data.target_big_M(option) *
                                                  X_vars(option));
                         // model.add_indicator_constraint(X_vars(option), false,
                         //                                F_prime_t_var <= 0);
@@ -179,19 +183,24 @@ struct flow_benders : public mip_solver_base {
                                        rho_values[u];
                             }) +
                        xsum(data.graph.arcs(), [&](auto && a) {
-                           return xsum(data.arc_options_map[a], [&,
-                                                                 a](auto && p) {
-                               auto && [improved_prob, option] = p;
-                               auto u = data.graph.arc_source(a);
-                               auto v = data.graph.arc_target(a);
-                               auto cai =
-                                   current_solution[option]
-                                       ? 0.0
-                                       : std::max(0.0, improved_prob *
-                                                               rho_values[v] -
-                                                           rho_values[u]);
-                               return data.big_M_map[u] * X_vars(option) * cai;
-                           });
+                           return xsum(
+                               std::views::iota(std::size_t{0},
+                                                data.arc_options_map[a].size()),
+                               [&, a](std::size_t k) {
+                                   auto && [improved_prob, option] =
+                                       data.arc_options_map[a][k];
+                                   auto u = data.graph.arc_source(a);
+                                   auto v = data.graph.arc_target(a);
+                                   auto cai =
+                                       current_solution[option]
+                                           ? 0.0
+                                           : std::max(
+                                                 0.0,
+                                                 improved_prob * rho_values[v] -
+                                                     rho_values[u]);
+                                   return data.improvement_big_M(a, k) *
+                                          X_vars(option) * cai;
+                               });
                        });
             };
 

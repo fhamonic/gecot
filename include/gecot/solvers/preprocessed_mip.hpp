@@ -17,6 +17,7 @@
 #include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
 #include "gecot/preprocessing/compute_contracted_generalized_flow_graph.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
+#include "gecot/preprocessing/compute_tight_big_M_maps.hpp"
 
 #include "gecot/solvers/mip_solver_base.hpp"
 
@@ -24,6 +25,11 @@ namespace gecot {
 namespace solvers {
 
 struct preprocessed_mip : public mip_solver_base {
+    // experimental: compute_tight_big_M_maps' big-Ms
+    bool tight_big_M = false;
+    // experimental: the options continuous, for the root relaxation's bound
+    bool relax_integrality = false;
+
     template <typename M, instance_c I>
     solve_result<I> solve(const I & instance, const double budget) const {
         spdlog::stopwatch sw;
@@ -50,6 +56,18 @@ struct preprocessed_mip : public mip_solver_base {
         model.add_constraint(xsum(instance.options(), [&](auto && o) {
                                  return instance.option_cost(o) * X_vars(o);
                              }) <= budget);
+        if(relax_integrality) {
+            if constexpr(requires { model.set_continuous(X_vars(0)); }) {
+                for(auto && o : instance.options())
+                    model.set_continuous(X_vars(o));
+            } else
+                throw std::invalid_argument(
+                    "this solver cannot relax the options");
+        }
+        // Σ of the big-Ms used and of the knapsack ones, arcs then targets
+        double arc_M_sum = 0, arc_M_old_sum = 0, target_M_sum = 0,
+               target_M_old_sum = 0;
+        std::size_t arc_M_count = 0, arc_M_halved = 0;
 
         for(auto && instance_case : instance.cases()) {
             const auto case_id = instance_case.id();
@@ -120,6 +138,29 @@ struct preprocessed_mip : public mip_solver_base {
                                        });
                         }));
 
+                // an arc per improvement, of base probability 0
+                auto base_probability_map =
+                    melon::create_arc_map<double>(graph, 0.0);
+                auto improvements_map = melon::create_arc_map<
+                    std::vector<std::pair<double, option_t>>>(graph, {});
+                for(auto && a : melon::arcs(graph)) {
+                    if(arc_option_map[a].has_value())
+                        improvements_map[a].emplace_back(
+                            probability_map[a], arc_option_map[a].value());
+                    else
+                        base_probability_map[a] = probability_map[a];
+                }
+                auto tight_maps =
+                    tight_big_M
+                        ? std::make_optional(compute_tight_big_M_maps(
+                              instance, budget, feasibility_tol, graph,
+                              source_quality_map, vertex_options_map,
+                              base_probability_map, improvements_map, t,
+                              std::views::transform(
+                                  original_vertex_options_map[original_t],
+                                  [](auto && e) { return std::get<2>(e); })))
+                        : std::nullopt;
+
                 for(const auto & [sqg, target_quality_gain, option] :
                     original_vertex_options_map[original_t]) {
                     const auto F_prime_t_var =
@@ -129,8 +170,14 @@ struct preprocessed_mip : public mip_solver_base {
                     model.add_constraint(F_prime_t_var <= F_var);
 
                     //*
+                    const double target_M =
+                        tight_maps
+                            ? std::min(big_M_map[t], tight_maps->second[option])
+                            : big_M_map[t];
+                    target_M_sum += target_M;
+                    target_M_old_sum += big_M_map[t];
                     model.add_constraint(F_prime_t_var <=
-                                         big_M_map[t] * X_vars(option));
+                                         target_M * X_vars(option));
                     /*/
                     model.add_indicator_constraint(X_vars(option), false,
                                                    F_prime_t_var <= 0);
@@ -195,10 +242,17 @@ struct preprocessed_mip : public mip_solver_base {
                 //*
                 for(auto && a : melon::arcs(graph)) {
                     if(!arc_option_map[a].has_value()) continue;
-                    model.add_constraint(
-                        Phi_t_vars(a) <=
-                        X_vars(arc_option_map[a].value()) *
-                            big_M_map[melon::arc_source(graph, a)]);
+                    const double old_M = big_M_map[melon::arc_source(graph, a)];
+                    const double arc_M =
+                        tight_maps ? std::min(old_M, tight_maps->first[a][0])
+                                   : old_M;
+                    arc_M_sum += arc_M;
+                    arc_M_old_sum += old_M;
+                    ++arc_M_count;
+                    arc_M_halved += arc_M <= old_M / 2;
+                    model.add_constraint(Phi_t_vars(a) <=
+                                         X_vars(arc_option_map[a].value()) *
+                                             arc_M);
                 }
                 /*/
                 for(auto && a : melon::arcs(graph)) {
@@ -218,6 +272,13 @@ struct preprocessed_mip : public mip_solver_base {
             model.add_constraint(C_vars(instance_case.id()) <= Xi_vars);
         }
 
+        if(tight_big_M)
+            spdlog::info(
+                "prep_mip tight big-Ms: arcs {:.4g} of the knapsack ones ({} "
+                "of {} halved at least), target gains {:.4g}",
+                arc_M_old_sum > 0 ? arc_M_sum / arc_M_old_sum : 1.0,
+                arc_M_halved, arc_M_count,
+                target_M_old_sum > 0 ? target_M_sum / target_M_old_sum : 1.0);
         spdlog::trace("prep_mip model has:");
         spdlog::trace("  {:>10} variables", model.num_variables());
         spdlog::trace("  {:>10} constraints", model.num_constraints());

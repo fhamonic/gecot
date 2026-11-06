@@ -12,6 +12,17 @@ public:
     PreprocessedmipInterface() : AbstractMipInterface("prep_mip") {
         add_mip_options(solver);
         add_preprocessing_options(solver);
+        app.add_option_function<std::string>(
+               "--big-m",
+               [this](const std::string & s) {
+                   solver.tight_big_M = s == "tight";
+               },
+               "Experimental: the big-Ms of the knapsack of quality gains, or "
+               "per arc over the sources that can use it")
+            ->check(CLI::IsMember({"knapsack", "tight"}))
+            ->default_val("knapsack");
+        app.add_flag("--lp-relaxation", solver.relax_integrality,
+                     "Experimental: solve the continuous relaxation");
     }
 
     gecot::solve_result<Instance> solve(const Instance & instance,

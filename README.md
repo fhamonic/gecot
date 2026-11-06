@@ -20,15 +20,35 @@ Otherwise, [here](https://github.com/fhamonic/gecot_docker) is a Docker containe
 ## Usage
 
 ```
-$ gecot_optimize --help
+$ gecot --help
 GECOT — Graph-based Ecological Connectivity Optimization Tool
-Version: 1.0 (built on Oct 26 2026)
+Version: 2.0 (built on Nov  5 2026)
 
 Usage:
-  gecot_optimize --help
-  gecot_optimize --list-algorithms
-  gecot_optimize <algorithm> --list-params
-  gecot_optimize <algorithm> <instance> <budget> [<parameters> ...]
+  gecot --help
+  gecot --version
+  gecot optimize --help
+  gecot optimize <algorithm> <instance> <budget> [<parameters> ...]
+  gecot bound --help
+  gecot bound <method> <instance> <budget> [<parameters> ...]
+
+Commands:
+  optimize    Select options within a budget to maximize the score
+  bound       Bound the best score of the options within a budget
+```
+
+`gecot optimize` selects the options to buy within the budget:
+
+```
+$ gecot optimize --help
+GECOT — Graph-based Ecological Connectivity Optimization Tool
+Version: 2.0 (built on Nov  5 2026)
+
+Usage:
+  gecot optimize --help
+  gecot optimize --list-algorithms
+  gecot optimize <algorithm> --list-params
+  gecot optimize <algorithm> <instance> <budget> [<parameters> ...]
 
 
 POSITIONALS:
@@ -50,6 +70,42 @@ OPTIONS:
           --max-threads UINT:POSITIVE
                               Limits the number of threads used
 ```
+
+`gecot bound` computes an upper bound on the scores `gecot optimize` can reach within the budget, the options of cost 0 being always bought, which certifies how far a solution is from the optimum:
+
+```
+$ gecot bound --help
+GECOT — Graph-based Ecological Connectivity Optimization Tool
+Version: 2.0 (built on Nov  5 2026)
+
+Usage:
+  gecot bound --help
+  gecot bound --list-methods
+  gecot bound <method> --list-params
+  gecot bound <method> <instance> <budget> [<parameters> ...]
+
+
+POSITIONALS:
+  method TEXT                 Bound method to use
+  instance TEXT               Instance JSON file
+  budget FLOAT                Budget value
+
+OPTIONS:
+  -h,     --help              Display this help message
+  -M,     --list-methods      List the available bound methods
+  -P,     --list-params       List the parameters of the chosen method
+          --method TEXT       Bound method to use
+  -i,     --instance TEXT     Instance JSON file
+  -B,     --budget FLOAT      Budget value
+  -o,     --output-json TEXT  Output bound data in JSON file
+  -v,     --verbose           Enable logging of methods trace
+  -q,     --quiet             Silence all logging except errors
+          --max-threads UINT:POSITIVE
+                              Limits the number of threads used
+```
+
+`gecot optimize --list-algorithms` and `gecot bound --list-methods` describe the algorithms and the bound methods, and `--list-params` their parameters.
+The `gecot_optimize <algorithm> ...` command of former releases is now `gecot optimize <algorithm> ...`.
 
 
 ## Citation

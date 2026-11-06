@@ -5,6 +5,7 @@
 #include <atomic>
 #include <utility>
 
+#include <fmt/ranges.h>
 #include <spdlog/stopwatch.h>
 
 #include <tbb/concurrent_vector.h>
@@ -23,7 +24,8 @@ template <instance_c I, case_c C>
 auto compute_constrained_strong_and_useless_arcs(
     const I & instance, const C & instance_case, const double budget,
     const auto & option_predicate = [](const option_t & o) { return true; },
-    double probability_resolution = 1e-8, int num_mus = 10) {
+    double probability_resolution = 1e-8, int num_mus = 10,
+    bool decades_sweep = true) {
     using graph_t = case_graph_t<C>;
     using log_probability_t = uint64_t;
     using log_probability_map_t = melon::arc_map_t<graph_t, log_probability_t>;
@@ -75,10 +77,12 @@ auto compute_constrained_strong_and_useless_arcs(
     auto cost_map = melon::create_arc_map<double>(graph);
     double min_mu = std::numeric_limits<double>::max();
     double max_mu = 0;
+    double max_arc_cost = 0;
     for(auto && i : instance.options()) {
-        if(!option_predicate(i)) continue;
+        if(!option_predicate(i) || arcs_options[i].empty()) continue;
         const double arc_cost = instance.option_cost(i) /
                                 static_cast<double>(arcs_options[i].size());
+        max_arc_cost = std::max(max_arc_cost, arc_cost);
         for(auto && [a, enhanced_prob] : arcs_options[i]) {
             min_mu = std::min(min_mu, 1 / arc_cost);
             if(base_length_map[a] > prob_to_length(enhanced_prob))
@@ -89,14 +93,32 @@ auto compute_constrained_strong_and_useless_arcs(
         }
     }
 
+    // a blue seed of 2^62 outweighs any path, so larger multipliers add no
+    // label; past 2^64 the uint64 casts of mu * budget and of mu * arc_cost
+    // are undefined, and a predicate may admit arc_cost > budget
+    max_mu = std::min(max_mu, 0x1p62 / std::max({budget, max_arc_cost, 1.0}));
+    if(decades_sweep) min_mu = std::max(min_mu, max_mu / 1000.0);
     double geometrical_ratio = std::pow(max_mu / min_mu, 1.0 / num_mus);
     spdlog::trace("Min µ: {:.4e}, Max µ: {:.4e}, common ratio: {:.6g}", min_mu,
                   max_mu, geometrical_ratio);
 
     std::vector<double> mus;
     mus.push_back(0.0);
-    for(double mu = min_mu; mu <= max_mu; mu *= geometrical_ratio)
-        mus.push_back(mu);
+    // by index: repeated products overshoot max_mu by an ulp and skip it, and
+    // never end when the ratio rounds to 1. The exponent k / num_mus, unlike
+    // pow(geometrical_ratio, k), makes the grid a bitwise subset of the grid
+    // of 2 * num_mus, so doubling num_mus never loses a label
+    for(int k = 0; k <= num_mus; ++k) {
+        const double mu =
+            k < num_mus ? min_mu * std::pow(max_mu / min_mu,
+                                            static_cast<double>(k) / num_mus)
+                        : max_mu;
+        if(mus.back() < mu && mu <= max_mu) mus.push_back(mu);
+    }
+    // µ = 0 again, seeded by the fiber of the positive multipliers: mus is
+    // the test order, not sorted
+    if(decades_sweep && mus.size() > 1) mus.push_back(0.0);
+    spdlog::trace("µ sequence: {:.3e}", fmt::join(mus, " "));
 
     std::vector<std::atomic<std::size_t>> stong_counters(mus.size());
     std::vector<std::atomic<std::size_t>> useless_counters(mus.size());
@@ -105,7 +127,7 @@ auto compute_constrained_strong_and_useless_arcs(
     for(double mu : mus) {
         auto mu_length_map = base_length_map;
         for(auto && i : instance.options()) {
-            if(!option_predicate(i)) continue;
+            if(!option_predicate(i) || arcs_options[i].empty()) continue;
             const double arc_cost = instance.option_cost(i) /
                                     static_cast<double>(arcs_options[i].size());
             const log_probability_t penalty = cost_to_penatlty(mu, arc_cost);
@@ -117,6 +139,17 @@ auto compute_constrained_strong_and_useless_arcs(
         lagrange_improved_length_maps.emplace_back(mu,
                                                    std::move(mu_length_map));
     }
+
+    // every out-arc of w but uv enters the fiber: as a blue seed w relaxes
+    // nothing, for good since the fiber only grows. Dropping such seeds makes
+    // mu_fiber smaller than the fiber
+    auto dead_seed = [&graph](const arc_t & uv, const auto & fiber_map,
+                              const vertex_t & w) {
+        return std::ranges::all_of(
+            melon::out_arcs(graph, w), [&](const arc_t & b) {
+                return b == uv || fiber_map[melon::arc_target(graph, b)];
+            });
+    };
 
     {
         progress_bar<spdlog::level::trace, 64> pb(2 * arcs_range.size());
@@ -141,7 +174,6 @@ auto compute_constrained_strong_and_useless_arcs(
                     fiber_map.fill(false);
                     auto && u = melon::arc_source(graph, uv);
                     auto && v = melon::arc_target(graph, uv);
-                    std::size_t previous_fiber_size = 0;
                     std::vector<std::pair<vertex_t, log_probability_t>>
                         mu_fiber;
                     for(auto i : std::views::iota(std::size_t(0), mus.size())) {
@@ -152,22 +184,29 @@ auto compute_constrained_strong_and_useless_arcs(
                         algo.reset();
                         algo.set_red_length_map(mu_length_map);
                         algo.add_red_source(u);
+                        // before the fiber seeds: each add_*_source settles
+                        // the red vertices closer than every blue seed pushed
+                        // so far, and this seed is the closest
                         algo.add_blue_source(
                             v, base_length_map[uv] + budget_penalty);
+                        std::erase_if(mu_fiber, [&](const auto & p) {
+                            return dead_seed(uv, fiber_map, p.first);
+                        });
                         for(auto && [w, w_dist] : mu_fiber)
-                            algo.add_blue_source(w, w_dist + budget_penalty);
+                            if(w != v)
+                                algo.add_blue_source(w,
+                                                     w_dist + budget_penalty);
+                        std::size_t fiber_gain = 0;
                         for(const auto & [w, w_dist] : algo) {
                             if(fiber_map[w]) continue;
                             fiber_map[w] = true;
+                            ++fiber_gain;
                             mu_fiber.emplace_back(
                                 w, w_dist.first - budget_penalty);
                             if(useless_target_vertices_map[w]) continue;
                             strong_arcs_map[w].push_back(uv);
                         }
-                        if(mu_fiber.size() == previous_fiber_size) continue;
-                        stong_counters[i] +=
-                            mu_fiber.size() - previous_fiber_size;
-                        previous_fiber_size = mu_fiber.size();
+                        if(fiber_gain > 0) stong_counters[i] += fiber_gain;
                     }
                     pb.tick();
                 }
@@ -193,32 +232,39 @@ auto compute_constrained_strong_and_useless_arcs(
                     fiber_map.fill(false);
                     auto && u = melon::arc_source(graph, uv);
                     auto && v = melon::arc_target(graph, uv);
-                    std::size_t previous_fiber_size = 0;
                     std::vector<std::pair<vertex_t, log_probability_t>>
                         mu_fiber;
                     for(auto i : std::views::iota(std::size_t(0), mus.size())) {
+                        // v blue means red lost its only source: the fiber
+                        // already holds every vertex u reaches
+                        if(fiber_map[v]) break;
                         auto && [mu, mu_length_map] =
                             lagrange_improved_length_maps[i];
                         const log_probability_t budget_penalty =
                             cost_to_penatlty(mu, budget);
                         algo.reset();
                         algo.set_red_length_map(mu_length_map);
+                        // before the fiber seeds, as in the strong loop
                         algo.add_blue_source(u, budget_penalty);
                         algo.add_red_source(v, mu_length_map[uv]);
+                        std::erase_if(mu_fiber, [&](const auto & p) {
+                            return dead_seed(uv, fiber_map, p.first);
+                        });
                         for(auto && [w, w_dist] : mu_fiber)
-                            algo.add_blue_source(w, w_dist + budget_penalty);
+                            if(w != u)
+                                algo.add_blue_source(w,
+                                                     w_dist + budget_penalty);
+                        std::size_t fiber_gain = 0;
                         for(const auto & [w, w_dist] : algo) {
                             if(fiber_map[w]) continue;
                             fiber_map[w] = true;
+                            ++fiber_gain;
                             mu_fiber.emplace_back(
                                 w, w_dist.first - budget_penalty);
                             if(useless_target_vertices_map[w]) continue;
                             useless_arcs_map[w].push_back(uv);
                         }
-                        if(mu_fiber.size() == previous_fiber_size) continue;
-                        useless_counters[i] +=
-                            mu_fiber.size() - previous_fiber_size;
-                        previous_fiber_size = mu_fiber.size();
+                        if(fiber_gain > 0) useless_counters[i] += fiber_gain;
                     }
 
                     pb.tick();

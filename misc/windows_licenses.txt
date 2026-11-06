@@ -1,6 +1,6 @@
 Licensing Information for Distributed Components:
 
-gecot_optimize:
+gecot:
    This executable is part of the
    Graph-based Ecological Connectivity Optimization tool
    (GECOT, https://github.com/fhamonic/gecot) distributed under the
@@ -29,7 +29,7 @@ libgcc_s_seh-1.dll, libstdc++-6.dll:
    General Public License version 3 or later
    (GPLv3, https://www.gnu.org/licenses/gpl-3.0.html#license-text).
 
-CLI11 (header-only, compiled into gecot_optimize):
+CLI11 (header-only, compiled into gecot):
    This command line parser library
    (CLI11, https://github.com/CLIUtils/CLI11) is distributed under the
    BSD 3-Clause License (https://opensource.org/licenses/BSD-3-Clause).

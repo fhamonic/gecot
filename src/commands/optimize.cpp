@@ -18,25 +18,13 @@
 
 #include "gecot/helper.hpp"
 
+#include "commands/commands.hpp"
+#include "commands/common.hpp"
+
 #include "instance.hpp"
 #include "io_helper.hpp"
-#include "parse_instance.hpp"
-#include "trivial_reformulate.hpp"
 
 #include "solver_interfaces/abstract_solver_interface.hpp"
-#include "solver_interfaces/flow_benders_interface.hpp"
-#include "solver_interfaces/greedy_decremental_interface.hpp"
-#include "solver_interfaces/greedy_incremental_interface.hpp"
-#include "solver_interfaces/mip_interface.hpp"
-#include "solver_interfaces/naive_benders_interface.hpp"
-#include "solver_interfaces/path_formulation_rr_interface.hpp"
-#include "solver_interfaces/preprocessed_mip_interface.hpp"
-#include "solver_interfaces/static_decremental_interface.hpp"
-#include "solver_interfaces/static_incremental_interface.hpp"
-#include "solver_interfaces/target_benders_interface.hpp"
-#include "solver_interfaces/tree_formulation_rr_interface.hpp"
-#include "solver_interfaces/worst_greedy_decremental_interface.hpp"
-#include "solver_interfaces/worst_greedy_incremental_interface.hpp"
 
 static bool process_command_line(
     const std::vector<std::string> & args,
@@ -45,27 +33,8 @@ static bool process_command_line(
     std::optional<std::filesystem::path> & opt_output_json_file,
     std::optional<std::filesystem::path> & opt_output_csv_file,
     std::optional<tbb::global_control> & opt_tbb_global_control) {
-    std::vector<std::shared_ptr<AbstractSolverInterface>> solver_interfaces{
-        std::make_unique<StaticIncrementalInterface>(),
-        std::make_unique<StaticDecrementalInterface>(),
-        std::make_unique<GreedyIncrementalInterface>(),
-        std::make_unique<GreedyDecrementalInterface>(),
-        std::make_unique<mipInterface>(),
-        std::make_unique<PreprocessedmipInterface>(),
-        std::make_unique<NaiveBendersInterface>(),
-        std::make_unique<TargetBendersInterface>(),
-        std::make_unique<FlowBendersInterface>(),
-        std::make_unique<TreeFormulationRRInterface>(),
-        std::make_unique<PathFormulationRRInterface>(),
-        std::make_unique<WorstGreedyIncrementalInterface>(),
-        std::make_unique<WorstGreedyDecrementalInterface>()};
+    auto solver_interfaces = make_solver_interfaces();
 
-    auto print_soft_name = []() {
-        fmt::print(
-            "GECOT — Graph-based Ecological Connectivity "
-            "Optimization Tool\nVersion: {} (built on {})\n\n",
-            PROJECT_VERSION, __DATE__);
-    };
     auto print_available_algorithms = [&solver_interfaces]() {
         fmt::println("Available algorithms:");
         const std::size_t algorithm_name_max_length = std::ranges::max(
@@ -86,12 +55,12 @@ static bool process_command_line(
          verbose = false, quiet = false;
     std::string solver_name;
     std::optional<std::size_t> opt_max_threads;
-    CLI::App app("", "gecot_optimize");
+    CLI::App app("", "gecot optimize");
     app.usage(R"(Usage:
-  gecot_optimize --help
-  gecot_optimize --list-algorithms
-  gecot_optimize <algorithm> --list-params
-  gecot_optimize <algorithm> <instance> <budget> [<parameters> ...])");
+  gecot optimize --help
+  gecot optimize --list-algorithms
+  gecot optimize <algorithm> --list-params
+  gecot optimize <algorithm> <instance> <budget> [<parameters> ...])");
     app.set_help_flag();
     app.add_flag("-h,--help", help, "Display this help message");
     app.add_flag("-A,--list-algorithms", list_algorithms,
@@ -170,13 +139,7 @@ static bool process_command_line(
                                    "' is required but missing");
     if(!std::isfinite(budget) || budget < 0)
         throw std::logic_error("the budget must be a non-negative number");
-    if(quiet) {
-        spdlog::set_level(spdlog::level::err);
-    } else if(verbose) {
-        spdlog::set_level(spdlog::level::trace);
-    } else {
-        spdlog::set_level(spdlog::level::info);
-    }
+    apply_logging(verbose, quiet);
     if(opt_max_threads.has_value()) {
         opt_tbb_global_control.emplace(
             tbb::global_control::max_allowed_parallelism,
@@ -190,10 +153,7 @@ static bool process_command_line(
     return true;
 }
 
-int main(int argc, const char * argv[]) {
-#ifdef WIN32
-    std::system("chcp 65001 > NUL");
-#endif
+int optimize_command(const std::vector<std::string> & args) {
     std::shared_ptr<AbstractSolverInterface> solver;
     std::filesystem::path instances_description_json;
     double budget;
@@ -201,56 +161,24 @@ int main(int argc, const char * argv[]) {
     std::optional<std::filesystem::path> opt_output_csv_file;
     std::optional<tbb::global_control> opt_tbb_global_control;
 
-    spdlog::set_pattern("[%^%l%$] %v");
     std::string program_state = "Parsing arguments";
 
     try {
-        std::vector<std::string> args(argv + 1, argv + argc);
         if(!process_command_line(args, solver, instances_description_json,
                                  budget, opt_output_json_file,
                                  opt_output_csv_file, opt_tbb_global_control))
             return EXIT_SUCCESS;
         program_state = "Checking output files";
-        for(auto && opt_file : {opt_output_json_file, opt_output_csv_file}) {
-            if(!opt_file.has_value()) continue;
-            const auto parent =
-                std::filesystem::absolute(opt_file.value()).parent_path();
-            if(!std::filesystem::is_directory(parent))
-                throw std::runtime_error("output directory '" +
-                                         parent.string() + "' does not exist");
-        }
+        check_output_directories({opt_output_json_file, opt_output_csv_file});
         program_state = "Parsing instance";
-        Instance raw_instance = parse_instance(instances_description_json);
-        spdlog::info(
-            "Parsed instance: {}",
-            std::filesystem::absolute(instances_description_json).string());
-
-        print_instance_size<spdlog::level::info>(raw_instance);
-        double options_total_cost = 0;
-        for(auto && o : raw_instance.options())
-            options_total_cost += raw_instance.option_cost(o);
-        if(options_total_cost > 0)
-            spdlog::info(
-                "Budget represents {:.2f}% of the total options cost (={:g})",
-                budget / options_total_cost * 100, options_total_cost);
-
-        const auto [instance, quality_scale] =
-            trivial_reformulate_instance(raw_instance, budget);
-        print_instance_size<spdlog::level::trace>(instance,
-                                                  "Simplified instance");
-        if(instance.num_options() == 0) {
-            spdlog::warn("Budget doesn't allow purchasing any options");
-        }
+        const prepared_instance prepared =
+            prepare_instance(instances_description_json, budget, "algorithm");
+        const Instance & raw_instance = prepared.raw_instance;
+        const Instance & instance = prepared.instance;
         // the algorithm's scores, bounds and logs are in this unit
-        const double score_scale = quality_scale * quality_scale;
-        const auto initial_cases_pc_num =
-            gecot::compute_base_cases_pc_num(raw_instance);
-        const double initial_score =
-            raw_instance.eval_criterion(initial_cases_pc_num);
-        spdlog::info(
-            "Qualities divided by {:g}: the algorithm's scores are divided by "
-            "{:g}, its initial score is {:g}",
-            quality_scale, score_scale, initial_score / score_scale);
+        const double score_scale = prepared.score_scale;
+        const auto & initial_cases_pc_num = prepared.initial_cases_pc_num;
+        const double initial_score = prepared.initial_score;
 
         spdlog::info("Calling algorithm '{}'", solver->name());
         program_state = "Running algorithm '" + solver->name() + '\'';
@@ -324,25 +252,6 @@ int main(int argc, const char * argv[]) {
                 std::filesystem::absolute(opt_output_json_file.value())
                     .string()
                     .c_str());
-            auto print_property = [&](const std::string & property_name,
-                                      auto && pairs_range) {
-                out.print("\n    \"{}\": {{", property_name);
-                const std::size_t key_max_length =
-                    (std::ranges::empty(pairs_range)
-                         ? 0
-                         : std::ranges::max(std::ranges::views::transform(
-                               std::views::keys(pairs_range),
-                               [&](auto && s) { return s.size(); }))) +
-                    3;
-                bool first_line = true;
-                for(const auto & [key, value] : pairs_range) {
-                    out.print("{}\n        {:<{}} {}", first_line ? "" : ",",
-                              std::string("\"") + key + "\":", key_max_length,
-                              value);
-                    first_line = false;
-                }
-                out.print("\n    }}");
-            };
             out.print(
                 "{{\n    \"instance_path\":  \"{}\",\n    \"algorithm\":  "
                 "\"{}\",\n    \"computation_time_ms\":  {},\n    "
@@ -350,8 +259,8 @@ int main(int argc, const char * argv[]) {
                 std::filesystem::absolute(instances_description_json)
                     .generic_string(),
                 solver->name(), computation_time_ms, initial_score);
-            print_property(
-                "initial_pc_num",
+            print_json_property(
+                out, "initial_pc_num",
                 std::views::transform(
                     instance.cases(),
                     [&initial_cases_pc_num](const auto & instance_case) {
@@ -363,8 +272,8 @@ int main(int argc, const char * argv[]) {
                 ",\n    \"budget\":         {},\n    "
                 "\"solution_score\": {},",
                 budget, solution_score);
-            print_property(
-                "solution_pc_num",
+            print_json_property(
+                out, "solution_pc_num",
                 std::views::transform(
                     instance.cases(),
                     [&solution_cases_pc_num](const auto & instance_case) {
@@ -373,8 +282,8 @@ int main(int argc, const char * argv[]) {
                             solution_cases_pc_num[instance_case.id()]);
                     }));
             out.print(",\n    \"solution_cost\":  {},", solution_cost);
-            print_property(
-                "solution",
+            print_json_property(
+                out, "solution",
                 std::views::transform(
                     raw_instance.options(),
                     [&raw_instance, &option_value](const auto & option) {

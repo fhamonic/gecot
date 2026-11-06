@@ -476,7 +476,10 @@ struct path_formulation_rr : public mip_solver_base {
             else
                 start = _mip_start_solution(instance);
         }
-        const auto [pairs, constants] = _pairs(instance, budget, start);
+        // enumerate's columns fit in budget + feasibility_tol, as the start
+        // and the solution returned do, or L can be below their score
+        const auto [pairs, constants] =
+            _pairs(instance, budget + feasibility_tol, start);
         std::vector<option_reach> reaches;
         if(search_pricing)
             for(const auto & instance_case : instance.cases())
@@ -580,9 +583,6 @@ struct path_formulation_rr : public mip_solver_base {
         std::size_t num_evicted = 0;
         // per pair, max(0, rc_p) or a bound on it
         std::vector<double> pricing_bounds(pairs.size());
-        // not the report's best_bound: the solution returned, x cast to bool,
-        // can exceed the budget
-        std::optional<double> best_bound;
         for(;; ++iterations) {
             model.solve();
             const auto dual_solution = model.get_dual_solution();
@@ -747,10 +747,11 @@ struct path_formulation_rr : public mip_solver_base {
                     master_value + std::accumulate(pricing_bounds.begin(),
                                                    pricing_bounds.end(), 0.0);
                 spdlog::info("Lagrangian bound: {}", bound);
-                if(!best_bound || bound < best_bound.value())
-                    best_bound = bound;
-                if(relative_gap > 0 && best_bound.value() - master_value <=
-                                           relative_gap * master_value) {
+                if(!report.best_bound || bound < report.best_bound.value())
+                    report.best_bound = bound;
+                if(relative_gap > 0 &&
+                   report.best_bound.value() - master_value <=
+                       relative_gap * master_value) {
                     spdlog::info(
                         "Column generation stopped: relative gap reached");
                     report.status = "relative gap reached";
@@ -803,10 +804,28 @@ struct path_formulation_rr : public mip_solver_base {
                     num_evicted += columns.evict_columns(model, unattractive);
         }
 
-        auto solution = instance.create_option_map(false);
+        // x cast to bool can exceed the budget: the options by decreasing x
+        // that fit in it, or the start if it scores more
         const auto model_solution = model.get_solution();
-        for(const auto & o : instance.options())
-            solution[o] = model_solution[x(o)];
+        auto options = std::ranges::to<std::vector>(instance.options());
+        std::ranges::stable_sort(
+            options, [&](const option_t a, const option_t b) {
+                return model_solution[x(a)] > model_solution[x(b)];
+            });
+        auto solution = instance.create_option_map(false);
+        double purchased = 0.0;
+        for(const option_t o : options) {
+            const double price = instance.option_cost(o);
+            if(purchased + price > budget + feasibility_tol) continue;
+            purchased += price;
+            solution[o] = true;
+        }
+        auto score = [&](const auto & s) {
+            return instance.eval_criterion(
+                compute_solution_cases_pc_num(instance, s));
+        };
+        if(start && score(start.value()) > score(solution))
+            solution = start.value();
         log_master();
 
         std::size_t num_columns = 0;
@@ -818,9 +837,6 @@ struct path_formulation_rr : public mip_solver_base {
                         {"pool_columns", columns.num_pool_columns()},
                         {"evicted_columns", num_evicted}};
         report.score_stats = {{"relaxation_value", model.get_solution_value()}};
-        if(best_bound)
-            report.score_stats.emplace_back("lagrangian_bound",
-                                            best_bound.value());
         if(search_pricing)
             report.stats.emplace_back("searches", num_searches.load());
         else

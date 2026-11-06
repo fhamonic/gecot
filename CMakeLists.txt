@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.25)
 
 project(
   Gecot
-  VERSION 1.0
+  VERSION 2.0
   DESCRIPTION
     "Graph-based Ecological Connectivity Optimization Tool"
   LANGUAGES CXX)
@@ -62,29 +62,31 @@ find_package(mippp REQUIRED)
 
 
 # ################### LIB target ####################
-add_library(gecot INTERFACE)
-target_compile_definitions(gecot INTERFACE PROJECT_VERSION="${CMAKE_PROJECT_VERSION_MAJOR}.${CMAKE_PROJECT_VERSION_MINOR}")
-target_include_directories(gecot
+add_library(gecot_lib INTERFACE)
+target_compile_definitions(gecot_lib INTERFACE PROJECT_VERSION="${CMAKE_PROJECT_VERSION_MAJOR}.${CMAKE_PROJECT_VERSION_MINOR}")
+target_include_directories(gecot_lib
                            INTERFACE ${PROJECT_SOURCE_DIR}/include)
 
 if(WIN32)
-  target_include_directories(gecot INTERFACE ${CONAN_TBB_INCLUDE_DIR})
-  target_link_directories(gecot INTERFACE ${CONAN_TBB_LIB_DIR} "${CONAN_TBB_LIB_DIR}\\..\\bin")
-  target_link_libraries(gecot INTERFACE "${CONAN_TBB_LIB_DIR}/../bin/libtbb12.dll")
+  target_include_directories(gecot_lib INTERFACE ${CONAN_TBB_INCLUDE_DIR})
+  target_link_directories(gecot_lib INTERFACE ${CONAN_TBB_LIB_DIR} "${CONAN_TBB_LIB_DIR}\\..\\bin")
+  target_link_libraries(gecot_lib INTERFACE "${CONAN_TBB_LIB_DIR}/../bin/libtbb12.dll")
 else()
-  target_link_libraries(gecot INTERFACE TBB::tbb)
+  target_link_libraries(gecot_lib INTERFACE TBB::tbb)
 endif()
-target_link_libraries(gecot INTERFACE fmt::fmt)
-target_link_libraries(gecot INTERFACE spdlog::spdlog)
+target_link_libraries(gecot_lib INTERFACE fmt::fmt)
+target_link_libraries(gecot_lib INTERFACE spdlog::spdlog)
 
-target_link_libraries(gecot INTERFACE melon::melon)
-target_link_libraries(gecot INTERFACE mippp::mippp)
+target_link_libraries(gecot_lib INTERFACE melon::melon)
+target_link_libraries(gecot_lib INTERFACE mippp::mippp)
 
 
 # ################### EXEC target ####################
 # one translation unit per MIP interface: each instantiates its solver for
 # every mippp backend
-add_executable(gecot_optimize src/instance.cpp src/parse_instance.cpp src/gecot_optimize.cpp
+add_executable(gecot src/gecot.cpp src/instance.cpp src/parse_instance.cpp
+    src/commands/common.cpp src/commands/registry.cpp src/commands/optimize.cpp
+    src/commands/bound.cpp
     src/solver_interfaces/mip_interface.cpp
     src/solver_interfaces/preprocessed_mip_interface.cpp
     src/solver_interfaces/naive_benders_interface.cpp
@@ -93,21 +95,21 @@ add_executable(gecot_optimize src/instance.cpp src/parse_instance.cpp src/gecot_
     src/solver_interfaces/tree_formulation_rr_interface.cpp
     src/solver_interfaces/path_formulation_rr_interface.cpp
     ${WINDRES_ICON_O})
-target_link_libraries(gecot_optimize PUBLIC gecot)
-target_link_libraries(gecot_optimize PUBLIC vincentlaucsb-csv-parser::vincentlaucsb-csv-parser)
-target_link_libraries(gecot_optimize PUBLIC nlohmann_json::nlohmann_json)
-target_link_libraries(gecot_optimize PUBLIC nlohmann_json_schema_validator)
-target_link_libraries(gecot_optimize PUBLIC phmap)
-target_link_libraries(gecot_optimize PUBLIC CLI11::CLI11)
-# target_compile_options(gecot_optimize PUBLIC -fconcepts-diagnostics-depth=30 -Wall)
-# target_compile_options(gecot_optimize PRIVATE -fsanitize=address)
-# target_link_options(gecot_optimize PRIVATE -fsanitize=address -lpthread -static-libasan)
+target_link_libraries(gecot PUBLIC gecot_lib)
+target_link_libraries(gecot PUBLIC vincentlaucsb-csv-parser::vincentlaucsb-csv-parser)
+target_link_libraries(gecot PUBLIC nlohmann_json::nlohmann_json)
+target_link_libraries(gecot PUBLIC nlohmann_json_schema_validator)
+target_link_libraries(gecot PUBLIC phmap)
+target_link_libraries(gecot PUBLIC CLI11::CLI11)
+# target_compile_options(gecot PUBLIC -fconcepts-diagnostics-depth=30 -Wall)
+# target_compile_options(gecot PRIVATE -fsanitize=address)
+# target_link_options(gecot PRIVATE -fsanitize=address -lpthread -static-libasan)
 
 if(WARNINGS)
-  set_project_warnings(gecot)
+  set_project_warnings(gecot_lib)
 endif()
 if(OPTIMIZE_FOR_NATIVE)
-  set_project_optimizations(gecot_optimize)
+  set_project_optimizations(gecot)
 endif()
 
 
@@ -115,13 +117,13 @@ endif()
 if(ENABLE_TESTING)
   enable_testing()
   message("Building Tests.")
-  set_project_warnings(gecot)
+  set_project_warnings(gecot_lib)
   add_subdirectory(test) 
 endif()
 
 
 # ################## INSTALL #####################
-install(TARGETS gecot_optimize RUNTIME DESTINATION bin LIBRARY DESTINATION lib
+install(TARGETS gecot RUNTIME DESTINATION bin LIBRARY DESTINATION lib
 ARCHIVE DESTINATION lib)
 
 if(NOT WIN32)
@@ -135,7 +137,7 @@ if(NOT WIN32)
   install(CODE "set(_cxx_runtime \"${LIBSTDCXX_PATH}\" \"${LIBGCC_S_PATH}\")")
   install(CODE [[
     file(GET_RUNTIME_DEPENDENCIES
-      EXECUTABLES $<TARGET_FILE:gecot_optimize>
+      EXECUTABLES $<TARGET_FILE:gecot>
       RESOLVED_DEPENDENCIES_VAR _r_deps
       UNRESOLVED_DEPENDENCIES_VAR _u_deps
       PRE_EXCLUDE_REGEXES "^ld-linux" "^lib(c|m|pthread|dl|rt|stdc\\+\\+|gcc_s)\\.so"

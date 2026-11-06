@@ -15,7 +15,7 @@
 
 using option_names = std::set<std::string>;
 
-// Mirrors gecot_optimize, whose feasibility tolerance defaults to 1e-7.
+// Mirrors gecot optimize, whose feasibility tolerance defaults to 1e-7.
 // One thread: parallel reductions vary in the last ulp and can flip near-ties.
 option_names solve_aude(auto solver, double budget) {
     const tbb::global_control single_thread(

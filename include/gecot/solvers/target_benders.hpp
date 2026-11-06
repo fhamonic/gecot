@@ -25,6 +25,9 @@ namespace gecot {
 namespace solvers {
 
 struct target_benders : public mip_solver_base {
+    // experimental: compute_tight_big_M_maps' big-Ms
+    bool tight_big_M = false;
+
     template <case_c C>
     auto _compute_dual_flow(const contracted_graph_data<C> & data,
                             const auto & solution) const {
@@ -131,8 +134,9 @@ struct target_benders : public mip_solver_base {
                     }
                     cases_contracted_data[case_id].emplace_back(
                         model.add_variable(),
-                        compute_contracted_graph_data(instance, instance_case,
-                                                      budget, original_t));
+                        compute_contracted_graph_data(
+                            instance, instance_case, budget, original_t,
+                            tight_big_M, feasibility_tol));
                     pb.tick();
                 }
             }
@@ -180,8 +184,12 @@ struct target_benders : public mip_solver_base {
                        xsum(data.graph.arcs(),
                             [&](auto && a) {
                                 return xsum(
-                                    data.arc_options_map[a], [&, a](auto && p) {
-                                        auto && [improved_prob, option] = p;
+                                    std::views::iota(
+                                        std::size_t{0},
+                                        data.arc_options_map[a].size()),
+                                    [&, a](std::size_t k) {
+                                        auto && [improved_prob, option] =
+                                            data.arc_options_map[a][k];
                                         auto u = data.graph.arc_source(a);
                                         auto v = data.graph.arc_target(a);
                                         auto cai =
@@ -192,7 +200,7 @@ struct target_benders : public mip_solver_base {
                                                       improved_prob *
                                                               rho_values[v] -
                                                           rho_values[u]);
-                                        return data.big_M_map[u] *
+                                        return data.improvement_big_M(a, k) *
                                                X_vars(option) * cai;
                                     });
                             }) +
@@ -203,8 +211,8 @@ struct target_benders : public mip_solver_base {
                                 auto ri = current_solution[option]
                                               ? 0.0
                                               : target_quality_gain;
-                                return data.big_M_map[data.t] * X_vars(option) *
-                                       ri;
+                                return data.target_big_M(option) *
+                                       X_vars(option) * ri;
                             });
             };
 

@@ -3,8 +3,8 @@ find_package(GTest)
 include(GoogleTest)
 
 # ################# TEST targets #################
-add_executable(gecot_test ../src/instance.cpp ../src/parse_instance.cpp main_test.cpp preprocessing_test.cpp parse_instance_test.cpp solvers_test.cpp)
-target_link_libraries(gecot_test gecot)
+add_executable(gecot_test ../src/instance.cpp ../src/parse_instance.cpp main_test.cpp preprocessing_test.cpp parse_instance_test.cpp solvers_test.cpp bounds_test.cpp)
+target_link_libraries(gecot_test gecot_lib)
 target_link_libraries(gecot_test vincentlaucsb-csv-parser::vincentlaucsb-csv-parser)
 target_link_libraries(gecot_test nlohmann_json::nlohmann_json)
 target_link_libraries(gecot_test nlohmann_json_schema_validator)
@@ -23,7 +23,7 @@ foreach(HEADER ${GECOT_HEADERS})
   list(APPEND HEADER_CHECK_TUS ${CMAKE_CURRENT_BINARY_DIR}/header_check/${TU}.cpp)
 endforeach()
 add_library(gecot_header_check OBJECT ${HEADER_CHECK_TUS})
-target_link_libraries(gecot_header_check gecot)
+target_link_libraries(gecot_header_check gecot_lib)
 
 # execute_process(COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libasan.so
 #                 OUTPUT_VARIABLE LIBASAN_PATH

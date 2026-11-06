@@ -38,9 +38,12 @@ struct mip_solver_base {
     double feasibility_tol = 0.0;
     double probability_resolution = 1e-8;
     int num_mus = 0;
+    bool decades_sweep = true;
     std::optional<std::vector<std::string>> mip_start;
     std::optional<double> time_limit;
 
+    // the variables of the sums, products and mins are free, {} rather than
+    // the default lower bound 0: a + min(b - 10, 0) is negative below b = 10
     template <typename M, typename V>
     struct formula_variable_visitor {
         std::reference_wrapper<M> model;
@@ -56,7 +59,7 @@ struct mip_solver_base {
         auto operator()(const criterion_var & v) { return C_vars.get()(v); }
         auto operator()(const criterion_sum & f) {
             using namespace mippp::operators;
-            auto var = model.get().add_variable();
+            auto var = model.get().add_variable({});
             std::vector<mippp::model_variable_t<M>> vars;
             for(auto && e : f.values) vars.emplace_back(std::visit(*this, e));
             model.get().add_constraint(var == xsum(vars));
@@ -71,7 +74,7 @@ struct mip_solver_base {
                     "criterion "
                     "!");
 
-            auto var = model.get().add_variable();
+            auto var = model.get().add_variable({});
             model.get().add_constraint(
                 var == std::get<criterion_constant>(f.values[0]) *
                            std::visit(*this, f.values[1]));
@@ -79,7 +82,7 @@ struct mip_solver_base {
         }
         auto operator()(const criterion_min & f) {
             using namespace mippp::operators;
-            auto var = model.get().add_variable();
+            auto var = model.get().add_variable({});
             for(auto && e : f.values) {
                 model.get().add_constraint(var <= std::visit(*this, e));
             }
@@ -97,7 +100,7 @@ struct mip_solver_base {
                 [&instance, budget](const option_t & o) {
                     return instance.option_cost(o) <= budget;
                 },
-                probability_resolution, num_mus);
+                probability_resolution, num_mus, decades_sweep);
         } else {
             return compute_strong_and_useless_arcs(
                 instance_case,

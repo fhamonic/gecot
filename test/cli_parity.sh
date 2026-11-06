@@ -6,7 +6,9 @@
 #       first error line of old / new
 # stdout is compared after dropping timing lines; output files are compared
 # after dropping the *_time_ms fields.
-# Usage: cli_parity.sh OLD_BIN NEW_BIN
+# Usage: [OLD_PREFIX=...] [NEW_PREFIX=...] cli_parity.sh OLD_BIN NEW_BIN
+# A prefix goes between a binary and the case's args, split on spaces:
+#   NEW_PREFIX=optimize cli_parity.sh gecot_optimize gecot
 set -u
 if [ $# -ne 2 ]; then
     echo "usage: $0 OLD_BIN NEW_BIN" >&2
@@ -22,14 +24,16 @@ ulimit -c 0
 
 # MIP start file shared by the --mip-start cases, produced by OLD_BIN
 START=$OUT/start.json
-"$OLD" mip "$I" 10 -o "$START" -q
+"$OLD" ${OLD_PREFIX:-} mip "$I" 10 -o "$START" -q
 
 run_bin() { # tag bin id args...
-    local tag=$1 bin=$2 id=$3
+    local tag=$1 bin=$2 id=$3 prefix
     shift 3
+    if [ "$tag" = old ]; then prefix=${OLD_PREFIX:-}; else prefix=${NEW_PREFIX:-}; fi
     local wd=$OUT/$id/$tag
     mkdir -p "$wd"
-    (cd "$wd" && timeout 10 "$bin" "$@" >stdout 2>stderr; echo $? >rc)
+    # shellcheck disable=SC2086 # the prefix splits into words
+    (cd "$wd" && timeout 10 "$bin" $prefix "$@" >stdout 2>stderr; echo $? >rc)
 }
 
 first_error() { # dir

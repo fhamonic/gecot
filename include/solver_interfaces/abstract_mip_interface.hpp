@@ -103,9 +103,24 @@ protected:
                        "preprocessing algorithm")
             ->default_val(1e-8);
         app.add_option("--nb-mus", solver.num_mus,
-                       "Sets the number of lagrangian multipliers to test for "
-                       "the constrained preprocessing algorithm (experimental)")
+                       "Sets the number of geometric steps between the "
+                       "lagrangian multipliers of the constrained "
+                       "preprocessing, which tests N + 1 positive ones after 0 "
+                       "(0: unconstrained preprocessing; experimental: 20, "
+                       "or 9 on large instances)")
+            ->check(CLI::NonNegativeNumber)
             ->default_val(0);
+        app.add_option_function<std::string>(
+               "--mus-sweep",
+               [&solver](const std::string & s) {
+                   solver.decades_sweep = s == "decades";
+               },
+               "Range of the positive multipliers, up to the largest useful "
+               "one: decades spans at most the 3 decades below it and tests 0 "
+               "again last, full starts from the inverse of the largest option "
+               "cost per arc (needs --nb-mus > 0; experimental)")
+            ->check(CLI::IsMember({"decades", "full"}))
+            ->default_val("decades");
     }
 
 private:

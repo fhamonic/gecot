@@ -12,6 +12,7 @@
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/preprocessing/compute_big_M_map.hpp"
+#include "gecot/preprocessing/compute_tight_big_M_maps.hpp"
 
 #include "melon/container/static_digraph.hpp"
 #include "melon/utility/make_static_digraph.hpp"
@@ -39,6 +40,19 @@ public:
     arc_map<double> probability_map;
     arc_map<std::vector<std::pair<double, option_t>>> arc_options_map;
     vertex_map<double> big_M_map;
+    // with tight big-Ms only: per arc, the big-Ms of its improvements in
+    // arc_options_map's order, and per option the big-M of a target quality
+    // gain at t
+    arc_map<std::vector<double>> arc_big_M_map;
+    std::vector<double> target_big_M_map;
+
+    double improvement_big_M(const arc & a, const std::size_t k) const {
+        return arc_big_M_map.empty() ? big_M_map[graph.arc_source(a)]
+                                     : arc_big_M_map[a][k];
+    }
+    double target_big_M(const option_t o) const {
+        return target_big_M_map.empty() ? big_M_map[t] : target_big_M_map[o];
+    }
 
     contracted_graph_data() = default;
     contracted_graph_data(contracted_graph_data &&) = default;
@@ -54,7 +68,9 @@ public:
             source_options_map_,
         arc_map<double> && probability_map_,
         arc_map<std::vector<std::pair<double, option_t>>> && arc_options_map_,
-        vertex_map<double> && big_M_map_)
+        vertex_map<double> && big_M_map_,
+        arc_map<std::vector<double>> && arc_big_M_map_,
+        std::vector<double> && target_big_M_map_)
         : instance_case(instance_case_)
         , original_t(original_t_)
         , t(t_)
@@ -63,13 +79,16 @@ public:
         , source_options_map(std::move(source_options_map_))
         , probability_map(std::move(probability_map_))
         , arc_options_map(std::move(arc_options_map_))
-        , big_M_map(std::move(big_M_map_)) {}
+        , big_M_map(std::move(big_M_map_))
+        , arc_big_M_map(std::move(arc_big_M_map_))
+        , target_big_M_map(std::move(target_big_M_map_)) {}
 };
 
 template <instance_c I, case_c C>
 contracted_graph_data<C> compute_contracted_graph_data(
     const I & instance, const C & instance_case, const double budget,
-    const auto & original_t) {
+    const auto & original_t, const bool tight_big_M = false,
+    const double tolerance = 0.0) {
     const auto & original_graph = instance_case.graph();
     const auto & original_source_quality_map =
         instance_case.source_quality_map();
@@ -116,19 +135,63 @@ contracted_graph_data<C> compute_contracted_graph_data(
                        });
         }));
 
+    if(!tight_big_M) {
+        auto [sgraph, ssource_quality_map, ssource_options_map, sbig_M_map,
+              sprobability_map, sarc_options_map] =
+            melon::make_static_digraph(
+                original_graph, [](auto && u, auto && v) { return u < v; },
+                std::tie(original_source_quality_map,
+                         original_source_options_map, big_M_map),
+                std::tie(original_probability_map, original_arc_options_map));
+        return contracted_graph_data(
+            instance_case, original_t, original_t, std::move(sgraph),
+            std::move(ssource_quality_map), std::move(ssource_options_map),
+            std::move(sprobability_map), std::move(sarc_options_map),
+            std::move(sbig_M_map), {}, {});
+    }
+
+    const auto num_options = std::ranges::size(instance.options());
+    auto arc_big_M_map =
+        melon::create_arc_map<std::vector<double>>(original_graph, {});
+    std::vector<double> target_big_M_map(num_options, big_M_map[original_t]);
+    for(const auto & a : melon::arcs(original_graph))
+        arc_big_M_map[a].assign(
+            original_arc_options_map[a].size(),
+            big_M_map[melon::arc_source(original_graph, a)]);
+    {
+        const auto [tight_arc_big_M_map, tight_target_big_M] =
+            compute_tight_big_M_maps(
+                instance, budget, tolerance, original_graph,
+                original_source_quality_map, original_source_options_map,
+                original_probability_map, original_arc_options_map, original_t,
+                std::views::transform(
+                    original_vertex_options_map[original_t],
+                    [](auto && e) { return std::get<2>(e); }));
+        for(const auto & a : melon::arcs(original_graph))
+            for(std::size_t k = 0; k < arc_big_M_map[a].size(); ++k)
+                arc_big_M_map[a][k] =
+                    std::min(arc_big_M_map[a][k], tight_arc_big_M_map[a][k]);
+        for(auto && [sqg, tqg, option] :
+            original_vertex_options_map[original_t])
+            target_big_M_map[option] =
+                std::min(target_big_M_map[option], tight_target_big_M[option]);
+    }
+
     auto [sgraph, ssource_quality_map, ssource_options_map, sbig_M_map,
-          sprobability_map, sarc_options_map] =
+          sprobability_map, sarc_options_map, sarc_big_M_map] =
         melon::make_static_digraph(
             original_graph, [](auto && u, auto && v) { return u < v; },
             std::tie(original_source_quality_map, original_source_options_map,
                      big_M_map),
-            std::tie(original_probability_map, original_arc_options_map));
+            std::tie(original_probability_map, original_arc_options_map,
+                     arc_big_M_map));
 
     return contracted_graph_data(
         instance_case, original_t, original_t, std::move(sgraph),
         std::move(ssource_quality_map), std::move(ssource_options_map),
         std::move(sprobability_map), std::move(sarc_options_map),
-        std::move(sbig_M_map));
+        std::move(sbig_M_map), std::move(sarc_big_M_map),
+        std::move(target_big_M_map));
     ////////////////////////////////////////////////////////////////////////////
 
     // melon::mutable_digraph graph;

@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
+#include <algorithm>
+#include <random>
 #include <string>
+#include <tuple>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
@@ -18,26 +22,24 @@
 #include "instance.hpp"
 #include "parse_instance.hpp"
 
-double compute_original_contribution(auto && graph, auto source_quality_map,
-                                     auto && vertex_option_map,
+double compute_solution_contribution(auto && graph, auto source_quality_map,
+                                     auto && vertex_options_map,
                                      auto probability_map,
-                                     auto && arc_option_map, auto && original_t,
+                                     auto && arc_option_map, auto && t,
                                      auto && solution) {
     for(auto && u : melon::vertices(graph)) {
-        for(auto && [quality_gain, option] : vertex_option_map[u]) {
-            if(!solution[option]) continue;
-            source_quality_map[u] += quality_gain;
+        for(auto && option_entry : vertex_options_map[u]) {
+            if(!solution[std::get<gecot::option_t>(option_entry)]) continue;
+            source_quality_map[u] += std::get<0>(option_entry);
         }
     }
     for(auto && a : melon::arcs(graph)) {
-        for(auto && [enhanced_prob, option] : arc_option_map[a]) {
-            if(!solution[option]) continue;
-            probability_map[a] = std::max(probability_map[a], enhanced_prob);
-        }
+        const auto & option = arc_option_map[a];
+        if(option.has_value() && !solution[option.value()])
+            probability_map[a] = 0.0;
     }
-
     return gecot::pc_num_vertex_in_flow(graph, source_quality_map,
-                                        probability_map, original_t);
+                                        probability_map, t);
 }
 
 GTEST_TEST(preprocessing, fuzzy_test) {
@@ -186,4 +188,103 @@ GTEST_TEST(preprocessing, fuzzy_test) {
     std::cout << "contracted_num_constraints: " << contracted_num_constraints
               << std::endl;
     ASSERT_EQ(cpt, cpt_ok);
+}
+
+GTEST_TEST(preprocessing, constrained_labels) {
+    std::string instance_path = PROJECT_SOURCE_DIR;
+    instance_path.append("/test/instances/Quebec_438_RASY/instance.json");
+    Instance instance = parse_instance(instance_path);
+    const double budget = 2133;
+    const auto option_predicate = [&](const gecot::option_t & o) {
+        return instance.option_cost(o) <= budget;
+    };
+
+    std::vector<gecot::option_t> affordable_options;
+    for(auto && o : instance.options())
+        if(option_predicate(o)) affordable_options.push_back(o);
+    std::vector<decltype(instance.create_option_map(false))> solutions;
+    solutions.push_back(instance.create_option_map(false));
+    std::mt19937 rng(0);
+    for(int i = 0; i < 4; ++i) {
+        std::ranges::shuffle(affordable_options, rng);
+        auto & solution =
+            solutions.emplace_back(instance.create_option_map(false));
+        double cost = 0;
+        for(auto && o : affordable_options) {
+            if(cost + instance.option_cost(o) > budget) continue;
+            solution[o] = true;
+            cost += instance.option_cost(o);
+        }
+    }
+
+    std::size_t num_unconstrained_labels = 0;
+    std::size_t num_strong_labels = 0;
+    std::size_t num_useless_labels = 0;
+    std::size_t num_not_superset = 0;
+    std::size_t num_not_nested = 0;
+    std::size_t num_invalid = 0;
+    for(auto && instance_case : instance.cases()) {
+        const auto [unconstrained_strong_arcs_map,
+                    unconstrained_useless_arcs_map] =
+            gecot::compute_strong_and_useless_arcs(instance_case,
+                                                   option_predicate, 1e-8);
+        // 10 divides 20: the multipliers of 10 are a subsequence of those of
+        // 20, which is what makes its labels a subset
+        const auto [strong_arcs_map_10, useless_arcs_map_10] =
+            gecot::compute_constrained_strong_and_useless_arcs(
+                instance, instance_case, budget, option_predicate, 1e-8, 10,
+                true);
+        const auto [strong_arcs_map, useless_arcs_map] =
+            gecot::compute_constrained_strong_and_useless_arcs(
+                instance, instance_case, budget, option_predicate, 1e-8, 20,
+                true);
+        const auto [graph, source_quality_map, target_quality_map,
+                    vertex_options_map, probability_map, arc_option_map] =
+            gecot::compute_generalized_flow_graph(instance_case);
+
+        for(const auto & t : melon::vertices(instance_case.graph())) {
+            num_unconstrained_labels +=
+                unconstrained_strong_arcs_map[t].size() +
+                unconstrained_useless_arcs_map[t].size();
+            num_strong_labels += strong_arcs_map[t].size();
+            num_useless_labels += useless_arcs_map[t].size();
+            num_not_superset += !std::ranges::includes(
+                strong_arcs_map[t], unconstrained_strong_arcs_map[t]);
+            num_not_superset += !std::ranges::includes(
+                useless_arcs_map[t], unconstrained_useless_arcs_map[t]);
+            num_not_nested += !std::ranges::includes(strong_arcs_map[t],
+                                                     strong_arcs_map_10[t]);
+            num_not_nested += !std::ranges::includes(useless_arcs_map[t],
+                                                     useless_arcs_map_10[t]);
+
+            const auto [contracted_graph, contracted_source_quality_map,
+                        contracted_vertex_options_map, contracted_arc_no_map,
+                        contracted_probability_map, contracted_arc_option_map,
+                        contracted_t] =
+                gecot::compute_contracted_generalized_flow_graph(
+                    instance_case, strong_arcs_map[t], useless_arcs_map[t], t);
+            for(auto && solution : solutions) {
+                const double contribution = compute_solution_contribution(
+                    graph, source_quality_map, vertex_options_map,
+                    probability_map, arc_option_map, t, solution);
+                const double contracted_contribution =
+                    compute_solution_contribution(
+                        contracted_graph, contracted_source_quality_map,
+                        contracted_vertex_options_map,
+                        contracted_probability_map, contracted_arc_option_map,
+                        contracted_t, solution);
+                num_invalid +=
+                    std::abs(contribution - contracted_contribution) >
+                    1e-6 * std::min(contribution, contracted_contribution);
+            }
+        }
+    }
+    EXPECT_EQ(num_not_superset, std::size_t{0});
+    EXPECT_EQ(num_not_nested, std::size_t{0});
+    EXPECT_EQ(num_invalid, std::size_t{0});
+    EXPECT_GT(num_strong_labels + num_useless_labels, num_unconstrained_labels);
+    // exact at any thread count; they move with the instance, the budget, the
+    // resolution and the multiplier grid, and drop when a pass loses labels
+    EXPECT_EQ(num_strong_labels, std::size_t{160083});
+    EXPECT_EQ(num_useless_labels, std::size_t{483907});
 }

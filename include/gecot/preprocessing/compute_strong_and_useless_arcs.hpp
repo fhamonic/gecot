@@ -9,6 +9,7 @@
 #include <tbb/concurrent_vector.h>
 
 #include "melon/algorithm/competing_dijkstras.hpp"
+#include "melon/algorithm/strongly_connected_components.hpp"
 #include "melon/views/subgraph.hpp"
 
 #include "gecot/helper.hpp"
@@ -65,6 +66,28 @@ struct useless_arc_default_traits {
     static constexpr bool store_distances = false;
     static constexpr bool store_paths = false;
 };
+
+// the arcs of length 0 on a cycle of such arcs. The improvable ones count: blue
+// spreads on the base lengths, so through them it comes back to the arc's tail
+template <typename G, typename LM>
+auto zero_cycle_arcs_map(const G & graph, const LM & length_map) {
+    auto component_map = melon::create_vertex_map<std::size_t>(graph);
+    std::size_t num_components = 0;
+    for(auto && component :
+        melon::strongly_connected_components(melon::views::subgraph(
+            graph, {}, [&length_map](const melon::arc_t<G> & a) {
+                return length_map[a] == 0;
+            }))) {
+        for(auto && v : component) component_map[v] = num_components;
+        ++num_components;
+    }
+    auto zero_cycle_arcs = melon::create_arc_map<bool>(graph, false);
+    for(auto && a : melon::arcs(graph))
+        zero_cycle_arcs[a] = length_map[a] == 0 &&
+                             component_map[melon::arc_source(graph, a)] ==
+                                 component_map[melon::arc_target(graph, a)];
+    return zero_cycle_arcs;
+}
 
 template <typename GR, typename V>
 struct path_dijkstra_traits {
@@ -130,6 +153,8 @@ auto compute_strong_and_useless_arcs(
                 std::min(improved_length_map[a], prob_to_length(improved_prob));
         }
     }
+    const auto zero_cycle_arcs_map =
+        detail::zero_cycle_arcs_map(graph, base_length_map);
 
     {
         progress_bar<spdlog::level::trace, 64> pb(2 * arcs_range.size());
@@ -143,8 +168,8 @@ auto compute_strong_and_useless_arcs(
                     graph, {},
                     [&uv](const arc_t & a) -> bool { return a != uv; });
                 auto algo = melon::competing_dijkstras(
-                    detail::useless_arc_default_traits<graph_t,
-                                                       log_probability_t>{},
+                    detail::strong_arc_default_traits<graph_t,
+                                                      log_probability_t>{},
                     sgraph, base_length_map, improved_length_map);
                 for(const auto & a : arcs_block) {
                     uv = a;
@@ -152,7 +177,11 @@ auto compute_strong_and_useless_arcs(
                     auto && v = melon::arc_target(graph, uv);
                     algo.reset();
                     algo.add_red_source(u);
-                    algo.add_blue_source(v, base_length_map[uv]);
+                    // blue wins ties, enough since a vertex contracts a single
+                    // strong arc, but not on a zero-length cycle: its arcs
+                    // would all be strong and contract onto each other
+                    algo.add_blue_source(
+                        v, base_length_map[uv] + zero_cycle_arcs_map[uv]);
                     for(const auto & [w, w_dist] : algo) {
                         if(useless_vertices_map[w]) continue;
                         strong_arcs_map[w].push_back(uv);
@@ -169,6 +198,8 @@ auto compute_strong_and_useless_arcs(
                 auto sgraph = melon::views::subgraph(
                     graph, {},
                     [&uv](const arc_t & a) -> bool { return a != uv; });
+                // red wins ties: two arcs tied for a target would both be
+                // useless, and removed together
                 auto algo = melon::competing_dijkstras(
                     detail::useless_arc_default_traits<graph_t,
                                                        log_probability_t>{},

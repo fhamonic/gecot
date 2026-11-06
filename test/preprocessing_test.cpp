@@ -3,6 +3,7 @@
 #include <random>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include <spdlog/spdlog.h>
@@ -21,6 +22,8 @@
 
 #include "instance.hpp"
 #include "parse_instance.hpp"
+
+#include "instance_builder.hpp"
 
 double compute_solution_contribution(auto && graph, auto source_quality_map,
                                      auto && vertex_options_map,
@@ -41,6 +44,69 @@ double compute_solution_contribution(auto && graph, auto source_quality_map,
     return gecot::pc_num_vertex_in_flow(graph, source_quality_map,
                                         probability_map, t);
 }
+
+namespace {
+// the contribution of t stays the same once contracted, with no option and with
+// all of them, which must fit in the budget, on the labels of both functions
+void expect_contraction_preserves_flow(const Instance & instance,
+                                       const double budget, const unsigned t,
+                                       const std::size_t num_strong_labels) {
+    const auto & instance_case = instance.cases()[0];
+    const auto option_predicate = [](const gecot::option_t &) { return true; };
+    const auto [graph, source_quality_map, target_quality_map,
+                vertex_options_map, probability_map, arc_option_map] =
+        gecot::compute_generalized_flow_graph(instance_case);
+    for(const bool constrained : {false, true}) {
+        SCOPED_TRACE(constrained ? "constrained" : "unconstrained");
+        const auto [strong_arcs_map, useless_arcs_map] =
+            constrained
+                ? gecot::compute_constrained_strong_and_useless_arcs(
+                      instance, instance_case, budget, option_predicate, 1e-8)
+                : gecot::compute_strong_and_useless_arcs(
+                      instance_case, option_predicate, 1e-8);
+        EXPECT_EQ(strong_arcs_map[t].size(), num_strong_labels);
+        const auto [contracted_graph, contracted_source_quality_map,
+                    contracted_vertex_options_map, contracted_arc_no_map,
+                    contracted_probability_map, contracted_arc_option_map,
+                    contracted_t] =
+            gecot::compute_contracted_generalized_flow_graph(
+                instance_case, strong_arcs_map[t], useless_arcs_map[t], t);
+        for(const bool bought : {false, true}) {
+            SCOPED_TRACE(bought ? "all options" : "no option");
+            const auto solution = instance.create_option_map(bought);
+            const double contribution = compute_solution_contribution(
+                graph, source_quality_map, vertex_options_map, probability_map,
+                arc_option_map, t, solution);
+            const double contracted_contribution =
+                compute_solution_contribution(
+                    contracted_graph, contracted_source_quality_map,
+                    contracted_vertex_options_map, contracted_probability_map,
+                    contracted_arc_option_map, contracted_t, solution);
+            EXPECT_NEAR(contracted_contribution, contribution,
+                        1e-6 * contribution);
+        }
+    }
+}
+
+// whether the constrained labelling makes source -> target strong, or useless,
+// for t
+bool has_constrained_label(const Instance & instance, const double budget,
+                           const unsigned t, const unsigned source,
+                           const unsigned target, const bool strong) {
+    const auto & instance_case = instance.cases()[0];
+    const auto & graph = instance_case.graph();
+    const auto [strong_arcs_map, useless_arcs_map] =
+        gecot::compute_constrained_strong_and_useless_arcs(
+            instance, instance_case, budget,
+            [](const gecot::option_t &) { return true; }, 1e-8);
+    return std::ranges::any_of(
+        (strong ? strong_arcs_map : useless_arcs_map)[t],
+        [&graph, source, target](const auto & a) {
+            return melon::arc_source(graph, a) == source &&
+                   melon::arc_target(graph, a) == target;
+        });
+}
+}  // namespace
 
 GTEST_TEST(preprocessing, fuzzy_test) {
     std::string instance_path = PROJECT_SOURCE_DIR;
@@ -285,6 +351,154 @@ GTEST_TEST(preprocessing, constrained_labels) {
     EXPECT_GT(num_strong_labels + num_useless_labels, num_unconstrained_labels);
     // exact at any thread count; they move with the instance, the budget, the
     // resolution and the multiplier grid, and drop when a pass loses labels
-    EXPECT_EQ(num_strong_labels, std::size_t{160083});
+    EXPECT_EQ(num_strong_labels, std::size_t{160562});
     EXPECT_EQ(num_useless_labels, std::size_t{483907});
+}
+
+GTEST_TEST(preprocessing, zero_length_cycle) {
+    // 1 <-> 2 has length 0 at resolution 1e-8 but p < 1, so no reformulation
+    // merges it; s = 0 and the sources 1, 2 reach t = 3 at equal lengths
+    const case_spec spec{
+        .num_vertices = 4,
+        .arcs = {{0, 1}, {0, 2}, {1, 2}, {2, 1}, {1, 3}, {2, 3}},
+        .probabilities = {0.5, 0.5, 1 - 3e-9, 1 - 3e-9, 0.5, 0.5},
+        .source_qualities = {1, 1, 1, 0},
+        .target_qualities = {0, 0, 0, 1},
+        .vertex_options = {},
+        .arc_options = {}};
+    // blue wins the ties of 0-1, 0-2, 1-3 and 2-3, red those of 1-2, 2-1
+    expect_contraction_preserves_flow(
+        build_instance({}, {spec}, criterion_var{0}), 0.0, 3, 4);
+}
+
+GTEST_TEST(preprocessing, zero_length_cycle_with_improvable_arc) {
+    // 1 -> 0 has length 0 and an option improves it: it still closes the cycle.
+    // Blue from 1 comes back through it to 0 and reaches t = 2 at the length of
+    // 0 -> 2. If it won that tie, 0 -> 1 would contract and the flow of 0 be
+    // lost, its only way on being 1 -> 2, which is useless
+    const case_spec spec{.num_vertices = 3,
+                         .arcs = {{0, 1}, {1, 0}, {0, 2}, {1, 2}},
+                         .probabilities = {1, 1 - 3e-9, 0.5, 0.25},
+                         .source_qualities = {1, 0, 1},
+                         .target_qualities = {1, 1, 1},
+                         .vertex_options = {},
+                         .arc_options = {{}, {{1.0, 0}}, {}, {}}};
+    const double budget = 1;
+    expect_contraction_preserves_flow(
+        build_instance({budget}, {spec}, criterion_var{0}), budget, 2, 2);
+}
+
+GTEST_TEST(preprocessing, zero_length_cycle_in_later_passes) {
+    // the option of 5 -> 4 gives the grid positive multipliers and a final
+    // µ = 0, whose fiber seeds must keep the unit of the cycle 0 <-> 1
+    const double zero_length = 1 - 3e-9;
+    const case_spec spec{
+        .num_vertices = 6,
+        .arcs = {{0, 1}, {1, 0}, {1, 2}, {2, 4}, {0, 3}, {3, 4}, {5, 4}},
+        .probabilities = {zero_length, zero_length, 0.5, 0.5, 0.5, 0.5, 0.5},
+        .source_qualities = {1, 1, 0, 0, 0, 1},
+        .target_qualities = {0, 0, 0, 0, 1, 0},
+        .vertex_options = {},
+        .arc_options = {{}, {}, {}, {}, {}, {}, {{0.9, 0}}}};
+    const double budget = 1;
+    expect_contraction_preserves_flow(
+        build_instance({budget}, {spec}, criterion_var{0}), budget, 4, 5);
+}
+
+GTEST_TEST(preprocessing, blue_tie_at_positive_mu) {
+    // the options improve one arc each of 0 3 4 and cost the whole budget, so at
+    // most one fits. With either one 0 3 4 is 2 units longer than 0 1 4, and at
+    // µ = max_mu red reaches 4 exactly when blue does: only there is 0 -> 1
+    // labelled, as red wins at µ = 0
+    const case_spec spec{.num_vertices = 5,
+                         .arcs = {{0, 1}, {1, 4}, {0, 3}, {3, 4}},
+                         .probabilities = {0.99, 0.3681818272770346, 0.5, 0.5},
+                         .source_qualities = {1, 0, 0, 0, 0},
+                         .target_qualities = {0, 0, 0, 0, 1},
+                         .vertex_options = {},
+                         .arc_options = {{}, {}, {{0.729, 0}}, {{0.729, 1}}}};
+    const double budget = 29;
+    EXPECT_TRUE(has_constrained_label(
+        build_instance({budget, budget}, {spec}, criterion_var{0}), budget, 4,
+        0, 1, true));
+}
+
+GTEST_TEST(preprocessing, penalty_rounding) {
+    // Q = 0 3 4 5 6 7 8 2 has 7 arcs that the option, costing the whole budget,
+    // improves from 0.5 to 0.729: 221257078 long at resolution 1e-8. At
+    // µ = max_mu, products rounded to nearest would sum the 7 truncated shares
+    // to one unit over the budget penalty. That would label 0 -> 1 strong for
+    // t = 2 with 0 1 2 one unit longer than Q, and 0 -> 3 useless with 0 1 2 as
+    // long as Q
+    const double budget = 29;
+    const auto instance = [budget](const double last_probability) {
+        const std::vector<std::pair<double, gecot::option_t>> improvement = {
+            {0.729, 0}};
+        return build_instance(
+            {budget},
+            {case_spec{.num_vertices = 9,
+                       .arcs = {{0, 1},
+                                {1, 2},
+                                {0, 3},
+                                {3, 4},
+                                {4, 5},
+                                {5, 6},
+                                {6, 7},
+                                {7, 8},
+                                {8, 2}},
+                       .probabilities = {0.99, last_probability, 0.5, 0.5, 0.5,
+                                         0.5, 0.5, 0.5, 0.5},
+                       .source_qualities = {1, 0, 0, 0, 0, 0, 0, 0, 0},
+                       .target_qualities = {0, 0, 1, 0, 0, 0, 0, 0, 0},
+                       .vertex_options = {},
+                       .arc_options = {{},
+                                       {},
+                                       improvement,
+                                       improvement,
+                                       improvement,
+                                       improvement,
+                                       improvement,
+                                       improvement,
+                                       improvement}}},
+            criterion_var{0});
+    };
+    // 0 1 2 is one unit longer than Q, as long as Q, one unit shorter
+    const double longer = 0.11052423580612372;
+    const double as_long = 0.11052423673744628;
+    const double shorter = 0.11052423796396785;
+    EXPECT_FALSE(has_constrained_label(instance(longer), budget, 2, 0, 1, true));
+    EXPECT_TRUE(has_constrained_label(instance(as_long), budget, 2, 0, 1, true));
+    EXPECT_FALSE(
+        has_constrained_label(instance(as_long), budget, 2, 0, 3, false));
+    EXPECT_TRUE(
+        has_constrained_label(instance(shorter), budget, 2, 0, 3, false));
+}
+
+GTEST_TEST(preprocessing, contraction_of_a_strong_self_loop) {
+    // labels the zero-length cycle guard no longer lets a labelling produce:
+    // contracting 0 -> 1 makes a self-loop of 1 -> 0, whose contraction would
+    // remove vertex 1 and the flow merged into it
+    const case_spec spec{.num_vertices = 3,
+                         .arcs = {{0, 1}, {1, 0}, {1, 2}},
+                         .probabilities = {0.5, 0.5, 0.5},
+                         .source_qualities = {1, 1, 0},
+                         .target_qualities = {0, 0, 1},
+                         .vertex_options = {},
+                         .arc_options = {}};
+    const Instance instance = build_instance({}, {spec}, criterion_var{0});
+    const auto & instance_case = instance.cases()[0];
+    const auto & graph = instance_case.graph();
+    std::vector<melon::arc_t<melon::static_digraph>> strong_arcs, useless_arcs;
+    for(const auto & a : melon::arcs(graph))
+        if(melon::arc_target(graph, a) != 2u) strong_arcs.push_back(a);
+    const auto [contracted_graph, contracted_source_quality_map,
+                contracted_vertex_options_map, contracted_arc_no_map,
+                contracted_probability_map, contracted_arc_option_map,
+                contracted_t] =
+        gecot::compute_contracted_generalized_flow_graph(
+            instance_case, strong_arcs, useless_arcs, 2u);
+    EXPECT_DOUBLE_EQ(gecot::pc_num_vertex_in_flow(
+                         contracted_graph, contracted_source_quality_map,
+                         contracted_probability_map, contracted_t),
+                     0.75);
 }

@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <utility>
 
 #include <fmt/ranges.h>
@@ -46,6 +47,15 @@ auto compute_constrained_strong_and_useless_arcs(
                                const double cost) -> log_probability_t {
         return static_cast<log_probability_t>(mu * cost);
     };
+    // two steps down, which outweigh the rounding of mu * budget: along a path,
+    // the shares of a feasible set must not sum past the budget penalty. One
+    // unit over lets blue win a strong tie it should lose, and the useless loop
+    // label an arc on a shortest path
+    auto arc_cost_to_penalty = [](const double mu,
+                                  const double arc_cost) -> log_probability_t {
+        return static_cast<log_probability_t>(
+            std::nextafter(mu * std::nextafter(arc_cost, 0.0), 0.0));
+    };
 
     const auto & graph = instance_case.graph();
     const auto & target_quality_map = instance_case.target_quality_map();
@@ -69,6 +79,8 @@ auto compute_constrained_strong_and_useless_arcs(
     for(const arc_t & a : arcs_range) {
         base_length_map[a] = prob_to_length(base_probability_map[a]);
     }
+    const auto zero_cycle_arcs_map =
+        detail::zero_cycle_arcs_map(graph, base_length_map);
 
     auto arcs_options = instance.create_option_map(
         std::vector<std::pair<melon::arc_t<graph_t>, double>>{});
@@ -130,7 +142,7 @@ auto compute_constrained_strong_and_useless_arcs(
             if(!option_predicate(i) || arcs_options[i].empty()) continue;
             const double arc_cost = instance.option_cost(i) /
                                     static_cast<double>(arcs_options[i].size());
-            const log_probability_t penalty = cost_to_penatlty(mu, arc_cost);
+            const log_probability_t penalty = arc_cost_to_penalty(mu, arc_cost);
             for(auto && [a, enhanced_prob] : arcs_options[i]) {
                 mu_length_map[a] = std::min(
                     mu_length_map[a], prob_to_length(enhanced_prob) + penalty);
@@ -166,8 +178,8 @@ auto compute_constrained_strong_and_useless_arcs(
                                a != uv;
                     });
                 auto algo = melon::competing_dijkstras(
-                    detail::useless_arc_default_traits<graph_t,
-                                                       log_probability_t>{},
+                    detail::strong_arc_default_traits<graph_t,
+                                                      log_probability_t>{},
                     sgraph, base_length_map, base_length_map);
                 for(const auto & a : arcs_block) {
                     uv = a;
@@ -186,9 +198,13 @@ auto compute_constrained_strong_and_useless_arcs(
                         algo.add_red_source(u);
                         // before the fiber seeds: each add_*_source settles
                         // the red vertices closer than every blue seed pushed
-                        // so far, and this seed is the closest
-                        algo.add_blue_source(
-                            v, base_length_map[uv] + budget_penalty);
+                        // so far, and this seed is the closest. Red wins the
+                        // ties of zero-length cycles, as in
+                        // compute_strong_and_useless_arcs; the fiber seeds
+                        // inherit the unit
+                        algo.add_blue_source(v, base_length_map[uv] +
+                                                    zero_cycle_arcs_map[uv] +
+                                                    budget_penalty);
                         std::erase_if(mu_fiber, [&](const auto & p) {
                             return dead_seed(uv, fiber_map, p.first);
                         });

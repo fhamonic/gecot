@@ -97,7 +97,12 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
             continue;  // if many strong arcs shared the same source
         const auto u = melon::arc_source(graph, uv);
         const auto v = melon::arc_target(graph, uv);
-        if(u == v) continue;  // if earlier contractions made it a self-loop
+        // earlier contractions made it a self-loop: useless, and contracting it
+        // would remove the merged vertex
+        if(u == v) {
+            graph.remove_arc(uv);
+            continue;
+        }
         const auto uv_prob = probability_map[uv];
 
         in_arcs_tmp.resize(0);

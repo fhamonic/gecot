@@ -477,7 +477,7 @@ GTEST_TEST(preprocessing, penalty_rounding) {
 GTEST_TEST(preprocessing, contraction_of_a_strong_self_loop) {
     // labels the zero-length cycle guard no longer lets a labelling produce:
     // contracting 0 -> 1 makes a self-loop of 1 -> 0, whose contraction would
-    // remove vertex 1 and the flow merged into it
+    // remove vertex 1 and the flow merged into it. The self-loop goes, 1 stays
     const case_spec spec{.num_vertices = 3,
                          .arcs = {{0, 1}, {1, 0}, {1, 2}},
                          .probabilities = {0.5, 0.5, 0.5},
@@ -497,6 +497,7 @@ GTEST_TEST(preprocessing, contraction_of_a_strong_self_loop) {
                 contracted_t] =
         gecot::compute_contracted_generalized_flow_graph(
             instance_case, strong_arcs, useless_arcs, 2u);
+    EXPECT_EQ(melon::num_arcs(contracted_graph), 1u);
     EXPECT_DOUBLE_EQ(gecot::pc_num_vertex_in_flow(
                          contracted_graph, contracted_source_quality_map,
                          contracted_probability_map, contracted_t),

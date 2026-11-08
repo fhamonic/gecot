@@ -119,11 +119,11 @@ struct target_benders : public mip_solver_base {
                                                  budget);
 
             spdlog::stopwatch prep_sw;
-            spdlog::trace(
+            spdlog::debug(
                 "Computing contractions and big-Ms of the '{}' graph:",
                 instance_case.name());
             {
-                progress_bar<spdlog::level::trace, 64> pb(
+                progress_bar<spdlog::level::info, 64> pb(
                     original_graph.num_vertices());
                 for(const auto & original_t : melon::vertices(original_graph)) {
                     if(original_target_quality_map[original_t] == 0 &&
@@ -146,7 +146,7 @@ struct target_benders : public mip_solver_base {
                     pb.tick();
                 }
             }
-            if(spdlog::get_level() == spdlog::level::trace) {
+            if(spdlog::should_log(spdlog::level::debug)) {
                 std::size_t num_vertices, num_arcs, num_graphs;
                 num_vertices = num_arcs = 0u;
                 num_graphs = cases_contracted_data[instance_case.id()].size();
@@ -155,13 +155,13 @@ struct target_benders : public mip_solver_base {
                     num_vertices += data.graph.num_vertices();
                     num_arcs += data.graph.num_arcs();
                 }
-                spdlog::trace("  {:>10.2f} vertices on average",
+                spdlog::debug("  {:>10.2f} vertices on average",
                               static_cast<double>(num_vertices) /
                                   static_cast<double>(num_graphs));
-                spdlog::trace("  {:>10.2f} arcs on average",
+                spdlog::debug("  {:>10.2f} arcs on average",
                               static_cast<double>(num_arcs) /
                                   static_cast<double>(num_graphs));
-                spdlog::trace(
+                spdlog::debug(
                     "          (took {} ms)",
                     std::chrono::duration_cast<std::chrono::milliseconds>(
                         prep_sw.elapsed())
@@ -392,11 +392,11 @@ int>>>();
                 instance_case.vertex_options_map();
 
             spdlog::stopwatch prep_sw;
-            spdlog::trace(
+            spdlog::debug(
                 "Computing contractions and big-Ms of the '{}' graph:",
                 instance_case.name());
             {
-                progress_bar<spdlog::level::trace, 64> pb(graph.num_vertices());
+                progress_bar<spdlog::level::info, 64> pb(graph.num_vertices());
                 for(const auto & t : melon::vertices(graph)) {
                     if(target_quality_map[t] == 0 &&
                        std::ranges::none_of(

@@ -5,6 +5,8 @@
 #include <iostream>
 #include <limits>
 #include <optional>
+#include <ranges>
+#include <vector>
 
 #include <CLI/CLI.hpp>
 
@@ -52,7 +54,8 @@ static bool process_command_line(
     };
 
     bool help = false, list_algorithms = false, list_params = false,
-         verbose = false, quiet = false;
+         quiet = false;
+    int verbosity = 0;
     std::string solver_name;
     std::optional<std::size_t> opt_max_threads;
     CLI::App app("", "gecot optimize");
@@ -79,7 +82,9 @@ static bool process_command_line(
                    "Output solution data in JSON file");
     app.add_option("--output-csv", opt_output_csv_file,
                    "Output solution value in CSV file");
-    app.add_flag("-v,--verbose", verbose, "Enable logging of algorithms trace");
+    app.add_flag("-v,--verbose", verbosity,
+                 "Log the algorithms' details, -vv everything with the "
+                 "solver's own log on stdout");
     app.add_flag("-q,--quiet", quiet, "Silence all logging except errors");
     app.add_option("--max-threads", opt_max_threads,
                    "Limits the number of threads used")
@@ -116,9 +121,7 @@ static bool process_command_line(
         }
         if(!found) {
             print_available_algorithms();
-            throw std::logic_error(std::string("Error: the argument ('") +
-                                   solver_name +
-                                   "') for option '--algorithm' is invalid");
+            throw std::logic_error("unknown algorithm '" + solver_name + "'");
         }
     }
 
@@ -139,7 +142,7 @@ static bool process_command_line(
                                    "' is required but missing");
     if(!std::isfinite(budget) || budget < 0)
         throw std::logic_error("the budget must be a non-negative number");
-    apply_logging(verbose, quiet);
+    apply_logging(verbosity, quiet);
     if(opt_max_threads.has_value()) {
         opt_tbb_global_control.emplace(
             tbb::global_control::max_allowed_parallelism,
@@ -170,6 +173,8 @@ int optimize_command(const std::vector<std::string> & args) {
             return EXIT_SUCCESS;
         program_state = "Checking output files";
         check_output_directories({opt_output_json_file, opt_output_csv_file});
+        spdlog::info("GECOT {}, algorithm {}", PROJECT_VERSION, solver->name());
+        log_parameters(solver->parameters());
         program_state = "Parsing instance";
         const prepared_instance prepared =
             prepare_instance(instances_description_json, budget, "algorithm");
@@ -180,20 +185,20 @@ int optimize_command(const std::vector<std::string> & args) {
         const auto & initial_cases_pc_num = prepared.initial_cases_pc_num;
         const double initial_score = prepared.initial_score;
 
-        spdlog::info("Calling algorithm '{}'", solver->name());
         program_state = "Running algorithm '" + solver->name() + '\'';
         spdlog::stopwatch sw;
-        auto [solution, report] =
-            instance.num_options() == 0
-                ? gecot::solve_result<Instance>{instance.create_option_map(
-                                                    false),
-                                                {"no option left"}}
-                : solver->solve(instance, budget);
+        auto [solution, report] = [&] {
+            const progress_watch watch(prepared);
+            return instance.num_options() == 0
+                       ? gecot::solve_result<Instance>{instance
+                                                           .create_option_map(
+                                                               false),
+                                                       {"no option left"}}
+                       : solver->solve(instance, budget);
+        }();
         const auto computation_time_ms =
             std::chrono::duration_cast<std::chrono::milliseconds>(sw.elapsed())
                 .count();
-        spdlog::info("Algorithm '{}' ran in {} ms", solver->name(),
-                     computation_time_ms);
 
         program_state = "Printing solution";
         auto solution_cases_pc_num =
@@ -206,13 +211,19 @@ int optimize_command(const std::vector<std::string> & args) {
             gecot::compute_solution_cost(instance, solution);
         for(const auto & [key, value] : report.score_stats)
             report.stats.emplace_back(key, value * score_scale);
+        std::optional<double> best_bound;
         if(report.best_bound) {
             const double bound = report.best_bound.value() * score_scale;
             report.stats.emplace_back("best_bound", bound);
             if(solution_score > 0)
                 report.stats.emplace_back(
                     "gap", (bound - solution_score) / solution_score);
+            // at the optimum, a few ulps below the recomputed score
+            best_bound = std::max(bound, solution_score);
         }
+        if(solution_cost > budget + 1e-6 * std::max(1.0, budget))
+            spdlog::warn("The solution costs {:.10g}, over the budget {:.10g}",
+                         solution_cost, budget);
         // free options were bought by trivial_reformulate_instance
         auto option_value = [&](const gecot::option_t & option) {
             const auto & option_name = raw_instance.option_name(option);
@@ -224,27 +235,50 @@ int optimize_command(const std::vector<std::string> & args) {
 
         if(!opt_output_json_file.has_value() &&
            !opt_output_csv_file.has_value()) {
-            fmt::print(
-                "Initial Score:  {}\nBudget: {}\nSolution score: {}\nSolution "
-                "cost: {}\nPC_num:\n",
-                initial_score, budget, solution_score, solution_cost);
-            for(const auto & instance_case : instance.cases()) {
-                fmt::print("\t{}: {}\n", instance_case.name(),
-                           solution_cases_pc_num[instance_case.id()]);
+            fmt::println("Status          {}", report.status);
+            fmt::println("Initial score   {}", format_score(initial_score));
+            fmt::println("Solution score  {} ({})",
+                         format_score(solution_score),
+                         format_gain(solution_score, initial_score));
+            if(best_bound)
+                fmt::println(
+                    "Upper bound     {}{}", format_score(best_bound.value()),
+                    guaranteed_gain_share(solution_score, best_bound.value(),
+                                          prepared.base_score)
+                        .transform([](double share) {
+                            return fmt::format(
+                                " (at least {:.1f} % of the best possible "
+                                "gain)",
+                                share);
+                        })
+                        .value_or(""));
+            fmt::println("Cost            {:.10g} of {:.10g}", solution_cost,
+                         budget);
+            fmt::println(
+                "Time            {}",
+                format_duration(static_cast<double>(computation_time_ms) /
+                                1000.0));
+            if(instance.cases().size() > 1) {
+                fmt::println("Per species");
+                const std::size_t name_max_length = std::ranges::max(
+                    std::views::transform(instance.cases(), [](auto && c) {
+                        return c.name().size();
+                    }));
+                for(const auto & instance_case : instance.cases())
+                    fmt::println(
+                        "    {:<{}} {} ({})", instance_case.name() + ':',
+                        name_max_length + 1,
+                        format_score(solution_cases_pc_num[instance_case.id()]),
+                        format_gain(solution_cases_pc_num[instance_case.id()],
+                                    initial_cases_pc_num[instance_case.id()]));
             }
-            fmt::print("Solution:\n");
-            const std::size_t option_name_max_length =
-                raw_instance.options().empty()
-                    ? 0
-                    : std::ranges::max(std::ranges::views::transform(
-                          raw_instance.options(), [&](auto && o) {
-                              return raw_instance.option_name(o).size();
-                          }));
-            for(auto && option : raw_instance.options()) {
-                fmt::println("    {:<{}} {}", raw_instance.option_name(option),
-                             option_name_max_length, option_value(option));
-            }
-            fmt::println("Computation time: {} ms", computation_time_ms);
+            const auto bought = std::ranges::to<std::vector>(std::views::filter(
+                raw_instance.options(),
+                [&](auto && option) { return option_value(option); }));
+            fmt::println("Options bought  {} of {}{}", bought.size(),
+                         raw_instance.num_options(), bought.empty() ? "" : ":");
+            for(auto && option : bought)
+                fmt::println("    {}", raw_instance.option_name(option));
         }
 
         if(opt_output_json_file.has_value()) {
@@ -297,7 +331,7 @@ int optimize_command(const std::vector<std::string> & args) {
                 out.print(",\n        \"{}\": {}", key, value);
             out.print("\n    }}\n}}");
 
-            spdlog::info("Solution printed to '{}'",
+            spdlog::info("Solution written to {}",
                          std::filesystem::absolute(opt_output_json_file.value())
                              .string());
         }
@@ -310,7 +344,7 @@ int optimize_command(const std::vector<std::string> & args) {
                 out.print("\"{}\",{}\n", raw_instance.option_name(option),
                           option_value(option));
             }
-            spdlog::info("Solution written to '{}'",
+            spdlog::info("Solution written to {}",
                          std::filesystem::absolute(opt_output_csv_file.value())
                              .string());
         }

@@ -144,19 +144,12 @@ struct mip : public mip_solver_base {
                 }));
         }
 
-        spdlog::trace("mip model has:");
-        spdlog::trace("  {:>10} variables", model.num_variables());
-        spdlog::trace("  {:>10} constraints", model.num_constraints());
-        spdlog::trace("  {:>10} entries", model.num_nonzeros());
-
         _add_mip_start(model, instance, X_vars);
 
         const auto [has_solution, report] = _solve(model, sw);
         if(!has_solution) return {_fallback_solution(instance, budget), report};
         const auto model_solution = model.get_solution();
 
-        spdlog::trace("mip solution found with value: {}",
-                      model.get_solution_value());
         for(const auto & i : instance.options()) {
             solution[i] = model_solution[X_vars(i)] > 0.5;
         }

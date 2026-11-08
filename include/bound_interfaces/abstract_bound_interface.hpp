@@ -10,6 +10,7 @@
 #include "gecot/bounds/bound_report.hpp"
 
 #include "instance.hpp"
+#include "solver_interfaces/abstract_solver_interface.hpp"
 
 // what compute needs to read its parameters in the instance's unit
 struct bound_context {
@@ -47,6 +48,10 @@ public:
     virtual void parse(std::vector<std::string> args) { app.parse(args); }
     std::string name() const { return app.get_name(); }
     virtual std::string options_description() const { return app.help(); }
+    virtual std::vector<std::pair<std::string, std::string>> parameters()
+        const {
+        return option_values(app);
+    }
 
     // the bound and score_stats in the unit of instance
     virtual gecot::bound_report compute(

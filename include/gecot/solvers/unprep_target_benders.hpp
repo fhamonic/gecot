@@ -112,11 +112,11 @@ struct unprep_target_benders : public mip_solver_base {
                 instance_case.vertex_options_map();
 
             spdlog::stopwatch prep_sw;
-            spdlog::trace(
+            spdlog::debug(
                 "Computing contractions and big-Ms of the '{}' graph:",
                 instance_case.name());
             {
-                progress_bar<spdlog::level::trace, 64> pb(graph.num_vertices());
+                progress_bar<spdlog::level::info, 64> pb(graph.num_vertices());
                 for(const auto & t : melon::vertices(graph)) {
                     if(target_quality_map[t] == 0 &&
                        std::ranges::none_of(

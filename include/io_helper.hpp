@@ -10,9 +10,8 @@
 #include <spdlog/spdlog.h>
 
 template <spdlog::level::level_enum LVL>
-void print_instance_size(auto && instance,
-                         const std::string & instance_name = "Instance") {
-    spdlog::log(LVL, "{} has {} options and {} species graph:", instance_name,
+void print_instance_size(auto && instance, const std::string & instance_name) {
+    spdlog::log(LVL, "{}: {} options, {} species", instance_name,
                 instance.num_options(), instance.cases().size());
     if(instance.cases().empty()) return;
     const std::size_t instance_name_max_length =
@@ -35,12 +34,11 @@ void print_instance_size(auto && instance,
             num_improvable_arcs +=
                 instance_case.arc_options_map()[a].size() > 0;
         spdlog::log(LVL,
-                    "    {:>{}}: {:>6} vertices ({} improvable, {} habitats)",
-                    instance_case.name(), instance_name_max_length,
-                    graph.num_vertices(), num_improvable_vertices,
-                    num_habitat_vertices);
-        spdlog::log(LVL, "    {:>{}}{:>8} arcs     ({} improvable)", "",
-                    instance_name_max_length, graph.num_arcs(),
+                    "  {:<{}} {} vertices ({} habitats, {} improvable), {} "
+                    "arcs ({} improvable)",
+                    instance_case.name() + ':', instance_name_max_length + 1,
+                    graph.num_vertices(), num_habitat_vertices,
+                    num_improvable_vertices, graph.num_arcs(),
                     num_improvable_arcs);
     }
 }

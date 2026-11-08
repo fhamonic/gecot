@@ -273,25 +273,18 @@ struct preprocessed_mip : public mip_solver_base {
         }
 
         if(tight_big_M)
-            spdlog::info(
+            spdlog::debug(
                 "prep_mip tight big-Ms: arcs {:.4g} of the knapsack ones ({} "
                 "of {} halved at least), target gains {:.4g}",
                 arc_M_old_sum > 0 ? arc_M_sum / arc_M_old_sum : 1.0,
                 arc_M_halved, arc_M_count,
                 target_M_old_sum > 0 ? target_M_sum / target_M_old_sum : 1.0);
-        spdlog::trace("prep_mip model has:");
-        spdlog::trace("  {:>10} variables", model.num_variables());
-        spdlog::trace("  {:>10} constraints", model.num_constraints());
-        spdlog::trace("  {:>10} entries", model.num_nonzeros());
-
         _add_mip_start(model, instance, X_vars);
 
         const auto [has_solution, report] = _solve(model, sw);
         if(!has_solution) return {_fallback_solution(instance, budget), report};
         const auto model_solution = model.get_solution();
 
-        spdlog::trace("prep_mip solution found with value: {}",
-                      model.get_solution_value());
         for(const auto & i : instance.options()) {
             solution[i] = model_solution[X_vars(i)] > 0.5;
         }

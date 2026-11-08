@@ -28,7 +28,7 @@ int main(int argc, const char * argv[]) {
 #ifdef WIN32
     std::system("chcp 65001 > NUL");
 #endif
-    spdlog::set_pattern("[%^%l%$] %v");
+    setup_logging();
     const std::vector<std::string> args(argv + 1, argv + argc);
 
     if(args.empty() || args[0] == "-h" || args[0] == "--help") {

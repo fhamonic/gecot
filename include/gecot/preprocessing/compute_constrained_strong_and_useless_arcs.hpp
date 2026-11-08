@@ -34,8 +34,8 @@ auto compute_constrained_strong_and_useless_arcs(
     using arc_t = melon::arc_t<graph_t>;
 
     spdlog::stopwatch prep_sw;
-    spdlog::trace("Lagrangian preprocessing of the '{}' graph:",
-                  instance_case.name());
+    spdlog::info("Preprocessing the '{}' graph, budget-aware",
+                 instance_case.name());
 
     auto prob_to_length =
         [probability_resolution](const double p) -> log_probability_t {
@@ -111,7 +111,7 @@ auto compute_constrained_strong_and_useless_arcs(
     max_mu = std::min(max_mu, 0x1p62 / std::max({budget, max_arc_cost, 1.0}));
     if(decades_sweep) min_mu = std::max(min_mu, max_mu / 1000.0);
     double geometrical_ratio = std::pow(max_mu / min_mu, 1.0 / num_mus);
-    spdlog::trace("Min µ: {:.4e}, Max µ: {:.4e}, common ratio: {:.6g}", min_mu,
+    spdlog::debug("Min µ: {:.4e}, Max µ: {:.4e}, common ratio: {:.6g}", min_mu,
                   max_mu, geometrical_ratio);
 
     std::vector<double> mus;
@@ -130,7 +130,7 @@ auto compute_constrained_strong_and_useless_arcs(
     // µ = 0 again, seeded by the fiber of the positive multipliers: mus is
     // the test order, not sorted
     if(decades_sweep && mus.size() > 1) mus.push_back(0.0);
-    spdlog::trace("µ sequence: {:.3e}", fmt::join(mus, " "));
+    spdlog::debug("µ sequence: {:.3e}", fmt::join(mus, " "));
 
     std::vector<std::atomic<std::size_t>> stong_counters(mus.size());
     std::vector<std::atomic<std::size_t>> useless_counters(mus.size());
@@ -164,7 +164,7 @@ auto compute_constrained_strong_and_useless_arcs(
     };
 
     {
-        progress_bar<spdlog::level::trace, 64> pb(2 * arcs_range.size());
+        progress_bar<spdlog::level::info, 64> pb(2 * arcs_range.size());
 
         tbb::parallel_for(
             tbb::blocked_range(arcs_range.begin(), arcs_range.end()),
@@ -293,28 +293,28 @@ auto compute_constrained_strong_and_useless_arcs(
         std::sort(strong_arcs_map[v].begin(), strong_arcs_map[v].end());
         std::sort(useless_arcs_map[v].begin(), useless_arcs_map[v].end());
     }
-    if(spdlog::get_level() == spdlog::level::trace) {
+    if(spdlog::should_log(spdlog::level::debug)) {
         for(auto i : std::views::iota(std::size_t(1), mus.size())) {
             stong_counters[i] += stong_counters[i - 1];
             useless_counters[i] += useless_counters[i - 1];
         }
-        spdlog::trace("------------------------------------------");
-        spdlog::trace("  µ value  | strong fiber | useless fiber ");
-        spdlog::trace("           |  (avg size)  |  (avg size)");
-        spdlog::trace("------------------------------------------");
+        spdlog::debug("------------------------------------------");
+        spdlog::debug("  µ value  | strong fiber | useless fiber ");
+        spdlog::debug("           |  (avg size)  |  (avg size)");
+        spdlog::debug("------------------------------------------");
         const auto num_arcs = melon::num_arcs(graph);
         for(auto i : std::views::iota(std::size_t(0), mus.size())) {
             if(i > 0 &&
                stong_counters[i].load() == stong_counters[i - 1].load() &&
                useless_counters[i].load() == useless_counters[i - 1].load())
                 continue;
-            spdlog::trace(" {:>.3e} | {:>12.3f} | {:>13.3f}  ", mus[i],
+            spdlog::debug(" {:>.3e} | {:>12.3f} | {:>13.3f}  ", mus[i],
                           static_cast<double>(stong_counters[i]) /
                               static_cast<double>(num_arcs),
                           static_cast<double>(useless_counters[i]) /
                               static_cast<double>(num_arcs));
         }
-        spdlog::trace("------------------------------------------");
+        spdlog::debug("------------------------------------------");
 
         std::size_t num_strong, num_useless, num_sinks;
         num_strong = num_useless = num_sinks = 0;
@@ -324,13 +324,13 @@ auto compute_constrained_strong_and_useless_arcs(
             num_useless += useless_arcs_map[v].size();
             ++num_sinks;
         }
-        spdlog::trace(
+        spdlog::debug(
             "  {:>10.2f} strong arcs on average",
             static_cast<double>(num_strong) / static_cast<double>(num_sinks));
-        spdlog::trace(
+        spdlog::debug(
             "  {:>10.2f} useless arcs on average",
             static_cast<double>(num_useless) / static_cast<double>(num_sinks));
-        spdlog::trace("          (took {} ms)",
+        spdlog::debug("          (took {} ms)",
                       std::chrono::duration_cast<std::chrono::milliseconds>(
                           prep_sw.elapsed())
                           .count());

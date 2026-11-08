@@ -30,6 +30,7 @@
 #include "gecot/helper.hpp"
 
 #include "gecot/solvers/mip_solver_base.hpp"
+#include "gecot/utils/progress.hpp"
 
 namespace gecot {
 namespace solvers {
@@ -517,12 +518,13 @@ struct path_formulation_rr : public mip_solver_base {
                                           return instance.option_name(o).size();
                                       }))]() {
             const auto model_solution = model.get_solution();
-            spdlog::info("path formulation relaxation has value: {}",
-                         model.get_solution_value());
+            spdlog::trace("path formulation relaxation has value: {}",
+                          model.get_solution_value());
             for(auto && option : instance.options()) {
                 const auto & option_name = instance.option_name(option);
-                spdlog::info("    {:<{}} {}", option_name,
-                             option_name_max_length, model_solution[x(option)]);
+                spdlog::trace("    {:<{}} {}", option_name,
+                              option_name_max_length,
+                              model_solution[x(option)]);
             }
         };
 
@@ -631,7 +633,7 @@ struct path_formulation_rr : public mip_solver_base {
                 pricing_bounds[p] = std::max(best_rc, 0.0);
                 if(best && best_rc > margin(p)) found(p, best_rc, *best);
             };
-            std::atomic<bool> cut_short = false;  // by the time limit
+            std::atomic<bool> cut_short = false;  // by a stop
             // The search of pair p. The labels only lose value and gain
             // weight, so a label is kept while π_k q_s(every option) w - W -
             // σ_p > margin, which bounds max(0, rc_p) when none is found; so
@@ -661,7 +663,7 @@ struct path_formulation_rr : public mip_solver_base {
                         found(p, best->first, best->second);
                     return;
                 }
-                if(time_up()) {
+                if(stop_requested || time_up()) {
                     cut_short = true;
                     return;
                 }
@@ -746,13 +748,15 @@ struct path_formulation_rr : public mip_solver_base {
                 const double bound =
                     master_value + std::accumulate(pricing_bounds.begin(),
                                                    pricing_bounds.end(), 0.0);
-                spdlog::info("Lagrangian bound: {}", bound);
                 if(!report.best_bound || bound < report.best_bound.value())
                     report.best_bound = bound;
+                report_progress({.bound = report.best_bound,
+                                 .relaxation = master_value,
+                                 .round = iterations});
                 if(relative_gap > 0 &&
                    report.best_bound.value() - master_value <=
                        relative_gap * master_value) {
-                    spdlog::info(
+                    spdlog::debug(
                         "Column generation stopped: relative gap reached");
                     report.status = "relative gap reached";
                     break;
@@ -788,12 +792,13 @@ struct path_formulation_rr : public mip_solver_base {
                               }))
                     : columns.activate_columns(model, improving, add_column);
             if(!num_activated && !cut_short) {
-                spdlog::info("Column generation stopped: converged");
+                spdlog::debug("Column generation stopped: converged");
                 break;
             }
-            if(time_up()) {
-                spdlog::warn("Column generation stopped: time limit reached");
-                report.status = "time limit reached";
+            if(stop_requested || time_up()) {
+                report.status =
+                    stop_requested ? "interrupted" : "time limit reached";
+                spdlog::warn("Column generation stopped: {}", report.status);
                 // as in tree_rr: the solvers lose the changed master's solution
                 if(num_activated) model.solve();
                 break;

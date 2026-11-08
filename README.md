@@ -65,7 +65,8 @@ OPTIONS:
   -B,     --budget FLOAT      Budget value
   -o,     --output-json TEXT  Output solution data in JSON file
           --output-csv TEXT   Output solution value in CSV file
-  -v,     --verbose           Enable logging of algorithms trace
+  -v,     --verbose [0]       Log the algorithms' details, -vv everything with the solver's own
+                              log on stdout
   -q,     --quiet             Silence all logging except errors
           --max-threads UINT:POSITIVE
                               Limits the number of threads used
@@ -98,7 +99,8 @@ OPTIONS:
   -i,     --instance TEXT     Instance JSON file
   -B,     --budget FLOAT      Budget value
   -o,     --output-json TEXT  Output bound data in JSON file
-  -v,     --verbose           Enable logging of methods trace
+  -v,     --verbose [0]       Log the methods' details, -vv everything with the solver's own
+                              log on stdout
   -q,     --quiet             Silence all logging except errors
           --max-threads UINT:POSITIVE
                               Limits the number of threads used
@@ -106,6 +108,9 @@ OPTIONS:
 
 `gecot optimize --list-algorithms` and `gecot bound --list-methods` describe the algorithms and the bound methods, and `--list-params` their parameters.
 The `gecot_optimize <algorithm> ...` command of former releases is now `gecot optimize <algorithm> ...`.
+
+The result is printed on stdout, unless `-o` or `--output-csv` writes it to a file. The log goes to stderr, each line after the seconds since the start: the steps of the run, then a table of the algorithm's progress, with a row when a value changes, at most every 5 s and at least every minute. Its `gain` is the best solution's over the initial score, `max gain` the best possible gain, proven, and `guaranteed` the share of this best possible gain that the solution is proven to reach. The rows of `tree_rr` and `path_rr` are their rounds, with the gain of their `relaxation`.
+Ctrl-C stops the algorithm and keeps its best result so far, with the status `interrupted`; a second Ctrl-C quits at once. A MIP solver notices it only when it next reports its progress: within seconds with Gurobi (2 s into a root relaxation on Quebec), up to about 15 s apart with HiGHS on the same model, never with CBC, which reports none. The column generations of `tree_rr` and `path_rr` stop at the end of their current round, and the heuristics run to the end.
 
 
 ## Citation

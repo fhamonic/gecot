@@ -26,6 +26,7 @@
 #include "gecot/preprocessing/compute_contracted_generalized_flow_graph.hpp"
 
 #include "gecot/solvers/mip_solver_base.hpp"
+#include "gecot/utils/progress.hpp"
 
 namespace gecot {
 namespace solvers {
@@ -260,12 +261,13 @@ struct tree_formulation_rr : public mip_solver_base {
                                           return instance.option_name(o).size();
                                       }))]() {
             const auto model_solution = model.get_solution();
-            spdlog::info("tree_decomposition relaxation has value: {}",
-                         model.get_solution_value());
+            spdlog::trace("tree_decomposition relaxation has value: {}",
+                          model.get_solution_value());
             for(auto && option : instance.options()) {
                 const auto & option_name = instance.option_name(option);
-                spdlog::info("    {:<{}} {}", option_name,
-                             option_name_max_length, model_solution[x(option)]);
+                spdlog::trace("    {:<{}} {}", option_name,
+                              option_name_max_length,
+                              model_solution[x(option)]);
             }
         };
 
@@ -355,6 +357,8 @@ struct tree_formulation_rr : public mip_solver_base {
             model.solve();
             const auto dual_solution = model.get_dual_solution();
             log_master();
+            report_progress({.relaxation = model.get_solution_value(),
+                             .round = iterations});
 
             auto pi = [&](const std::size_t t) {
                 return dual_solution[contribution_rows[targets[t].case_id]];
@@ -405,11 +409,11 @@ struct tree_formulation_rr : public mip_solver_base {
                     evaluate(p.v, solution)};
             };
 
-            std::atomic<bool> cut_short = false;  // by the time limit
+            std::atomic<bool> cut_short = false;  // by a stop
             tbb::concurrent_vector<std::pair<tree, double>> priced_trees;
             tbb::parallel_for(std::size_t{0}, targets.size(),
                               [&](const std::size_t t) {
-                                  if(time_up()) {
+                                  if(stop_requested || time_up()) {
                                       cut_short = true;
                                       return;
                                   }
@@ -432,12 +436,13 @@ struct tree_formulation_rr : public mip_solver_base {
                 },
                 add_tree);
             if(!num_activated && !cut_short) {
-                spdlog::info("Column generation stopped: converged");
+                spdlog::debug("Column generation stopped: converged");
                 break;
             }
-            if(time_up()) {
-                spdlog::warn("Column generation stopped: time limit reached");
-                report.status = "time limit reached";
+            if(stop_requested || time_up()) {
+                report.status =
+                    stop_requested ? "interrupted" : "time limit reached";
+                spdlog::warn("Column generation stopped: {}", report.status);
                 // Gurobi, CPLEX and COPT give no solution for a master
                 // changed since its last solve, HiGHS a zero value
                 if(num_activated) model.solve();

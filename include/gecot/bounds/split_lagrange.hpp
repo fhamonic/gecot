@@ -34,6 +34,7 @@
 #include "gecot/bounds/qkp_planes.hpp"
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
+#include "gecot/utils/progress.hpp"
 
 namespace gecot {
 
@@ -392,7 +393,7 @@ public:
                           });
         for(std::size_t p = 0; p < num_pairs; ++p) offsets[p + 1] += offsets[p];
         const std::size_t num_entries = offsets[num_pairs];
-        spdlog::info(
+        spdlog::debug(
             "split_lagrange: {} pairs, {} corridor entries ({:.1f} per pair), "
             "{:.0f} MB of prices",
             num_pairs, num_entries,
@@ -442,7 +443,8 @@ public:
                     scratch & sc = scratches.local();
                     for(std::size_t p = r.begin(); p != r.end(); ++p) {
                         if(timed_out.load(std::memory_order_relaxed)) break;
-                        if(time_limit && elapsed() > time_limit.value()) {
+                        if(stop_requested ||
+                           (time_limit && elapsed() > time_limit.value())) {
                             timed_out = true;
                             break;
                         }
@@ -482,9 +484,9 @@ public:
                     return a;
                 });
             if(timed_out) {
-                spdlog::info(
-                    "split_lagrange: time limit reached in iteration {}, its "
-                    "sweep discarded",
+                spdlog::debug(
+                    "split_lagrange: stopped in iteration {}, its sweep "
+                    "discarded",
                     iteration);
                 result.timed_out = true;
                 break;
@@ -499,7 +501,7 @@ public:
                 step /= 2;
                 stall = 0;
             }
-            spdlog::info(
+            spdlog::debug(
                 "split_lagrange: iteration {}: bound {} (Σ R {} + knapsack "
                 "{}), "
                 "best {}, {} labels, {:.1f} options used per pair, {} outside, "
@@ -576,7 +578,9 @@ public:
                 return r.bound;
             });
         return {b,
-                timed_out ? "time limit reached" : "completed",
+                timed_out
+                    ? (stop_requested ? "interrupted" : "time limit reached")
+                    : "completed",
                 {{"iterations", static_cast<double>(total_iterations)}}};
     }
 

@@ -37,7 +37,8 @@ run_bin() { # tag bin id args...
 }
 
 first_error() { # dir
-    grep -h -m1 '^\[error\]' "$1/stdout" "$1/stderr" | head -n1
+    grep -h -m1 -E '^\[error\]|^\[ *[0-9.]+s\] error: ' "$1/stdout" "$1/stderr" |
+        head -n1
 }
 
 filtered_stdout() { # dir

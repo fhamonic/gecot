@@ -50,8 +50,8 @@ static bool process_command_line(
         fmt::println("");
     };
 
-    bool help = false, list_methods = false, list_params = false,
-         verbose = false, quiet = false;
+    bool help = false, list_methods = false, list_params = false, quiet = false;
+    int verbosity = 0;
     std::string method_name;
     std::optional<std::size_t> opt_max_threads;
     CLI::App app("", "gecot bound");
@@ -76,7 +76,9 @@ static bool process_command_line(
         app.add_option("budget,-B,--budget", budget, "Budget value");
     app.add_option("-o,--output-json", opt_output_json_file,
                    "Output bound data in JSON file");
-    app.add_flag("-v,--verbose", verbose, "Enable logging of methods trace");
+    app.add_flag("-v,--verbose", verbosity,
+                 "Log the methods' details, -vv everything with the solver's "
+                 "own log on stdout");
     app.add_flag("-q,--quiet", quiet, "Silence all logging except errors");
     app.add_option("--max-threads", opt_max_threads,
                    "Limits the number of threads used")
@@ -112,9 +114,7 @@ static bool process_command_line(
                                        "' proves no bound, see 'gecot bound "
                                        "--list-methods'");
             print_available_methods();
-            throw std::logic_error(std::string("Error: the argument ('") +
-                                   method_name +
-                                   "') for option '--method' is invalid");
+            throw std::logic_error("unknown method '" + method_name + "'");
         }
         method = *it;
     }
@@ -136,7 +136,7 @@ static bool process_command_line(
                                    "' is required but missing");
     if(!std::isfinite(budget) || budget < 0)
         throw std::logic_error("the budget must be a non-negative number");
-    apply_logging(verbose, quiet);
+    apply_logging(verbosity, quiet);
     if(opt_max_threads.has_value()) {
         opt_tbb_global_control.emplace(
             tbb::global_control::max_allowed_parallelism,
@@ -166,6 +166,9 @@ int bound_command(const std::vector<std::string> & args) {
             return EXIT_SUCCESS;
         program_state = "Checking output files";
         check_output_directories({opt_output_json_file});
+        spdlog::info("GECOT {}, bound method {}", PROJECT_VERSION,
+                     method->name());
+        log_parameters(method->parameters());
         program_state = "Parsing instance";
         const prepared_instance prepared =
             prepare_instance(instances_description_json, budget, "method");
@@ -174,21 +177,19 @@ int bound_command(const std::vector<std::string> & args) {
         const double score_scale = prepared.score_scale;
         // the solutions are those of 'gecot optimize', the options of cost 0
         // bought: buying no other is one
-        const double base_score =
-            instance.eval_criterion(gecot::compute_base_cases_pc_num(instance));
+        const double base_score = prepared.base_score / score_scale;
 
-        spdlog::info("Calling method '{}'", method->name());
         program_state = "Running method '" + method->name() + '\'';
         spdlog::stopwatch sw;
-        gecot::bound_report report =
-            instance.num_options() == 0
-                ? gecot::bound_report{base_score, "no option left"}
-                : method->compute(instance, budget, {score_scale});
+        gecot::bound_report report = [&] {
+            const progress_watch watch(prepared);
+            return instance.num_options() == 0
+                       ? gecot::bound_report{base_score, "no option left"}
+                       : method->compute(instance, budget, {score_scale});
+        }();
         const auto computation_time_ms =
             std::chrono::duration_cast<std::chrono::milliseconds>(sw.elapsed())
                 .count();
-        spdlog::info("Method '{}' ran in {} ms", method->name(),
-                     computation_time_ms);
 
         program_state = "Checking the bound of '" + method->name() + '\'';
         const double bound = report.bound * score_scale;
@@ -207,12 +208,20 @@ int bound_command(const std::vector<std::string> & args) {
             report.stats.emplace_back(key, value * score_scale);
 
         if(!opt_output_json_file.has_value()) {
-            fmt::print("Initial Score:  {}\nBudget: {}\nUpper bound: {}\n",
-                       prepared.initial_score, budget, bound);
+            fmt::println("Status             {}", report.status);
+            fmt::println("Initial score      {}",
+                         format_score(prepared.initial_score));
+            fmt::println("Upper bound        {} (at most {})",
+                         format_score(bound),
+                         format_gain(bound, prepared.initial_score));
             if(all_options_bound)
-                fmt::print("All options bound: {}\n",
-                           all_options_bound.value());
-            fmt::println("Computation time: {} ms", computation_time_ms);
+                fmt::println("All options bound  {}",
+                             format_score(all_options_bound.value()));
+            fmt::println("Budget             {:.10g}", budget);
+            fmt::println(
+                "Time               {}",
+                format_duration(static_cast<double>(computation_time_ms) /
+                                1000.0));
         }
 
         if(opt_output_json_file.has_value()) {
@@ -247,7 +256,7 @@ int bound_command(const std::vector<std::string> & args) {
                 out.print(",\n        \"{}\": {}", key, value);
             out.print("\n    }}\n}}");
 
-            spdlog::info("Bound printed to '{}'",
+            spdlog::info("Bound written to {}",
                          std::filesystem::absolute(opt_output_json_file.value())
                              .string());
         }

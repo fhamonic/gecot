@@ -34,6 +34,10 @@ public:
     std::string options_description() const override {
         return solver->options_description();
     }
+    std::vector<std::pair<std::string, std::string>> parameters()
+        const override {
+        return solver->parameters();
+    }
 
     gecot::bound_report compute(const Instance & instance, const double B,
                                 const bound_context &) const override {

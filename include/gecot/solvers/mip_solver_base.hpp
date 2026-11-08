@@ -2,11 +2,13 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <concepts>
 #include <optional>
 #include <ranges>
 #include <stdexcept>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <variant>
 
@@ -23,6 +25,7 @@
 #include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 #include "gecot/solvers/solve_result.hpp"
+#include "gecot/utils/progress.hpp"
 
 namespace gecot {
 namespace solvers {
@@ -136,6 +139,33 @@ struct mip_solver_base {
             // pruned better solutions before the scores were scaled
             GRB.setintparam(env, "NumericFocus", 1);
         }
+        if constexpr(mippp::has_progress_callback<M>)
+            model.set_progress_callback([](auto & handle) noexcept {
+                if(stop_requested) {
+                    handle.interrupt();
+                    return;
+                }
+                // infinite until the solver has one
+                auto finite = [](const double v) {
+                    return std::isfinite(v) ? std::optional<double>{v}
+                                            : std::nullopt;
+                };
+                progress p{.score = finite(handle.get_solution_value()),
+                           .bound = finite(handle.get_dual_bound())};
+                if constexpr(mippp::has_node_count<
+                                 std::remove_cvref_t<decltype(handle)>>)
+                    p.nodes = handle.get_node_count();
+                report_progress(p);
+            });
+        // the solver's own log, on stdout
+        if constexpr(mippp::has_verbosity<M>)
+            model.set_verbose(spdlog::should_log(spdlog::level::trace));
+        spdlog::info("Solving the optimization model");
+        spdlog::debug(
+            "The model has {} variables, {} constraints and {} "
+            "nonzeros",
+            model.num_variables(), model.num_constraints(),
+            model.num_nonzeros());
         model.solve();
         const auto & s = model.get_status();
         const std::string_view reason = std::visit(
@@ -188,7 +218,7 @@ struct mip_solver_base {
         if constexpr(mippp::has_node_count<M>)
             report.stats.emplace_back("nodes", model.get_node_count());
         spdlog::log(std::holds_alternative<status::optimal>(s)
-                        ? spdlog::level::info
+                        ? spdlog::level::debug
                         : spdlog::level::warn,
                     "Solver stopped: {}", reason);
         return {true, report};

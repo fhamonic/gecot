@@ -102,7 +102,7 @@ struct qkp_planes {
         std::vector<double> costs(n);
         for(std::size_t i = 0; i < n; ++i)
             costs[i] = instance.option_cost(items[i]);
-        spdlog::info(
+        spdlog::debug(
             "qkp_planes: {} options with quality gains, {:.0f} MB of dense "
             "matrices",
             n,

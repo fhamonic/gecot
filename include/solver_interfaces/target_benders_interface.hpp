@@ -11,6 +11,7 @@ private:
 public:
     TargetBendersInterface() : AbstractMipInterface("target_benders") {
         add_mip_options(solver, 1e-7, lazy_constraint_solvers);
+        add_preprocessing_options(solver);
         app.add_option_function<std::string>(
                "--big-m",
                [this](const std::string & s) {

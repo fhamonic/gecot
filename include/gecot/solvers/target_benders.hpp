@@ -114,6 +114,10 @@ struct target_benders : public mip_solver_base {
             const auto & original_vertex_options_map =
                 instance_case.vertex_options_map();
 
+            const auto [strong_arcs_map, useless_arcs_map] =
+                _compute_strong_and_useless_arcs(instance, instance_case,
+                                                 budget);
+
             spdlog::stopwatch prep_sw;
             spdlog::trace(
                 "Computing contractions and big-Ms of the '{}' graph:",
@@ -136,7 +140,9 @@ struct target_benders : public mip_solver_base {
                         model.add_variable(),
                         compute_contracted_graph_data(
                             instance, instance_case, budget, original_t,
-                            tight_big_M, feasibility_tol));
+                            strong_arcs_map[original_t],
+                            useless_arcs_map[original_t], tight_big_M,
+                            feasibility_tol));
                     pb.tick();
                 }
             }

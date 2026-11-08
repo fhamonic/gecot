@@ -17,14 +17,14 @@ tif_matrix = np.array(tif_image)
 
 # instance_name = "instance_70x70"
 
-instance_name = "instance_30x30"
+# instance_name = "instance_30x30"
 # strat_x = 2
 # start_y = 12
 # tif_matrix = tif_matrix[start_y:start_y+40, strat_x:strat_x+40]
-tif_matrix = tif_matrix[16:46, 16:46]
+# tif_matrix = tif_matrix[16:46, 16:46]
 
-# instance_name = "instance_40x40"
-# tif_matrix = tif_matrix[0:40, 0:40]
+instance_name = "instance_40x40"
+tif_matrix = tif_matrix[0:40, 0:40]
 
 # print(tif_matrix)
 
@@ -56,11 +56,11 @@ def cell_option_id(v):
 
 
 colors = {
-    "habitat": (0,136,55),
-    "field": (166,219,160),
-    "road": (123,50,148),
-    "wildlife crossing": (194,165,207),
-    "land acquisition": (247,247,247),
+    "habitat": (0, 136, 55),
+    "field": (166, 219, 160),
+    "road": (123, 50, 148),
+    "wildlife crossing": (194, 165, 207),
+    "land acquisition": (247, 247, 247),
 }
 source_quality_map = {
     "habitat": 1,
@@ -85,11 +85,11 @@ cell_cost = {"wildlife crossing": 1, "land acquisition": 0.2}
 
 os.makedirs(root_path / instance_name, exist_ok=True)
 
-(height, width) = tif_matrix.shape
+height, width = tif_matrix.shape
 img = Image.new("RGB", (width, height))
 pixels = img.load()
 for idx, value in np.ndenumerate(tif_matrix):
-    (y, x) = idx
+    y, x = idx
     pixels[x, y] = colors[cell_type(value)]
 
 fig, ax = plt.subplots(figsize=(16, 16))
@@ -131,12 +131,14 @@ def writeCSV(file_name, columns):
     return file
 
 
-vertices_csv = writeCSV(root_path / f"{instance_name}/vertices.csv", "id,quality,x,y")
+vertices_csv = writeCSV(
+    root_path / f"{instance_name}/vertices.csv", "id,source_quality,target_quality,x,y"
+)
 arcs_csv = writeCSV(root_path / f"{instance_name}/arcs.csv", "id,from,to,probability")
 
 
 def add_vertex(id, quality, x, y):
-    vertices_csv.write(f"{id},{quality},{x},{y}\n")
+    vertices_csv.write(f"{id},{quality},{quality},{x},{y}\n")
 
 
 def add_arc(arc_id, source_id, target_id, probability):
@@ -145,9 +147,9 @@ def add_arc(arc_id, source_id, target_id, probability):
 
 offset_for_display = 0.33
 
-(width, height) = tif_matrix.shape
+width, height = tif_matrix.shape
 for idx, value in np.ndenumerate(tif_matrix):
-    (y, x) = idx
+    y, x = idx
     id = f"{x}:{y}"
     quality = source_quality_map[cell_type(value)]
     probability = probability_map[cell_type(value)]
@@ -171,7 +173,7 @@ arcs_csv.close()
 options_csv = writeCSV(root_path / f"{instance_name}/options.csv", "id,cost")
 vertex_options_csv = writeCSV(
     root_path / f"{instance_name}/vertices_improvements.csv",
-    "vertex_id,option_id,quality_gain",
+    "vertex_id,option_id,source_quality_gain,target_quality_gain",
 )
 arc_options_csv = writeCSV(
     root_path / f"{instance_name}/arcs_improvements.csv",
@@ -184,7 +186,7 @@ def add_option(option_id, cost):
 
 
 def add_vertex_option(vertex_id, option_id, quality_gain):
-    vertex_options_csv.write(f"{vertex_id},{option_id},{quality_gain}\n")
+    vertex_options_csv.write(f"{vertex_id},{option_id},{quality_gain},{quality_gain}\n")
 
 
 def add_arc_option(arc_id, option_id, improved_prob):
@@ -194,7 +196,7 @@ def add_arc_option(arc_id, option_id, improved_prob):
 options = {}
 
 for idx, value in np.ndenumerate(tif_matrix):
-    (y, x) = idx
+    y, x = idx
     id = f"{x}:{y}"
     value = int(value)
     cell_t = cell_type(value)
@@ -225,8 +227,7 @@ arc_options_csv.close()
 
 
 instance_file = open(root_path / f"{instance_name}/instance.json", "w")
-instance_file.write(
-    """{
+instance_file.write("""{
     "options": {
         "csv_file": "options.csv"
     },
@@ -247,6 +248,5 @@ instance_file.write(
         }
     },
     "criterion": "squirrel"
-}"""
-)
+}""")
 instance_file.close()

@@ -107,6 +107,10 @@ struct flow_benders : public mip_solver_base {
 
             auto C_constr = model.add_constraint(C_vars(case_id) <= 0);
 
+            const auto [strong_arcs_map, useless_arcs_map] =
+                _compute_strong_and_useless_arcs(instance, instance_case,
+                                                 budget);
+
             spdlog::stopwatch prep_sw;
             spdlog::trace(
                 "Computing contractions and big-Ms of the '{}' graph:",
@@ -128,7 +132,9 @@ struct flow_benders : public mip_solver_base {
                                 C_constr, -original_t_target_quality)}),
                             compute_contracted_graph_data(
                                 instance, instance_case, budget, original_t,
-                                tight_big_M, feasibility_tol));
+                                strong_arcs_map[original_t],
+                                useless_arcs_map[original_t], tight_big_M,
+                                feasibility_tol));
 
                     for(const auto & [sqg, target_quality_gain, option] :
                         original_vertex_options_map[original_t]) {

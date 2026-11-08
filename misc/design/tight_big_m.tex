@@ -1,0 +1,563 @@
+\documentclass[11pt,a4paper]{report}
+
+% The preamble reproduces tex/custom.tex and tex/gloss.tex of the thesis, so
+% that the chapter below uses its macros, environments and acronyms.
+\usepackage[margin=2.5cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{xcolor}
+\usepackage{amsmath,amsthm,amssymb}
+\usepackage{mdframed,tabularx,environ}
+\usepackage{hyperref}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{empheq}
+\usepackage[most]{tcolorbox}
+\usetikzlibrary{shadows}
+\usepackage{glossaries}
+\glsdisablehyper
+
+% Proof environments
+\newtheorem{theorem}{Theorem}[chapter]
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{conjecture}[theorem]{Conjecture}
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[chapter]
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}
+
+\makeatletter
+\newcommand\xlabel[2][]{\phantomsection\def\@currentlabelname{#1}#1\label{#2}}
+\makeatother
+
+% optimization problem environment
+\makeatletter
+\newcounter{optimization_program}
+\newcounter{optimization_program_st}
+\newcommand{\name}[1]{\gdef\@name{#1}}% problem name
+\newcommand{\sense}[1]{\gdef\@sense{#1}}% problem sense
+\newcommand{\objective}[1]{\gdef\@objective{#1}}% problem objective
+\newcommand{\constraints}[1]{\gdef\@constraints{\setcounter{optimization_program_st}{1}#1\setcounter{optimization_program_st}{0}}}% problem constraints
+\newcommand{\constraint}[2]{\\ \ifnum\value{optimization_program_st}>0 {\textnormal{subject to~}} \else {}\fi & \text{~#1} && \text{~~~~#2} \setcounter{optimization_program_st}{0}}% problem constraint
+\NewEnviron{optimization_program}{
+  \name{}\sense{minimize}\objective{}\constraints{}% Default input is empty
+  \stepcounter{optimization_program}% step optimization_program number
+  \BODY% parse commands
+  \par\nopagebreak\vspace{-\abovedisplayskip}
+  \linespread{1.5}\selectfont\normalbaselines
+  \begin{empheq}[left=\textnormal{\@name}\empheqlbrace~]{alignat=3}%
+    \textnormal{\@sense~} & \text{~\@objective}
+    \@constraints
+  \end{empheq}
+}
+\makeatother
+
+% color blind colors
+\definecolor{cborange}{HTML}{E69F00}
+\definecolor{cblightblue}{HTML}{56B4E9}
+\definecolor{cbgreen}{HTML}{009E73}
+\definecolor{cbyellow}{HTML}{F0E442}
+\definecolor{cbblue}{HTML}{0072B2}
+\definecolor{cbred}{HTML}{D55E00}
+\definecolor{cbpink}{HTML}{CC797A}
+\definecolor{cbblack}{HTML}{000000}
+
+\hypersetup{
+  colorlinks=true,
+  urlcolor=cbblue,
+  citecolor=cbblue,
+  linkcolor=cbblue,
+  anchorcolor=cbblue,
+}
+
+\newcounter{defbox}
+
+\newtcolorbox{tdefinitionbox}[1]{
+  enhanced,
+  breakable,
+  colback=black!10!white,
+  colframe=white!50!black,
+  fonttitle=\scshape,
+  titlerule=1pt,
+  title={\addcontentsline{todb}{section}{#1}\refstepcounter{defbox}definition box~\thedefbox: #1},
+  enlarge top initially by=2em,
+  extras unbroken and last={drop lifted shadow}
+}
+
+\newtcolorbox{timportantbox}[0]{
+  enhanced,
+  breakable,
+  colback=cbyellow!25!white,
+  colframe=cbred,
+  enlarge top initially by=2em
+}
+
+% entries of tex/gloss.tex
+\newglossaryentry{acr:pc}{name={PC}, description={Probability of Connectivity}}
+\newglossaryentry{acr:bc_pc_opt}{name={BC-PC-Opt}, description={Budget Constrained PC Optimization}}
+\newglossaryentry{term:np_hard}{name={$NP$-Hard}, description={Non-determinstic Polynomial Hard}}
+\newglossaryentry{acr:lp}{name={LP}, description={Linear Programming}}
+\newglossaryentry{acr:milp}{name={MILP}, description={Mixed Integer Linear Programming}}
+\newglossaryentry{acr:cspp}{name={CSPP}, description={Constrained Shortest Path Problem}}
+
+\begin{document}
+
+\chapter{Budget-aware big-M constants for the BC-PC-Opt formulation}\label{chap:big_m}
+
+
+\section{Introduction}\label{sec:big_m_introduction}
+
+As pointed out in the thesis, the efficiency of the branch and bound algorithms used to solve the \gls{acr:milp} formulation of the \gls{acr:bc_pc_opt} problem heavily depends on the quality of its linear relaxation, which in turn depends on the values of the constants used in its big-M constraints \cite{BIG-M_BELOTTI_2016}. In the formulation recalled in Section~\ref{sec:big_m_reminders}, big-M constants appear in two families of constraints. Given a vertex $t \in V\,,$ an arc $a = (u,v) \in A$ and an option $i \in \Phi$ that improves it, the constant $M^t_{a^i}$ of constraint \eqref{eq:bc_pc_opt_arc_decision_constraint} must bound the quantity of flow that the improved copy $a^i$ of the arc $a$ carries in the generalized flow to $t$ when the option $i$ is purchased. Given a vertex $t \in V$ and an option $i \in \Phi\,,$ the constant $M^i_t$ of constraint \eqref{eq:bc_pc_opt_fti_decision_constraint} must bound the quantity of flow $f_t$ arriving at $t$ when the option $i$ is purchased. The simplest choice, $M^t_{a^i} = M^i_t = \sum_{u \in V} \overline{w}_u\,,$ is valid but very loose. The constants $M^t_{u,G}$ recalled in \eqref{eq:big_m_thesis} are much smaller, since they only count the vertices $s$ that can send flow through the vertex $u\,,$ but, like the knapsack constants $\overline{M}^t_u$ of \eqref{eq:big_m_knapsack}, they bound the probability of connectivity from $s$ to $u$ by its value $\Pi^+(s,u)$ in the scenario where all the options are purchased simultaneously, i.e., they ignore the budget $\beta\,.$ When the budget only allows purchasing a small fraction of the options, which is the case in most practical instances, the most reliable paths of this scenario use far more improved arcs than the paths that can actually occur, and the constants are much larger than the flows they bound.
+
+In this chapter, we present two families of big-M constants that take the budget into account. Both rely on the fact that, when an option $i$ is purchased, the other purchased options cost at most $\beta - c_i$ in total. This constraint limits the weights that the vertices can gain from the other options, which we bound with a 0/1 knapsack problem, and the number of improved arcs that a path can use, which we bound with the Lagrangian relaxation technique used for the \textit{Constrained Shortest Path Problem} (\gls{acr:cspp}) \cite{CSP-LANGRAGIAN-RELAXATION_HANDLER_1980,CSP-LAGRANGIAN-RELAXATION_AHUJA_1993}. In Section~\ref{sec:big_m_reminders}, we recall the formulation and introduce our notations. In Section~\ref{sec:big_m_validity}, we give a sufficient condition for a family of constants to preserve the value of the formulation for every scenario whose cost is at most $\beta\,.$ In Section~\ref{sec:big_m_lagrangian}, we show how to bound the probability of connectivity between two vertices over all the scenarios whose cost is at most $\beta$ and that purchase a given option. In Section~\ref{sec:big_m_per_copy}, we combine these tools into per-copy constants $M^t_{a^i}\,,$ and, in Section~\ref{sec:big_m_budget_filter}, we refine the set of vertices that are allowed to send flow through a copy. Finally, in Section~\ref{sec:big_m_implementation}, we discuss the implementation of these constants in the software gecot.
+
+
+\section{Reminders and notations}\label{sec:big_m_reminders}
+% The formulation reuses the labels of the thesis, but its big-M constants are
+% indexed by option and by copy; the definition box condenses the one of the
+% thesis.
+
+An instance of the \gls{acr:bc_pc_opt} problem is composed of a landscape graph $G=(V,A,w,\pi)\,,$ a budget $\beta \in \mathbb{R}^+$ and a set of options $\Phi$ such that each option $i \in \Phi$ is associated with a cost $c_i \in \mathbb{R}^+\,,$ a weight $w^i_u \in \mathbb{R}^+$ for each vertex $u \in V$ and a probability $\pi^i_a \in [\pi_a, 1]$ for each arc $a \in A\,.$ For each option $i \in \Phi\,,$ we denote by $A_i = \{a \in A : \pi^i_a > \pi_a\}$ the set of arcs improved by $i\,.$ As in the \gls{acr:milp} formulation of the \gls{acr:bc_pc_opt} problem, each arc $a \in A_i$ is associated with an improved copy $a^i$ that has the same endpoints as $a$ and the probability $\pi_{a^i} = \pi^i_a\,.$ We denote by $A'_i = \{a^i : a \in A_i\}$ the set of the copies of the option $i\,,$ by $A' = \bigcup_{i \in \Phi} A'_i$ the set of all the copies and by $G_\Psi = (V, \Psi)$ the multigraph whose set of arcs is $\Psi = A \cup A'\,.$ Unless specified otherwise, $\delta^{\text{out}}_u$ and $\delta^{\text{in}}_u$ denote the sets of arcs of $\Psi$ leaving and entering the vertex $u\,,$ and paths are paths of $G_\Psi\,.$ The probability of a path $P$ is $\pi(P) = \prod_{b \in P} \pi_b$ and, for two vertices $u$ and $v$ of $P\,,$ $P[u,v]$ denotes the subpath of $P$ from $u$ to $v\,.$
+
+We call \textit{scenario} a vector $x \in \{0,1\}^\Phi$ such that $x_i = 1$ if the option $i \in \Phi$ is purchased and $x_i = 0$ otherwise. The cost of a scenario $x$ is $c(x) = \sum_{i \in \Phi} c_i \cdot x_i$ and we denote by
+\begin{equation}
+  \mathcal{X}^\beta = \{x \in \{0,1\}^\Phi : c(x) \leq \beta\}
+\end{equation}
+the set of the scenarios whose costs are at most $\beta\,.$ Given two scenarios $x$ and $y\,,$ we write $x \leq y$ if $x_j \leq y_j$ for every option $j \in \Phi\,.$ Under the scenario $x\,,$ the weight of a vertex $u \in V$ is
+\begin{equation}
+  w^x_u = w_u + \sum_{i \in \Phi} w^i_u \cdot x_i\,,
+\end{equation}
+and the arcs that can be used are those of the set $\Psi^x = A \cup \{a^i \in A' : x_i = 1\}\,,$ i.e., the arcs of $G$ and the copies of the purchased options. We denote by $G^x_\Psi = (V, \Psi^x)$ the corresponding multigraph and by $\Pi^x(s,t)$ the probability of a most reliable $st$-path of $G^x_\Psi\,,$ with $\Pi^x(s,s) = 1$ and $\Pi^x(s,t) = 0$ if $G^x_\Psi$ contains no $st$-path. Since the parallel arcs of $G^x_\Psi$ joining the endpoints of an arc $a \in A$ have the probabilities $\pi_a$ and $\pi^i_a$ for the options $i$ purchased in $x\,,$ $\Pi^x(s,t)$ is also the probability of the most reliable $st$-path of the landscape graph $G^x = (V,A,w^x,\pi^x)$ in which the options purchased in $x$ are realized. As in the thesis, the contribution of the vertex $t$ to $\gls{acr:pc}_{\text{num}}(G^x)$ is $w^x_t \cdot f^x_t$ where
+\begin{equation}
+  f^x_t = \sum_{s \in V} w^x_s \cdot \Pi^x(s,t)\,.
+\end{equation}
+We denote by $\Pi(s,t)$ the probability of connectivity from $s$ to $t$ when no option is purchased, by $\Pi^+(s,t)$ the one when all the options are purchased, by $x^i$ the scenario that only purchases the option $i\,,$ i.e., $x^i_j = 1$ if and only if $j = i\,,$ by $\Pi^{x^i}(s,t)$ the probability of connectivity from $s$ to $t$ under this scenario, by $\overline{w}_u = w_u + \sum_{i \in \Phi} w^i_u$ the weight of the vertex $u$ when all the options are purchased, and by $\overline{\pi}_a = \max\left\{\pi_a\,, \max_{i \in \Phi} \pi^i_a\right\}$ the probability of the arc $a$ when all the options are purchased. Since $G^x_\Psi$ is a subgraph of $G^y_\Psi$ whenever $x \leq y\,,$
+\begin{equation}\label{eq:big_m_monotone}
+  x \leq y \implies \Pi^x(s,t) \leq \Pi^y(s,t) \quad \text{for every $s,t \in V$}\,,
+\end{equation}
+and, in particular, $\Pi(s,t) \leq \Pi^x(s,t) \leq \Pi^+(s,t)$ for every scenario $x\,.$
+
+Throughout this chapter, we assume that $0 < c_i \leq \beta$ for every option $i \in \Phi\,.$ Indeed, since purchasing an option can only increase the weights of the vertices and the probabilities of the arcs, and thus the \gls{acr:pc}, an option of null cost can be purchased in every scenario without loss of generality and can therefore be realized in the instance beforehand, whereas an option whose cost exceeds the budget can never be purchased and can be removed from the instance. As a consequence, every option $i$ leaves a non-negative budget $\beta - c_i$ to the other options.
+
+With these notations, the \gls{acr:milp} formulation of the \gls{acr:bc_pc_opt} problem reads as follows, where the big-M constants $M^i_t$ and $M^t_{a^i}$ of constraints \eqref{eq:bc_pc_opt_fti_decision_constraint} and \eqref{eq:bc_pc_opt_arc_decision_constraint} are specific to each option and to each copy, respectively.
+
+\vspace{0.75cm}
+\xlabel[$(\text{BC-PC-Opt})$]{bc_pc_opt}:
+\vspace*{-0.75cm}
+\begin{optimization_program}
+  \name{}
+  \sense{maximize}
+  \objective{$\sum\limits_{t \in V} \left(w_t \cdot f_t + \sum\limits_{i \in \Phi} w_t^i \cdot f_t^i\right)$}
+  \constraints{
+    \constraint{\label{eq:bc_pc_opt_flow_conservation}$\sum\limits_{a \in \delta^{\text{out}}_u} \phi^t_a - \sum\limits_{b \in \delta^{\text{in}}_u} \pi_b \cdot \phi^t_b \leq w_u + \sum\limits_{i \in \Phi} w_u^i \cdot x_i$} {$t \in V\,,$ $u \in V \setminus \{t\}$}
+    \constraint{\label{eq:bc_pc_opt_flow_in_t}$\sum\limits_{a \in \delta^{\text{out}}_t} \phi^t_a - \sum\limits_{b \in \delta^{\text{in}}_t} \pi_b\cdot  \phi^t_b =  w_t + \sum\limits_{i \in \Phi} w_t^i \cdot x_i - f_t$} {$t\in V$}
+    \constraint{\label{eq:bc_pc_opt_fti_ft}$f_t^i \le f_t$} {$t\in V\,,$ $i \in \Phi$}
+    \constraint{\label{eq:bc_pc_opt_fti_decision_constraint}$f_t^i \le M^i_t \cdot x_i$} {$t\in V\,,$ $i \in \Phi$}
+    \constraint{\label{eq:bc_pc_opt_arc_decision_constraint}$\phi^{t}_{a^i} \le M^t_{a^i} \cdot x_i$} {$t\in V\,,$ $a^i \in A'$}
+    \constraint{\label{eq:bc_pc_opt_budget_constraint}$\sum\limits_{i \in \Phi} c_i \cdot x_i \le \beta$} {}
+    \constraint{\label{eq:bc_pc_opt_binary_vars}$x_i\in \{0,1\}$} {$i \in \Phi$}
+    \constraint{\label{eq:bc_pc_opt_flow_positive}$\phi^{t}_a\geq 0$} {$t \in V\,,$ $a \in \Psi$}
+  }
+\end{optimization_program}
+
+Constraints \eqref{eq:bc_pc_opt_flow_conservation} and \eqref{eq:bc_pc_opt_flow_in_t} are the constraints of the generalized flow to the vertex $t$ in which the weights of the vertices depend on the purchased options. For each copy $a^i\,,$ the big-M constraint \eqref{eq:bc_pc_opt_arc_decision_constraint} forbids any flow on $a^i$ if the option $i$ is not purchased, and constraints \eqref{eq:bc_pc_opt_fti_ft} and \eqref{eq:bc_pc_opt_fti_decision_constraint} are the McCormick linearization \cite{LINEARISATION_MCCORMICK_1976} of the product $x_i \cdot f_t\,.$
+
+\noindent
+\paragraph{Big-M constants that ignore the budget.}
+In the formulation of the thesis, the constants of constraints \eqref{eq:bc_pc_opt_fti_decision_constraint} and \eqref{eq:bc_pc_opt_arc_decision_constraint} are denoted $M_t$ and $M^t_a\,,$ the latter being shared by all the copies of the arc $a\,.$ We index them by the option and by the copy since the constants of this chapter depend on both. In the section of the thesis on the improvement of the linear relaxation bounds, the constant of the copies leaving a vertex $u$ in the generalized flow to $t$ is
+\begin{equation}\label{eq:big_m_thesis}
+  M^t_{u,G} = \sum_{s \in I_{t,u}} \overline{w}_s \cdot \Pi^+(s,u)\,, \quad \text{where} \quad I_{t,u} = \{s \in V : \Pi(s,t) \leq \Pi^+(s,u) \cdot \Pi^+(u,t)\}\,,
+\end{equation}
+The thesis writes this set $I_{u,t}$ and these weights $w^+_s$ in the formula of $M^t_{u,G}\,;$ we keep the names $I_{t,u}$ and $\overline{w}_s\,.$ Computing $M^t_{u,G}$ on the graph $G_t$ obtained from $G$ by removing the set $W(t)$ of the $t$-useless arcs gives the smaller constant $M^t_{u,G_t}\,.$ Since the constant $M_t$ of constraint \eqref{eq:bc_pc_opt_fti_decision_constraint} bounds the flow arriving at the vertex $u = t\,,$ for which $I_{t,t} = V\,,$ we denote by $M^t_{t,G} = \sum_{s \in V} \overline{w}_s \cdot \Pi^+(s,t)$ the corresponding constant. The algorithms \texttt{prep\_mip}, \texttt{naive\_benders}, \texttt{target\_benders} and \texttt{flow\_benders} of the software gecot use by default the \textit{knapsack constants}
+\begin{equation}\label{eq:big_m_knapsack}
+  \overline{M}^t_u = \sum_{s \in V} w_s \cdot \Pi^+(s,u) + KP_\beta\left(\left(\sum_{s \in V} \Pi^+(s,u) \cdot w^j_s\right)_{j \in \Phi}\right)\,,
+\end{equation}
+for the copies leaving $u$ and, with $u = t\,,$ for constraint \eqref{eq:bc_pc_opt_fti_decision_constraint}, where, given a capacity $C \geq 0$ and a value $\gamma_j \geq 0$ for each option $j$ of a subset $J \subseteq \Phi\,,$
+\begin{equation}
+  KP_C(\gamma) = \max\left\{\sum_{j \in J} \gamma_j \cdot z_j : z \in \{0,1\}^J\,, \sum_{j \in J} c_j \cdot z_j \leq C\right\}
+\end{equation}
+is the optimal value of the 0/1 knapsack problem in which each option $j \in J$ has the value $\gamma_j$ and the weight $c_j\,.$ The knapsack constants do not filter the vertices $s\,,$ but they only count the weights gained from a set of options that fits into the budget. We prove in Lemma~\ref{lemma:big_m_previous_constants} that both families are valid in the sense of Section~\ref{sec:big_m_validity}.
+
+\noindent
+\paragraph{Reduced graphs.}
+In the \texttt{prep\_mip} algorithm of the software gecot, the generalized flow to a vertex $t$ is not formulated on $G_\Psi$ but on the reduced graph $\widetilde{G}_t$ obtained from the graph $G_t\,,$ i.e., from $G$ without the arcs of $W(t)\,,$ by contracting the $t$-strong arcs $(u,v) \in S(t)$ such that $\pi_{uv} = \overline{\pi}_{uv}\,,$ i.e., that no option improves, as described in the thesis and in \cite{OPTIMIZING-CONNECTIVITY_HAMONIC_2022}. By default, these reductions preserve the value $f^x_t$ for every scenario $x\,,$ and, with the experimental option discussed in Section~\ref{sec:big_m_implementation}, for every scenario $x \in \mathcal{X}^\beta\,,$ which suffices since the validity of the constants only concerns $\mathcal{X}^\beta\,.$ The contraction of an arc $(u,v)$ transfers the weights of $u$ to $v\,,$ i.e., the weights of $v$ become $w'_v = w_v + \pi_{uv} \cdot w_u$ and $w'^i_v = w^i_v + \pi_{uv} \cdot w^i_u$ for each option $i \in \Phi$ in the formulation of the generalized flow to $t$ only, it replaces every arc $(s,u)$ by an arc $(s,v)$ of probability $\pi_{su} \cdot \pi_{uv}$ and every copy $(s,u)^i$ by a copy $(s,v)^i$ of probability $\pi^i_{su} \cdot \pi_{uv}\,,$ and it removes the vertex $u$ with its outgoing arcs and copies. The results of this chapter only use the fact that the rows of the vertex $t$ in the formulation are those of a generalized flow on some multigraph whose arcs are either base arcs or copies of options and whose vertices have weights $w_u$ and $w^i_u\,.$ Therefore, they hold verbatim on $\widetilde{G}_t\,,$ provided that every quantity, i.e., the sets $A_i$ and the values $k_j$ of Section~\ref{sec:big_m_lagrangian}, the probabilities $\Pi(s,u)\,,$ $\Pi^+(s,u)\,,$ $\Pi^{\mu,i}(s,u)$ and $\Pi^{x^i}(s,u)\,,$ and the weights, is computed on $\widetilde{G}_t\,.$ Similarly, the software gecot distinguishes the weight of a vertex as a source of flow from its weight as a target. Since the target weights only appear as coefficients of the objective function, all the results of this chapter hold when $w$ and $w^i$ denote the source weights, except for the coefficients $w_t$ and $w^i_t$ of the objective function and the factor $w^x_t$ of the contribution $w^x_t \cdot f^x_t\,,$ in this section and in Proposition~\ref{prop:big_m_exactness}, which are the target weights.
+
+\begin{tdefinitionbox}{Constrained shortest path and Lagrangian relaxation\label{box:def_cspp}}
+  Given a directed graph $G=(V,A)$ where each arc $a \in A$ is associated with a length $l_a \geq 0$ and a cost $c_a \geq 0\,,$ two vertices $s,t \in V$ and a budget $\beta\,,$ the \gls{acr:cspp} is to find an $st$-path $P$ whose cost $c(P) = \sum_{a \in P} c_a$ is at most $\beta$ and whose length $l(P) = \sum_{a \in P} l_a$ is minimum. This problem is \gls{term:np_hard} \cite{CSP-LANGRAGIAN-RELAXATION_HANDLER_1980}. The Lagrangian relaxation technique \cite{CSP-LANGRAGIAN-RELAXATION_HANDLER_1980,CSP-LAGRANGIAN-RELAXATION_AHUJA_1993} penalizes the expensive arcs by defining a length function that accounts for their cost:
+  \begin{equation}
+    l^{\mu}_a = l_a + \mu \cdot c_a\,,
+  \end{equation}
+  where $\mu \geq 0$ is a constant called \textit{Lagrange multiplier}. The distance $d^{\mu}(s,t)$ from $s$ to $t$ using $l^{\mu}_a$ as the length of each arc $a$ satisfies
+  \begin{equation}\label{eq:langragian_bound}
+    d^{\mu}(s,t) = \min_{\text{$P$ : $st$-path}} \left(l(P) + \mu \cdot c(P)\right) \leq \min_{\substack{\text{$P$ : $st$-path} \\ c(P) \leq \beta}} \left(l(P) + \mu \cdot c(P)\right) \leq \min_{\substack{\text{$P$ : $st$-path} \\ c(P) \leq \beta}} l(P) + \mu \cdot \beta\,.
+  \end{equation}
+  As a consequence, $d^{\mu}(s,t) - \mu \cdot \beta$ is a lower bound on the length of any $st$-path whose cost is at most $\beta\,.$ Since this lower bound depends on the value of the Lagrange multiplier $\mu\,,$ it is often interesting to test many values for $\mu$ and retain the highest lower bound obtained.
+\end{tdefinitionbox}
+
+
+\section{Valid big-M constants}\label{sec:big_m_validity}
+
+For a vertex $t \in V$ and a scenario $x \in \{0,1\}^\Phi\,,$ let $(\mathcal{P}^x_t)$ denote the linear program that maximizes $f_t$ subject to the constraints \eqref{eq:bc_pc_opt_flow_conservation}, \eqref{eq:bc_pc_opt_flow_in_t}, \eqref{eq:bc_pc_opt_arc_decision_constraint} and \eqref{eq:bc_pc_opt_flow_positive} of the vertex $t\,,$ in which the variables $x_i$ are fixed to the values of the scenario $x\,.$ The big-M constants should not modify the value of the formulation for the scenarios that fit into the budget, which leads to the following definition.
+
+\begin{timportantbox}
+  Given a vertex $t \in V\,,$ we say that the constants $(M^t_{a^i})_{a^i \in A'}$ are \textbf{valid} for $t$ if the optimal value of $(\mathcal{P}^x_t)$ is $f^x_t$ for every scenario $x \in \mathcal{X}^\beta\,.$
+
+  Given a vertex $t \in V$ and an option $i \in \Phi\,,$ we say that the constant $M^i_t$ is \textbf{valid} if $M^i_t \geq f^x_t$ for every scenario $x \in \mathcal{X}^\beta$ such that $x_i = 1\,.$
+\end{timportantbox}
+
+\begin{proposition}\label{prop:big_m_exactness}
+  If all the constants of the formulation are valid, then, for every scenario $x \in \mathcal{X}^\beta\,,$ the optimal value of the formulation in which the variables $x_i$ are fixed to the values of $x$ is $\gls{acr:pc}_{\text{num}}(G^x) = \sum_{t \in V} w^x_t \cdot f^x_t\,.$
+\end{proposition}
+
+\begin{proof}
+  Let $x \in \mathcal{X}^\beta$ and consider any feasible solution of the formulation in which the variables $x_i$ are fixed to the values of $x\,.$ The rows of the different vertices $t$ share no variable, so, for each vertex $t\,,$ the restriction of the solution to the variables of $t$ is feasible for $(\mathcal{P}^x_t)$ and, by validity, $f_t \leq f^x_t\,.$ For each option $i\,,$ constraints \eqref{eq:bc_pc_opt_fti_ft} and \eqref{eq:bc_pc_opt_fti_decision_constraint} imply that $f^i_t \leq 0$ if $x_i = 0$ and $f^i_t \leq f_t$ if $x_i = 1\,,$ i.e., $f^i_t \leq x_i \cdot f_t\,.$ Since the weights are non-negative, the objective value of the solution is at most
+  \begin{equation}
+    \sum_{t \in V} \left(w_t + \sum_{i \in \Phi} w^i_t \cdot x_i\right) \cdot f_t \leq \sum_{t \in V} w^x_t \cdot f^x_t\,.
+  \end{equation}
+  Conversely, by validity of the constants $M^t_{a^i}\,,$ each linear program $(\mathcal{P}^x_t)$ has an optimal solution of value $f^x_t$ and, by validity of the constants $M^i_t\,,$ setting $f^i_t = x_i \cdot f^x_t$ satisfies \eqref{eq:bc_pc_opt_fti_ft} and \eqref{eq:bc_pc_opt_fti_decision_constraint}. The resulting solution reaches the value $\sum_{t \in V} w^x_t \cdot f^x_t\,.$
+\end{proof}
+
+To prove that a family of constants is valid, we exhibit, for each scenario $x \in \mathcal{X}^\beta\,,$ a particular optimal flow. A most reliable path can always be chosen simple, since removing a cycle from a walk cannot decrease its probability. For a scenario $x \in \mathcal{X}^\beta$ and every vertex $s \neq t$ such that $\Pi^x(s,t) > 0\,,$ let $P^x_s$ be a simple most reliable $st$-path of $G^x_\Psi\,,$ chosen arbitrarily among the simple most reliable $st$-paths of $G^x_\Psi\,.$ We call \textit{canonical flow} of the scenario $x\,,$ and denote by $\hat{\phi}^{t,x}\,,$ the flow obtained by sending $w^x_s$ units of flow along the path $P^x_s$ from each such vertex $s\,,$ and no flow from the other vertices.
+
+\begin{lemma}\label{lemma:big_m_sufficient_condition}
+  Let $x \in \mathcal{X}^\beta\,.$ The canonical flow $\hat{\phi}^{t,x}$ satisfies constraints \eqref{eq:bc_pc_opt_flow_conservation} and \eqref{eq:bc_pc_opt_flow_positive}, satisfies constraint \eqref{eq:bc_pc_opt_flow_in_t} with $f_t = f^x_t\,,$ is null on the copies of the options that are not purchased in $x\,,$ and the quantity of flow it sends on an arc $b=(u,v) \in \Psi$ is
+  \begin{equation}\label{eq:big_m_canonical_flow}
+    \hat{\phi}^{t,x}_b = \sum_{s \,:\, b \in P^x_s} w^x_s \cdot \pi\left(P^x_s[s,u]\right) \leq \sum_{s \,:\, b \in P^x_s} w^x_s \cdot \Pi^x(s,u)\,.
+  \end{equation}
+  Consequently, if
+  \begin{equation*}\label{eq:big_m_V}
+    M^t_{a^i} \geq \hat{\phi}^{t,x}_{a^i} \quad \text{for every copy $a^i \in A'$ and every scenario $x \in \mathcal{X}^\beta$ such that $x_i = 1$}\,,
+    \tag{V}
+  \end{equation*}
+  then the constants $(M^t_{a^i})_{a^i \in A'}$ are valid for $t\,.$
+\end{lemma}
+
+\begin{proof}
+  First, notice that when $w^x_s$ units of flow are sent from $s$ along a path $P\,,$ the quantity of flow entering an arc $b = (u,v)$ of $P$ is $w^x_s$ times the probability of the subpath $P[s,u]\,,$ and the flow conservation holds with equality at every vertex of $P$ distinct from its endpoints. Summing over the vertices $s$ gives the equality of \eqref{eq:big_m_canonical_flow}, and the inequality holds since $P^x_s[s,u]$ is an $su$-path of $G^x_\Psi\,.$ Constraint \eqref{eq:bc_pc_opt_flow_conservation} holds with equality at every vertex $u \neq t$ such that $\Pi^x(u,t) > 0\,.$ A vertex $u$ such that $\Pi^x(u,t) = 0$ belongs to no path $P^x_s\,,$ since otherwise the subpath $P^x_s[u,t]$ would give $\Pi^x(u,t) \geq \pi(P^x_s) > 0\,,$ so the left-hand side of its constraint is $0 \leq w^x_u\,.$ Since each path $P^x_s$ is simple, it does not leave $t$ and it brings $w^x_s \cdot \Pi^x(s,t)$ units of flow to $t\,,$ so constraint \eqref{eq:bc_pc_opt_flow_in_t} holds with $f_t = w^x_t + \sum_{s \neq t} w^x_s \cdot \Pi^x(s,t) = f^x_t\,.$ Finally, the paths of $G^x_\Psi$ only use copies of purchased options.
+
+  It remains to prove the second claim. Let $(\phi^t, f_t)$ be a feasible solution of $(\mathcal{P}^x_t)\,.$ By constraints \eqref{eq:bc_pc_opt_arc_decision_constraint} and \eqref{eq:bc_pc_opt_flow_positive}, $\phi^t_b = 0$ for every copy $b$ of an option that is not purchased in $x\,.$ Let $\rho_u = \Pi^x(u,t)$ for each vertex $u \in V\,,$ such that $\rho_t = 1\,.$ For every arc $b = (u,v) \in \Psi^x\,,$ $\rho_u \geq \pi_b \cdot \rho_v$ since the arc $b$ followed by a most reliable $vt$-path is a $ut$-walk of $G^x_\Psi\,.$ Multiplying constraint \eqref{eq:bc_pc_opt_flow_conservation} of each vertex $u \neq t$ by $\rho_u \geq 0$ and adding constraint \eqref{eq:bc_pc_opt_flow_in_t}, we obtain
+  \begin{equation}
+    0 \leq \sum_{b = (u,v) \in \Psi^x} \left(\rho_u - \pi_b \cdot \rho_v\right) \cdot \phi^t_b \leq \sum_{u \in V} w^x_u \cdot \rho_u - f_t\,,
+  \end{equation}
+  hence $f_t \leq f^x_t\,.$ Under the condition \eqref{eq:big_m_V}, the canonical flow also satisfies constraint \eqref{eq:bc_pc_opt_arc_decision_constraint} for the copies of the purchased options, so it is a feasible solution of $(\mathcal{P}^x_t)$ of value $f^x_t\,,$ which is therefore optimal.
+\end{proof}
+
+The above upper bound on $f_t$ extends to the multigraph $G^x_\Psi$ the fact that the optimal value of the generalized flow to $t$ is $f_t = \sum_{s \in V} w_s \cdot \Pi(s,t)\,.$ We prove it with the dual solution $(\rho_u)_{u \in V}$ rather than by an exchange argument on the paths, since a generalized flow does not always decompose into paths.
+
+Given a copy $a^i$ and the chosen paths $P^x_s\,,$ the smallest constant satisfying \eqref{eq:big_m_V} is
+\begin{equation}
+  \mathcal{M}^t_{a^i} = \max_{\substack{x \in \mathcal{X}^\beta \\ x_i = 1}} \hat{\phi}^{t,x}_{a^i}\,,
+\end{equation}
+which is the analogue, for a copy and for the scenarios that fit into the budget and purchase the option $i\,,$ of the exact bound $\mathcal{M}^t_u$ of the thesis. Like $\mathcal{M}^t_u\,,$ it is not trivial to compute: the algorithm that consists in enumerating all the scenarios $x \in \mathcal{X}^\beta$ such that $x_i = 1$ is not tractable in general, as their number can be exponential in the number of options. The constants of the following sections are upper bounds of $\mathcal{M}^t_{a^i}$ that are computed in polynomial time, up to a knapsack problem. We first check that the constants that ignore the budget satisfy \eqref{eq:big_m_V}.
+
+\begin{lemma}\label{lemma:big_m_previous_constants}
+  For every vertex $t \in V\,,$ the constants $M^t_{a^i} = M^t_{u,G}$ of \eqref{eq:big_m_thesis} and $M^t_{a^i} = \overline{M}^t_u$ of \eqref{eq:big_m_knapsack}, where $u$ is the source of the copy $a^i\,,$ satisfy \eqref{eq:big_m_V}. For every option $i\,,$ the constants $M^i_t = M^t_{t,G}$ and $M^i_t = \overline{M}^t_t$ are valid.
+\end{lemma}
+
+\begin{proof}
+  Let $x \in \mathcal{X}^\beta$ and let $a^i$ be a copy leaving a vertex $u\,.$ If $a^i \in P^x_s\,,$ the vertex $u$ belongs to the most reliable path $P^x_s\,,$ so, by \eqref{eq:big_m_monotone},
+  \begin{equation}
+    \Pi(s,t) \leq \Pi^x(s,t) = \pi(P^x_s[s,u]) \cdot \pi(P^x_s[u,t]) \leq \Pi^x(s,u) \cdot \Pi^x(u,t) \leq \Pi^+(s,u) \cdot \Pi^+(u,t)\,,
+  \end{equation}
+  i.e., $s \in I_{t,u}\,.$ Since $w^x_s \leq \overline{w}_s$ and $\Pi^x(s,u) \leq \Pi^+(s,u)\,,$ \eqref{eq:big_m_canonical_flow} gives $\hat{\phi}^{t,x}_{a^i} \leq \sum_{s \in I_{t,u}} \overline{w}_s \cdot \Pi^+(s,u) = M^t_{u,G}\,.$ For the knapsack constants, \eqref{eq:big_m_canonical_flow} gives
+  \begin{equation}
+    \hat{\phi}^{t,x}_{a^i} \leq \sum_{s \in V} w^x_s \cdot \Pi^x(s,u) \leq \sum_{s \in V} w_s \cdot \Pi^+(s,u) + \sum_{\substack{j \in \Phi \\ x_j = 1}} \, \sum_{s \in V} \Pi^+(s,u) \cdot w^j_s \leq \overline{M}^t_u\,,
+  \end{equation}
+  since the options purchased in $x$ cost at most $\beta$ and thus form a feasible solution of the knapsack problem. With $u = t\,,$ the same inequalities bound $f^x_t = \sum_{s \in V} w^x_s \cdot \Pi^x(s,t)$ for every scenario $x \in \mathcal{X}^\beta\,,$ which proves the validity of $M^t_{t,G}$ and $\overline{M}^t_t\,.$
+\end{proof}
+
+
+\section{Bounding the probabilities of connectivity under a budget}\label{sec:big_m_lagrangian}
+
+In this section, we fix an option $i \in \Phi$ and bound, for every pair of vertices $s$ and $u\,,$ the probability of connectivity $\Pi^x(s,u)$ over all the scenarios $x \in \mathcal{X}^\beta$ such that $x_i = 1\,.$ In such a scenario, the other purchased options cost at most $\beta - c_i$ in total. A path of $G^x_\Psi$ can only use the copies of the purchased options, so it can be seen as a path whose cost is at most $\beta - c_i\,,$ provided that the cost of each option is shared among its copies in such a way that a path never pays more than the cost of the option. This leads to an instance of the \gls{acr:cspp}, which we relax with Lagrange multipliers.
+
+\noindent
+\paragraph{Sharing the costs of the options among their copies.}
+For each option $j \in \Phi$ such that $A_j \neq \emptyset\,,$ let $T_j$ and $H_j$ denote the sets of the sources and of the targets of the arcs of $A_j\,,$ respectively, and let $k_j = \min(|T_j|, |H_j|) \geq 1\,.$ The options $j$ such that $A_j = \emptyset$ have no copy and need no such value.
+
+\begin{lemma}\label{lemma:big_m_simple_path_copies}
+  A simple path of $G_\Psi$ contains at most $k_j$ copies of the option $j\,.$
+\end{lemma}
+
+\begin{proof}
+  A simple path leaves each vertex at most once and enters each vertex at most once. Therefore, the copies of the option $j$ that it contains have pairwise distinct sources, which all belong to $T_j\,,$ and pairwise distinct targets, which all belong to $H_j\,.$
+\end{proof}
+
+\begin{remark}
+  The copies of the option $j$ contained in a simple path also form a matching of the bipartite graph whose two sides are disjoint sets in bijection with $T_j$ and $H_j$ and that contains one edge per arc of $A_j\,.$ Thus, $k_j$ can be replaced by the size $\nu_j \leq k_j$ of a maximum matching of this bipartite graph. On our instances, $\nu_j = k_j$ for every option $j\,.$
+\end{remark}
+
+\noindent
+\paragraph{Lagrangian bound.}
+For each arc $b \in \Psi\,,$ let $l_b = -\ln(\pi_b)$ denote its length, such that the most reliable paths are the shortest paths for these lengths, and let $c^i_b$ denote the share of cost that $b$ pays when the option $i$ is purchased, i.e.,
+\begin{equation}
+  c^i_b=\left\{\begin{array}{ll} \frac{c_j}{k_j} & \text{if $b \in A'_j$ for an option $j \neq i$}\\ 0 & \text{if $b \in A$ or $b \in A'_i$} \end{array} \right.\,.
+\end{equation}
+The copies of the option $i$ are free since the cost of $i$ is already paid. For a path $P\,,$ we denote by $l(P) = \sum_{b \in P} l_b$ its length and by $c^i(P) = \sum_{b \in P} c^i_b$ its cost. Following Definition~Box~\ref{box:def_cspp}, given a Lagrange multiplier $\mu \geq 0\,,$ we define the modified length of each arc $b \in \Psi$ as
+\begin{equation}
+  l^{\mu,i}_b = l_b + \mu \cdot c^i_b\,,
+\end{equation}
+we denote by $d^{\mu,i}(s,u)$ the distance from $s$ to $u$ in $G_\Psi$ using $l^{\mu,i}_b$ as the length of each arc $b\,,$ and we define
+\begin{equation}
+  \Pi^{\mu,i}(s,u) = \exp\left(-d^{\mu,i}(s,u)\right)\,,
+\end{equation}
+which is the probability of a most reliable $su$-path of $G_\Psi$ when each arc $b \in \Psi$ has the probability $\pi_b \cdot e^{-\mu \cdot c^i_b}\,,$ with $\Pi^{\mu,i}(u,u) = 1$ and $\Pi^{\mu,i}(s,u) = 0$ if no $su$-path exists. In other words, every copy of an option $j \neq i$ pays a toll that multiplies its probability by $e^{-\mu \cdot c_j / k_j}\,.$ For $\mu = 0\,,$ no toll is paid and $\Pi^{0,i}(s,u) = \Pi^+(s,u)\,.$ For a fixed vertex $u\,,$ the probabilities $\Pi^{\mu,i}(s,u)$ of all the vertices $s \in V$ are computed in $O(|\Psi| + |V| \log |V|)$ time by running the Dijkstra algorithm \cite{DIJKSTRA_1959} from $u$ on the reversed graph with a Fibonacci heap as priority queue.
+
+\begin{lemma}\label{lemma:big_m_lagrangian_bound}
+  Let $x \in \mathcal{X}^\beta$ be a scenario such that $x_i = 1$ and let $P$ be a simple $su$-path of $G^x_\Psi\,.$ Then, $c^i(P) \leq \beta - c_i$ and, for every Lagrange multiplier $\mu \geq 0\,,$
+  \begin{equation}
+    \pi(P) \leq e^{\mu \cdot (\beta - c_i)} \cdot \prod_{b \in P} \pi_b \cdot e^{-\mu \cdot c^i_b} \leq e^{\mu \cdot (\beta - c_i)} \cdot \Pi^{\mu,i}(s,u)\,.
+  \end{equation}
+  In particular, $\Pi^x(s,u) \leq e^{\mu \cdot (\beta - c_i)} \cdot \Pi^{\mu,i}(s,u)$ for every pair of vertices $s,u \in V\,.$
+\end{lemma}
+
+\begin{proof}
+  Every copy of $P$ belongs to an option purchased in $x$ and, by Lemma~\ref{lemma:big_m_simple_path_copies}, $P$ contains at most $k_j$ copies of each option $j\,.$ Thus,
+  \begin{equation}
+    c^i(P) = \sum_{\substack{j \in \Phi \setminus \{i\} \\ x_j = 1\,, A_j \neq \emptyset}} \frac{c_j}{k_j} \cdot |P \cap A'_j| \leq \sum_{\substack{j \in \Phi \setminus \{i\} \\ x_j = 1}} c_j = c(x) - c_i \leq \beta - c_i\,.
+  \end{equation}
+  Then, as in \eqref{eq:langragian_bound}, since $\mu \geq 0\,,$ the modified length of $P$ satisfies
+  \begin{equation}
+    l^{\mu,i}(P) = l(P) + \mu \cdot c^i(P) \leq l(P) + \mu \cdot (\beta - c_i)\,,
+  \end{equation}
+  and, since $P$ is an $su$-path of $G_\Psi\,,$ $d^{\mu,i}(s,u) \leq l^{\mu,i}(P)\,.$ Taking the exponential of the opposite of these quantities gives the two inequalities on $\pi(P)\,.$ For the last claim, $\Pi^x(s,u) = 0$ if $G^x_\Psi$ contains no $su$-path, and otherwise it suffices to apply the inequality to a simple most reliable $su$-path of $G^x_\Psi\,.$
+\end{proof}
+
+The bound of Lemma~\ref{lemma:big_m_lagrangian_bound} is exactly the Lagrangian lower bound $d^{\mu}(s,t) - \mu \cdot \beta$ of Definition~Box~\ref{box:def_cspp}, applied to the lengths $l_b\,,$ the costs $c^i_b$ and the budget $\beta - c_i\,,$ and expressed in terms of probabilities. As suggested there, we test several values of the Lagrange multiplier and retain the best bound.
+
+\begin{timportantbox}
+  Given an option $i \in \Phi$ and a finite set $\mathcal{U} \subset \mathbb{R}^+$ of Lagrange multipliers such that $0 \in \mathcal{U}\,,$ the \textbf{budget-aware probability of connectivity} from a vertex $s$ to a vertex $u$ is
+  \begin{equation}\label{eq:big_m_budget_aware_probability}
+    \widehat{\Pi}^i(s,u) = \min_{\mu \in \mathcal{U}} e^{\mu \cdot (\beta - c_i)} \cdot \Pi^{\mu,i}(s,u)\,.
+  \end{equation}
+  By Lemma~\ref{lemma:big_m_lagrangian_bound}, $\Pi^x(s,u) \leq \widehat{\Pi}^i(s,u)$ for every scenario $x \in \mathcal{X}^\beta$ such that $x_i = 1\,,$ and, since $0 \in \mathcal{U}\,,$ $\widehat{\Pi}^i(s,u) \leq \Pi^+(s,u)\,.$
+\end{timportantbox}
+
+\begin{remark}
+  The bound of Lemma~\ref{lemma:big_m_lagrangian_bound} is the weak duality of the Lagrangian relaxation of the \gls{acr:cspp}
+  \begin{equation}
+    z^*(s,u) = \min\left\{l(P) : \text{$P$ simple $su$-path of $G_\Psi$}\,, c^i(P) \leq \beta - c_i\right\}\,.
+  \end{equation}
+  Since the lengths and the costs are non-negative, the minimum of $\sum_{b \in \Psi} l^{\mu,i}_b \cdot \eta_b$ over the unit $su$-flows $\eta$ of $G_\Psi$ is reached on a path, so the supremum over $\mu \geq 0$ of $d^{\mu,i}(s,u) - \mu \cdot (\beta - c_i)$ is the optimal value $z^{\text{LP}}(s,u)$ of the linear relaxation \cite{CSP-LAGRANGIAN-RELAXATION_AHUJA_1993}
+  \begin{equation}
+    \min\left\{\sum_{b \in \Psi} l_b \cdot \eta_b : \text{$\eta \geq 0$ unit $su$-flow of $G_\Psi$}\,, \sum_{b \in \Psi} c^i_b \cdot \eta_b \leq \beta - c_i\right\}\,,
+  \end{equation}
+  whose variables are indexed by the arcs and the copies of $G_\Psi\,.$ Equivalently, $\inf_{\mu \geq 0} e^{\mu \cdot (\beta - c_i)} \cdot \Pi^{\mu,i}(s,u) = e^{-z^{\text{LP}}(s,u)}\,.$ The exact value $e^{-z^*(s,u)}$ can be computed with a bi-objective label setting algorithm. On our instances, neither of them improves the constants by more than a few percents with respect to the small set $\mathcal{U}$ used in Section~\ref{sec:big_m_implementation}.
+\end{remark}
+
+
+\section{Per-copy big-M constants}\label{sec:big_m_per_copy}
+
+We now combine the source filter of the constants $M^t_{u,G}\,,$ adapted to copies, the knapsack of the constants $\overline{M}^t_u\,,$ restricted to the budget left by the option $i\,,$ and the budget-aware probabilities of connectivity. Given a vertex $t \in V$ and a copy $a^i \in A'$ of an arc $a = (u,v)\,,$ let
+\begin{equation}
+  I_{t,a^i} = \{s \in V : \Pi(s,t) \leq \Pi^+(s,u) \cdot \pi^i_a \cdot \Pi^+(v,t)\}
+\end{equation}
+be the set of the vertices $s$ for which the bound $\Pi^+(s,u) \cdot \pi^i_a \cdot \Pi^+(v,t)$ on the probability of an $st$-path passing by $a^i\,,$ when all the options are purchased, is at least the probability of connectivity from $s$ to $t$ when no option is purchased. We define the constant
+\begin{equation}\label{eq:big_m_per_copy}
+  M^t_{a^i} = \sum_{s \in I_{t,a^i}} \widehat{\Pi}^i(s,u) \cdot \left(w_s + w^i_s\right) + KP_{\beta - c_i}\left(\left(\sum_{s \in I_{t,a^i}} \widehat{\Pi}^i(s,u) \cdot w^j_s\right)_{j \in \Phi \setminus \{i\}}\right)\,.
+\end{equation}
+The weights gained from the option $i$ are counted outside the knapsack since $i$ is purchased in every scenario that we need to consider, and the capacity of the knapsack is the budget $\beta - c_i$ left to the other options.
+
+\begin{lemma}\label{lemma:big_m_source_filter}
+  Let $x \in \mathcal{X}^\beta$ and $s \in V\,.$ If the path $P^x_s$ contains the copy $a^i\,,$ then $s \in I_{t,a^i}\,.$
+\end{lemma}
+
+\begin{proof}
+  The path $P^x_s$ can be decomposed as $P_1 \cdot a^i \cdot P_2$ where $P_1$ is an $su$-path and $P_2$ is a $vt$-path of $G^x_\Psi\,.$ By \eqref{eq:big_m_monotone},
+  \begin{equation}
+    \Pi(s,t) \leq \Pi^x(s,t) = \pi(P^x_s) = \pi(P_1) \cdot \pi^i_a \cdot \pi(P_2) \leq \Pi^x(s,u) \cdot \pi^i_a \cdot \Pi^x(v,t) \leq \Pi^+(s,u) \cdot \pi^i_a \cdot \Pi^+(v,t)\,.
+  \end{equation}
+\end{proof}
+
+\begin{proposition}\label{prop:big_m_per_copy}
+  The constants $(M^t_{a^i})_{a^i \in A'}$ of \eqref{eq:big_m_per_copy} satisfy \eqref{eq:big_m_V} and are thus valid for $t\,.$
+\end{proposition}
+
+\begin{proof}
+  Let $x \in \mathcal{X}^\beta$ be a scenario such that $x_i = 1\,.$ By \eqref{eq:big_m_canonical_flow}, the quantity of flow $\hat{\phi}^{t,x}_{a^i}$ is a sum over the vertices $s$ such that $a^i \in P^x_s\,,$ which belong to $I_{t,a^i}$ by Lemma~\ref{lemma:big_m_source_filter}. Adding the non-negative terms of the other vertices of $I_{t,a^i}$ and using $\Pi^x(s,u) \leq \widehat{\Pi}^i(s,u)\,,$ we obtain
+  \begin{equation}
+    \hat{\phi}^{t,x}_{a^i} \leq \sum_{s \in I_{t,a^i}} w^x_s \cdot \Pi^x(s,u) \leq \sum_{s \in I_{t,a^i}} w^x_s \cdot \widehat{\Pi}^i(s,u)\,.
+  \end{equation}
+  Since $x_i = 1\,,$ the weight of each vertex $s$ is $w^x_s = w_s + w^i_s + \sum_{j \in \Phi \setminus \{i\}} w^j_s \cdot x_j\,,$ hence
+  \begin{equation}
+    \hat{\phi}^{t,x}_{a^i} \leq \sum_{s \in I_{t,a^i}} \widehat{\Pi}^i(s,u) \cdot \left(w_s + w^i_s\right) + \sum_{\substack{j \in \Phi \setminus \{i\} \\ x_j = 1}} \, \sum_{s \in I_{t,a^i}} \widehat{\Pi}^i(s,u) \cdot w^j_s\,.
+  \end{equation}
+  The options of $\Phi \setminus \{i\}$ purchased in $x$ cost $c(x) - c_i \leq \beta - c_i$ in total, so they form a feasible solution of the knapsack problem of \eqref{eq:big_m_per_copy} and the last sum is at most its optimal value.
+\end{proof}
+
+\begin{corollary}\label{corollary:big_m_mccormick}
+  For every vertex $t \in V$ and every option $i \in \Phi\,,$ the constant
+  \begin{equation}\label{eq:big_m_mccormick}
+    M^i_t = \sum_{s \in V} \widehat{\Pi}^i(s,t) \cdot \left(w_s + w^i_s\right) + KP_{\beta - c_i}\left(\left(\sum_{s \in V} \widehat{\Pi}^i(s,t) \cdot w^j_s\right)_{j \in \Phi \setminus \{i\}}\right)
+  \end{equation}
+  is valid.
+\end{corollary}
+
+\begin{proof}
+  For every scenario $x \in \mathcal{X}^\beta$ such that $x_i = 1\,,$ $f^x_t = \sum_{s \in V} w^x_s \cdot \Pi^x(s,t)$ and $\Pi^x(s,t) \leq \widehat{\Pi}^i(s,t)$ for every vertex $s\,.$ The rest of the proof is identical to the one of Proposition~\ref{prop:big_m_per_copy}.
+\end{proof}
+
+The constants of this section are never larger than those that ignore the budget, as stated in the following proposition.
+
+\begin{proposition}\label{prop:big_m_comparison}
+  When all the quantities are computed on the same graph, $M^t_{a^i} \leq M^t_{u,G}$ and $M^t_{a^i} \leq \overline{M}^t_u$ for every copy $a^i$ of an arc $a = (u,v)\,,$ and $M^i_t \leq M^t_{t,G}$ and $M^i_t \leq \overline{M}^t_t$ for every option $i\,.$
+\end{proposition}
+
+\begin{proof}
+  Since $\pi^i_a \cdot \Pi^+(v,t) \leq \Pi^+(u,t)\,,$ the set $I_{t,a^i}$ is a subset of $I_{t,u}\,.$ The optimal value of a knapsack problem is at most the sum of the values of its items and $\widehat{\Pi}^i(s,u) \leq \Pi^+(s,u)\,,$ so $M^t_{a^i} \leq \sum_{s \in I_{t,a^i}} \Pi^+(s,u) \cdot \overline{w}_s \leq M^t_{u,G}\,.$ For the knapsack constants, let $\gamma_j = \sum_{s \in V} \Pi^+(s,u) \cdot w^j_s$ denote the values of the knapsack problem of \eqref{eq:big_m_knapsack}. The values of the knapsack problem of \eqref{eq:big_m_per_copy} are at most the corresponding $\gamma_j\,,$ and adding the option $i$ to any solution of capacity $\beta - c_i$ gives a solution of capacity $\beta\,,$ so
+  \begin{equation}
+    M^t_{a^i} \leq \sum_{s \in V} \Pi^+(s,u) \cdot w_s + \gamma_i + KP_{\beta - c_i}\left((\gamma_j)_{j \in \Phi \setminus \{i\}}\right) \leq \sum_{s \in V} \Pi^+(s,u) \cdot w_s + KP_\beta(\gamma) = \overline{M}^t_u\,.
+  \end{equation}
+  The same arguments with $u = t$ and $I_{t,t} = V$ prove the inequalities on $M^i_t\,.$
+\end{proof}
+
+\begin{remark}
+  Lemma~\ref{lemma:big_m_sufficient_condition} allows any choice of the most reliable paths $P^x_s\,.$ If, among the simple most reliable paths, we choose one that contains the fewest copies, then the vertices $s$ for which the inequality defining $I_{t,a^i}$ is an equality can be excluded from $I_{t,a^i}$ as well. Indeed, if $a^i \in P^x_s$ and $\Pi(s,t) = \Pi^+(s,u) \cdot \pi^i_a \cdot \Pi^+(v,t)\,,$ then all the inequalities in the proof of Lemma~\ref{lemma:big_m_source_filter} are equalities, so $\Pi^x(s,t) = \Pi(s,t)$ and a simple most reliable $st$-path of $G$ without any copy is also a most reliable $st$-path of $G^x_\Psi\,,$ whereas $P^x_s$ contains at least one copy. Moreover, any non-empty finite set $\mathcal{U} \subset \mathbb{R}^+$ gives valid constants. The condition $0 \in \mathcal{U}$ only ensures that $\widehat{\Pi}^i(s,u) \leq \Pi^+(s,u)\,,$ which is used in Proposition~\ref{prop:big_m_comparison} and, in Section~\ref{sec:big_m_budget_filter}, makes the restriction of $\tilde{I}_{t,a^i}$ to $I_{t,a^i}$ redundant.
+\end{remark}
+
+Algorithm~\ref{algo:big_m_per_copy} computes the constant $M^t_{a^i}$ of a copy $a^i$ of an arc $a=(u,v)\,.$ It assumes that the probabilities $\Pi(s,t)$ and $\Pi^+(s,t)$ have been computed for all the vertices $s \in V$ beforehand, with two runs of the Dijkstra algorithm from $t$ on the reversed graph, without and with the copies respectively. The run for $\mu = 0$ computes the probabilities $\Pi^+(s,u)\,,$ which give both the set $I_{t,a^i}$ and the initial values of $\widehat{\Pi}^i(s,u)\,,$ and each other multiplier requires one more run of the Dijkstra algorithm from $u$ on the reversed graph with the modified lengths $l^{\mu,i}\,.$
+
+\medskip
+\begin{algorithm}[H]
+  \caption{Computes the constant $M^t_{a^i}$ of a copy $a^i$\label{algo:big_m_per_copy}}
+  \SetKwInOut{Input}{Input}
+  \SetKwInOut{Output}{Output}
+  \Input{$G_\Psi=(V, \Psi)\,,$ $(\pi_b)_{b \in \Psi}\,,$ $(c_j\,, k_j)_{j \in \Phi}\,,$ $\beta\,,$ $(w_s)_{s \in V}\,,$ $(w^j_s)^{j \in \Phi}_{s \in V}\,,$ $t \in V\,,$ $a^i \in A'$ with $a=(u,v)\,,$ $(\Pi(s,t))_{s \in V}\,,$ $(\Pi^+(s,t))_{s \in V}\,,$ $\mathcal{U} \subset \mathbb{R}^+$ finite with $0 \in \mathcal{U}$}
+  \Output{$M^t_{a^i}$}
+  Compute $\Pi^+(s,u)$ for every $s \in V$\\
+  $I \gets \{s \in V : \Pi(s,t) \leq \Pi^+(s,u) \cdot \pi^i_a \cdot \Pi^+(v,t)\}$\\
+  \ForEach{$s \in I$} {
+    $\widehat{\Pi}(s) \gets \Pi^+(s,u)$
+  }
+  \ForEach{$\mu \in \mathcal{U} \setminus \{0\}$} {
+    Compute $\Pi^{\mu,i}(s,u)$ for every $s \in V$\\
+    \ForEach{$s \in I$} {
+      $\widehat{\Pi}(s) \gets \min\left(\widehat{\Pi}(s)\,, e^{\mu \cdot (\beta - c_i)} \cdot \Pi^{\mu,i}(s,u)\right)$
+    }
+  }
+  \ForEach{$j \in \Phi \setminus \{i\}$} {
+    $\gamma_j \gets \sum_{s \in I} \widehat{\Pi}(s) \cdot w^j_s$
+  }
+  \Return $\sum_{s \in I} \widehat{\Pi}(s) \cdot \left(w_s + w^i_s\right) + KP_{\beta - c_i}(\gamma)$
+\end{algorithm}
+
+\begin{proposition}
+  Given a vertex $t \in V$ and a copy $a^i \in A'\,,$ Algorithm~\ref{algo:big_m_per_copy} computes the constant $M^t_{a^i}$ with $|\mathcal{U}|$ runs of the Dijkstra algorithm, i.e., in $O(|\mathcal{U}| \cdot (|\Psi| + |V| \log |V|) + |V| \cdot |\Phi|)$ time with a Fibonacci heap as priority queue, where the last term accounts for the values $\gamma_j\,,$ plus the time needed to solve one 0/1 knapsack problem with at most $|\Phi| - 1$ items.
+\end{proposition}
+
+The 0/1 knapsack problem is \gls{term:np_hard}, and the software gecot solves it with a branch and bound algorithm. If needed, it can be replaced by its linear relaxation, whose optimal value is larger and thus still gives valid constants. The constant $M^i_t$ of Corollary~\ref{corollary:big_m_mccormick} is computed in the same way, by starting the runs of the Dijkstra algorithm from $t$ and by keeping all the vertices $s \in V\,.$
+
+
+\section{A budget-aware source filter}\label{sec:big_m_budget_filter}
+
+The set $I_{t,a^i}$ compares a bound on the probability of the $st$-paths passing by $a^i\,,$ when all the options are purchased on both sides of $a^i\,,$ with the probability of connectivity from $s$ to $t$ when no option is purchased. Both sides of this comparison can be sharpened. On the one hand, the path passing by $a^i$ must respect the budget as a whole, and, on the other hand, every scenario that we need to consider purchases the option $i\,.$ Given a vertex $t \in V$ and a copy $a^i \in A'$ of an arc $a = (u,v)\,,$ let
+\begin{equation}
+  \widehat{\Pi}_{a^i}(s,t) = \min_{\mu \in \mathcal{U}} e^{\mu \cdot (\beta - c_i)} \cdot \Pi^{\mu,i}(s,u) \cdot \pi^i_a \cdot \Pi^{\mu,i}(v,t)
+\end{equation}
+denote the budget-aware probability of connectivity from $s$ to $t$ through $a^i\,,$ let
+\begin{equation}
+  \tilde{I}_{t,a^i} = \{s \in I_{t,a^i} : \Pi^{x^i}(s,t) \leq \widehat{\Pi}_{a^i}(s,t)\}\,,
+\end{equation}
+and define the constant
+\begin{equation}\label{eq:big_m_budget_filter}
+  \tilde{M}^t_{a^i} = \sum_{s \in \tilde{I}_{t,a^i}} \widehat{\Pi}^i(s,u) \cdot \left(w_s + w^i_s\right) + KP_{\beta - c_i}\left(\left(\sum_{s \in \tilde{I}_{t,a^i}} \widehat{\Pi}^i(s,u) \cdot w^j_s\right)_{j \in \Phi \setminus \{i\}}\right)\,.
+\end{equation}
+By definition, $\tilde{I}_{t,a^i} \subseteq I_{t,a^i}\,,$ so $\tilde{M}^t_{a^i} \leq M^t_{a^i}\,.$ Moreover, since $0 \in \mathcal{U}\,,$ $\widehat{\Pi}_{a^i}(s,t) \leq \Pi^+(s,u) \cdot \pi^i_a \cdot \Pi^+(v,t)$ and, by \eqref{eq:big_m_monotone}, $\Pi(s,t) \leq \Pi^{x^i}(s,t)\,,$ so every vertex $s$ such that $\Pi^{x^i}(s,t) \leq \widehat{\Pi}_{a^i}(s,t)$ belongs to $I_{t,a^i}\,.$ The restriction to $I_{t,a^i}$ in the definition of $\tilde{I}_{t,a^i}$ thus only matters when the vertices for which the inequality defining $I_{t,a^i}$ is an equality are excluded from $I_{t,a^i}\,,$ as in the remark of Section~\ref{sec:big_m_per_copy}. The constants $M^i_t$ of constraint \eqref{eq:bc_pc_opt_fti_decision_constraint} remain those of Corollary~\ref{corollary:big_m_mccormick}, since there is no arc on which the vertices could be filtered.
+
+\begin{lemma}\label{lemma:big_m_budget_filter}
+  Let $x \in \mathcal{X}^\beta$ be a scenario such that $x_i = 1$ and $s \in V\,.$ If the path $P^x_s$ contains the copy $a^i\,,$ then $s \in \tilde{I}_{t,a^i}\,.$
+\end{lemma}
+
+\begin{proof}
+  By Lemma~\ref{lemma:big_m_source_filter}, $s \in I_{t,a^i}\,.$ As before, we decompose $P^x_s$ as $P_1 \cdot a^i \cdot P_2\,.$ The path $P^x_s$ is a simple path of $G^x_\Psi$ and the copy $a^i$ pays no toll since $c^i_{a^i} = 0\,,$ so Lemma~\ref{lemma:big_m_lagrangian_bound} applied to the whole path $P^x_s$ gives, for every Lagrange multiplier $\mu \in \mathcal{U}\,,$
+  \begin{equation}
+    \pi(P^x_s) \leq e^{\mu \cdot (\beta - c_i)} \cdot \prod_{b \in P_1} \pi_b \cdot e^{-\mu \cdot c^i_b} \cdot \pi^i_a \cdot \prod_{b \in P_2} \pi_b \cdot e^{-\mu \cdot c^i_b} \leq e^{\mu \cdot (\beta - c_i)} \cdot \Pi^{\mu,i}(s,u) \cdot \pi^i_a \cdot \Pi^{\mu,i}(v,t)\,,
+  \end{equation}
+  hence $\pi(P^x_s) \leq \widehat{\Pi}_{a^i}(s,t)\,.$ On the other hand, $x^i \leq x$ since $x_i = 1\,,$ so, by \eqref{eq:big_m_monotone}, $\Pi^{x^i}(s,t) \leq \Pi^x(s,t) = \pi(P^x_s) \leq \widehat{\Pi}_{a^i}(s,t)\,.$
+\end{proof}
+
+Note that a single Lagrange multiplier and a single factor $e^{\mu \cdot (\beta - c_i)}$ cover the whole path, i.e., the two sides of $a^i$ share the budget $\beta - c_i\,.$ Therefore, this filter is at least as strong as the one obtained with the product $\widehat{\Pi}^i(s,u) \cdot \pi^i_a \cdot \widehat{\Pi}^i(v,t)$ of the bounds of each side, which counts the budget $\beta - c_i$ twice. Indeed, let $\mu_1, \mu_2 \in \mathcal{U}$ be the Lagrange multipliers that reach the minima defining $\widehat{\Pi}^i(s,u)$ and $\widehat{\Pi}^i(v,t)$ respectively, and assume that $\mu_1 \leq \mu_2\,,$ the other case being symmetric. Since the costs $c^i_b$ are non-negative, the modified lengths $l^{\mu,i}_b$ are non-decreasing in $\mu\,,$ so $\Pi^{\mu,i}(s',u')$ is non-increasing in $\mu$ for every pair of vertices $s'$ and $u'\,,$ and, since $\beta - c_i \geq 0\,,$ $e^{\mu_1 \cdot (\beta - c_i)} \geq 1\,,$ so
+\begin{equation}
+  \widehat{\Pi}_{a^i}(s,t) \leq e^{\mu_2 \cdot (\beta - c_i)} \cdot \Pi^{\mu_2,i}(s,u) \cdot \pi^i_a \cdot \Pi^{\mu_2,i}(v,t) \leq e^{\mu_1 \cdot (\beta - c_i)} \cdot \Pi^{\mu_1,i}(s,u) \cdot \pi^i_a \cdot e^{\mu_2 \cdot (\beta - c_i)} \cdot \Pi^{\mu_2,i}(v,t)\,,
+\end{equation}
+which is $\widehat{\Pi}^i(s,u) \cdot \pi^i_a \cdot \widehat{\Pi}^i(v,t)\,.$ The two bounds can be equal, e.g., when $v = t\,.$
+
+\begin{proposition}\label{prop:big_m_budget_filter}
+  The constants $(\tilde{M}^t_{a^i})_{a^i \in A'}$ of \eqref{eq:big_m_budget_filter} satisfy \eqref{eq:big_m_V} and are thus valid for $t\,.$
+\end{proposition}
+
+\begin{proof}
+  We proceed exactly as in the proof of Proposition~\ref{prop:big_m_per_copy}, using Lemma~\ref{lemma:big_m_budget_filter} instead of Lemma~\ref{lemma:big_m_source_filter}.
+\end{proof}
+
+\begin{remark}
+  Unlike the filter of Section~\ref{sec:big_m_per_copy}, the filter $\tilde{I}_{t,a^i}$ cannot exclude the vertices for which its inequality is an equality, since a most reliable path of $G^{x^i}_\Psi$ may itself contain the copy $a^i\,.$
+\end{remark}
+
+In addition to the computations of Algorithm~\ref{algo:big_m_per_copy}, the constants $\tilde{M}^t_{a^i}$ require, for each option $i \in \Phi\,,$ one run of the Dijkstra algorithm from $t$ on the reversed graph for each multiplier $\mu \in \mathcal{U} \setminus \{0\}\,,$ which gives the probabilities $\Pi^{\mu,i}(v,t)\,,$ and one run on the arcs of $A$ and the copies of $A'_i$ only, which gives the probabilities $\Pi^{x^i}(s,t)\,.$
+
+
+\section{Implementation in gecot}\label{sec:big_m_implementation}
+
+\noindent
+\paragraph{Graphs on which the constants are computed.}
+The \texttt{prep\_mip} algorithm formulates the generalized flow to each vertex $t$ on the reduced graph $\widetilde{G}_t\,,$ in which each copy $a^i$ is a separate arc whose probability is $0$ unless the option $i$ is purchased, and all the quantities of this chapter, i.e., the values $k_j\,,$ the probabilities $\Pi\,,$ $\Pi^+\,,$ $\Pi^{\mu,i}$ and $\Pi^{x^i}\,,$ and the weights, are computed on $\widetilde{G}_t\,,$ in which the contractions may have moved the targets of the copies. With a positive value of the experimental option \texttt{-{}-nb-mus}, which sets the number of Lagrange multipliers of the constrained preprocessing of the thesis, the sets $S(t)$ and $W(t)$ are computed for the budget $\beta\,,$ so the reductions only preserve $f^x_t$ for the scenarios $x \in \mathcal{X}^\beta\,.$ The Benders decompositions \texttt{naive\_benders}, \texttt{target\_benders} and \texttt{flow\_benders} use the whole graph $G_\Psi$ for every vertex $t\,.$ In both cases, the constants are computed once for each vertex $t\,.$ On the whole graph, the probabilities $\Pi^{\mu,i}(s,u)$ do not depend on $t$ and could be shared by all the vertices $t\,.$ Finally, the software creates a copy for every improvement listed in the instance, even if $\pi^j_a \leq \pi_a\,,$ and computes the values $k_j$ over these copies, i.e., $A_j$ is the set of the arcs for which the instance lists an improvement by $j\,.$ All the results of this chapter hold verbatim for this set.
+
+\noindent
+\paragraph{Choice of the Lagrange multipliers.}
+The set of Lagrange multipliers is $\mathcal{U} = \{\theta / \beta : \theta \in \{0, \frac{1}{2}, 1, 2, 4, 8\}\}\,,$ where the multiplier $0$ is processed first since its run of the Dijkstra algorithm also computes the set $I_{t,a^i}\,.$
+
+\noindent
+\paragraph{Tolerances on the filters and on the budget.}
+Both filters keep the vertices that satisfy their inequality up to a relative tolerance of $10^{-9}\,,$ e.g., $\Pi(s,t) \cdot (1 - 10^{-9}) \leq \Pi^+(s,u) \cdot \pi^i_a \cdot \Pi^+(v,t)\,,$ which gives supersets of $I_{t,a^i}$ and $\tilde{I}_{t,a^i}\,.$ The constants of \eqref{eq:big_m_per_copy}, \eqref{eq:big_m_mccormick} and \eqref{eq:big_m_budget_filter} replace the budget $\beta - c_i$ by $\beta - c_i + \tau\,,$ where $\tau$ is the feasibility tolerance of the solver, both in the factors $e^{\mu \cdot (\beta - c_i)}$ and in the capacity of the knapsack, so that they also cover the scenarios whose costs are at most $\beta + \tau\,,$ which the solver accepts. The software takes the minimum of these constants and of the knapsack constants \eqref{eq:big_m_knapsack}, which is valid since both satisfy \eqref{eq:big_m_V}. By Proposition~\ref{prop:big_m_comparison}, this minimum only matters because of the tolerance $\tau\,.$ However, the knapsack constants use the capacity $\beta\,,$ so the minimum is only guaranteed for the scenarios whose costs are at most $\beta\,,$ and passing the capacity $\beta + \tau$ to the knapsack constants as well would close this gap. The member \texttt{feasibility\_tol} of the solver classes defaults to $\tau = 0\,,$ whereas the command line of gecot sets $\tau = 10^{-7}$ unless the option \texttt{-t} is given. With $\tau = 0\,,$ the capacity $\beta - c_i$ can be rounded below the cost of the other options of a scenario whose cost is exactly $\beta\,,$ which a relative tolerance on the capacity would avoid.
+
+\noindent
+\paragraph{Inequality form of the flow constraint of $\mathbf{t}\,.$}
+The software writes constraint \eqref{eq:bc_pc_opt_flow_in_t} as an inequality $\leq\,,$ which does not change the optimal value of $(\mathcal{P}^x_t)$ since $f_t$ is maximized.
+
+\noindent
+\paragraph{Options of null cost or whose cost exceeds the budget.}
+These options are respectively realized and removed by the reformulation of the instance before any algorithm runs, which ensures the assumption $0 < c_i \leq \beta$ of this chapter. The function computing the constants of Section~\ref{sec:big_m_per_copy} also ignores by itself the options whose cost exceeds the budget, in $\Pi^+\,,$ in the tolls and in the values $k_j\,,$ whereas the knapsack constants \eqref{eq:big_m_knapsack} do not. The experimental implementation of the constants of Section~\ref{sec:big_m_budget_filter} computes $\Pi^{x^i}(s,t)$ as $\Pi^{\mu,i}(s,t)$ with $\mu = 10^{18}\,.$ Since $\Pi^{\mu,i}(s,t) \geq \Pi^{x^i}(s,t)$ for every $\mu\,,$ which is the direction that can wrongly exclude vertices from $\tilde{I}_{t,a^i}\,,$ this is only correct because the tolls $e^{-\mu \cdot c_j / k_j}$ underflow to $0$ in floating point, which requires every other option $j$ to have a cost $c_j$ larger than about $7.5 \cdot 10^{-16} \cdot k_j\,.$ In particular, the copies of an option $j$ of null cost would pay no toll, so the computed value would be the probability of connectivity under the scenario that purchases $i$ and $j\,,$ which can exceed $\Pi^x(s,t)$ for the scenarios $x$ that purchase $i$ but not $j$ and thus break the inequality $\Pi^{x^i}(s,t) \leq \Pi^x(s,t)$ used in Lemma~\ref{lemma:big_m_budget_filter}. Moreover, the experiment builds the probabilities $\Pi^{\mu,j}(\cdot,t)$ and $\Pi^{x^j}(\cdot,t)$ only for the options $j$ whose cost is at most $\beta\,,$ but reads them for every copy of the graph, so it relies on the reformulation to remove the copies of the other options. Computing $\Pi^{x^i}(s,t)$ on the arcs of $A$ and the copies of $A'_i$ only, and not computing the constants of the copies of the options whose cost exceeds the budget, for which $x_j = 0$ is forced, removes both the dependency on the costs of the other options and the dependency on the reformulation.
+
+\noindent
+\paragraph{Status of the implementation.}
+The constants of Section~\ref{sec:big_m_per_copy} are those of the \texttt{-{}-big-m tight} mode of the software, where they are used as the minimum with the knapsack constants \eqref{eq:big_m_knapsack}. The constants of Section~\ref{sec:big_m_budget_filter} are an experiment that has not been committed.
+
+
+\begin{thebibliography}{9}
+\bibitem{BIG-M_BELOTTI_2016}
+P.~Belotti, P.~Bonami, M.~Fischetti, A.~Lodi, M.~Monaci, A.~Nogales-G\'omez and D.~Salvagnin.
+\newblock On handling indicator constraints in mixed integer programming.
+\newblock \emph{Computational Optimization and Applications}, 65(3):545--566, 2016.
+
+\bibitem{CSP-LANGRAGIAN-RELAXATION_HANDLER_1980}
+G.~Y.~Handler and I.~Zang.
+\newblock A dual algorithm for the constrained shortest path problem.
+\newblock \emph{Networks}, 10(4):293--309, 1980.
+
+\bibitem{CSP-LAGRANGIAN-RELAXATION_AHUJA_1993}
+R.~K.~Ahuja, T.~L.~Magnanti and J.~B.~Orlin.
+\newblock Lagrangian relaxation and network optimization.
+\newblock In \emph{Network Flows: Theory, Algorithms, and Applications}, chapter~16, pages 598--648. Prentice-Hall, 1993.
+
+\bibitem{LINEARISATION_MCCORMICK_1976}
+G.~P.~McCormick.
+\newblock Computability of global solutions to factorable nonconvex programs: Part {I} -- Convex underestimating problems.
+\newblock \emph{Mathematical Programming}, 10(1):147--175, 1976.
+
+\bibitem{DIJKSTRA_1959}
+E.~W.~Dijkstra.
+\newblock A note on two problems in connexion with graphs.
+\newblock \emph{Numerische Mathematik}, 1(1):269--271, 1959.
+
+\bibitem{OPTIMIZING-CONNECTIVITY_HAMONIC_2022}
+F.~Hamonic, C.~Albert, B.~Cou\"etoux and Y.~Vax\`es.
+\newblock Optimizing the ecological connectivity of landscapes.
+\newblock \emph{Networks}, 2022.
+\newblock doi:10.1002/net.22131.
+\end{thebibliography}
+
+\end{document}

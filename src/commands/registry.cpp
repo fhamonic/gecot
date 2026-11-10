@@ -11,6 +11,7 @@
 #include "solver_interfaces/flow_benders_interface.hpp"
 #include "solver_interfaces/greedy_decremental_interface.hpp"
 #include "solver_interfaces/greedy_incremental_interface.hpp"
+#include "solver_interfaces/grouped_benders_interface.hpp"
 #include "solver_interfaces/mip_interface.hpp"
 #include "solver_interfaces/naive_benders_interface.hpp"
 #include "solver_interfaces/path_formulation_rr_interface.hpp"
@@ -32,6 +33,7 @@ std::vector<std::shared_ptr<AbstractSolverInterface>> make_solver_interfaces() {
             std::make_unique<NaiveBendersInterface>(),
             std::make_unique<TargetBendersInterface>(),
             std::make_unique<FlowBendersInterface>(),
+            std::make_unique<GroupedBendersInterface>(),
             std::make_unique<TreeFormulationRRInterface>(),
             std::make_unique<PathFormulationRRInterface>(),
             std::make_unique<WorstGreedyIncrementalInterface>(),
@@ -58,6 +60,8 @@ std::vector<std::shared_ptr<AbstractBoundInterface>> make_bound_interfaces() {
          "Dual bound of the target Benders master; needs an incumbent."},
         {"flow_benders",
          "Dual bound of the flow Benders master; needs an incumbent."},
+        {"grouped_benders",
+         "Dual bound of the grouped Benders master; needs an incumbent."},
         {"path_rr",
          "Lagrangian bound of the path formulation relaxation, the lowest "
          "over its complete pricing rounds."}};

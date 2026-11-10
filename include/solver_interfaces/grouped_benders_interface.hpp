@@ -18,6 +18,23 @@ public:
                        "target_benders' cuts)")
             ->default_val(2);
         app.add_option_function<std::string>(
+               "--grouping",
+               [this](const std::string & s) {
+                   using grouping = gecot::solvers::grouped_benders::grouping;
+                   solver.groups = s == "voronoi"       ? grouping::voronoi
+                                   : s == "consecutive" ? grouping::consecutive
+                                                        : grouping::random;
+               },
+               "voronoi: the cells of a network Voronoi diagram around "
+               "targets of value far from each other; consecutive: groups of "
+               "consecutive targets; random: groups of targets drawn at "
+               "random, as a control")
+            ->check(CLI::IsMember({"voronoi", "consecutive", "random"}))
+            ->default_val("voronoi");
+        app.add_option("--grouping-seed", solver.random_seed,
+                       "Seed of --grouping random")
+            ->default_val(0);
+        app.add_option_function<std::string>(
                "--big-m",
                [this](const std::string & s) {
                    solver.tight_big_M = s == "tight";

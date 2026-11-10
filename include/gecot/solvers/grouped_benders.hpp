@@ -1,17 +1,21 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <limits>
+#include <random>
 #include <ranges>
 #include <utility>
 #include <vector>
 
+#include <fmt/ranges.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 
 #include "mippp/solvers/gurobi/all.hpp"
 
+#include "melon/algorithm/network_voronoi.hpp"
 #include "melon/graph.hpp"
 
 #include "gecot/concepts/instance.hpp"
@@ -48,9 +52,102 @@ namespace solvers {
 // Σ_{t∈g} v_t(Y). One group per case gives naive_benders' cuts, one group
 // per target target_benders': fewer groups mean fewer, weaker cuts.
 struct grouped_benders : public mip_solver_base {
-    // groups per case, of consecutive targets; 0: a group per target
+    // groups per case; 0: a group per target
     std::size_t num_groups = 2;
+    // voronoi: the cells of a network Voronoi diagram, so that a group
+    // holds targets close to each other; consecutive: groups of consecutive
+    // targets; random: of targets drawn at random, a control
+    enum class grouping { voronoi, consecutive, random };
+    grouping groups = grouping::voronoi;
+    std::size_t random_seed = 0;
     bool tight_big_M = false;
+
+    // The targets of a case in the order of their groups, and the position
+    // of the first target of each group, then their number. The kernels of
+    // the Voronoi cells are targets of value far from each other, on the
+    // graph without options: the target of most value, then each time the
+    // one of most value not connected to the kernels so far.
+    template <case_c C>
+    auto _grouped_targets(const C & instance_case) const {
+        using vertex = melon::vertex_t<case_graph_t<C>>;
+        const auto & graph = instance_case.graph();
+        auto is_target = melon::create_vertex_map<bool>(graph, false);
+        std::vector<vertex> targets;
+        for(const auto & t : melon::vertices(graph))
+            if(instance_case.target_quality_map()[t] > 0 ||
+               std::ranges::any_of(instance_case.vertex_options_map()[t],
+                                   [](auto && e) {
+                                       auto && [sqg, tqg, o] = e;
+                                       return tqg > 0;
+                                   })) {
+                is_target[t] = true;
+                targets.push_back(t);
+            }
+        const std::size_t n = targets.size();
+        const std::size_t G = num_groups ? std::min(num_groups, n) : n;
+        std::vector<std::size_t> firsts;
+        if(groups != grouping::voronoi || G <= 1 || G == n) {
+            if(groups == grouping::random)
+                std::ranges::shuffle(targets, std::mt19937_64{random_seed});
+            for(std::size_t g = 0; g < G; ++g) firsts.push_back(g * n / G);
+            firsts.push_back(n);
+            return std::make_pair(std::move(targets), std::move(firsts));
+        }
+        auto length_map = melon::create_arc_map<double>(graph);
+        for(const auto & a : melon::arcs(graph))
+            length_map[a] = -std::log(instance_case.arc_probability_map()[a]);
+        // the value of each target without options, its best quality counted
+        auto value_map = melon::create_vertex_map<double>(graph, 0.0);
+        for(const vertex t : targets) {
+            double quality = instance_case.target_quality_map()[t];
+            for(auto && [sqg, tqg, o] : instance_case.vertex_options_map()[t])
+                quality += tqg;
+            value_map[t] =
+                quality *
+                pc_num_vertex_in_flow(graph, instance_case.source_quality_map(),
+                                      instance_case.arc_probability_map(), t);
+        }
+        auto group_map = melon::create_vertex_map<std::size_t>(graph, 0);
+        std::vector<vertex> kernels{*std::ranges::max_element(
+            targets, {}, [&](const vertex t) { return value_map[t]; })};
+        for(;;) {
+            // the next kernel: the target of most value not connected to
+            // the kernels, v_t (1 - P), P the probability of its most
+            // reliable path from a kernel. Never a kernel: set_kernels
+            // requires them distinct.
+            auto unreached = is_target;
+            vertex next = kernels.front();
+            double next_value = -1;
+            auto propose = [&](const vertex t, const double value) {
+                if(value <= next_value || std::ranges::contains(kernels, t))
+                    return;
+                next = t;
+                next_value = value;
+            };
+            for(const auto & [v, entry] :
+                melon::network_voronoi(graph, length_map, kernels)) {
+                if(!is_target[v]) continue;
+                unreached[v] = false;
+                group_map[v] = static_cast<std::size_t>(std::ranges::distance(
+                    kernels.begin(), std::ranges::find(kernels, entry.second)));
+                propose(v, value_map[v] * (1 - std::exp(-entry.first)));
+            }
+            for(const vertex t : targets)
+                if(unreached[t]) {
+                    group_map[t] = 0;
+                    propose(t, value_map[t]);
+                }
+            if(kernels.size() == G) break;
+            kernels.push_back(next);
+        }
+        std::ranges::stable_sort(targets, {},
+                                 [&](const vertex t) { return group_map[t]; });
+        for(std::size_t i = 0; i < n; ++i)
+            if(i == 0 || group_map[targets[i]] != group_map[targets[i - 1]])
+                firsts.push_back(i);
+        firsts.push_back(n);
+        return std::make_pair(std::move(targets), std::move(firsts));
+    }
 
     // v_t(Y) and the ρ of cut_tY
     template <case_c C>
@@ -117,36 +214,34 @@ struct grouped_benders : public mip_solver_base {
             instance.template create_case_map<std::vector<target_data>>();
         auto groups = instance.template create_case_map<std::vector<group>>();
         for(auto && instance_case : instance.cases()) {
-            const auto & graph = instance_case.graph();
             const auto [strong_arcs_map, useless_arcs_map] =
                 _compute_strong_and_useless_arcs(instance, instance_case,
                                                  budget);
             spdlog::debug("Computing contractions and big-Ms of the '{}' graph",
                           instance_case.name());
             auto & case_targets = targets[instance_case.id()];
+            const auto [target_vertices, firsts] =
+                _grouped_targets(instance_case);
             {
-                progress_bar<spdlog::level::info, 64> pb(graph.num_vertices());
-                for(const auto & t : melon::vertices(graph)) {
-                    pb.tick();
-                    if(instance_case.target_quality_map()[t] == 0 &&
-                       std::ranges::none_of(
-                           instance_case.vertex_options_map()[t],
-                           [](auto && e) {
-                               auto && [sqg, tqg, o] = e;
-                               return tqg > 0;
-                           }))
-                        continue;
+                progress_bar<spdlog::level::info, 64> pb(
+                    target_vertices.size());
+                for(const auto & t : target_vertices) {
                     case_targets.push_back(compute_contracted_graph_data(
                         instance, instance_case, budget, t, strong_arcs_map[t],
                         useless_arcs_map[t], tight_big_M, feasibility_tol));
+                    pb.tick();
                 }
             }
-            const std::size_t n = case_targets.size();
-            const std::size_t G = num_groups ? std::min(num_groups, n) : n;
             auto & case_groups = groups[instance_case.id()];
-            for(std::size_t g = 0; g < G; ++g)
+            for(std::size_t g = 0; g + 1 < firsts.size(); ++g)
                 case_groups.push_back(
-                    {model.add_variable(), g * n / G, (g + 1) * n / G});
+                    {model.add_variable(), firsts[g], firsts[g + 1]});
+            spdlog::debug(
+                "  {} groups of {} targets", case_groups.size(),
+                fmt::join(std::views::transform(
+                              case_groups,
+                              [](const group & g) { return g.last - g.first; }),
+                          ", "));
             model.add_constraint(
                 z(instance_case.id()) <=
                 xsum(std::views::transform(case_groups, &group::theta)));

@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include <spdlog/spdlog.h>
+#include <spdlog/stopwatch.h>
 #include <CLI/CLI.hpp>
 #include <nlohmann/json.hpp>
 
@@ -20,7 +22,11 @@
 #include "mippp/solvers/scip/all.hpp"
 #include "mippp/solvers/xpress/all.hpp"
 
+#include "gecot/solvers/greedy_decremental.hpp"
+#include "gecot/solvers/greedy_incremental.hpp"
 #include "gecot/solvers/mip_solver_base.hpp"
+#include "gecot/solvers/static_decremental.hpp"
+#include "gecot/solvers/static_incremental.hpp"
 
 #include "solver_interfaces/abstract_solver_interface.hpp"
 
@@ -51,6 +57,7 @@ public:
 
 protected:
     std::string solver_name;
+    std::string mip_start_algorithm;
 
     static inline const std::vector<std::string> all_solvers{
         "gurobi", "cplex", "copt", "xpress", "mosek",
@@ -68,16 +75,50 @@ protected:
             ->check(CLI::IsMember(solvers))
             ->default_val("gurobi");
         add_feasibility_tol_option(solver.feasibility_tol, default_tol);
-        app.add_option_function<std::filesystem::path>(
-            "--mip-start",
-            [&solver](const std::filesystem::path & solution_path) {
-                solver.mip_start = parse_mip_start(solution_path);
-            },
-            "Solution file (JSON) to propose as a MIP start to the solver.");
+        auto * mip_start_option =
+            app.add_option_function<std::filesystem::path>(
+                "--mip-start",
+                [&solver](const std::filesystem::path & solution_path) {
+                    solver.mip_start = parse_mip_start(solution_path);
+                },
+                "Solution file (JSON) to propose as a MIP start to the "
+                "solver.");
+        app.add_option("--mip-start-algorithm", mip_start_algorithm,
+                       "Algorithm whose solution is proposed as a MIP start "
+                       "to the solver, its time counted in --time-limit")
+            ->check(CLI::IsMember({"none", "static_incr", "static_decr",
+                                   "greedy_incr", "greedy_decr"}))
+            ->default_val("none")
+            ->excludes(mip_start_option);
         app.add_option("--time-limit", solver.time_limit,
                        "Time limit in seconds, after which the best solution "
                        "found is returned")
             ->check(CLI::NonNegativeNumber);
+    }
+
+    // solver with the solution of --mip-start-algorithm as its MIP start
+    template <typename S>
+    S with_mip_start(S solver, const Instance & instance,
+                     const double B) const {
+        if(mip_start_algorithm == "none") return solver;
+        spdlog::info("Computing the MIP start with {}", mip_start_algorithm);
+        const spdlog::stopwatch sw;
+        const double tol = solver.feasibility_tol;
+        using namespace gecot::solvers;
+        const auto start = mip_start_algorithm == "static_incr"
+                               ? StaticIncremental{tol}.solve(instance, B)
+                           : mip_start_algorithm == "static_decr"
+                               ? StaticDecremental{tol}.solve(instance, B)
+                           : mip_start_algorithm == "greedy_incr"
+                               ? GreedyIncremental{tol}.solve(instance, B)
+                               : GreedyDecremental{tol}.solve(instance, B);
+        solver.mip_start.emplace();
+        for(auto && o : instance.options())
+            if(start[o]) solver.mip_start->push_back(instance.option_name(o));
+        if(solver.time_limit)
+            solver.time_limit =
+                std::max(0.0, *solver.time_limit - sw.elapsed().count());
+        return solver;
     }
 
     // f.template operator()<LP, MILP>() with the --solver mippp models

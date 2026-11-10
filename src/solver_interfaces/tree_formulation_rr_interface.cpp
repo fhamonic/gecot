@@ -2,7 +2,8 @@
 
 gecot::solve_result<Instance> TreeFormulationRRInterface::solve(
     const Instance & instance, const double B) const {
+    const auto started = with_mip_start(solver, instance, B);
     return with_solver([&]<typename LP, typename MILP>() {
-        return solver.template solve<LP, MILP>(instance, B);
+        return started.template solve<LP, MILP>(instance, B);
     });
 }

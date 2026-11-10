@@ -93,8 +93,8 @@ add_executable(gecot src/gecot.cpp src/instance.cpp src/parse_instance.cpp
     src/solver_interfaces/target_benders_interface.cpp
     src/solver_interfaces/flow_benders_interface.cpp
     src/solver_interfaces/grouped_benders_interface.cpp
-    src/solver_interfaces/tree_formulation_rr_interface.cpp
-    src/solver_interfaces/path_formulation_rr_interface.cpp
+    src/solver_interfaces/tree_formulation_lp_interface.cpp
+    src/solver_interfaces/path_formulation_lp_interface.cpp
     ${WINDRES_ICON_O})
 target_link_libraries(gecot PUBLIC gecot_lib)
 target_link_libraries(gecot PUBLIC vincentlaucsb-csv-parser::vincentlaucsb-csv-parser)

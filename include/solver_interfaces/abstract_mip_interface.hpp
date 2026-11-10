@@ -64,7 +64,7 @@ protected:
         "highs",  "scip",  "cbc",  "glpk"};
     static inline const std::vector<std::string> lazy_constraint_solvers{
         "gurobi", "cplex", "copt"};
-    // GLPK is not thread-safe, tree_rr prices in parallel
+    // GLPK is not thread-safe, tree_lp prices in parallel
     static inline const std::vector<std::string> thread_safe_solvers{
         "gurobi", "cplex", "copt", "xpress", "mosek", "highs", "scip", "cbc"};
 

@@ -14,12 +14,12 @@
 #include "solver_interfaces/grouped_benders_interface.hpp"
 #include "solver_interfaces/mip_interface.hpp"
 #include "solver_interfaces/naive_benders_interface.hpp"
-#include "solver_interfaces/path_formulation_rr_interface.hpp"
+#include "solver_interfaces/path_formulation_lp_interface.hpp"
 #include "solver_interfaces/preprocessed_mip_interface.hpp"
 #include "solver_interfaces/static_decremental_interface.hpp"
 #include "solver_interfaces/static_incremental_interface.hpp"
 #include "solver_interfaces/target_benders_interface.hpp"
-#include "solver_interfaces/tree_formulation_rr_interface.hpp"
+#include "solver_interfaces/tree_formulation_lp_interface.hpp"
 #include "solver_interfaces/worst_greedy_decremental_interface.hpp"
 #include "solver_interfaces/worst_greedy_incremental_interface.hpp"
 
@@ -34,8 +34,8 @@ std::vector<std::shared_ptr<AbstractSolverInterface>> make_solver_interfaces() {
             std::make_unique<TargetBendersInterface>(),
             std::make_unique<FlowBendersInterface>(),
             std::make_unique<GroupedBendersInterface>(),
-            std::make_unique<TreeFormulationRRInterface>(),
-            std::make_unique<PathFormulationRRInterface>(),
+            std::make_unique<TreeFormulationLPInterface>(),
+            std::make_unique<PathFormulationLPInterface>(),
             std::make_unique<WorstGreedyIncrementalInterface>(),
             std::make_unique<WorstGreedyDecrementalInterface>()};
 }
@@ -45,7 +45,7 @@ std::vector<std::shared_ptr<AbstractBoundInterface>> make_bound_interfaces() {
         std::make_unique<AllOptionsInterface>(),
         std::make_unique<QkpPlanesInterface>(),
         std::make_unique<SplitLagrangeInterface>()};
-    // the algorithms whose relaxation proves a bound; tree_rr's pricing can
+    // the algorithms whose relaxation proves a bound; tree_lp's pricing can
     // miss improving trees, so its relaxation value bounds nothing
     const std::vector<std::pair<std::string, std::string>> proving_algorithms{
         {"mip",
@@ -62,7 +62,7 @@ std::vector<std::shared_ptr<AbstractBoundInterface>> make_bound_interfaces() {
          "Dual bound of the flow Benders master; needs an incumbent."},
         {"grouped_benders",
          "Dual bound of the grouped Benders master; needs an incumbent."},
-        {"path_rr",
+        {"path_lp",
          "Lagrangian bound of the path formulation relaxation, the lowest "
          "over its complete pricing rounds."}};
     for(auto & solver : make_solver_interfaces()) {

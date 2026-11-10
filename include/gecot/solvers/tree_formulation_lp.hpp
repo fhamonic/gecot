@@ -56,7 +56,7 @@ namespace solvers {
 // among its trees within the budget, which the LP above does not require:
 // this tightens the relaxation. The pricing can miss improving trees, so the
 // relaxation value is not a bound.
-struct tree_formulation_rr : public mip_solver_base {
+struct tree_formulation_lp : public mip_solver_base {
     using variable_t = mippp::model_variable<int, double>;
     using constraint_t = mippp::model_constraint<int>;
 

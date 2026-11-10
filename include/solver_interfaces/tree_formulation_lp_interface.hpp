@@ -1,15 +1,15 @@
 #pragma once
 
-#include "gecot/solvers/tree_formulation_rr.hpp"
+#include "gecot/solvers/tree_formulation_lp.hpp"
 
 #include "solver_interfaces/abstract_mip_interface.hpp"
 
-class TreeFormulationRRInterface : public AbstractMipInterface {
+class TreeFormulationLPInterface : public AbstractMipInterface {
 private:
-    gecot::solvers::tree_formulation_rr solver;
+    gecot::solvers::tree_formulation_lp solver;
 
 public:
-    TreeFormulationRRInterface() : AbstractMipInterface("tree_rr") {
+    TreeFormulationLPInterface() : AbstractMipInterface("tree_lp") {
         add_mip_options(solver, 1e-7, thread_safe_solvers);
         add_preprocessing_options(solver);
         app.add_option("--evict-age", solver.evict_age,
@@ -22,6 +22,7 @@ public:
                                         const double B) const override;
 
     std::string description() const override {
-        return "tree formulation relaxation with randomized rounding";
+        return "tree formulation relaxation, one column per target and set of "
+               "options";
     }
 };

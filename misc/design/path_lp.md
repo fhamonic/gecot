@@ -1,6 +1,8 @@
-# path_rr: design note
+# path_lp: design note
 
-Design note on gecot's `path_rr` solver, the path formulation relaxation solved by column generation. It is written for the owner and future maintainers, not as user documentation. Dated 2026-10-29, it lists every method that proved useful for `path_rr`, landed or not, with its mathematics made explicit, and the methods that were measured and set aside, so that "useful" reads as a selection. The code on branch `path-rr-rewrite`, on top of `path-rr-search-fixes`, was rewritten to follow the structure of §1 and §2; §2.8 maps the two. Its results are bit-identical to `path-rr-search-fixes` on 34 single-threaded runs covering both pricings, `--mip-start`, `--max-activations`, `--evict-age` and `--relative-gap`. On branch `path-rr-simplify` (2026-11-02), both pricings and the setup run one label search on the case graph, backwards from the target (§2.1, §2.4, §2.5): the split graph and the backtrack are gone, search prices every option shape, and `--mip-start` keeps the column without options (§2.2).
+`path_lp` was named `path_rr`, and `tree_lp` `tree_rr`, until 2026-11-10: the branches and the commit messages cited below use the former names.
+
+Design note on gecot's `path_lp` solver, the path formulation relaxation solved by column generation. It is written for the owner and future maintainers, not as user documentation. Dated 2026-10-29, it lists every method that proved useful for `path_lp`, landed or not, with its mathematics made explicit, and the methods that were measured and set aside, so that "useful" reads as a selection. The code on branch `path-rr-rewrite`, on top of `path-rr-search-fixes`, was rewritten to follow the structure of §1 and §2; §2.8 maps the two. Its results are bit-identical to `path-rr-search-fixes` on 34 single-threaded runs covering both pricings, `--mip-start`, `--max-activations`, `--evict-age` and `--relative-gap`. On branch `path-rr-simplify` (2026-11-02), both pricings and the setup run one label search on the case graph, backwards from the target (§2.1, §2.4, §2.5): the split graph and the backtrack are gone, search prices every option shape, and `--mip-start` keeps the column without options (§2.2).
 
 - **Sources.** Main at 029471d; the two fixes on branch `path-rr-search-fixes`; the unmerged branch `path-rr-smoothing`; and a study of 2026-10-28/29 that prototyped six directions toward a quality guarantee (a feasible incumbent plus a valid bound). An adversarial verifier reviewed five directions, all "sound with fixes". The tighter-relaxation write-up has no separate review.
 - **Citations.** A commit sha marks a measurement taken when that commit was validated. "study: <direction>" marks a study result, with ", verifier" when the verifier measured or corrected it. "study: decision page" marks the study's synthesis. Where an analyst and the verifier disagree, the verifier's figure is given.
@@ -9,7 +11,7 @@ Design note on gecot's `path_rr` solver, the path formulation relaxation solved 
 ## Summary
 
 - **The relaxation is tight where column generation converges.** Converged, the path LP is at most 0.042% above the optimum on bike_small, at most 0.030% on bike_mid, 0.01–0.03% on Quebec with enumerate (the default search LP: +0.01% / +0.09% at B=1000 / 10000) and 0.03–0.17% on Aix. Aude's 0.5–2.3% is closed at B=2 and B=3 by column-cover cuts. Full bike's converged LP has never been measured.
-- **The guarantee is a feasible incumbent plus the Lagrangian bound** L = z_RMP + Σ_p max(0, max_S rc_pS), valid after every complete pricing round. path_rr computes L (1af6651) and, since branch `path-rr-feasible` (2026-11-03), returns a budget-feasible rounding of x with L as its `best_bound`, so `gecot optimize` prints a gap (§3.1). Before, it returned the master's x cast to a set, which exceeded the budget.
+- **The guarantee is a feasible incumbent plus the Lagrangian bound** L = z_RMP + Σ_p max(0, max_S rc_pS), valid after every complete pricing round. path_lp computes L (1af6651) and, since branch `path-rr-feasible` (2026-11-03), returns a budget-feasible rounding of x with L as its `best_bound`, so `gecot optimize` prints a gap (§3.1). Before, it returned the master's x cast to a set, which exceeded the budget.
 - **In the code** (main 029471d): pairs no option can change folded into a constant; lazy rows; start columns from `--mip-start`; enumerate pricing (budget-aware, any option shape, exponential); search pricing (default; budget-free; single-arc and star options); the max-value skip, the early stop and the unchanged-duals reuse; the dual clamp; `--max-activations`, `--evict-age`, `--relative-gap`. Two validity fixes, for an invalid bound and a crash, wait on `path-rr-search-fixes`.
 - **Useful, not landed** (§3, in the decision page's three tiers). *Small and generic, land first:* time limits and an LP status check; an incremental evaluator. *Land after review:* local search; pruned search pricing; lazy budget pricing, a knapsack-hull end phase and column-cover cuts for instances that converge; generic exact pricing for every option shape (it certifies Aix N2 within 0.38%, where nothing else runs). *Research, not ready to land:* the direct Lagrangian dual; a barrier master with value scaling, and dual completion (modest on bike_small, 449 → 342 rounds; unproven alone on green); pair tolerance.
 - **What stalls, and why** (§4): bike and green. A useful bound needs purchase duals on most (pair, option) entries. Under such duals one pair search costs 20–300 ms instead of 0.4 ms, and bike has 58,966 pairs. Under `--max-activations` most pairs never get rows, price every option as free, and keep the bound near the all-free value: 7.72e6 on bike B=1000, against prep_mip's 6.459e6. Green is limited by coverage and by the master LP, about 90% of a round.
@@ -33,7 +35,7 @@ maximize φ(Score_1(X), …, Score_K(X))   s.t.  Σ_{o∈X} c_o ≤ B
 
 - **Monotone.** p_a(X) and q_v(X) are nondecreasing in X, hence so is v_p(X). Every bound below relies on it.
 - **Criterion φ:** sums, min, nonnegative scalings and constants of case scores. It is concave and nondecreasing in each case score. Products of case variables are rejected (`formula_variable_visitor`).
-- **Caveat: negative factors.** The parser accepts a negative constant factor, but every criterion variable has lower bound 0 (mippp's default, in `formula_variable_visitor`), so a term c·e with c < 0 forces e = 0 and the term is dropped. Measured on Aude B=3 with sum([2, trout], [−1, trout]), which equals trout: mip returns the empty solution as "optimal" with a bound of 0 (the optimum is 1,120,213.88), and path_rr's Lagrangian bound is 0.001, below the empty landscape's 864,655.72 (main 029471d, 2026-10-29). It affects every solver built on `formula_variable_visitor`, not only path_rr. A negative factor also breaks monotonicity (§3.10) and, on a min term, the concavity §3.8 uses to compute φ*. A negative additive constant, sum(k0, −50), solves on main (119.115; study: master-acceleration, verifier).
+- **Caveat: negative factors.** The parser accepts a negative constant factor, but every criterion variable has lower bound 0 (mippp's default, in `formula_variable_visitor`), so a term c·e with c < 0 forces e = 0 and the term is dropped. Measured on Aude B=3 with sum([2, trout], [−1, trout]), which equals trout: mip returns the empty solution as "optimal" with a bound of 0 (the optimum is 1,120,213.88), and path_lp's Lagrangian bound is 0.001, below the empty landscape's 864,655.72 (main 029471d, 2026-10-29). It affects every solver built on `formula_variable_visitor`, not only path_lp. A negative factor also breaks monotonicity (§3.10) and, on a min term, the concavity §3.8 uses to compute φ*. A negative additive constant, sum(k0, −50), solves on main (119.115; study: master-acceleration, verifier).
 
 ### 1.2 The path LP
 
@@ -72,13 +74,13 @@ z_hull    z_budget with x ∈ conv{x ∈ {0,1}^O : c·x ≤ B}: the Lagrangian d
 z_hull^S  z_search with x in the same hull: the Lagrangian dual with search columns (§3.8)
 z_PPC     per-pair consistency: each pair a distribution ν_p over budget-feasible full sets X with Σ_{X∋o} ν_pX = x_o;
           the best any family of single-pair inequalities can reach (§3.6c)
-z_tree    tree_rr: one column per (target, option set) shared by all sources of the target
+z_tree    tree_lp: one column per (target, option set) shared by all sources of the target
 ```
 
 - With unit costs and an integer B the knapsack polytope is integral, so z_hull = z_budget and z_hull^S = z_search (Aude, Aix70 B=2).
 - The first chain is the analyst's (study: tighter-relaxation, no review). It follows from standard arguments.
-- **Against tree_rr.** tree_rr has per-(target, option) purchase rows and the budget row inside its pricing MILP. Splitting a tree column (t, X) into its pair columns (s, t, X_s ⊆ X) maps any tree-LP point into the budget path LP, hence z_tree ≤ z_budget. This is a derivation: tree_rr's column definition was not re-read in full. It concerns exact converged values. tree_rr's own relaxation_value is not a bound, since its pricing is inexact (2089fd9). Observed: optimum ≤ tree ≤ path (0b3f2b2). Aude B=3: tree_rr's DW bound with the knapsack pricing row was +0.30% above the optimum, against path enumerate's +0.85% and search's +1.64% (2026-10-27 ablation, before 2089fd9).
-- **What path_rr gains over tree_rr** is convergence. Quebec B=1000: path_rr converges in 6.7 s (0b3f2b2), while tree_rr has not converged at 600 s, its master 0.7% below the optimum (c983ada). Quebec B=10000: 65 s at 3.3 GB (0b3f2b2), while tree_rr's master is 45% below the optimum at 600 s, under the empty landscape's score (c983ada).
+- **Against tree_lp.** tree_lp has per-(target, option) purchase rows and the budget row inside its pricing MILP. Splitting a tree column (t, X) into its pair columns (s, t, X_s ⊆ X) maps any tree-LP point into the budget path LP, hence z_tree ≤ z_budget. This is a derivation: tree_lp's column definition was not re-read in full. It concerns exact converged values. tree_lp's own relaxation_value is not a bound, since its pricing is inexact (2089fd9). Observed: optimum ≤ tree ≤ path (0b3f2b2). Aude B=3: tree_lp's DW bound with the knapsack pricing row was +0.30% above the optimum, against path enumerate's +0.85% and search's +1.64% (2026-10-27 ablation, before 2089fd9).
+- **What path_lp gains over tree_lp** is convergence. Quebec B=1000: path_lp converges in 6.7 s (0b3f2b2), while tree_lp has not converged at 600 s, its master 0.7% below the optimum (c983ada). Quebec B=10000: 65 s at 3.3 GB (0b3f2b2), while tree_lp's master is 45% below the optimum at 600 s, under the empty landscape's score (c983ada).
 
 ### 1.4 Measured tightness
 
@@ -139,7 +141,7 @@ Multithreaded runs vary in iteration count from run to run, with the same final 
   - With x = X_0 these columns are feasible, and the RMP holds nothing better, so the first master value is score(X_0).
   - Search mode computes S⁰_p with the setup's label search restricted to X_0. Enumerate takes the best pooled column ⊆ X_0; that is exact, because a column dominating a subset of X_0 is itself a subset of X_0.
   - Checked: with prep_mip's optimum as the start, the first master equals it to about 1e-15 on 8 Aude and Aix instance-budget pairs (0b3f2b2). Search-mode start masters are exact (c7754f5).
-  - The start sets the master's first value, not the bound. Greedy leaves budget slack, so μ = 0 and every λ_po = 0 (§4.6). path_rr returns the start only if it scores more than the rounding of x (§3.1).
+  - The start sets the master's first value, not the bound. Greedy leaves budget slack, so μ = 0 and every λ_po = 0 (§4.6). path_lp returns the start only if it scores more than the rounding of x (§3.1).
 
 ### 2.3 Reduced cost and the Lagrangian bound
 
@@ -188,7 +190,7 @@ S1 ⊆ S2, v_pS1 ≥ v_pS2:   rc_pS1 − rc_pS2 = π_k (v_pS1 − v_pS2) + Σ_{o
 - **Measured.**
   - Fronts: Aude about 1,000 columns; Aix 30x30 33k labels (76k with endpoint options) in 0.05 s; Aix 40x40 under 7k; Quebec B=1000 391k labels (729k); Quebec B=10000 11.7M labels (28M), enumerated in 5 s (0b3f2b2).
   - Times at landing: Aude 0.01–0.06 s; Aix 30x30 0.35–0.77 s; Quebec B=1000 6.7 s; Quebec B=10000 65 s at 3.3 GB (0b3f2b2); 3.9 s and 32.7 s with lazy rows (8ef534c).
-  - Against prep_mip (f0da701). prep_mip is faster on Quebec (2.2 against 3.8 s at B=1000, 8.4 against 33 s at B=10000) and on Aude (all under 0.1 s). path_rr is faster on Aix: 1.7–3.3× on 30x30, 2.5× on 40x40, and 20 s / 0.6 GB against 47 s / 2.2 GB on 70x70 B=2.
+  - Against prep_mip (f0da701). prep_mip is faster on Quebec (2.2 against 3.8 s at B=1000, 8.4 against 33 s at B=10000) and on Aude (all under 0.1 s). path_lp is faster on Aix: 1.7–3.3× on 30x30, 2.5× on 40x40, and 20 s / 0.6 GB against 47 s / 2.2 GB on 70x70 B=2.
   - It explodes when many cheap options lie along a path: green even at B=0.5; bike never finishes, even at B=50, with up to 1.6e15 non-dominated labels per pair at B=1000 (8429409); Aix N2 B=100 stays in setup over 200 s (study: generic-pricing).
 - **Role since 029471d.** Opt-in `--pricing enumerate`, for small instances whose options search cannot price: Aix, test, min3. N1 and N2 are out of reach of both pricings (enumerate stays in setup on N2; N1 was never run). Where both run, it gives the tighter z_budget: Aude B=3 1,129,774.9224 against 1,138,555.6616 for search.
 - **Fix needed.** Check the clock inside the enumeration parallel_for (§3.2).
@@ -237,7 +239,7 @@ r_p = max over option sets S and paths P of   π_k q_s(S) q_t(S) Π_{a∈P} p_a(
 - **Measured.**
   - Green B=5 from greedy, 600 s: searches 11.0M → 0.72M, rounds 45 → 64, bound 3.1186e13 → 3.0944e13, certifying greedy within 9.3%. The master LP becomes about 90% of a round, growing from 1 s to 10 s (f0da701).
   - Bike B=1000, cap 5,000: 94,483 searches in all, 58,966 of them in round 1 and about 4.4k per round after (study: master-acceleration).
-  - tree_rr has the same skip per target (c983ada): 28–46% of pricings skipped on Aix 30x30, with the same final value.
+  - tree_lp has the same skip per target (c983ada): 28–46% of pricings skipped on Aix 30x30, with the same final value.
 - **Anything that moves the duals defeats it.** Wentges smoothing at α = 0.5 multiplies Quebec B=1000 searches by 13 (90k → 1.18M; mippp dual_smoothing §7, F3). Barrier duals: 90k → 209k at B=1000, 207k → 555k at B=10000. Dual completion on green: 11.4M against 568k searches (study: master-acceleration).
 - On bike and green the reuse is cheap because most pairs never get rows and keep zero duals. It is a symptom of §4.3, not its cause (study: master-acceleration, verifier).
 
@@ -250,19 +252,19 @@ r_p = max over option sets S and paths P of   π_k q_s(S) q_t(S) Π_{a∈P} p_a(
   - The cap limits coverage (§4.3), and k has no rule. Pool-first activation was rejected (§5).
 - **`--evict-age k`** (0b3f2b2). A master column older than k rounds with rc < −1e-6 goes back to the pool.
   - A basic column has rc = 0, so only nonbasic columns leave and the RMP optimum is unchanged. Rows stay, so L is unaffected. An evicted column is re-priced at the next round and purged unless its reduced cost is then positive; later, it returns only if the pricing finds it again.
-  - Eviction runs after the time-limit test, and only when the master will be solved again: removing columns after the last solve loses the solution on Gurobi and CPLEX and silently zeroes it on HiGHS (mippp column manager note, L1 and X1). path_rr calls `update_columns` once per round, so the age counts rounds (L11).
+  - Eviction runs after the time-limit test, and only when the master will be solved again: removing columns after the last solve loses the solution on Gurobi and CPLEX and silently zeroes it on HiGHS (mippp column manager note, L1 and X1). path_lp calls `update_columns` once per round, so the age counts rounds (L11).
   - Backends without `has_remove_variable` warn and ignore the option.
-  - Measured neutral or slower on Aude, Aix and Quebec (0b3f2b2). Never run on bike or green, where the master dominates; that was tree_rr_cm's only winning case.
+  - Measured neutral or slower on Aude, Aix and Quebec (0b3f2b2). Never run on bike or green, where the master dominates; that was tree_lp_cm's only winning case.
   - bike_small B=200, `--evict-age 3`, single-threaded: no convergence in 1,800 s on main cf1d235. On `path-rr-feasible`, whose loop is the same, 4,946 rounds in 6 minutes, the bound stuck at 118,431 (117,226 converged without eviction, in about a minute): evicted columns come back in a cycle (2026-11-03).
-- **Time limit** (0b3f2b2, c7754f5). In search mode the clock is checked before each pair search; an unsearched pair marks the round cut short, and such a round gives no bound and cannot converge. In enumerate mode it is checked only after activation, so every enumerate round is complete. After activation, if time is up, the status is "time limit reached", and the master is solved once more if columns were added, because the backends lose the solution after the model changes (as tree_rr's 33ccf0d). The master solve and the enumeration ignore the limit (§3.2).
+- **Time limit** (0b3f2b2, c7754f5). In search mode the clock is checked before each pair search; an unsearched pair marks the round cut short, and such a round gives no bound and cannot converge. In enumerate mode it is checked only after activation, so every enumerate round is complete. After activation, if time is up, the status is "time limit reached", and the master is solved once more if columns were added, because the backends lose the solution after the model changes (as tree_lp's 33ccf0d). The master solve and the enumeration ignore the limit (§3.2).
 
 ### 2.8 Code map
 
-In `include/gecot/solvers/path_formulation_rr.hpp` on branch `path-rr-simplify`, which uses the notation of §1.2: z_k, C_k, π_k, σ_p, λ_po, rc_pS.
+In `include/gecot/solvers/path_formulation_lp.hpp` on branch `path-rr-simplify`, which uses the notation of §1.2: z_k, C_k, π_k, σ_p, λ_po, rc_pS.
 
 | Part | Where |
 |---|---|
-| The LP (§1.2), the reduced cost and L (§2.3), the two pricings | the comment above `struct path_formulation_rr` |
+| The LP (§1.2), the reduced cost and L (§2.3), the two pricings | the comment above `struct path_formulation_lp` |
 | Pairs, C_k, base_p, V_p and start columns (§2.1, §2.2) | `pair_data`, `_pairs` |
 | The label search of both pricings and the setup (§2.4, §2.5) | `label`, `_labels`; its weights, live options, pruning and dominance are the callers' |
 | Enumerate pricing (§2.4) | in `_pairs`, `_labels` with costs, then `_pair_columns`; in `solve`, the `enumerate` lambda scans `pair_data::columns` |
@@ -282,7 +284,7 @@ The study's ranking: a valid guarantee for every instance shape first, then boun
 ### 3.1 A budget-feasible incumbent and its gap (item 2)
 
 - **Status.** Landed on branch `path-rr-feasible` (2026-11-03), about 25 lines, without the local search polish. The proposal had been reviewed as a fix by three verifiers (study: primal-side, master-acceleration, reduction); the change itself by three reviewers, each finding checked by a skeptic.
-- **Problem.** path_rr returns {o : x*_o > 0}, and nothing ties that set to the budget: a fractional x* spreads small values over many options.
+- **Problem.** path_lp returns {o : x*_o > 0}, and nothing ties that set to the budget: a fractional x* spreads small values over many options.
   - Simplex masters: 365–409 options at cost 16–20k on bike B=1000; costs of 1,359 / 15,687 / 42,264 on Quebec B=1000 / 10000 / 20000. Barrier: 1,504 options at 78.7k on bike. Tiny instances: 11 of 64 over budget with simplex, 36 of 64 with barrier (study: master-acceleration, reduction, verifiers).
   - On N2 B=100 the cast scores 1466.11, above the 1463.19 bound of the same run (generic exact pricing prototype; study: generic-pricing, verifier).
   - Reported by the owner on the regenerated Aix 70x70, B=10: cost 11.6. The master spends exactly 10, nine options at x = 1 (9.6) and option 123 at x = 0.2 (cost 2); the cast buys 123. Its score, 2,688,238, is above the run's own L, 2,650,855.
@@ -295,7 +297,7 @@ report.best_bound = L_best,  only after a complete pricing round; gecot optimize
 ```
 
   - G skips an option that does not fit and goes on, with static_incremental's test. The options of x*_o = 0 come last and take what is left: scores are monotone in the option set (gains and qualities ≥ 0, improved arcs by max), so they never lower the score. The negative-factor caveat of §1.1 is the exception.
-  - Enumerate's columns are built within B + feasibility_tol, the test of G and of the start check (§2.4). With the strict B, a set of decimal costs whose float sum exceeds B (0.2 + 0.4 > 0.6) was missing from the LP, so path_rr could return it with a score above L: Aix 30x30 B=0.6 gave a gap of −4.9e-5, and 22 of 400 random decimal-cost instances a negative gap, down to −0.28. The master's budget row stays at B, so a set of cost in (B, B + tol] can exceed L by about μ·tol.
+  - Enumerate's columns are built within B + feasibility_tol, the test of G and of the start check (§2.4). With the strict B, a set of decimal costs whose float sum exceeds B (0.2 + 0.4 > 0.6) was missing from the LP, so path_lp could return it with a score above L: Aix 30x30 B=0.6 gave a gap of −4.9e-5, and 22 of 400 random decimal-cost instances a negative gap, down to −0.28. The master's budget row stays at B, so a set of cost in (B, B + tol] can exceed L by about μ·tol.
   - Not done: local search (§3.4) and a ratio-ordered fill. The x* order is LP-driven: on a fuzz instance with x*_o1 = x*_o2 = 2/3 at B=2, the option order buys o1 (3.50) instead of o2 (6.65, the optimum).
 
 - **Measured** against main cf1d235, single-threaded (2026-11-03): 278 configurations (real, scaled and fuzz instances; both pricings; `--max-activations`, `--evict-age`, `--relative-gap`, `--mip-start`, `--time-limit`).
@@ -314,19 +316,19 @@ report.best_bound = L_best,  only after a complete pricing round; gecot optimize
 
     On Aix 70x70 B=10 the solution has cost 10, score 2,647,561 against 2,648,030, and a gap of 0.12%.
   - Fuzz, both pricings, default options: 162 of the 173 configurations with a positive optimal gain reach the optimum; the lowest share is 0.47.
-  - With prep_mip's optimum as `--mip-start`, path_rr returns it with a certified gap: Aude B=3 1.6%, Quebec B=1000 0.011%, Aix 30x30 B=8 0.13%, bike_small B=200 0.042%.
+  - With prep_mip's optimum as `--mip-start`, path_lp returns it with a certified gap: Aude B=3 1.6%, Quebec B=1000 0.011%, Aix 30x30 B=8 0.13%, bike_small B=200 0.042%.
   - The reviewers' harnesses, rerun on the final change:
     - 400 random decimal-cost instances: no bound below mip's optimum in any of the four pricing × start modes. Before the enumerate fix, 22 runs without a start and 27 with one printed a negative gap.
-    - 427 adversarial instances, 15,570 runs: the only bounds below mip's optimum are on one instance built near the tolerance, where mip's solution exceeds B by 2.5e-7. That is within mip's default `-t` of 1e-6, not within path_rr's 1e-7.
-- **Effect.** path_rr itself outputs a guarantee. LP rounding never beat greedy (Quebec B=10000: 1.21023e11 against greedy's 1.21052e11; study: primal-side), so the start carries the incumbent in practice. With path_rr's own bike bound the gap stays about 20%.
-- **The gap is conditional:** a complete round, a shape the pricing accepts (or `--pricing enumerate`), a criterion path_rr can model, and the tolerance-sized clamp hole of §2.3. The owner's ruling leaves tree_rr without rounding for now (work in progress, do not change its cast); for path_rr, question 2 of §6 was answered yes on 2026-11-03.
+    - 427 adversarial instances, 15,570 runs: the only bounds below mip's optimum are on one instance built near the tolerance, where mip's solution exceeds B by 2.5e-7. That is within mip's default `-t` of 1e-6, not within path_lp's 1e-7.
+- **Effect.** path_lp itself outputs a guarantee. LP rounding never beat greedy (Quebec B=10000: 1.21023e11 against greedy's 1.21052e11; study: primal-side), so the start carries the incumbent in practice. With path_lp's own bike bound the gap stays about 20%.
+- **The gap is conditional:** a complete round, a shape the pricing accepts (or `--pricing enumerate`), a criterion path_lp can model, and the tolerance-sized clamp hole of §2.3. The owner's ruling leaves tree_lp without rounding for now (work in progress, do not change its cast); for path_lp, question 2 of §6 was answered yes on 2026-11-03.
 
 ### 3.2 Time limits that hold, and the LP status (item 3)
 
 - **Status.** Small fixes (study: decision page).
 - **Problem.**
   - Three places ignore `--time-limit`. The master LP solve: bike B=1000 ran 870 s at a 600 s limit (029471d). The enumeration parallel_for. A single long search: the generic budget-mode prototype on bike B=1000 ignored a 420 s `--time-limit` and was still running when a 600 s timeout killed it, about 180 s later, without finishing round 1 (study: generic-pricing).
-  - The LP status is not checked. mippp's `gurobi_lp::solve` stores a non-optimal status without throwing, and path_rr reads ObjVal and Pi regardless. With BarIterLimit=1, the barrier prototype reported "converged" with a bound of 1279.25, below the optimum 1337.595 (r1_sumc B=1; study: master-acceleration, verifier).
+  - The LP status is not checked. mippp's `gurobi_lp::solve` stores a non-optimal status without throwing, and path_lp reads ObjVal and Pi regardless. With BarIterLimit=1, the barrier prototype reported "converged" with a bound of 1279.25, below the optimum 1337.595 (r1_sumc B=1; study: master-acceleration, verifier).
 - **Rule.** A valid L needs an optimal RMP solve and a complete round at its duals. A stopped run reports the last L that met both.
 - **Change.** Pass the remaining time to the LP solver. Check the clock in the enumeration loop, and every N labels inside a search; an aborted search then returns the overestimate of §3.7. After each solve, check `mippp::is<mippp::status::optimal>`, and re-solve with dual simplex or stop without recording a bound.
 
@@ -352,7 +354,7 @@ DROP o: recompute s by a full Dijkstra iff an arc a = (u, v) that o improves is 
 
 - **Status.** Prototype reviewed sound with fixes (study: primal-side); about 200 lines. The criterion-aware key is research.
 - **Moves**, from S with residual R = B − c(S). N1: drop one option, refill greedily with positive gains. N2: drop a pair among the m options with the least loss per cost (m = 12–20), refill. N3: insert one of the k options of largest gain (k = 20–40) beyond the budget, drop by least loss per cost until c(S) ≤ B, refill. The first improvement above 1e-10 relative is taken. Every move ends budget-feasible and is scored exactly, so the result is a valid incumbent, with no approximation guarantee.
-- **Bundle greedy.** Synthetic purchase duals λ_po := θ c_o, with θ a multiple of the median log-gain per cost. Per source, a shortest-path tree on ℓ(a) = min(−log p_S(a), min_{o∉S, c_o≤R} [−log p'_oa + θ c_o]); the options on the tree path to t form a bundle. Greedy then picks among single options and bundles by exact gain per cost. This is path_rr's pricing with λ = θ c collapsed to one objective: it buys complementary chains whose links alone gain little.
+- **Bundle greedy.** Synthetic purchase duals λ_po := θ c_o, with θ a multiple of the median log-gain per cost. Per source, a shortest-path tree on ℓ(a) = min(−log p_S(a), min_{o∉S, c_o≤R} [−log p'_oa + θ c_o]); the options on the tree path to t form a bundle. Greedy then picks among single options and bundles by exact gain per cost. This is path_lp's pricing with λ = θ c collapsed to one objective: it buys complementary chains whose links alone gain little.
 - **Non-submodularity.** 616 of the 1,620 options in primal-side's gain sweep (bike has 1,642) gain more at the B=1000 local-search state than at the base state (study: primal-side). So lazy (CELF) greedy is invalid, greedy carries no guarantee, and the incumbent's quality can only come from a bound.
 - **Effect.**
   - Bike B=1000: greedy 6.39784e6 → 6.418970948e6 (+0.330%) in 88.2 s, the same 22-option set as prep_mip's 600 s incumbent. Bundle greedy alone: 6.418949702e6 in 30.2 s.
@@ -476,11 +478,11 @@ step:         λ ← clip(λ − t s_p g),  s_p = gain_p = V_p − base_p,  t = 
 - **Conditions.** λ ≥ 0, a missing entry counting as 0. h_p computed exactly or overestimated, with S = ∅ included. π the criterion's exact weights, never a solver's contribution dual (which can be 1 − ε). K replaced by an upper bound K̄: min(floor-grid DP, Dantzig), or a MIP's dual bound at MIPGap 0, never its incumbent. 560ce44 applied. A coarse grid hides the gain: at R = 20000 the floor DP exceeded K_LP at every iteration on bike.
 - **Box.** λ_po ∈ [0, g_po] is a valid projection, with g_po = min(gain_p, π (p'_oa − p_a)⁺ F*_s(u) P*_t(v)) for a single-arc option, F* and P* the all-options-free forward and backward values, endpoint qualities q_s(O) and q_t(O) included. Above the cap, every column containing o is dominated by S∖{o}, so o's arc can be deleted from p's search. Snapping λ to the cap is not free (§5).
 - **Effect.**
-  - L(0) equals path_rr's round-1 bound (bike: 7,816,736.299526). On Aude it converges to the search LP, and with budget-limited columns to the enumerate LP.
-  - bike_small: proved optimal (L − z ≤ 1e-9 z) at B=50 in 0.12 s, B=400 in 0.96 s and B=1600 in 1.7 s. At B=100 the best L is 116845.71, against the optimum 116843.65 and the converged path LP 116857.50; other passages of the same write-up give 116846.06. L falls below the converged path LP after about 60 iterations (0.3 s), while path_rr needs 289 rounds (4.1 s) to converge. The tail is slow: after 500 iterations B=200 stays at +0.033% and B=800 at +0.023% (verifier).
+  - L(0) equals path_lp's round-1 bound (bike: 7,816,736.299526). On Aude it converges to the search LP, and with budget-limited columns to the enumerate LP.
+  - bike_small: proved optimal (L − z ≤ 1e-9 z) at B=50 in 0.12 s, B=400 in 0.96 s and B=1600 in 1.7 s. At B=100 the best L is 116845.71, against the optimum 116843.65 and the converged path LP 116857.50; other passages of the same write-up give 116846.06. L falls below the converged path LP after about 60 iterations (0.3 s), while path_lp needs 289 rounds (4.1 s) to converge. The tail is slow: after 500 iterations B=200 stays at +0.033% and B=800 at +0.023% (verifier).
   - 40 random search-shaped instances: L reaches the optimum on 34 (36 with budget columns), against 5 for the converged path LP (verifier).
-  - bike_mid: +0.0095% / +0.0084% / +0.020% above the optimum at B=200 / 900 / 1800, in 163–200 s, where path_rr's `lagrangian_bound` is still +4.84% / +3.65% / +2.88% above the optimum after 300 s, its master 0.34–1.89% below it (study: tighter-relaxation, analyst and its run logs).
-  - **Bike B=1000:** 7.817e6 → 6.667e6 in 8 iterations and 561 s, at 806 MB. That is about 5× better in gap than path_rr's column-generation bound (7.72e6, reached only after 786–870 s; verifier; the analyst wrote 20×), and 3.2% looser than prep_mip's 6.459e6 at 8.1 GB. Its knapsack was in effect the LP knapsack (R = 20000, see Conditions), so integrality on full bike is unmeasured.
+  - bike_mid: +0.0095% / +0.0084% / +0.020% above the optimum at B=200 / 900 / 1800, in 163–200 s, where path_lp's `lagrangian_bound` is still +4.84% / +3.65% / +2.88% above the optimum after 300 s, its master 0.34–1.89% below it (study: tighter-relaxation, analyst and its run logs).
+  - **Bike B=1000:** 7.817e6 → 6.667e6 in 8 iterations and 561 s, at 806 MB. That is about 5× better in gap than path_lp's column-generation bound (7.72e6, reached only after 786–870 s; verifier; the analyst wrote 20×), and 3.2% looser than prep_mip's 6.459e6 at 8.1 GB. Its knapsack was in effect the LP knapsack (R = 20000, see Conditions), so integrality on full bike is unmeasured.
   - **λ′ passes** (study: master-acceleration): raise the master's budget dual μ to μ′, spread the slack c_o (μ′ − μ) as virtual duals, and re-price: the LP-knapsack version of L(λ). Bike B=1000, round 1, pruned, μ′ = 60: 7.817 → 6.830e6 in 5 passes and 340 s, which the direct Lagrangian's 6.667e6 beats; since that run's knapsack was in effect the LP knapsack, the edge comes from per-pair multipliers, not integrality. Green: 3.247e13 after 6 passes of 7–26 s, worse than the prototype column generation's 3.068e13. bike_small: 3.7e-4 relative above the LP in round 1 after 20 passes (0.3 s), then a stall on degenerate duals. They belong in this item, not as their own option.
 - **Blocker.** Pricing per iteration grows from 0.49 to 138 s, and labels from 6.87e7 to 2.62e9 per iteration. The argmax columns shrink to about 5 options per pair, but every option a pair ever used keeps an intermediate λ, so its front stays biobjective. The analyst's projection of 50–100 iterations is unsupported: 2–4 hours at that rate. Green was never run.
 - **Density controls to try.**
@@ -586,10 +588,10 @@ score(x) ≤ Σ_k C_k + Σ_{p∈R} V_p + Σ_{p∉R} v_p(x)        for every budg
 
 | Instance | Incumbent | Bound | Gap | Gain share ≥ | Sources |
 |---|---|---|---|---|---|
-| bike B=1000 | 6.41897e6 | 6.45909e6 | 0.62% | 81.5% | both from prep_mip (600 s, 8.1 GB); local search reaches the incumbent in 88 s. path_rr's own bound: 20.3% (7.72e6); Lagrangian prototype: 3.9% (6.667e6 in 561 s) |
+| bike B=1000 | 6.41897e6 | 6.45909e6 | 0.62% | 81.5% | both from prep_mip (600 s, 8.1 GB); local search reaches the incumbent in 88 s. path_lp's own bound: 20.3% (7.72e6); Lagrangian prototype: 3.9% (6.667e6 in 561 s) |
 | bike B=5000 | 6.80864e6 | 6.95043e6 | 2.08% | 80.0% | greedy and local search, prep_mip's bound |
 | bike B=10000 | 7.05972e6 | 7.28527e6 | 3.20% | 78.4% | greedy and local search (cut by its time limit), prep_mip's bound; prep_mip's own incumbent is empty |
-| green B=5 | 2.83266e13 | 3.0944e13 | 9.24% | 36.0% | bundle greedy; path_rr's bound (f0da701, 600 s); prep_mip runs out of memory |
+| green B=5 | 2.83266e13 | 3.0944e13 | 9.24% | 36.0% | bundle greedy; path_lp's bound (f0da701, 600 s); prep_mip runs out of memory |
 | Aix N2 B=100 | 1457.61 | 1463.19 | 0.38% | 87.3% | greedy_incr; generic exact pricing (prototype, 88 s) |
 
 "Gain share" is the share of the possible gain over the base score that the incumbent is guaranteed to reach (study: decision page).
@@ -601,7 +603,7 @@ score(x) ≤ Σ_k C_k + Σ_{p∈R} V_p + Σ_{p∉R} v_p(x)        for every budg
 | Wentges smoothing, fixed α (branch `path-rr-smoothing`) | Loses on Quebec at every α. At α = 0.5, B=1000: 15 → 32 master solves, 90k → 1.18M searches, 5.4 → 9.7 s, 7 → 10 rounds to the bound. Green α = 0.5: bound 3.1108e13 against 3.1186e13, worse in early rounds (3.59e13 against 3.41e13 at round 2); f0da701's reuse later reached 3.0944e13. It defeats the reuse. Adaptive α was not tried: the best fixed α is 0. Adaptive α and in-out separation do not address a coverage-limited master | a99eb98; mippp dual_smoothing §7; study: master-acceleration |
 | Pool-first activation | On green the stale all-free columns bought many options, the master grew to 2.85M rows, and progress was worse. A pool-only round gives no bound | c7754f5 |
 | Gurobi Method=0 for the master | Slower on green, where the master is about 90% of a round | f0da701 |
-| `--evict-age` on path_rr (landed, §2.7) | Neutral or slower on Aude, Aix and Quebec; never run on bike or green. Quebec's 2.2 GB are stored columns, which eviction keeps | 0b3f2b2 |
+| `--evict-age` on path_lp (landed, §2.7) | Neutral or slower on Aude, Aix and Quebec; never run on bike or green. Quebec's 2.2 GB are stored columns, which eviction keeps | 0b3f2b2 |
 | Enumerate at scale (landed, §2.4) | Green explodes at B=0.5; bike never finishes at B=50 (1.6e15 labels per pair at B=1000); N2 stays in setup over 200 s; Quebec B=10000 needs 2.2 GB against 457 MB for search | 8429409; c7754f5; study: generic-pricing |
 | Budget pricing on full bike and green | Bike B=1000: the 3-resource search runs out of memory at 13.8 GB uncapped, and round 1 takes 240 s with a 2M-label cap (8,544 pairs capped); the generic budget mode does not finish round 1 in 600 s. A no-op at B ≥ 5000 and on green B=5, where 2.6% and 0.7% of the round-1 columns exceed B. It stays useful on converging instances (§3.6a) | study: tighter-relaxation, generic-pricing |
 | Relaxed charging (λ_po/m_o per element of a general option) | Valid only after aggregating quality entries (instance 253: 27.57 against an optimum of 36 before). Weak: slack 4.9% on Aix40 B=2 and 7.9% on Aix70 B=2 against integrality gaps of 0.034–0.17%, because paths use 0.085–0.54 of an option's elements; column generation stalls (N2 bound +3.65%) | study: generic-pricing |
@@ -616,11 +618,11 @@ score(x) ≤ Σ_k C_k + Σ_{p∈R} V_p + Σ_{p∉R} v_p(x)        for every budg
 | Pendant pair aggregation | −8.1% pairs on bike, −4.4% on Quebec, 0% on green | study: reduction |
 | Useless-option and dominance tests | 0 of 1,642 bike options useless: each can improve 22,475 of 63,504 pairs on average. Dominance: no figure reported | study: reduction |
 | Pair tolerance on bike and green (§3.10) | The gain is spread: bike 4.9% / 14.7% / 37.6% of pairs moved at slack 1e-4 / 1e-3 / 1e-2; green 0.7% to 25.7% at 1e-5 to 1e-2, where the 1e-2 slack (2.7e11) compares with a gap of about 2.6e12 | study: reduction, verifier |
-| Aggregated purchase rows, pair-proportional prices | Analytical, no measurement. An aggregate of the per-pair rows is a relaxation: in dual terms λ_po = κ_o w_p, a far weaker LP. The equivalent per-source decomposition is tree_rr's pricing | study: reduction, master-acceleration |
+| Aggregated purchase rows, pair-proportional prices | Analytical, no measurement. An aggregate of the per-pair rows is a relaxation: in dual terms λ_po = κ_o w_p, a far weaker LP. The equivalent per-source decomposition is tree_lp's pricing | study: reduction, master-acceleration |
 | Rounding x* as the incumbent | Never beat greedy: Quebec B=10000 1.21023e11 against 1.21052e11. Bike's x* is 0.05–0.06 on 340–409 options. Kept only as one candidate in §3.1 | study: primal-side |
 | Knapsack primal of the Lagrangian iterations | Bike B=1000: 6.275e6 against greedy's 6.398e6; Aude B=3: about 5% below the optimum. It helps only on small instances: it found the optimum on bike_small B=200, 400, 3200 and bike_mid B=200, 900 | study: lagrangian-dual, tighter-relaxation |
 | Final crossover for the returned solution | Refuted: the cast exceeds B with or without it (bike: 1,504 options with barrier, 365–409 with simplex). The bound does not need it once D is used | study: master-acceleration, verifier |
-| Bundles taken from path_rr's column pool | Untested and doubtful: pool columns are priced at per-pair duals (missing rows at 0, no budget), round-1 columns exceed R, and 65k–96k columns would need exact evaluation | study: primal-side, verifier |
+| Bundles taken from path_lp's column pool | Untested and doubtful: pool columns are priced at per-pair duals (missing rows at 0, no budget), round-1 columns exceed R, and 65k–96k columns would need exact evaluation | study: primal-side, verifier |
 | Column-cover cuts in search mode | Pricing would need the cost and T as label resources, intractable at bike scale; ignoring the cut duals is valid but loses most of their effect (§3.6c) | study: tighter-relaxation |
 | Static and enumerate-list fallbacks of the Lagrangian | For shapes search rejects: h_p ≤ max_p makes λ only raise K, so it is minimised at λ = 0 and gives L(0), the trivial bound (22% over greedy on bike); enumerate's lists inherit its exponential enumeration. The disaggregated rows of §3.8, untested, would replace them | study: lagrangian-dual, verifier |
 
@@ -629,16 +631,16 @@ score(x) ≤ Σ_k C_k + Σ_{p∈R} V_p + Σ_{p∉R} v_p(x)        for every budg
 The owner's six questions from the study's decision page, answered where marked:
 
 1. **The fixes branch.** Merge `path-rr-search-fixes` as is? Should the parser also reject an improved probability below the base?
-2. **Item 2.** May path_rr's returned solution change from the over-budget cast to a feasible incumbent, with best_bound and a gap (§3.1)? Answered 2026-11-03: yes, for path_rr only; tree_rr keeps its cast.
+2. **Item 2.** May path_lp's returned solution change from the over-budget cast to a feasible incumbent, with best_bound and a gap (§3.1)? Answered 2026-11-03: yes, for path_lp only; tree_lp keeps its cast.
 3. **Items 4 and 5.** Rebuild greedy_incr on the incremental evaluator? Should local search be `--polish` on the heuristics, or a solver of its own (§3.3, §3.4)?
-4. **The certificate for bike-like instances.** Is prep_mip's bound (8 GB, 600 s) acceptable for now? path_rr would then cover the instances prep_mip cannot hold, like green and N2.
+4. **The certificate for bike-like instances.** Is prep_mip's bound (8 GB, 600 s) acceptable for now? path_lp would then cover the instances prep_mip cannot hold, like green and N2.
 5. **Item 9.** Run the density-control experiment next (§3.8)? It also answers whether full bike's LP is as tight as its crops.
 6. **Item 10.** Land the Gurobi-only barrier now, or wait for mippp's lp_algorithm? Value scaling (open item C5) is needed either way (§3.9).
 
 ## References
 
 **gecot commits.**
-- 0b3f2b2: `path_rr`, the path formulation relaxation, with columns enumerated once per pair, on mippp's column manager; `--evict-age`.
+- 0b3f2b2: `path_lp`, the path formulation relaxation, with columns enumerated once per pair, on mippp's column manager; `--evict-age`.
 - 8ef534c: a pair's rows are created with its first columns in the master.
 - c7754f5: `--pricing search` (biobjective search on the split graph, center copies, early stop, backtrack), the max-value skip, the reuse of unproductive searches, `--max-activations`.
 - 1af6651: the Lagrangian bound of each complete pricing round, as `lagrangian_bound`, and `--relative-gap`.
@@ -649,12 +651,12 @@ The owner's six questions from the study's decision page, answered where marked:
 - 560ce44 (branch `path-rr-search-fixes`): a star option's copy arc keeps max(base, improved).
 - d47ada5 (branch `path-rr-search-fixes`): depth-first backtrack over (vertex, label) states.
 - a99eb98 (branch `path-rr-smoothing`, not merged): `--smoothing α`, Wentges smoothing with the mispricing schedule of Pessoa et al.
-- Related tree_rr commits: 2089fd9 (relaxation_value is not a bound under inexact pricing), 33ccf0d (re-solve the master when the time limit stops a round that added columns), c983ada (skip a target at the duals of an unproductive pricing).
+- Related tree_lp commits: 2089fd9 (relaxation_value is not a bound under inexact pricing), 33ccf0d (re-solve the master when the time limit stops a round that added columns), c983ada (skip a target at the duals of an unproductive pricing).
 - Branch `path-rr-rewrite`: the rewrite that follows this note, on top of d47ada5, with the same results.
 - Branch `path-rr-feasible` (2026-11-03): the returned solution fits the budget, the lowest L is the report's best_bound, and enumerate's columns are built within B + feasibility_tol (§3.1).
 
 **mippp design notes.**
-- `~/Projects/mippp/misc/design/dual_smoothing/dual_smoothing.md`: the Lagrangian value under smoothing and validity with rows added at dual 0; §7 is the path_rr field test.
-- `~/Projects/mippp/misc/design/column_manager/column_manager_tree_rr.md`: the column manager path_rr uses; L1 (eviction before activation), L11 (age counts events) and X1 (solution reads after a model change).
+- `~/Projects/mippp/misc/design/dual_smoothing/dual_smoothing.md`: the Lagrangian value under smoothing and validity with rows added at dual 0; §7 is the path_lp field test.
+- `~/Projects/mippp/misc/design/column_manager/column_manager_tree_rr.md`: the column manager path_lp uses; L1 (eviction before activation), L11 (age counts events) and X1 (solution reads after a model change).
 
 **The study.** Its decision page is published privately at https://claude.ai/artifact/6CQTheQzG91s47ctU7Euvs. Its prototypes, run logs, the analysts' write-ups with the verifiers' verdicts, and the verifiers' counterexamples and fuzzers live in a session scratchpad, not in the repository, and disappear on reboot: `/tmp/claude-1000/-home-plaiseek-Projects-gecot/094cc502-712b-4c26-b6be-3b28e9a86c0c/scratchpad/design/` (`results/*.md`, one prototype folder per direction, `verify-*/`).

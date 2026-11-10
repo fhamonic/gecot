@@ -142,19 +142,19 @@ case_ E24 static_incr "$I" 10 -q -h
 case_ E25 mip "$I" 10 --mip-start missing.json -q
 case_ E26 mip "$I" 10 --mip-start=missing.json -q
 case_ E27 static_incr "$I" 10 -- -t
-case_ E28 tree_rr "$I" 10 -q
+case_ E28 tree_lp "$I" 10 -q
 case_ E29 static_decr "$I" 10 --only-dec -q
 case_ E30 worst_greedy_decr -P
 case_ E31 static_incr /nonexistent.json 10 -q
 case_ E32 static_incr "$I" 10 -o /nonexistent_dir/F.json -q
-case_ E33 tree_rr "$I" 10 --nb-mus=2 --resolution=1e-6 -q
+case_ E33 tree_lp "$I" 10 --nb-mus=2 --resolution=1e-6 -q
 case_ E34 naive_benders "$I" 10 -t 1e-6 -m -q
 case_ E35 worst_greedy_incr "$I" 10 -q
 case_ E36 greedy_incr "$I" 10 -q
 # space-separated solver values must reach the option, not a 4th positional
 case_ V01 static_incr "$I" 10 -t abc
 case_ V02 prep_mip "$I" 10 --nb-mus abc
-case_ V03 tree_rr "$I" 10 --resolution abc
+case_ V03 tree_lp "$I" 10 --resolution abc
 # abbreviated long options (boost's default style allows guessing)
 case_ G01 static_incr "$I" 10 --quie
 case_ G02 static_incr "$I" 10 --feas=1e-5 -q
@@ -169,7 +169,7 @@ case_ X14 -a static_incr -i "$I" -B 10 --feasibility-tolerance=1e-5
 case_ X34 naive_benders "$I" 10 -t1e-6 -m -q
 # every algorithm with defaults and full trace logging
 for alg in static_incr static_decr greedy_incr greedy_decr mip prep_mip \
-    naive_benders target_benders flow_benders tree_rr worst_greedy_incr \
+    naive_benders target_benders flow_benders tree_lp worst_greedy_incr \
     worst_greedy_decr; do
     case_ "A-$alg" "$alg" "$I" 10 -v
 done

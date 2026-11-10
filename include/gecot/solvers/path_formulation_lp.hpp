@@ -82,7 +82,7 @@ namespace solvers {
 //   relaxation: a label is worth no less than those of no more value that
 //   buy at least its options whatever the duals, so each pair keeps the
 //   non-dominated columns, an argmax for any duals.
-struct path_formulation_rr : public mip_solver_base {
+struct path_formulation_lp : public mip_solver_base {
     using variable_t = mippp::model_variable<int, double>;
     using constraint_t = mippp::model_constraint<int>;
     using vertex = melon::vertex_t<melon::static_digraph>;
@@ -131,7 +131,7 @@ struct path_formulation_rr : public mip_solver_base {
     static auto _subsets(const option_set & S) {
         if(S.size() > 20)
             throw std::invalid_argument(
-                "path_rr: too many quality options at a vertex");
+                "path_lp: too many quality options at a vertex");
         return std::views::iota(std::size_t{0}, std::size_t{1} << S.size()) |
                std::views::transform([&S](const std::size_t mask) {
                    option_set A;

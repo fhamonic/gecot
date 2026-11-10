@@ -1,15 +1,15 @@
 #pragma once
 
-#include "gecot/solvers/path_formulation_rr.hpp"
+#include "gecot/solvers/path_formulation_lp.hpp"
 
 #include "solver_interfaces/abstract_mip_interface.hpp"
 
-class PathFormulationRRInterface : public AbstractMipInterface {
+class PathFormulationLPInterface : public AbstractMipInterface {
 private:
-    gecot::solvers::path_formulation_rr solver;
+    gecot::solvers::path_formulation_lp solver;
 
 public:
-    PathFormulationRRInterface() : AbstractMipInterface("path_rr") {
+    PathFormulationLPInterface() : AbstractMipInterface("path_lp") {
         add_mip_options(solver, 1e-7);
         app.add_option("--evict-age", solver.evict_age,
                        "Pricing rounds a column stays in the master before it "

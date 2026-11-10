@@ -92,7 +92,12 @@ struct preprocessed_mip : public mip_solver_base {
 
             for(const auto & original_t : melon::vertices(original_graph)) {
                 if(original_target_quality_map[original_t] == 0 &&
-                   instance_case.vertex_options_map()[original_t].empty()) {
+                   std::ranges::none_of(
+                       instance_case.vertex_options_map()[original_t],
+                       [](auto && e) {
+                           auto && [sqg, tqg, o] = e;
+                           return tqg > 0;
+                       })) {
                     model.set_variable_upper_bound(Xi_vars(original_t), 0);
                     continue;
                 }

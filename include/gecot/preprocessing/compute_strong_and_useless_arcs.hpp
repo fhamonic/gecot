@@ -128,7 +128,11 @@ auto compute_strong_and_useless_arcs(
     for(const auto & v : melon::vertices(graph)) {
         useless_vertices_map[v] =
             (target_quality_map[v] == 0 &&
-             instance_case.vertex_options_map()[v].empty());
+             std::ranges::none_of(instance_case.vertex_options_map()[v],
+                                  [](auto && e) {
+                                      auto && [sqg, tqg, o] = e;
+                                      return tqg > 0;
+                                  }));
     }
 
     auto strong_arcs_map =

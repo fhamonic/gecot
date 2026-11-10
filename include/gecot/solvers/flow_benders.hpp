@@ -122,7 +122,12 @@ struct flow_benders : public mip_solver_base {
                     const double original_t_target_quality =
                         original_target_quality_map[original_t];
                     if(original_t_target_quality == 0 &&
-                       original_vertex_options_map[original_t].empty()) {
+                       std::ranges::none_of(
+                           original_vertex_options_map[original_t],
+                           [](auto && e) {
+                               auto && [sqg, tqg, o] = e;
+                               return tqg > 0;
+                           })) {
                         pb.tick();
                         continue;
                     }

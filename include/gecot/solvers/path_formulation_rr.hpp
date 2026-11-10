@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <flat_map>
 #include <iterator>
@@ -23,11 +24,13 @@
 
 #include "mippp/utility/column_manager.hpp"
 
+#include "melon/algorithm/dijkstra.hpp"
 #include "melon/container/static_digraph.hpp"
 #include "melon/graph.hpp"
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
+#include "gecot/indices/pc_num.hpp"
 
 #include "gecot/solvers/mip_solver_base.hpp"
 #include "gecot/utils/progress.hpp"
@@ -62,7 +65,9 @@ namespace solvers {
 // and raising each σ_p by max(0, rc_p) makes the master's duals feasible for
 // the relaxation's dual, so after a complete pricing round
 //     L = master_value + Σ_p max(0, rc_p),
-// the Lagrangian bound, bounds the relaxation.
+// the Lagrangian bound, bounds the relaxation. In this dual the row of x_o
+// has the slack -d_o, with d_o = Σ_p λ_po - c_o μ <= 0 the reduced cost of
+// x_o, so a solution that buys o scores at most L + d_o.
 //
 // Both pricings label the paths to t, backwards from t: a label (S, w, W) is
 // a path to t that buys the options S, of value w = q_t(S) P(S) without the
@@ -147,8 +152,8 @@ struct path_formulation_rr : public mip_solver_base {
     // options of t. Along an arc a, a label takes p_a, or p'_oa > p_a for an
     // option o, buying o unless it is live; it keeps live the options that
     // reusable(o, u) accepts at the vertex u it reaches. A label of u is
-    // dropped unless keep(l), or if dominates(e, l, u) for a label e that left
-    // u, and so of no less value, which requires e.weight <= l.weight.
+    // dropped unless keep(l, u), or if dominates(e, l, u) for a label e that
+    // left u, and so of no less value, which requires e.weight <= l.weight.
     // visit(u, l, options) sees each label as it leaves u, options() giving
     // the options S of its path, and returns whether it goes further.
     template <case_c C>
@@ -187,7 +192,7 @@ struct path_formulation_rr : public mip_solver_base {
         };
         auto relax = [&](const vertex u, label && l, const std::size_t pred,
                          option_set && bought) {
-            if(l.value <= 0 || !keep(l) || dominated(l, u)) return;
+            if(l.value <= 0 || !keep(l, u) || dominated(l, u)) return;
             heap.emplace(l.value, -l.weight, nodes.size());
             nodes.push_back({std::move(l), u, pred, std::move(bought)});
         };
@@ -387,7 +392,7 @@ struct path_formulation_rr : public mip_solver_base {
                             return instance.option_cost(o);
                         },
                         [](auto, auto) { return true; },
-                        [budget](const label & l) {
+                        [budget](const label & l, vertex) {
                             return l.weight <= budget;
                         },
                         [](const label & a, const label & b, vertex) {
@@ -426,7 +431,7 @@ struct path_formulation_rr : public mip_solver_base {
                     _labels(
                         instance_case, t, allowed, [](auto) { return 0.0; },
                         [](auto, auto) { return false; },
-                        [](const label &) { return true; },
+                        [](const label &, vertex) { return true; },
                         [](const label & a, const label & b, vertex) {
                             return a.value >= b.value;
                         },
@@ -459,8 +464,24 @@ struct path_formulation_rr : public mip_solver_base {
         return {std::move(pairs), std::move(constants)};
     }
 
+    template <instance_c I>
+    struct relaxation {
+        instance_solution_t<I> solution;
+        solve_report report;
+        // per option, a bound on the score of the solutions that buy it:
+        // the least L + d_o over the complete pricing rounds
+        std::vector<double> option_bounds;
+    };
+
     template <typename LP, instance_c I>
     solve_result<I> solve(const I & instance, const double budget) const {
+        auto [solution, report, option_bounds] =
+            this->template relax<LP>(instance, budget);
+        return {std::move(solution), std::move(report)};
+    }
+
+    template <typename LP, instance_c I>
+    relaxation<I> relax(const I & instance, const double budget) const {
         namespace colgen = mippp::colgen;
         using namespace mippp;
         using namespace mippp::operators;
@@ -482,9 +503,39 @@ struct path_formulation_rr : public mip_solver_base {
         const auto [pairs, constants] =
             _pairs(instance, budget + feasibility_tol, start);
         std::vector<option_reach> reaches;
+        // per case, source s of a pair and vertex u, the probability of the
+        // most reliable s-u path with every option: the share of its value
+        // that a label at u keeps at best on its way to s
+        std::vector<std::vector<std::vector<double>>> source_reaches;
         if(search_pricing)
-            for(const auto & instance_case : instance.cases())
+            for(const auto & instance_case : instance.cases()) {
                 reaches.push_back(_option_reach(instance, instance_case));
+                const auto & graph = instance_case.graph();
+                auto probability_map = instance_case.arc_probability_map();
+                for(const auto & a : melon::arcs(graph))
+                    for(const auto & [improved_prob, o] :
+                        instance_case.arc_options_map()[a])
+                        probability_map[a] =
+                            std::max(probability_map[a], improved_prob);
+                auto & case_reaches =
+                    source_reaches.emplace_back(graph.num_vertices());
+                std::vector<vertex> sources;
+                for(const pair_data & p : pairs)
+                    if(p.case_id == instance_case.id() &&
+                       case_reaches[p.source].empty()) {
+                        case_reaches[p.source].assign(graph.num_vertices(),
+                                                      0.0);
+                        sources.push_back(p.source);
+                    }
+                tbb::parallel_for(
+                    std::size_t{0}, sources.size(), [&](const std::size_t i) {
+                        for(const auto & [u, prob] : melon::dijkstra(
+                                detail::pc_num_dijkstra_traits<
+                                    std::decay_t<decltype(graph)>, double>{},
+                                graph, probability_map, sources[i]))
+                            case_reaches[sources[i]][u] = prob;
+                    });
+            }
 
         // The master: x, the budget row, and for each case k, z_k with its
         // contribution row; the rows of a pair come with the first column
@@ -495,9 +546,10 @@ struct path_formulation_rr : public mip_solver_base {
         model.set_maximization();
         const auto x = model.add_variables(
             instance.options().size(), [](const option_t & o) { return o; });
-        model.add_constraint(xsum(instance.options(), [&](auto && o) {
-                                 return instance.option_cost(o) * x(o);
-                             }) <= budget);
+        const auto budget_row =
+            model.add_constraint(xsum(instance.options(), [&](auto && o) {
+                                     return instance.option_cost(o) * x(o);
+                                 }) <= budget);
         std::vector<variable_t> z;
         std::vector<constraint_t> contribution_rows;
         for(const double C_k : constants) {
@@ -512,19 +564,21 @@ struct path_formulation_rr : public mip_solver_base {
         std::vector<std::flat_map<option_t, constraint_t>> purchase_rows(
             pairs.size());
 
+        // The master's value and x at its last solve: the solvers give no
+        // solution for a master changed since, or stopped by the time limit.
+        double master_value = 0;
+        auto x_values = instance.create_option_map(0.0);
         auto log_master = [&, option_name_max_length = std::ranges::max(
                                   std::ranges::views::transform(
                                       instance.options(), [&](auto && o) {
                                           return instance.option_name(o).size();
                                       }))]() {
-            const auto model_solution = model.get_solution();
             spdlog::trace("path formulation relaxation has value: {}",
-                          model.get_solution_value());
+                          master_value);
             for(auto && option : instance.options()) {
                 const auto & option_name = instance.option_name(option);
                 spdlog::trace("    {:<{}} {}", option_name,
-                              option_name_max_length,
-                              model_solution[x(option)]);
+                              option_name_max_length, x_values[option]);
             }
         };
 
@@ -585,10 +639,28 @@ struct path_formulation_rr : public mip_solver_base {
         std::size_t num_evicted = 0;
         // per pair, max(0, rc_p) or a bound on it
         std::vector<double> pricing_bounds(pairs.size());
+        std::vector<double> option_bounds(
+            instance.options().size(), std::numeric_limits<double>::infinity());
         for(;; ++iterations) {
+            if constexpr(has_time_limit<LP>)
+                if(time_limit)
+                    model.set_time_limit(std::chrono::duration<double>(std::max(
+                        0.0, time_limit.value() - sw.elapsed().count())));
             model.solve();
+            if(!is_a<status::optimal>(model.get_status())) {
+                report.status = stop_requested ? "interrupted"
+                                : time_up()    ? "time limit reached"
+                                               : "master not solved";
+                spdlog::warn("Column generation stopped: {}", report.status);
+                break;
+            }
             const auto dual_solution = model.get_dual_solution();
-            const double master_value = model.get_solution_value();
+            master_value = model.get_solution_value();
+            {
+                const auto model_solution = model.get_solution();
+                for(auto && o : instance.options())
+                    x_values[o] = model_solution[x(o)];
+            }
             log_master();
 
             auto pi = [&](const std::size_t p) {
@@ -635,9 +707,11 @@ struct path_formulation_rr : public mip_solver_base {
             };
             std::atomic<bool> cut_short = false;  // by a stop
             // The search of pair p. The labels only lose value and gain
-            // weight, so a label is kept while π_k q_s(every option) w - W -
-            // σ_p > margin, which bounds max(0, rc_p) when none is found; so
-            // does the max-value skip. Without a positive purchase dual, the
+            // weight, so a label at u is kept while π_k q_s(every option) w
+            // R_su - W - σ_p > margin, R_su the probability of the most
+            // reliable s-u path with every option, which bounds max(0, rc_p)
+            // when none is found; so does the max-value skip. Without a
+            // positive purchase dual, the
             // best column is the one with every option. The master can return
             // a dual a little below 0 (-7.6e-7 on Quebec), which counts as 0:
             // the search needs weights that never improve a label.
@@ -679,6 +753,7 @@ struct path_formulation_rr : public mip_solver_base {
                 const option_set target_options =
                     _quality_options(instance_case, data.target, false, all);
                 const double q_max = _quality(instance_case, s, true, all);
+                const auto & source_reach = source_reaches[data.case_id][s];
                 std::optional<std::pair<double, valued_set>> best;
                 // a label can use again its options of a gain at s, those of
                 // a gain at t, which it can have bought before their arcs,
@@ -690,8 +765,10 @@ struct path_formulation_rr : public mip_solver_base {
                                std::ranges::binary_search(target_options, o) ||
                                reach(o, u);
                     },
-                    [&](const label & l) {
-                        return pi_p * q_max * l.value - l.weight - sigma_p >
+                    [&](const label & l, const vertex u) {
+                        return pi_p * q_max * l.value * source_reach[u] *
+                                       (1 + 1e-12) -
+                                   l.weight - sigma_p >
                                margin_p;
                     },
                     // the live options of b that a lacks cost a their λ
@@ -750,6 +827,19 @@ struct path_formulation_rr : public mip_solver_base {
                                                    pricing_bounds.end(), 0.0);
                 if(!report.best_bound || bound < report.best_bound.value())
                     report.best_bound = bound;
+                // the purchase duals as the search counts them, a little
+                // below 0 as 0
+                std::vector<double> reduced_costs(instance.options().size());
+                for(auto && o : instance.options())
+                    reduced_costs[o] =
+                        -instance.option_cost(o) * dual_solution[budget_row];
+                for(const auto & rows : purchase_rows)
+                    for(const auto & [o, row] : rows)
+                        reduced_costs[o] += std::max(0.0, dual_solution[row]);
+                for(auto && o : instance.options())
+                    option_bounds[o] =
+                        std::min(option_bounds[o],
+                                 bound + std::min(0.0, reduced_costs[o]));
                 report_progress({.bound = report.best_bound,
                                  .relaxation = master_value,
                                  .round = iterations});
@@ -799,8 +889,6 @@ struct path_formulation_rr : public mip_solver_base {
                 report.status =
                     stop_requested ? "interrupted" : "time limit reached";
                 spdlog::warn("Column generation stopped: {}", report.status);
-                // as in tree_rr: the solvers lose the changed master's solution
-                if(num_activated) model.solve();
                 break;
             }
             // only once the master will be solved again, for the same reason
@@ -811,12 +899,11 @@ struct path_formulation_rr : public mip_solver_base {
 
         // x cast to bool can exceed the budget: the options by decreasing x
         // that fit in it, or the start if it scores more
-        const auto model_solution = model.get_solution();
         auto options = std::ranges::to<std::vector>(instance.options());
-        std::ranges::stable_sort(
-            options, [&](const option_t a, const option_t b) {
-                return model_solution[x(a)] > model_solution[x(b)];
-            });
+        std::ranges::stable_sort(options,
+                                 [&](const option_t a, const option_t b) {
+                                     return x_values[a] > x_values[b];
+                                 });
         auto solution = instance.create_option_map(false);
         double purchased = 0.0;
         for(const option_t o : options) {
@@ -841,12 +928,13 @@ struct path_formulation_rr : public mip_solver_base {
                         {"pairs", pairs.size()},
                         {"pool_columns", columns.num_pool_columns()},
                         {"evicted_columns", num_evicted}};
-        report.score_stats = {{"relaxation_value", model.get_solution_value()}};
+        report.score_stats = {{"relaxation_value", master_value}};
         if(search_pricing)
             report.stats.emplace_back("searches", num_searches.load());
         else
             report.stats.emplace_back("columns", num_columns);
-        return {solution, report};
+        return {std::move(solution), std::move(report),
+                std::move(option_bounds)};
     }
 };
 

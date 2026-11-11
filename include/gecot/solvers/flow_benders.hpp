@@ -82,8 +82,8 @@ struct flow_benders : public mip_solver_base {
             instance.cases().size(), [](const case_id_t & id) { return id; });
 
         model.set_maximization();
-        model.set_objective(std::visit(formula_variable_visitor{model, C_vars},
-                                       instance.criterion()));
+        formula_variable_visitor formula{model, C_vars};
+        model.set_objective(formula.variable(instance.criterion()));
 
         const auto X_vars = model.add_binary_variables(
             instance.options().size(), [](const option_t & i) { return i; });
@@ -96,6 +96,9 @@ struct flow_benders : public mip_solver_base {
             instance.template create_case_map<std::vector<
                 std::pair<mippp::model_variable_t<M>,
                           contracted_graph_data<instance_case_t<I>>>>>();
+        // the flows of the target quality gains: case by case, target by
+        // target, in the order of the target's options
+        std::vector<mippp::model_variable_t<M>> F_prime_vars;
 
         for(auto && instance_case : instance.cases()) {
             const auto case_id = instance_case.id();
@@ -143,8 +146,9 @@ struct flow_benders : public mip_solver_base {
 
                     for(const auto & [sqg, target_quality_gain, option] :
                         original_vertex_options_map[original_t]) {
-                        const auto F_prime_t_var = model.add_column(
-                            {std::make_pair(C_constr, -target_quality_gain)});
+                        const auto F_prime_t_var = F_prime_vars.emplace_back(
+                            model.add_column({std::make_pair(
+                                C_constr, -target_quality_gain)}));
                         model.add_constraint(F_prime_t_var <= F_var);
                         model.add_constraint(F_prime_t_var <=
                                              data.target_big_M(option) *
@@ -227,22 +231,46 @@ struct flow_benders : public mip_solver_base {
         std::size_t num_cuts = 0;
         model.set_candidate_solution_callback(
             [&](typename M::candidate_solution_callback_handle & handle) {
-                const auto master_solution = handle.get_solution();
+                auto master_solution = handle.get_solution();
                 auto sol = melon::maps::function([&](option_t i) {
                     return master_solution[X_vars(i)] > 0.5;
                 });
+                auto case_scores = instance.create_case_map(0.0);
+                const std::size_t num_cuts_before = num_cuts;
+                auto F_prime_var = F_prime_vars.begin();
                 for(auto && instance_case : instance.cases()) {
+                    const auto case_id = instance_case.id();
                     for(const auto & [var, data] :
-                        cases_contracted_data[instance_case.id()]) {
+                        cases_contracted_data[case_id]) {
                         auto && [opt, rho_values] =
                             _compute_dual_flow(data, sol);
-                        if(master_solution[var] - opt <= feasibility_tol * opt)
+                        double quality =
+                            instance_case.target_quality_map()[data.original_t];
+                        for(const auto & [sqg, target_quality_gain, option] :
+                            instance_case
+                                .vertex_options_map()[data.original_t]) {
+                            master_solution[*F_prime_var++] =
+                                sol[option] ? opt : 0.0;
+                            if(sol[option]) quality += target_quality_gain;
+                        }
+                        case_scores[case_id] += quality * opt;
+                        if(std::exchange(master_solution[var], opt) - opt <=
+                           feasibility_tol * opt)
                             continue;
                         ++num_cuts;
                         handle.add_lazy_constraint(
                             var <= get_cut_expression(data, sol, rho_values));
                     }
+                    master_solution[C_vars(case_id)] = case_scores[case_id];
                 }
+                // The solver drops a candidate that receives a cut and may
+                // never propose its options again, although they are a
+                // solution: it gets them back with their flows and scores.
+                if(num_cuts == num_cuts_before) return;
+                for(auto && o : instance.options())
+                    master_solution[X_vars(o)] = sol[o];
+                formula.set_values(master_solution, case_scores);
+                handle.add_solution(master_solution);
             });
 
         if(mip_start) {

@@ -89,9 +89,8 @@ struct tree_formulation_lp : public mip_solver_base {
             : case_id(instance_case.id()), target(original_t) {
             using namespace mippp::operators;
             // the pricing models are solved in parallel
-            if constexpr(std::same_as<MILP, mippp::gurobi_milp>)
-                model.native_api().setintparam(model.native_model().first,
-                                               "Threads", 1);
+            if constexpr(mippp::has_thread_limit<MILP>)
+                model.set_thread_limit(1);
             _set_tolerances(model, 1e-10, 1e-8);
             model.set_maximization();
 
@@ -177,16 +176,11 @@ struct tree_formulation_lp : public mip_solver_base {
         }
     };
 
-    // Gurobi's algorithm for the master: method 2 the barrier, crossover 0
-    // none, -1 for its defaults
-    template <typename LP>
-    static void _set_method(LP & model, const int method, const int crossover) {
-        if constexpr(std::same_as<LP, mippp::gurobi_lp>) {
-            model.native_api().setintparam(model.native_model().first, "Method",
-                                           method);
-            model.native_api().setintparam(model.native_model().first,
-                                           "Crossover", crossover);
-        }
+    // set_lp_algorithm only compiles on the models that list the algorithm
+    template <typename LP, typename A>
+    static void _set_lp_algorithm(LP & model, const A algorithm) {
+        if constexpr(mippp::has_lp_algorithm<LP, A>)
+            model.set_lp_algorithm(algorithm);
     }
 
     template <typename LP, typename MILP, instance_c I>
@@ -342,12 +336,14 @@ struct tree_formulation_lp : public mip_solver_base {
             if(evict_age)
                 spdlog::warn(
                     "This solver cannot remove columns: --evict-age ignored");
-        // Gurobi's barrier without crossover for the master: its central duals
-        // halve the rounds, its 1e-8 primal-dual gap is below the pricing
-        // test's 1e-7. Not with eviction: the central duals move at every
-        // round and the evicted columns come back, in a cycle.
-        const bool barrier = std::same_as<LP, gurobi_lp> && !evict_age;
-        if(barrier) _set_method(model, 2, 0);
+        // The barrier without crossover for the master, on the solvers that
+        // have one: its central duals halve the rounds, its 1e-8 primal-dual
+        // gap is below the pricing test's 1e-7. Not with eviction: the central
+        // duals move at every round and the evicted columns come back, in a
+        // cycle.
+        using barrier_t = lp_algorithm::interior_point_without_crossover;
+        const bool barrier = has_lp_algorithm<LP, barrier_t> && !evict_age;
+        if(barrier) _set_lp_algorithm(model, barrier_t{});
 
         // Column generation.
         solve_report report{"converged"};
@@ -455,7 +451,7 @@ struct tree_formulation_lp : public mip_solver_base {
         }
         // the solution at a vertex, as the simplex gives it
         if(barrier) {
-            _set_method(model, -1, -1);
+            _set_lp_algorithm(model, lp_algorithm::automatic{});
             model.solve();
         }
 

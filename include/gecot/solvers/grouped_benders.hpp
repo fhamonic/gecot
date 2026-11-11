@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
-#include <limits>
 #include <random>
 #include <ranges>
 #include <utility>
@@ -197,8 +196,8 @@ struct grouped_benders : public mip_solver_base {
         model.set_maximization();
         const auto z = model.add_variables(
             instance.cases().size(), [](const case_id_t & k) { return k; });
-        model.set_objective(std::visit(formula_variable_visitor{model, z},
-                                       instance.criterion()));
+        formula_variable_visitor formula{model, z};
+        model.set_objective(formula.variable(instance.criterion()));
         const auto x = model.add_binary_variables(
             instance.options().size(), [](const option_t & o) { return o; });
         model.add_constraint(xsum(instance.options(), [&](auto && o) {
@@ -327,33 +326,34 @@ struct grouped_benders : public mip_solver_base {
             seed_cuts(start);
         }
 
-        // The solver drops a candidate that receives cuts, although its
-        // options are a solution of score φ(v(Y)), and may never propose
-        // them again: the best one is kept for the end.
+        // The solver drops a candidate that receives cuts and may never
+        // propose its options again, although they are a solution of score
+        // φ(v(Y)): it gets them back with their scores.
         std::size_t num_cuts = 0;
-        double best_score = -std::numeric_limits<double>::infinity();
-        auto best_candidate = instance.create_option_map(false);
         model.set_candidate_solution_callback(
             [&](typename M::candidate_solution_callback_handle & handle) {
-                const auto candidate = handle.get_solution();
+                auto candidate = handle.get_solution();
                 auto Y = melon::maps::function(
                     [&](const option_t o) { return candidate[x(o)] > 0.5; });
                 auto case_scores = instance.create_case_map(0.0);
+                const std::size_t num_cuts_before = num_cuts;
                 for_each_group(Y, [&](const case_id_t k, const group & g,
                                       const double value, auto && group_cut) {
                     case_scores[k] += value;
-                    if(candidate[g.theta] - value <= feasibility_tol * value)
+                    if(std::exchange(candidate[g.theta], value) - value <=
+                       feasibility_tol * value)
                         return;
                     ++num_cuts;
                     handle.add_lazy_constraint(
                         std::forward<decltype(group_cut)>(group_cut));
                 });
-                if(const double score = instance.eval_criterion(case_scores);
-                   score > best_score) {
-                    best_score = score;
-                    for(auto && o : instance.options())
-                        best_candidate[o] = Y[o];
-                }
+                if(num_cuts == num_cuts_before) return;
+                for(auto && o : instance.options()) candidate[x(o)] = Y[o];
+                for(auto && instance_case : instance.cases())
+                    candidate[z(instance_case.id())] =
+                        case_scores[instance_case.id()];
+                formula.set_values(candidate, case_scores);
+                handle.add_solution(candidate);
             });
 
         auto [has_solution, report] = _solve(model, sw);
@@ -363,12 +363,6 @@ struct grouped_benders : public mip_solver_base {
         auto solution = instance.create_option_map(false);
         for(auto && o : instance.options())
             solution[o] = master_solution[x(o)] > 0.5;
-        auto case_scores = instance.create_case_map(0.0);
-        for_each_group(solution,
-                       [&](const case_id_t k, const group &, const double value,
-                           auto &&) { case_scores[k] += value; });
-        if(best_score > instance.eval_criterion(case_scores))
-            solution = best_candidate;
         return {solution, report};
     }
 };

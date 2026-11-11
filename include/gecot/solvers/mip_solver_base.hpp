@@ -30,12 +30,15 @@
 namespace gecot {
 namespace solvers {
 
-// backends whose candidate solutions can be cut by lazy constraints (Benders)
+// backends whose candidate solutions can be cut by lazy constraints and
+// handed back with the scores of their options (Benders)
 template <typename M>
 concept lazy_constraint_model =
     mippp::has_candidate_solution_callback<M> &&
     mippp::has_lazy_constraints<mippp::candidate_solution_callback_handle_t<M>,
-                                M>;
+                                M> &&
+    mippp::has_solution_injection<
+        mippp::candidate_solution_callback_handle_t<M>, M>;
 
 struct mip_solver_base {
     double feasibility_tol = 0.0;
@@ -51,9 +54,26 @@ struct mip_solver_base {
     struct formula_variable_visitor {
         std::reference_wrapper<M> model;
         std::reference_wrapper<const V> C_vars;
+        std::vector<
+            std::pair<mippp::model_variable_t<M>, const criterion_formula *>>
+            variables;
 
         formula_variable_visitor(M & t_model, const V & t_C_vars)
             : model{t_model}, C_vars{t_C_vars} {}
+
+        // the variable of the formula e, kept for set_values
+        auto variable(const criterion_formula & e) {
+            const auto var = std::visit(*this, e);
+            variables.emplace_back(var, &e);
+            return var;
+        }
+        // Gives the variables of the formulas their values at the cases'
+        // scores: a point handed to the solver is refused if a sum or a
+        // product does not hold.
+        void set_values(auto & point, const auto & case_scores) const {
+            for(const auto & [var, e] : variables)
+                point[var] = std::visit(formula_eval_visitor{case_scores}, *e);
+        }
 
         auto operator()(const criterion_constant & c) {
             return model.get().add_variable(
@@ -64,7 +84,7 @@ struct mip_solver_base {
             using namespace mippp::operators;
             auto var = model.get().add_variable({});
             std::vector<mippp::model_variable_t<M>> vars;
-            for(auto && e : f.values) vars.emplace_back(std::visit(*this, e));
+            for(auto && e : f.values) vars.emplace_back(variable(e));
             model.get().add_constraint(var == xsum(vars));
             return var;
         }
@@ -80,14 +100,14 @@ struct mip_solver_base {
             auto var = model.get().add_variable({});
             model.get().add_constraint(
                 var == std::get<criterion_constant>(f.values[0]) *
-                           std::visit(*this, f.values[1]));
+                           variable(f.values[1]));
             return var;
         }
         auto operator()(const criterion_min & f) {
             using namespace mippp::operators;
             auto var = model.get().add_variable({});
             for(auto && e : f.values) {
-                model.get().add_constraint(var <= std::visit(*this, e));
+                model.get().add_constraint(var <= variable(e));
             }
             return var;
         }

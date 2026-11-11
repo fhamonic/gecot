@@ -89,8 +89,8 @@ struct naive_benders : public mip_solver_base {
             instance.cases().size(), [](const case_id_t & id) { return id; });
 
         model.set_maximization();
-        model.set_objective(std::visit(formula_variable_visitor{model, C_vars},
-                                       instance.criterion()));
+        formula_variable_visitor formula{model, C_vars};
+        model.set_objective(formula.variable(instance.criterion()));
 
         const auto X_vars = model.add_binary_variables(
             instance.options().size(), [](const option_t & i) { return i; });
@@ -235,10 +235,12 @@ struct naive_benders : public mip_solver_base {
         std::size_t num_cuts = 0;
         model.set_candidate_solution_callback(
             [&](typename M::candidate_solution_callback_handle & handle) {
-                const auto master_solution = handle.get_solution();
+                auto master_solution = handle.get_solution();
                 auto sol = melon::maps::function([&](option_t i) {
                     return master_solution[X_vars(i)] > 0.5;
                 });
+                auto case_scores = instance.create_case_map(0.0);
+                const std::size_t num_cuts_before = num_cuts;
                 for(auto && instance_case : instance.cases()) {
                     const auto case_id = instance_case.id();
                     auto cut_data =
@@ -249,7 +251,9 @@ struct naive_benders : public mip_solver_base {
 
                     const double opt = std::ranges::fold_left(
                         std::views::keys(cut_data), 0.0, std::plus<double>());
-                    if(master_solution[C_vars(case_id)] - opt <=
+                    case_scores[case_id] = opt;
+                    if(std::exchange(master_solution[C_vars(case_id)], opt) -
+                           opt <=
                        feasibility_tol * opt)
                         continue;
 
@@ -264,6 +268,14 @@ struct naive_benders : public mip_solver_base {
                                                            rho_values);
                              }));
                 }
+                // The solver drops a candidate that receives a cut and may
+                // never propose its options again, although they are a
+                // solution: it gets them back with their scores.
+                if(num_cuts == num_cuts_before) return;
+                for(auto && o : instance.options())
+                    master_solution[X_vars(o)] = sol[o];
+                formula.set_values(master_solution, case_scores);
+                handle.add_solution(master_solution);
             });
 
         if(mip_start.has_value()) {

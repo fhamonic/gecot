@@ -503,7 +503,7 @@ step:         λ ← clip(λ − t s_p g),  s_p = gain_p = V_p − base_p,  t = 
   - Bike B=1000: each solve 5–7× faster, but interior duals defeat the reuse (§2.6), and pricing rises to 110–161 s per round unpruned. With pruning: 10 rounds in 430 s, bound 7.454e6.
   - Green: slower per solve (230 s over 21 rounds, against 265 s over 45), and it needs value scaling.
   - Validity: check the status (§3.2), and take z_RMP from the dual objective D, not ObjVal. With BarConvTol = 0.5 and status optimal, primal 1329.15 and dual 1340.57 gave a reported bound of 1329.15, below the optimum 1337.595 (r1_sumc B=1; verifier). At the default tolerance, primal and dual agree to about 1e-9 relative on bike and green.
-  - Gurobi only (`native_api`) until mippp has an lp_algorithm selector.
+  - The prototype is Gurobi only (`native_api`). mippp now has the selector: `set_lp_algorithm(lp_algorithm::interior_point_without_crossover{})` on Gurobi, CPLEX, Xpress and MOSEK, as tree_lp's master uses it.
 - **Value scaling** (open item C5). Divide the contribution coefficients and constants by S (1e8 on green), and π by S in pricing.
   - The scaled LP equals the original divided by S iff φ is positively homogeneous: the criterion's constants must be divided too. The prototype did not divide them. With S = 1e3, sum(k0, k1, 1000) gave 1,000,337.6 instead of 1,337.6; min(k0, 120) gave a bound of 169.12 against an optimum of 120; sum(k0, −50) crashed (verifier).
   - Green's matrix range is 2e-4..5e11 with a right-hand side of 1e13; unscaled barrier hits the 1000-iteration limit. Scaled barrier with pruning reached 3.0767e13 in 300 s, against 3.1177e13 for unscaled simplex.
@@ -635,7 +635,7 @@ The owner's six questions from the study's decision page, answered where marked:
 3. **Items 4 and 5.** Rebuild greedy_incr on the incremental evaluator? Should local search be `--polish` on the heuristics, or a solver of its own (§3.3, §3.4)?
 4. **The certificate for bike-like instances.** Is prep_mip's bound (8 GB, 600 s) acceptable for now? path_lp would then cover the instances prep_mip cannot hold, like green and N2.
 5. **Item 9.** Run the density-control experiment next (§3.8)? It also answers whether full bike's LP is as tight as its crops.
-6. **Item 10.** Land the Gurobi-only barrier now, or wait for mippp's lp_algorithm? Value scaling (open item C5) is needed either way (§3.9).
+6. **Item 10.** Land the barrier, through mippp's lp_algorithm selector? Value scaling (open item C5) is needed either way (§3.9).
 
 ## References
 

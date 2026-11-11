@@ -55,9 +55,16 @@ public:
         return taken_option_names;
     }
 
+    // the MIP start, unless --mip-start or --mip-start-algorithm gives one
+    void set_start(std::vector<std::string> option_names) override {
+        if(!mip_solver->mip_start && mip_start_algorithm == "none")
+            mip_solver->mip_start = std::move(option_names);
+    }
+
 protected:
     std::string solver_name;
     std::string mip_start_algorithm;
+    gecot::solvers::mip_solver_base * mip_solver = nullptr;
 
     static inline const std::vector<std::string> all_solvers{
         "gurobi", "cplex", "copt", "xpress", "mosek",
@@ -71,6 +78,7 @@ protected:
     void add_mip_options(
         gecot::solvers::mip_solver_base & solver, double default_tol = 1e-7,
         const std::vector<std::string> & solvers = all_solvers) {
+        mip_solver = &solver;
         app.add_option("--solver", solver_name, "Solver used through mippp")
             ->check(CLI::IsMember(solvers))
             ->default_val("gurobi");

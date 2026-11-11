@@ -65,6 +65,15 @@ OPTIONS:
   -B,     --budget FLOAT      Budget value
   -o,     --output-json TEXT  Output solution data in JSON file
           --output-csv TEXT   Output solution value in CSV file
+          --reformulation TEXT:{trivial,path_lp} [trivial]
+                              Instance given to the algorithm, trivial: without the options of
+                              cost 0, bought, or over the budget; path_lp: also without the
+                              options that the path relaxation proves to be in no better
+                              solution than its own
+          --reformulation-params TEXT
+                              Parameters of the path_lp of --reformulation path_lp, as
+                              "time-limit=60 pricing=enumerate"; its MIP start is greedy_incr's
+                              solution by default
   -v,     --verbose [0]       Log the algorithms' details, -vv everything with the solver's own
                               log on stdout
   -q,     --quiet             Silence all logging except errors

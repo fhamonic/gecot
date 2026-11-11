@@ -86,6 +86,7 @@ target_link_libraries(gecot_lib INTERFACE mippp::mippp)
 # every mippp backend
 add_executable(gecot src/gecot.cpp src/instance.cpp src/parse_instance.cpp
     src/commands/common.cpp src/commands/registry.cpp src/commands/optimize.cpp
+    src/commands/path_reformulation.cpp
     src/commands/bound.cpp
     src/solver_interfaces/mip_interface.cpp
     src/solver_interfaces/preprocessed_mip_interface.cpp

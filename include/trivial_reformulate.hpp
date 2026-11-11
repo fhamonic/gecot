@@ -94,6 +94,26 @@ std::pair<Instance, double> trivial_reformulate_instance(
     return {std::move(reformulated_instance), quality_scale};
 }
 
+// the instance without the options that keep rejects, the others under their
+// names
+template <gecot::instance_c I>
+Instance restrict_instance(const I & instance, const auto & keep) {
+    Instance restricted_instance;
+    restricted_instance.set_criterion(instance.criterion());
+    auto restricted_option_map =
+        instance.template create_option_map<std::optional<gecot::option_t>>();
+    for(auto && option : instance.options())
+        if(keep(option))
+            restricted_option_map[option].emplace(
+                restricted_instance.add_option(instance.option_name(option),
+                                               instance.option_cost(option)));
+    for(auto && instance_case : instance.cases())
+        trivial_reformulate_case(instance_case, restricted_instance,
+                                 restricted_option_map,
+                                 instance.create_option_map(false), 1.0);
+    return restricted_instance;
+}
+
 template <gecot::case_c C>
 void trivial_reformulate_case(const C & instance_case, Instance & instance,
                               auto && reformulated_option_map,

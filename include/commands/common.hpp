@@ -66,7 +66,20 @@ struct progress_watch {
     progress_watch & operator=(const progress_watch &) = delete;
 };
 
-// the 13 algorithms of 'gecot optimize', in the order -A lists them
+// 'gecot optimize --reformulation path_lp': path_lp, with the given
+// "name=value" parameters and greedy_incr's solution as its default MIP
+// start, bounds for each option the score of the solutions that buy it. The
+// options whose bound is no more than the score of path_lp's solution are in
+// no better solution: solver runs on the instance without them, from
+// path_lp's solution, and the result is the better of the two solutions.
+class PathFormulationLPInterface;
+std::shared_ptr<const PathFormulationLPInterface> make_path_reformulation(
+    const std::string & parameters);
+gecot::solve_result<Instance> solve_path_reformulated(
+    const PathFormulationLPInterface & path_lp,
+    AbstractSolverInterface & solver, const Instance & instance, double budget);
+
+// the algorithms of 'gecot optimize', in the order -A lists them
 std::vector<std::shared_ptr<AbstractSolverInterface>> make_solver_interfaces();
 // the methods of 'gecot bound', in the order -M lists them
 std::vector<std::shared_ptr<AbstractBoundInterface>> make_bound_interfaces();

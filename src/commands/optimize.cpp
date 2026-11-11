@@ -34,7 +34,8 @@ static bool process_command_line(
     std::filesystem::path & instances_description_json_file, double & budget,
     std::optional<std::filesystem::path> & opt_output_json_file,
     std::optional<std::filesystem::path> & opt_output_csv_file,
-    std::optional<tbb::global_control> & opt_tbb_global_control) {
+    std::optional<tbb::global_control> & opt_tbb_global_control,
+    std::shared_ptr<const PathFormulationLPInterface> & path_reformulation) {
     auto solver_interfaces = make_solver_interfaces();
 
     auto print_available_algorithms = [&solver_interfaces]() {
@@ -56,7 +57,7 @@ static bool process_command_line(
     bool help = false, list_algorithms = false, list_params = false,
          quiet = false;
     int verbosity = 0;
-    std::string solver_name;
+    std::string solver_name, reformulation, reformulation_params;
     std::optional<std::size_t> opt_max_threads;
     CLI::App app("", "gecot optimize");
     app.usage(R"(Usage:
@@ -82,6 +83,17 @@ static bool process_command_line(
                    "Output solution data in JSON file");
     app.add_option("--output-csv", opt_output_csv_file,
                    "Output solution value in CSV file");
+    app.add_option("--reformulation", reformulation,
+                   "Instance given to the algorithm, trivial: without the "
+                   "options of cost 0, bought, or over the budget; path_lp: "
+                   "also without the options that the path relaxation proves "
+                   "to be in no better solution than its own")
+        ->check(CLI::IsMember({"trivial", "path_lp"}))
+        ->default_val("trivial");
+    app.add_option("--reformulation-params", reformulation_params,
+                   "Parameters of the path_lp of --reformulation path_lp, as "
+                   "\"time-limit=60 pricing=enumerate\"; its MIP start is "
+                   "greedy_incr's solution by default");
     app.add_flag("-v,--verbose", verbosity,
                  "Log the algorithms' details, -vv everything with the "
                  "solver's own log on stdout");
@@ -152,6 +164,11 @@ static bool process_command_line(
     // remaining() is in command line order: the solver would read '-t 1e-5'
     // as '1e-5 -t'
     solver->parse(app.remaining_for_passthrough());
+    if(reformulation == "path_lp")
+        path_reformulation = make_path_reformulation(reformulation_params);
+    else if(!reformulation_params.empty())
+        throw std::logic_error(
+            "'--reformulation-params' requires '--reformulation path_lp'");
 
     return true;
 }
@@ -163,13 +180,15 @@ int optimize_command(const std::vector<std::string> & args) {
     std::optional<std::filesystem::path> opt_output_json_file;
     std::optional<std::filesystem::path> opt_output_csv_file;
     std::optional<tbb::global_control> opt_tbb_global_control;
+    std::shared_ptr<const PathFormulationLPInterface> path_reformulation;
 
     std::string program_state = "Parsing arguments";
 
     try {
         if(!process_command_line(args, solver, instances_description_json,
                                  budget, opt_output_json_file,
-                                 opt_output_csv_file, opt_tbb_global_control))
+                                 opt_output_csv_file, opt_tbb_global_control,
+                                 path_reformulation))
             return EXIT_SUCCESS;
         program_state = "Checking output files";
         check_output_directories({opt_output_json_file, opt_output_csv_file});
@@ -194,6 +213,9 @@ int optimize_command(const std::vector<std::string> & args) {
                                                            .create_option_map(
                                                                false),
                                                        {"no option left"}}
+                   : path_reformulation
+                       ? solve_path_reformulated(*path_reformulation, *solver,
+                                                 instance, budget)
                        : solver->solve(instance, budget);
         }();
         const auto computation_time_ms =

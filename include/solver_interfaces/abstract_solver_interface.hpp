@@ -57,6 +57,8 @@ public:
         return option_values(app);
     }
 
+    // the options of a solution that the algorithm may start from
+    virtual void set_start(std::vector<std::string>) {}
     virtual gecot::solve_result<Instance> solve(const Instance & instance,
                                                 const double B) const = 0;
     virtual std::string description() const = 0;

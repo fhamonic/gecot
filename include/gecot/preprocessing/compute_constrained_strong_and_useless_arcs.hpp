@@ -17,6 +17,7 @@
 #include "gecot/helper.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 
+#include "gecot/utils/log_table.hpp"
 #include "gecot/utils/progress_bar.hpp"
 
 namespace gecot {
@@ -304,23 +305,22 @@ auto compute_constrained_strong_and_useless_arcs(
             stong_counters[i] += stong_counters[i - 1];
             useless_counters[i] += useless_counters[i - 1];
         }
-        spdlog::debug("------------------------------------------");
-        spdlog::debug("  µ value  | strong fiber | useless fiber ");
-        spdlog::debug("           |  (avg size)  |  (avg size)");
-        spdlog::debug("------------------------------------------");
+        log_table<spdlog::level::debug, 0, 9, 12, 13> fibers(
+            {"µ value", log_format::scientific(3)},
+            {"strong fiber (avg. size)", log_format::fixed(3)},
+            {"useless fiber (avg. size)", log_format::fixed(3)});
         const auto num_arcs = melon::num_arcs(graph);
         for(auto i : std::views::iota(std::size_t(0), mus.size())) {
             if(i > 0 &&
                stong_counters[i].load() == stong_counters[i - 1].load() &&
                useless_counters[i].load() == useless_counters[i - 1].load())
                 continue;
-            spdlog::debug(" {:>.3e} | {:>12.3f} | {:>13.3f}  ", mus[i],
-                          static_cast<double>(stong_counters[i]) /
-                              static_cast<double>(num_arcs),
-                          static_cast<double>(useless_counters[i]) /
-                              static_cast<double>(num_arcs));
+            fibers.row(mus[i],
+                       static_cast<double>(stong_counters[i]) /
+                           static_cast<double>(num_arcs),
+                       static_cast<double>(useless_counters[i]) /
+                           static_cast<double>(num_arcs));
         }
-        spdlog::debug("------------------------------------------");
 
         std::size_t num_strong, num_useless, num_sinks;
         num_strong = num_useless = num_sinks = 0;

@@ -10,6 +10,7 @@
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
+#include "gecot/utils/log_table.hpp"
 
 namespace gecot {
 namespace solvers {
@@ -54,9 +55,9 @@ struct GreedyIncremental {
         const auto cases_arc_options = compute_cases_arc_options(instance);
         auto options_ratios = instance.create_option_map(0.0);
 
-        spdlog::trace("---------------------------------------------------");
-        spdlog::trace("   added option id   | score gain |  budget left");
-        spdlog::trace("---------------------------------------------------");
+        log_table<spdlog::level::trace, 50, 40, 12, 11> added(
+            {"added option id"}, {"score gain", log_format::scientific(4)},
+            {"budget left", log_format::scientific(5)});
 
         double previous_score = compute_base_score(instance);
         double budget_left = budget;
@@ -95,10 +96,9 @@ struct GreedyIncremental {
                     cases_arc_options[instance_case.id()][best_option])
                     current_pm[a] = std::max(current_pm[a], enhanced_prob);
             }
-            spdlog::trace("{:>20} |{: #.4e} | {: #.5e}",
-                          instance.option_name(best_option),
-                          options_ratios[best_option] * best_option_price,
-                          budget_left);
+            added.row(instance.option_name(best_option),
+                      options_ratios[best_option] * best_option_price,
+                      budget_left);
 
             options.erase(best_option_it);
             const auto [first, last] = std::ranges::remove_if(
@@ -108,7 +108,6 @@ struct GreedyIncremental {
                 });
             options.erase(first, last);
         }
-        spdlog::trace("---------------------------------------------------");
 
         return solution;
     }

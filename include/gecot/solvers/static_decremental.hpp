@@ -10,6 +10,7 @@
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
+#include "gecot/utils/log_table.hpp"
 
 namespace gecot {
 namespace solvers {
@@ -69,11 +70,10 @@ struct StaticDecremental {
             }
         }
 
-        spdlog::trace(
-            "--------------------------------------------------------");
-        spdlog::trace("  removed option id  | loss/cost ratio | solution cost");
-        spdlog::trace(
-            "--------------------------------------------------------");
+        log_table<spdlog::level::trace, 50, 40, 12, 11> removed(
+            {"removed option id"},
+            {"loss/cost ratio", log_format::scientific(5)},
+            {"solution cost", log_format::scientific(5)});
 
         const double max_score = compute_score(
             instance, cases_current_sqm, cases_current_tqm, cases_current_pm);
@@ -101,9 +101,8 @@ struct StaticDecremental {
             purchased -= price;
             solution[option] = false;
             free_options.emplace_back(option);
-            spdlog::trace("{:>20} |  {: #.6e}  | {: #.5e}",
-                          instance.option_name(option), options_ratios[option],
-                          purchased);
+            removed.row(instance.option_name(option), options_ratios[option],
+                        purchased);
         }
 
         if(!only_dec &&
@@ -113,12 +112,10 @@ struct StaticDecremental {
                                          feasibility_tol](const option_t & o) {
                    return instance.option_cost(o) <= budget_left;
                })) {
-            spdlog::trace(
-                "--------------------------------------------------------");
-            spdlog::trace(
-                "   added option id   | gain/cost ratio | solution cost");
-            spdlog::trace(
-                "--------------------------------------------------------");
+            log_table<spdlog::level::trace, 50, 40, 12, 11> added(
+                {"added option id"},
+                {"gain/cost ratio", log_format::scientific(5)},
+                {"budget left", log_format::scientific(5)});
 
             for(const auto & instance_case : cases) {
                 auto & current_sqm = (cases_current_sqm[instance_case.id()] =
@@ -165,13 +162,10 @@ struct StaticDecremental {
                 if(purchased + price > budget + feasibility_tol) continue;
                 purchased += price;
                 solution[option] = true;
-                spdlog::trace("{:>20} |  {: #.6e}  | {: #.5e}",
-                              instance.option_name(option),
-                              options_ratios[option], budget - purchased);
+                added.row(instance.option_name(option), options_ratios[option],
+                          budget - purchased);
             }
         }
-        spdlog::trace(
-            "--------------------------------------------------------");
 
         return solution;
     }

@@ -10,6 +10,7 @@
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
+#include "gecot/utils/log_table.hpp"
 
 namespace gecot {
 namespace solvers {
@@ -30,11 +31,9 @@ struct StaticIncremental {
             options.emplace_back(option);
         }
 
-        spdlog::trace(
-            "--------------------------------------------------------");
-        spdlog::trace("   added option id   | gain/cost ratio | solution cost");
-        spdlog::trace(
-            "--------------------------------------------------------");
+        log_table<spdlog::level::trace, 50, 40, 12, 11> added(
+            {"added option id"}, {"gain/cost ratio", log_format::scientific(5)},
+            {"budget left", log_format::scientific(5)});
 
         const double base_score = compute_base_score(instance);
         auto options_cases_pc_num = instance.create_option_map(
@@ -73,12 +72,9 @@ struct StaticIncremental {
             if(purchased + price > budget + feasibility_tol) continue;
             purchased += price;
             solution[option] = true;
-            spdlog::trace("{:>20} |  {: #.6e}  | {: #.5e}",
-                          instance.option_name(option), options_ratios[option],
-                          budget - purchased);
+            added.row(instance.option_name(option), options_ratios[option],
+                      budget - purchased);
         }
-        spdlog::trace(
-            "--------------------------------------------------------");
 
         return solution;
     }

@@ -20,6 +20,7 @@
 #include <spdlog/spdlog.h>
 
 #include "gecot/helper.hpp"
+#include "gecot/utils/log_table.hpp"
 #include "gecot/utils/progress.hpp"
 
 #include "io_helper.hpp"
@@ -88,7 +89,9 @@ void setup_logging() {
 #endif
     auto formatter = std::make_unique<spdlog::pattern_formatter>();
     formatter->add_flag<elapsed_flag>('*').add_flag<level_flag>('&');
-    // the time, and "warning: " or "error: ", in the level's color
+    // the time, and "warning: " or "error: ", in the level's color. The
+    // tables count gecot::log_table<>::margin characters for it: a longer
+    // prefix pushes their lines past 80 characters
     formatter->set_pattern("%^[%*] %&%$%v");
     sink->set_formatter(std::move(formatter));
     spdlog::set_default_logger(std::make_shared<spdlog::logger>("gecot", sink));
@@ -207,13 +210,24 @@ prepared_instance prepare_instance(const std::filesystem::path & instance_file,
 }
 
 progress_watch::progress_watch(const prepared_instance & prepared) {
+    const auto gain = [scale = prepared.score_scale,
+                       initial = prepared.initial_score](const double score) {
+        return format_gain(score * scale, initial);
+    };
+    // the max gain of the rounds only with a bound, the nodes only at -v
+    gecot::log_table<spdlog::level::info, 20, 12, 12, 12> rounds(
+        {"round", gecot::log_format::fixed(0)}, {"relaxation", gain},
+        {"max gain", gain});
+    gecot::log_table<spdlog::level::info, 20, 12, 12, 12, 12> search(
+        {"gain", gain}, {"max gain", gain},
+        {"guaranteed",
+         [](const double share) { return fmt::format("{:.1f} %", share); }},
+        {"nodes", gecot::log_format::fixed(0)});
     gecot::report_progress = [scale = prepared.score_scale,
-                              initial = prepared.initial_score,
-                              base = prepared.base_score,
+                              base = prepared.base_score, gain, rounds, search,
                               looked = std::chrono::steady_clock::time_point{},
                               printed = std::chrono::steady_clock::time_point{},
-                              printed_values = std::string{},
-                              header = std::string{}, rows = std::size_t{0}](
+                              printed_values = std::string{}, started = false](
                                  const gecot::progress & p) mutable {
         using namespace std::chrono_literals;
         const auto now = std::chrono::steady_clock::now();
@@ -227,53 +241,40 @@ progress_watch::progress_watch(const prepared_instance & prepared) {
                     : now - printed < 5s || elapsed_seconds() < 2)
             return;
 
-        auto gain = [&](const std::optional<double> & v) {
-            return v ? format_gain(*v * scale, initial) : std::string("-");
-        };
         // a model can value a solution below its score, as the Benders
         // masters do at 0 first: below buying nothing, it says nothing
         const auto score =
             p.score && *p.score * scale >= base ? p.score : std::nullopt;
-        std::vector<std::pair<std::string_view, std::string>> columns;
-        if(p.round) {
-            columns = {{"round", std::to_string(*p.round)},
-                       {"relaxation", gain(p.relaxation)}};
-            if(p.bound) columns.emplace_back("max gain", gain(p.bound));
-        } else {
-            const auto share = score && p.bound
-                                   ? guaranteed_gain_share(
-                                         *score * scale, *p.bound * scale, base)
-                                   : std::nullopt;
-            columns = {
-                {"gain", gain(score)},
-                {"max gain", gain(p.bound)},
-                {"guaranteed", share ? fmt::format("{:.1f} %", *share) : "-"}};
-            if(detailed)
-                columns.emplace_back("nodes",
-                                     p.nodes ? std::to_string(*p.nodes) : "-");
-        }
+        const auto share =
+            !p.round && score && p.bound
+                ? guaranteed_gain_share(*score * scale, *p.bound * scale, base)
+                : std::nullopt;
         // a row when a value changed, else one a minute; the round and
         // the nodes always change
-        std::string values, header_line, row;
-        for(const auto & [label, value] : columns) {
-            if(label != "round" && label != "nodes") values += value + '|';
-            header_line += fmt::format("{:>12}", label);
-            row += fmt::format("{:>12}", value);
-        }
+        auto shown = [&gain](const std::optional<double> & v) {
+            return v ? gain(*v) : std::string("-");
+        };
+        std::string values = p.round
+                                 ? shown(p.relaxation) + '|' + shown(p.bound)
+                                 : shown(score) + '|' + shown(p.bound) + '|' +
+                                       fmt::format("{}", share.value_or(-1));
         if(values == printed_values && now - printed < 60s) return;
         printed = now;
         printed_values = std::move(values);
-        if(header.empty())
+        if(!std::exchange(started, true))
             spdlog::info(
                 "Ctrl-C stops the algorithm and keeps its best result so "
                 "far");
-        if(header_line != header || rows == 20) {
-            spdlog::info("{}", header_line);
-            header = std::move(header_line);
-            rows = 0;
+        // the rows of a table make the other one log its header again
+        if(p.round) {
+            search.restart();
+            p.bound ? rounds.row(*p.round, p.relaxation, p.bound)
+                    : rounds.row(*p.round, p.relaxation);
+        } else {
+            rounds.restart();
+            detailed ? search.row(score, p.bound, share, p.nodes)
+                     : search.row(score, p.bound, share);
         }
-        ++rows;
-        spdlog::info("{}", row);
     };
     gecot::stop_requested = false;
     std::signal(SIGINT, request_stop);

@@ -150,22 +150,23 @@ $ gecot optimize multicut_benders instance.json 8 --preprocessing none --time-li
 [   0.0s] Instance /home/user/instances/Aix/instance_40x40/instance.json: 27 options, 1 species
 [   0.0s]   squirrel: 4800 vertices (752 habitats, 27 improvable), 9440 arcs (100 improvable)
 [   0.0s] Budget 8: 28.17 % of the options' total cost (28.4)
-[   0.3s] Solving the optimization model
-[   2.3s] Ctrl-C stops the algorithm and keeps its best result so far
-[   2.3s]         gain    max gain  guaranteed
-[   2.3s]     +20.20 %    +60.87 %      33.1 %
-[   7.6s]     +22.97 %    +49.19 %      46.7 %
-[  12.8s]     +22.97 %    +46.92 %      48.9 %
-[  17.8s]     +22.97 %    +45.44 %      50.5 %
-[  23.1s]     +22.97 %    +44.04 %      52.1 %
-[  25.4s] warning: Solver stopped: time limit reached
+[   0.1s] Solving the optimization model
+[   2.2s] Ctrl-C stops the algorithm and keeps its best result so far
+[   2.2s]     gain     |   max gain   |  guaranteed
+[   2.2s] -------------+--------------+-------------
+[   2.2s]     +20.20 % |     +60.87 % |       33.1 %
+[   7.4s]     +22.97 % |     +49.18 % |       46.7 %
+[  12.5s]     +22.97 % |     +46.92 % |       48.9 %
+[  17.6s]     +22.97 % |     +45.36 % |       50.6 %
+[  22.7s]     +22.97 % |     +44.04 % |       52.1 %
+[  25.5s] warning: Solver stopped: time limit reached
 ```
 
 The first lines say what was read: the options, the cases, and for each case its vertices (those of positive quality counted as habitats), its arcs and how many of them some option improves, then the budget as a share of the total cost of the options.
 
 ### Progress
 
-When the algorithm runs for more than two seconds, a table follows its progress, with a new row when a value changes: at most every five seconds, and at least every minute.
+When the algorithm runs for more than two seconds, a table follows its progress, with a new row when a value changes: at most every five seconds, and at least every minute. Its header comes again every 20 rows, and a value that is not known yet reads `-`.
 
 For `flow_mip` and the Benders decompositions:
 
@@ -180,8 +181,9 @@ The run above was stopped by its time limit with a solution proved to reach 52 %
 For `path_lp` and `tree_lp`, each row is a round of the column generation:
 
 ```text
-[   2.2s]        round  relaxation    max gain
-[   2.2s]            5    +21.81 %    +25.20 %
+[   2.1s]    round     |  relaxation  |   max gain
+[   2.1s] -------------+--------------+-------------
+[   2.1s]            7 |     +22.06 % |     +24.67 %
 ```
 
 | Column | Meaning |
@@ -197,7 +199,7 @@ For `path_lp` and `tree_lp`, each row is a round of the column generation:
 | `-q` | errors only |
 | (default) | the steps of the run, the progress, the warnings |
 | `-v` | also the parameters of the algorithm with their values, the size of the instance after its reformulation, the factor by which the qualities are divided, the numbers of strong and useless arcs, the size of the model; the progress table has a row every second or every round, and a `nodes` column |
-| `-vv` | also the details of each step, and the solver's own log, which goes to the standard output |
+| `-vv` | also the details of each step, such as a table of the options that a heuristic buys or removes, and the solver's own log, which goes to the standard output |
 
 With `-v`, the line `Qualities divided by ...` gives the factor of the [rescaling](../formulations/preprocessing.md#the-instance-given-to-the-algorithms): the solver's own log is in the rescaled unit, everything else in the unit of the instance.
 

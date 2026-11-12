@@ -3,7 +3,7 @@ find_package(GTest)
 include(GoogleTest)
 
 # ################# TEST targets #################
-add_executable(gecot_test ../src/instance.cpp ../src/parse_instance.cpp main_test.cpp preprocessing_test.cpp parse_instance_test.cpp solvers_test.cpp bounds_test.cpp)
+add_executable(gecot_test ../src/instance.cpp ../src/parse_instance.cpp main_test.cpp preprocessing_test.cpp parse_instance_test.cpp solvers_test.cpp bounds_test.cpp log_table_test.cpp)
 target_link_libraries(gecot_test gecot_lib)
 target_link_libraries(gecot_test vincentlaucsb-csv-parser::vincentlaucsb-csv-parser)
 target_link_libraries(gecot_test nlohmann_json::nlohmann_json)

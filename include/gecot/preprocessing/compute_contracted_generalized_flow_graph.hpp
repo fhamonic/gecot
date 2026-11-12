@@ -16,7 +16,8 @@ template <case_c C>
 auto compute_contracted_generalized_flow_graph(const C & instance_case,
                                                const auto & strong_arcs,
                                                const auto & useless_arcs,
-                                               const auto & original_t) {
+                                               const auto & original_t,
+                                               const bool pruning = true) {
     const auto & original_graph = instance_case.graph();
     const auto & original_source_quality_map =
         instance_case.source_quality_map();
@@ -57,8 +58,9 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
     for(const auto & a : useless_arcs) arc_uselessness_map[a] = true;
     for(const auto & a : strong_arcs) arc_uselessness_map[a] = false;
     // add uselessness of outgoing arcs of t
-    for(const auto & a : melon::out_arcs(original_graph, original_t))
-        arc_uselessness_map[a] = true;
+    if(pruning)
+        for(const auto & a : melon::out_arcs(original_graph, original_t))
+            arc_uselessness_map[a] = true;
 
     // create new arcs
     for(const auto & a : melon::arcs(original_graph)) {
@@ -120,23 +122,25 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
     }
 
     // remove vertices that cannot be traversed by flow
-    auto bfs = melon::breadth_first_search(graph);
-    for(const auto & v : melon::vertices(graph)) {
-        if(source_quality_map[v] == 0 && source_options_map[v].empty())
-            continue;
-        if(bfs.reached(v)) continue;
-        bfs.add_source(v).run();
-    }
-    std::vector<melon::vertex_t<melon::mutable_digraph>> vertices_to_delete_tmp;
-    std::ranges::copy(
-        std::ranges::views::filter(
-            melon::vertices(graph),
-            [&bfs, t = original_to_new_vertex_map[original_t]](const auto & v) {
-                return !bfs.reached(v) && v != t;
-            }),
-        std::back_inserter(vertices_to_delete_tmp));
-    for(const auto & v : vertices_to_delete_tmp) {
-        graph.remove_vertex(v);
+    if(pruning) {
+        auto bfs = melon::breadth_first_search(graph);
+        for(const auto & v : melon::vertices(graph)) {
+            if(source_quality_map[v] == 0 && source_options_map[v].empty())
+                continue;
+            if(bfs.reached(v)) continue;
+            bfs.add_source(v).run();
+        }
+        std::vector<melon::vertex_t<melon::mutable_digraph>>
+            vertices_to_delete_tmp;
+        std::ranges::copy(
+            std::ranges::views::filter(
+                melon::vertices(graph),
+                [&bfs, t = original_to_new_vertex_map[original_t]](
+                    const auto & v) { return !bfs.reached(v) && v != t; }),
+            std::back_inserter(vertices_to_delete_tmp));
+        for(const auto & v : vertices_to_delete_tmp) {
+            graph.remove_vertex(v);
+        }
     }
 
     auto arc_no_map = melon::create_arc_map<std::size_t>(graph);

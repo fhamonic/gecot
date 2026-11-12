@@ -57,7 +57,8 @@ struct formula_scale_visitor {
 // and an instance whose cases score less is left unscaled
 template <gecot::instance_c I>
 std::pair<Instance, double> trivial_reformulate_instance(
-    const I & instance, double budget = std::numeric_limits<double>::max()) {
+    const I & instance, double budget = std::numeric_limits<double>::max(),
+    const bool merge = true) {
     // one factor for all cases: a sum or a min criterion weighs them
     const auto base_cases_pc_num = gecot::compute_base_cases_pc_num(instance);
     double max_case_score = 0;
@@ -88,7 +89,7 @@ std::pair<Instance, double> trivial_reformulate_instance(
     for(auto && instance_case : instance.cases()) {
         trivial_reformulate_case(instance_case, reformulated_instance,
                                  reformulated_option_map, free_options,
-                                 quality_scale);
+                                 quality_scale, merge);
     }
 
     return {std::move(reformulated_instance), quality_scale};
@@ -97,7 +98,8 @@ std::pair<Instance, double> trivial_reformulate_instance(
 // the instance without the options that keep rejects, the others under their
 // names
 template <gecot::instance_c I>
-Instance restrict_instance(const I & instance, const auto & keep) {
+Instance restrict_instance(const I & instance, const auto & keep,
+                           const bool merge = true) {
     Instance restricted_instance;
     restricted_instance.set_criterion(instance.criterion());
     auto restricted_option_map =
@@ -110,7 +112,7 @@ Instance restrict_instance(const I & instance, const auto & keep) {
     for(auto && instance_case : instance.cases())
         trivial_reformulate_case(instance_case, restricted_instance,
                                  restricted_option_map,
-                                 instance.create_option_map(false), 1.0);
+                                 instance.create_option_map(false), 1.0, merge);
     return restricted_instance;
 }
 
@@ -118,7 +120,7 @@ template <gecot::case_c C>
 void trivial_reformulate_case(const C & instance_case, Instance & instance,
                               auto && reformulated_option_map,
                               const auto & free_options,
-                              const double quality_scale) {
+                              const double quality_scale, const bool merge) {
     using graph_t = gecot::case_graph_t<C>;
     using vertex_t = melon::vertex_t<graph_t>;
     using arc_t = melon::arc_t<graph_t>;
@@ -159,8 +161,9 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
 
     for(auto component :
         melon::strongly_connected_components(melon::views::subgraph(
-            original_graph, {}, [&original_probability_map](const arc_t & a) {
-                return original_probability_map[a] == 1;
+            original_graph, {},
+            [&original_probability_map, merge](const arc_t & a) {
+                return merge && original_probability_map[a] == 1;
             }))) {
         source_quality_map.push_back(0.0);
         target_quality_map.push_back(0.0);

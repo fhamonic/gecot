@@ -55,7 +55,8 @@ struct prepared_instance {
 };
 // logs the steps of 'gecot optimize', with "the <noun>'s scores"
 prepared_instance prepare_instance(const std::filesystem::path & instance_file,
-                                   double budget, std::string_view noun);
+                                   double budget, std::string_view noun,
+                                   bool merge = true);
 
 // While it lives, the algorithm's progress is logged in raw scores, and Ctrl-C
 // stops it: it returns its best result so far.
@@ -77,7 +78,8 @@ std::shared_ptr<const PathFormulationLPInterface> make_path_reformulation(
     const std::string & parameters);
 gecot::solve_result<Instance> solve_path_reformulated(
     const PathFormulationLPInterface & path_lp,
-    AbstractSolverInterface & solver, const Instance & instance, double budget);
+    AbstractSolverInterface & solver, const Instance & instance, double budget,
+    bool merge = true);
 
 // the algorithms of 'gecot optimize', in the order -A lists them
 std::vector<std::shared_ptr<AbstractSolverInterface>> make_solver_interfaces();

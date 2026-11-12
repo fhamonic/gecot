@@ -47,9 +47,15 @@ struct mip_solver_base {
     double probability_resolution = 1e-8;
     int num_mus = 0;
     bool decades_sweep = true;
-    // for comparison: no strong nor useless arcs, so each target keeps the
-    // whole graph
-    bool no_preprocessing = false;
+    // For comparison, a preprocessing step switched off: the contraction of
+    // the strong arcs, the removal of the useless arcs, the skipping of the
+    // vertices that can never be targets, and in the graph of a target the
+    // removal of the arcs that leave it and of the vertices no quality
+    // reaches.
+    bool contract_strong_arcs = true;
+    bool remove_useless_arcs = true;
+    bool all_targets = false;
+    bool no_pruning = false;
     std::optional<std::vector<std::string>> mip_start;
     std::optional<double> time_limit;
 
@@ -118,31 +124,44 @@ struct mip_solver_base {
         }
     };
 
+    // a vertex that some options make a target
+    template <case_c C>
+    bool _is_target(const C & instance_case,
+                    const melon::vertex_t<case_graph_t<C>> & t) const {
+        return all_targets || instance_case.target_quality_map()[t] > 0 ||
+               std::ranges::any_of(instance_case.vertex_options_map()[t],
+                                   [](auto && e) {
+                                       auto && [sqg, tqg, o] = e;
+                                       return tqg > 0;
+                                   });
+    }
+
+    // Both kinds of arcs are labelled together: contracting or removing
+    // alone saves no labelling time.
     template <instance_c I, case_c C>
     auto _compute_strong_and_useless_arcs(const I & instance,
                                           const C & instance_case,
                                           const double budget) const {
-        if(no_preprocessing) {
-            using arcs = tbb::concurrent_vector<melon::arc_t<case_graph_t<C>>>;
-            return std::make_pair(
-                melon::create_vertex_map<arcs>(instance_case.graph()),
-                melon::create_vertex_map<arcs>(instance_case.graph()));
-        }
-        if(num_mus >= 1) {
-            return compute_constrained_strong_and_useless_arcs(
-                instance, instance_case, budget,
-                [&instance, budget](const option_t & o) {
-                    return instance.option_cost(o) <= budget;
-                },
-                probability_resolution, num_mus, decades_sweep);
-        } else {
-            return compute_strong_and_useless_arcs(
-                instance_case,
-                [&instance, budget](const option_t & o) {
-                    return instance.option_cost(o) <= budget;
-                },
-                probability_resolution);
-        }
+        using arcs = tbb::concurrent_vector<melon::arc_t<case_graph_t<C>>>;
+        auto no_arcs = [&instance_case] {
+            return melon::create_vertex_map<arcs>(instance_case.graph());
+        };
+        if(!contract_strong_arcs && !remove_useless_arcs)
+            return std::make_pair(no_arcs(), no_arcs());
+        auto affordable = [&instance, budget](const option_t & o) {
+            return instance.option_cost(o) <= budget;
+        };
+        auto labels = num_mus >= 1
+                          ? compute_constrained_strong_and_useless_arcs(
+                                instance, instance_case, budget, affordable,
+                                probability_resolution, num_mus, decades_sweep,
+                                all_targets)
+                          : compute_strong_and_useless_arcs(
+                                instance_case, affordable,
+                                probability_resolution, all_targets);
+        if(!contract_strong_arcs) labels.first = no_arcs();
+        if(!remove_useless_arcs) labels.second = no_arcs();
+        return labels;
     }
 
     // sw starts with solve(): the time limit also counts the preprocessing

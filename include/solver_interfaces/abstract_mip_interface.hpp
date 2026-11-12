@@ -22,6 +22,7 @@
 #include "mippp/solvers/scip/all.hpp"
 #include "mippp/solvers/xpress/all.hpp"
 
+#include "gecot/preprocessing/compute_big_M_map.hpp"
 #include "gecot/solvers/greedy_decremental.hpp"
 #include "gecot/solvers/greedy_incremental.hpp"
 #include "gecot/solvers/mip_solver_base.hpp"
@@ -146,6 +147,23 @@ protected:
         throw std::invalid_argument("unknown solver '" + solver_name + "'");
     }
 
+    void add_big_M_option(gecot::big_M_kind & big_Ms) {
+        app.add_option_function<std::string>(
+               "--big-m",
+               [&big_Ms](const std::string & s) {
+                   using enum gecot::big_M_kind;
+                   big_Ms = s == "plain"   ? plain
+                            : s == "tight" ? tight
+                                           : knapsack;
+               },
+               "The big-Ms: plain, with every quality gain (for comparison); "
+               "knapsack, with the gains of the best options within the "
+               "budget; tight (experimental), knapsack lowered per arc over "
+               "the sources that can use it")
+            ->check(CLI::IsMember({"plain", "knapsack", "tight"}))
+            ->default_val("knapsack");
+    }
+
     void add_preprocessing_options(gecot::solvers::mip_solver_base & solver) {
         app.add_option("--resolution", solver.probability_resolution,
                        "Sets the resolution of the probabilities used by the "
@@ -170,10 +188,25 @@ protected:
                "cost per arc (needs --nb-mus > 0; experimental)")
             ->check(CLI::IsMember({"decades", "full"}))
             ->default_val("decades");
-        app.add_flag("--no-preprocessing", solver.no_preprocessing,
-                     "For comparison: skips the computation of the strong and "
-                     "useless arcs, so no graph is contracted and "
-                     "--resolution, --nb-mus and --mus-sweep have no effect");
+        app.add_option_function<std::string>(
+               "--preprocessing",
+               [&solver](const std::string & s) {
+                   solver.contract_strong_arcs = s == "all" || s == "strong";
+                   solver.remove_useless_arcs = s == "all" || s == "useless";
+               },
+               "For comparison, what the strong and useless arcs are used "
+               "for: all; strong, only the contraction of the strong arcs; "
+               "useless, only the removal of the useless arcs; none, where "
+               "--resolution, --nb-mus and --mus-sweep have no effect")
+            ->check(CLI::IsMember({"all", "strong", "useless", "none"}))
+            ->default_val("all");
+        app.add_flag("--all-targets", solver.all_targets,
+                     "For comparison: the vertices that can never be targets "
+                     "are preprocessed and modelled as the others");
+        app.add_flag("--no-pruning", solver.no_pruning,
+                     "For comparison: keeps, in the graph of a target, the "
+                     "arcs that leave it and the vertices that no quality "
+                     "reaches");
     }
 
 private:

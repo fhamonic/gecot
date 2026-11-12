@@ -60,7 +60,8 @@ struct multicut_benders : public mip_solver_base {
     enum class grouping { voronoi, consecutive, random };
     grouping groups = grouping::voronoi;
     std::size_t random_seed = 0;
-    bool tight_big_M = false;
+    // plain for comparison, tight experimental
+    big_M_kind big_Ms = big_M_kind::knapsack;
 
     // The targets of a case in the order of their groups, and the position
     // of the first target of each group, then their number. The kernels of
@@ -74,12 +75,7 @@ struct multicut_benders : public mip_solver_base {
         auto is_target = melon::create_vertex_map<bool>(graph, false);
         std::vector<vertex> targets;
         for(const auto & t : melon::vertices(graph))
-            if(instance_case.target_quality_map()[t] > 0 ||
-               std::ranges::any_of(instance_case.vertex_options_map()[t],
-                                   [](auto && e) {
-                                       auto && [sqg, tqg, o] = e;
-                                       return tqg > 0;
-                                   })) {
+            if(_is_target(instance_case, t)) {
                 is_target[t] = true;
                 targets.push_back(t);
             }
@@ -228,7 +224,8 @@ struct multicut_benders : public mip_solver_base {
                 for(const auto & t : target_vertices) {
                     case_targets.push_back(compute_contracted_graph_data(
                         instance, instance_case, budget, t, strong_arcs_map[t],
-                        useless_arcs_map[t], tight_big_M, feasibility_tol));
+                        useless_arcs_map[t], big_Ms, feasibility_tol,
+                        !no_pruning));
                     pb.tick();
                 }
             }

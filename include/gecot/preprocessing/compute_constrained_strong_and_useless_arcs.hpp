@@ -26,7 +26,7 @@ auto compute_constrained_strong_and_useless_arcs(
     const I & instance, const C & instance_case, const double budget,
     const auto & option_predicate = [](const option_t & o) { return true; },
     double probability_resolution = 1e-8, int num_mus = 10,
-    bool decades_sweep = true) {
+    bool decades_sweep = true, const bool all_targets = false) {
     using graph_t = case_graph_t<C>;
     using log_probability_t = uint64_t;
     using log_probability_map_t = melon::arc_map_t<graph_t, log_probability_t>;
@@ -63,6 +63,7 @@ auto compute_constrained_strong_and_useless_arcs(
     auto useless_target_vertices_map = melon::create_vertex_map<bool>(graph);
     for(const auto & v : melon::vertices(graph)) {
         useless_target_vertices_map[v] =
+            !all_targets &&
             (target_quality_map[v] == 0 &&
              std::ranges::none_of(instance_case.vertex_options_map()[v],
                                   [](auto && e) {

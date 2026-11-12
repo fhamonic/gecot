@@ -25,8 +25,8 @@ namespace gecot {
 namespace solvers {
 
 struct flow_mip : public mip_solver_base {
-    // experimental: compute_tight_big_M_maps' big-Ms
-    bool tight_big_M = false;
+    // plain for comparison, tight experimental
+    big_M_kind big_Ms = big_M_kind::knapsack;
     // experimental: the options continuous, for the root relaxation's bound
     bool relax_integrality = false;
 
@@ -91,13 +91,7 @@ struct flow_mip : public mip_solver_base {
                                                  budget);
 
             for(const auto & original_t : melon::vertices(original_graph)) {
-                if(original_target_quality_map[original_t] == 0 &&
-                   std::ranges::none_of(
-                       instance_case.vertex_options_map()[original_t],
-                       [](auto && e) {
-                           auto && [sqg, tqg, o] = e;
-                           return tqg > 0;
-                       })) {
+                if(!_is_target(instance_case, original_t)) {
                     model.set_variable_upper_bound(Xi_vars(original_t), 0);
                     continue;
                 }
@@ -113,35 +107,27 @@ struct flow_mip : public mip_solver_base {
                             arc_no_map, probability_map, arc_option_map, t] =
                     compute_contracted_generalized_flow_graph(
                         instance_case, strong_arcs_map[original_t],
-                        useless_arcs_map[original_t], original_t);
+                        useless_arcs_map[original_t], original_t, !no_pruning);
                 using Graph = std::decay_t<decltype(graph)>;
-                // const auto big_M_map = compute_big_M_map(
-                //     graph, source_quality_map, vertex_options_map,
-                //     probability_map,
-                //     std::views::filter(
-                //         melon::vertices(graph),
-                //         [&graph, &arc_option_map, t](auto && u) {
-                //             return u == t ||
-                //                    std::ranges::any_of(
-                //                        melon::out_arcs(graph, u),
-                //                        [&arc_option_map](auto && a) {
-                //                            return
-                //                            arc_option_map[a].has_value();
-                //                        });
-                //         }));
-                const auto big_M_map = compute_knapsack_big_M_map(
-                    instance, budget, graph, source_quality_map,
-                    vertex_options_map, probability_map,
-                    std::views::filter(
-                        melon::vertices(graph),
-                        [&graph, &arc_option_map, t](auto && u) {
-                            return u == t ||
-                                   std::ranges::any_of(
-                                       melon::out_arcs(graph, u),
-                                       [&arc_option_map](auto && a) {
-                                           return arc_option_map[a].has_value();
-                                       });
-                        }));
+                auto big_M_vertices = std::views::filter(
+                    melon::vertices(graph),
+                    [&graph, &arc_option_map, t](auto && u) {
+                        return u == t ||
+                               std::ranges::any_of(
+                                   melon::out_arcs(graph, u),
+                                   [&arc_option_map](auto && a) {
+                                       return arc_option_map[a].has_value();
+                                   });
+                    });
+                const auto big_M_map =
+                    big_Ms == big_M_kind::plain
+                        ? compute_big_M_map(graph, source_quality_map,
+                                            vertex_options_map, probability_map,
+                                            big_M_vertices)
+                        : compute_knapsack_big_M_map(
+                              instance, budget, graph, source_quality_map,
+                              vertex_options_map, probability_map,
+                              big_M_vertices);
 
                 // an arc per improvement, of base probability 0
                 auto base_probability_map =
@@ -156,7 +142,7 @@ struct flow_mip : public mip_solver_base {
                         base_probability_map[a] = probability_map[a];
                 }
                 auto tight_maps =
-                    tight_big_M
+                    big_Ms == big_M_kind::tight
                         ? std::make_optional(compute_tight_big_M_maps(
                               instance, budget, feasibility_tol, graph,
                               source_quality_map, vertex_options_map,
@@ -277,7 +263,7 @@ struct flow_mip : public mip_solver_base {
             model.add_constraint(C_vars(instance_case.id()) <= Xi_vars);
         }
 
-        if(tight_big_M)
+        if(big_Ms == big_M_kind::tight)
             spdlog::debug(
                 "flow_mip tight big-Ms: arcs {:.4g} of the knapsack ones ({} "
                 "of {} halved at least), target gains {:.4g}",

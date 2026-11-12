@@ -35,7 +35,8 @@ static bool process_command_line(
     std::optional<std::filesystem::path> & opt_output_json_file,
     std::optional<std::filesystem::path> & opt_output_csv_file,
     std::optional<tbb::global_control> & opt_tbb_global_control,
-    std::shared_ptr<const PathFormulationLPInterface> & path_reformulation) {
+    std::shared_ptr<const PathFormulationLPInterface> & path_reformulation,
+    bool & no_merging) {
     auto solver_interfaces = make_solver_interfaces();
 
     auto print_available_algorithms = [&solver_interfaces]() {
@@ -94,6 +95,10 @@ static bool process_command_line(
                    "Parameters of the path_lp of --reformulation path_lp, as "
                    "\"time-limit=60 pricing=enumerate\"; its MIP start is "
                    "greedy_incr's solution by default");
+    app.add_flag("--no-merging", no_merging,
+                 "For comparison: keeps apart the vertices that arcs of "
+                 "probability 1 link, merged in the instance given to the "
+                 "algorithm");
     app.add_flag("-v,--verbose", verbosity,
                  "Log the algorithms' details, -vv everything with the "
                  "solver's own log on stdout");
@@ -181,6 +186,7 @@ int optimize_command(const std::vector<std::string> & args) {
     std::optional<std::filesystem::path> opt_output_csv_file;
     std::optional<tbb::global_control> opt_tbb_global_control;
     std::shared_ptr<const PathFormulationLPInterface> path_reformulation;
+    bool no_merging = false;
 
     std::string program_state = "Parsing arguments";
 
@@ -188,15 +194,15 @@ int optimize_command(const std::vector<std::string> & args) {
         if(!process_command_line(args, solver, instances_description_json,
                                  budget, opt_output_json_file,
                                  opt_output_csv_file, opt_tbb_global_control,
-                                 path_reformulation))
+                                 path_reformulation, no_merging))
             return EXIT_SUCCESS;
         program_state = "Checking output files";
         check_output_directories({opt_output_json_file, opt_output_csv_file});
         spdlog::info("GECOT {}, algorithm {}", PROJECT_VERSION, solver->name());
         log_parameters(solver->parameters());
         program_state = "Parsing instance";
-        const prepared_instance prepared =
-            prepare_instance(instances_description_json, budget, "algorithm");
+        const prepared_instance prepared = prepare_instance(
+            instances_description_json, budget, "algorithm", !no_merging);
         const Instance & raw_instance = prepared.raw_instance;
         const Instance & instance = prepared.instance;
         // the algorithm's scores, bounds and logs are in this unit
@@ -215,7 +221,7 @@ int optimize_command(const std::vector<std::string> & args) {
                                                        {"no option left"}}
                    : path_reformulation
                        ? solve_path_reformulated(*path_reformulation, *solver,
-                                                 instance, budget)
+                                                 instance, budget, !no_merging)
                        : solver->solve(instance, budget);
         }();
         const auto computation_time_ms =

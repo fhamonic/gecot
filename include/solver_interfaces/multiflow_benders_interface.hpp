@@ -12,6 +12,13 @@ public:
     MultiflowBendersInterface() : AbstractMipInterface("multiflow_benders") {
         add_mip_options(solver, 1e-7, lazy_constraint_solvers);
         add_preprocessing_options(solver);
+        app.add_flag("--no-root-cuts", solver.no_root_cuts,
+                     "For comparison: no cut on the linear relaxation before "
+                     "the search");
+        app.add_flag("--no-in-out", solver.no_in_out,
+                     "For comparison: the cuts of each optimum of the "
+                     "relaxation, without the center that moves halfway to "
+                     "it");
     }
 
     gecot::solve_result<Instance> solve(const Instance & instance,

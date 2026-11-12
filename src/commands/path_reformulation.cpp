@@ -38,7 +38,7 @@ std::shared_ptr<const PathFormulationLPInterface> make_path_reformulation(
 gecot::solve_result<Instance> solve_path_reformulated(
     const PathFormulationLPInterface & path_lp,
     AbstractSolverInterface & solver, const Instance & instance,
-    const double budget) {
+    const double budget, const bool merge) {
     auto score = [&](const auto & X) {
         return instance.eval_criterion(
             gecot::compute_solution_cases_pc_num(instance, X));
@@ -69,7 +69,8 @@ gecot::solve_result<Instance> solve_path_reformulated(
     }
     if(gecot::stop_requested) return {std::move(solution), std::move(report)};
 
-    const Instance restricted_instance = restrict_instance(instance, keep);
+    const Instance restricted_instance =
+        restrict_instance(instance, keep, merge);
     std::vector<std::string> start;
     for(auto && o : instance.options())
         if(solution[o]) start.push_back(instance.option_name(o));

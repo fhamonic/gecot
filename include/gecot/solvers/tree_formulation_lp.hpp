@@ -85,7 +85,8 @@ struct tree_formulation_lp : public mip_solver_base {
 
         pricing_model(const I & instance, const double budget,
                       const auto & instance_case, const auto & strong_arcs,
-                      const auto & useless_arcs, const auto original_t)
+                      const auto & useless_arcs, const auto original_t,
+                      const bool pruning)
             : case_id(instance_case.id()), target(original_t) {
             using namespace mippp::operators;
             // the pricing models are solved in parallel
@@ -97,7 +98,8 @@ struct tree_formulation_lp : public mip_solver_base {
             const auto [graph, source_quality_map, vertex_options_map,
                         arc_no_map, probability_map, arc_option_map, t] =
                 compute_contracted_generalized_flow_graph(
-                    instance_case, strong_arcs, useless_arcs, original_t);
+                    instance_case, strong_arcs, useless_arcs, original_t,
+                    pruning);
 
             std::vector<option_t> options;
             options.append_range(std::views::join(std::views::transform(
@@ -218,22 +220,16 @@ struct tree_formulation_lp : public mip_solver_base {
             contribution_rows.push_back(model.add_constraint(z.back() <= 0));
             // the vertices of positive quality or quality gain as a target
             const std::size_t first_target = targets.size();
-            for(const auto & t : std::views::filter(
-                    melon::vertices(instance_case.graph()),
-                    [&instance_case](const auto & t) {
-                        return instance_case.target_quality_map()[t] > 0 ||
-                               std::ranges::any_of(
-                                   instance_case.vertex_options_map()[t],
-                                   [](const auto & e) {
-                                       const auto & [sqg, tqg, o] = e;
-                                       return tqg > 0;
-                                   });
-                    })) {
+            for(const auto & t :
+                std::views::filter(melon::vertices(instance_case.graph()),
+                                   [&](const auto & t) {
+                                       return _is_target(instance_case, t);
+                                   })) {
                 uniqueness_rows.push_back(model.add_constraint(
                     empty_linear_expression<variable_t, double> <= 1));
                 targets.emplace_back(instance, budget, instance_case,
-                                     strong_arcs_map[t], useless_arcs_map[t],
-                                     t);
+                                     strong_arcs_map[t], useless_arcs_map[t], t,
+                                     !no_pruning);
             }
             for(const auto & p : std::views::drop(targets, first_target)) {
                 auto & rows = purchase_rows.emplace_back();

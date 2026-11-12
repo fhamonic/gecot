@@ -69,6 +69,11 @@ namespace solvers {
 // its largest flow at x̄. It is separated first on the linear relaxation,
 // until its optimum violates no cut, then at the solver's candidates.
 struct multiflow_benders : public mip_solver_base {
+    // for comparison: no cut on the linear relaxation before the search, and
+    // each optimum of the relaxation separated itself, without the center
+    bool no_root_cuts = false;
+    bool no_in_out = false;
+
     // The graph contracted for a target t, each improvement an arc of its
     // own, and for each source the arcs that can carry its flow to t.
     struct target_block {
@@ -373,16 +378,11 @@ struct multiflow_benders : public mip_solver_base {
                 instance_case.graph().num_vertices());
             for(const auto & t : melon::vertices(instance_case.graph())) {
                 pb.tick();
-                if(instance_case.target_quality_map()[t] == 0 &&
-                   std::ranges::none_of(instance_case.vertex_options_map()[t],
-                                        [](auto && e) {
-                                            auto && [sqg, tqg, o] = e;
-                                            return tqg > 0;
-                                        }))
-                    continue;
+                if(!_is_target(instance_case, t)) continue;
                 const auto data = compute_contracted_graph_data(
                     instance, instance_case, budget, t, strong_arcs_map[t],
-                    useless_arcs_map[t], false, feasibility_tol);
+                    useless_arcs_map[t], big_M_kind::knapsack, feasibility_tol,
+                    !no_pruning);
                 const target_block & block = blocks.emplace_back(data);
                 // M_t bounds F_t: without it the relaxation is unbounded
                 // until t receives a cut
@@ -453,8 +453,8 @@ struct multiflow_benders : public mip_solver_base {
         std::size_t root_rounds = 0, root_cuts = 0;
         std::optional<double> root_value;
         std::vector<double> center, flows(blocks.size());
-        for(bool in_out = true;
-            !stop_requested && !(time_limit && root_time_left() <= 0);
+        for(bool in_out = !no_in_out; !no_root_cuts && !stop_requested &&
+                                      !(time_limit && root_time_left() <= 0);
             ++root_rounds) {
             if(time_limit)
                 model.set_time_limit(std::chrono::duration<double>(

@@ -33,15 +33,7 @@ public:
         app.add_option("--grouping-seed", solver.random_seed,
                        "Seed of --grouping random")
             ->default_val(0);
-        app.add_option_function<std::string>(
-               "--big-m",
-               [this](const std::string & s) {
-                   solver.tight_big_M = s == "tight";
-               },
-               "Experimental: the big-Ms of the knapsack of quality gains, or "
-               "per arc over the sources that can use it")
-            ->check(CLI::IsMember({"knapsack", "tight"}))
-            ->default_val("knapsack");
+        add_big_M_option(solver.big_Ms);
     }
 
     gecot::solve_result<Instance> solve(const Instance & instance,

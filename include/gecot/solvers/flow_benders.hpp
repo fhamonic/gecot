@@ -24,8 +24,8 @@ namespace gecot {
 namespace solvers {
 
 struct flow_benders : public mip_solver_base {
-    // experimental: compute_tight_big_M_maps' big-Ms
-    bool tight_big_M = false;
+    // plain for comparison, tight experimental
+    big_M_kind big_Ms = big_M_kind::knapsack;
 
     template <case_c C>
     auto _compute_dual_flow(const contracted_graph_data<C> & data,
@@ -124,13 +124,7 @@ struct flow_benders : public mip_solver_base {
                 for(const auto & original_t : melon::vertices(original_graph)) {
                     const double original_t_target_quality =
                         original_target_quality_map[original_t];
-                    if(original_t_target_quality == 0 &&
-                       std::ranges::none_of(
-                           original_vertex_options_map[original_t],
-                           [](auto && e) {
-                               auto && [sqg, tqg, o] = e;
-                               return tqg > 0;
-                           })) {
+                    if(!_is_target(instance_case, original_t)) {
                         pb.tick();
                         continue;
                     }
@@ -141,8 +135,8 @@ struct flow_benders : public mip_solver_base {
                             compute_contracted_graph_data(
                                 instance, instance_case, budget, original_t,
                                 strong_arcs_map[original_t],
-                                useless_arcs_map[original_t], tight_big_M,
-                                feasibility_tol));
+                                useless_arcs_map[original_t], big_Ms,
+                                feasibility_tol, !no_pruning));
 
                     for(const auto & [sqg, target_quality_gain, option] :
                         original_vertex_options_map[original_t]) {

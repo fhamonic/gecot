@@ -107,7 +107,8 @@ template <case_c C>
 auto compute_strong_and_useless_arcs(
     const C & instance_case,
     const auto & option_predicate = [](const option_t & o) { return true; },
-    double probability_resolution = 0.00000001) {
+    double probability_resolution = 0.00000001,
+    const bool all_targets = false) {
     using graph_t = case_graph_t<C>;
     using arc_t = melon::arc_t<graph_t>;
     using log_probability_t = uint64_t;
@@ -127,6 +128,7 @@ auto compute_strong_and_useless_arcs(
     auto useless_vertices_map = melon::create_vertex_map<bool>(graph);
     for(const auto & v : melon::vertices(graph)) {
         useless_vertices_map[v] =
+            !all_targets &&
             (target_quality_map[v] == 0 &&
              std::ranges::none_of(instance_case.vertex_options_map()[v],
                                   [](auto && e) {

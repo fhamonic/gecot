@@ -17,6 +17,11 @@
 
 namespace gecot {
 
+// plain: the quality that reaches a vertex with every quality gain;
+// knapsack: with the gains of its best options within the budget; tight:
+// knapsack, lowered per improvement by compute_tight_big_M_maps
+enum class big_M_kind { plain, knapsack, tight };
+
 template <typename GR, typename QM, typename VOM, typename PM>
 auto compute_big_M_map(const GR & graph, const QM & source_quality_map,
                        const VOM & source_options_map,

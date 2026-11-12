@@ -91,14 +91,14 @@ template <instance_c I, case_c C>
 contracted_graph_data<C> compute_contracted_graph_data(
     const I & instance, const C & instance_case, const double budget,
     const auto & original_t, const auto & strong_arcs,
-    const auto & useless_arcs, const bool tight_big_M = false,
-    const double tolerance = 0.0) {
+    const auto & useless_arcs, const big_M_kind big_Ms, const double tolerance,
+    const bool pruning) {
     const auto & original_vertex_options_map =
         instance_case.vertex_options_map();
     const auto [graph, source_quality_map, source_options_map, arc_no_map,
                 probability_map, arc_option_map, t] =
-        compute_contracted_generalized_flow_graph(instance_case, strong_arcs,
-                                                  useless_arcs, original_t);
+        compute_contracted_generalized_flow_graph(
+            instance_case, strong_arcs, useless_arcs, original_t, pruning);
 
     ////////////////////////////////////////////////////////////////////////////
     auto base_probability_map = melon::create_arc_map<double>(graph, 0.0);
@@ -112,15 +112,20 @@ contracted_graph_data<C> compute_contracted_graph_data(
         else
             base_probability_map[a] = probability_map[a];
     }
-    const auto big_M_map = compute_knapsack_big_M_map(
-        instance, budget, graph, source_quality_map, source_options_map,
-        probability_map,
+    auto big_M_vertices =
         std::views::filter(melon::vertices(graph), [&](auto && u) {
             return u == t || std::ranges::any_of(
                                  melon::out_arcs(graph, u), [&](auto && a) {
                                      return arc_option_map[a].has_value();
                                  });
-        }));
+        });
+    const auto big_M_map =
+        big_Ms == big_M_kind::plain
+            ? compute_big_M_map(graph, source_quality_map, source_options_map,
+                                probability_map, big_M_vertices)
+            : compute_knapsack_big_M_map(instance, budget, graph,
+                                         source_quality_map, source_options_map,
+                                         probability_map, big_M_vertices);
 
     // make_static_digraph renumbers the vertices in vertex_cmp's order
     const auto vertex_cmp = [](auto && u, auto && v) { return u < v; };
@@ -128,7 +133,7 @@ contracted_graph_data<C> compute_contracted_graph_data(
         std::ranges::count_if(melon::vertices(graph),
                               [&](auto && u) { return vertex_cmp(u, t); }));
 
-    if(!tight_big_M) {
+    if(big_Ms != big_M_kind::tight) {
         auto [sgraph, ssource_quality_map, ssource_options_map, sbig_M_map,
               sprobability_map, sarc_options_map] =
             melon::make_static_digraph(

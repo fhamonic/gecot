@@ -167,7 +167,8 @@ void check_output_directories(
 }
 
 prepared_instance prepare_instance(const std::filesystem::path & instance_file,
-                                   double budget, std::string_view noun) {
+                                   double budget, std::string_view noun,
+                                   const bool merge) {
     Instance raw_instance = parse_instance(instance_file);
     print_instance_size<spdlog::level::info>(
         raw_instance,
@@ -182,7 +183,7 @@ prepared_instance prepare_instance(const std::filesystem::path & instance_file,
                      options_total_cost);
 
     auto [instance, quality_scale] =
-        trivial_reformulate_instance(raw_instance, budget);
+        trivial_reformulate_instance(raw_instance, budget, merge);
     print_instance_size<spdlog::level::debug>(
         instance, "Without the options of cost 0 or over the budget");
     if(instance.num_options() == 0) {

@@ -68,7 +68,7 @@ struct progress_watch {
 };
 
 // 'gecot optimize --reformulation path_lp': path_lp, with the given
-// "name=value" parameters and greedy_incr's solution as its default MIP
+// "name=value" parameters and greedy's solution as its default MIP
 // start, bounds for each option the score of the solutions that buy it. The
 // options whose bound is no more than the score of path_lp's solution are in
 // no better solution: solver runs on the instance without them, from

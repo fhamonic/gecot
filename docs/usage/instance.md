@@ -182,8 +182,8 @@ GECOT checks the instance when it reads it, and stops with a message that starts
 A quick way to check that an instance says what you mean is to run a heuristic on it: the first lines of the log count what was read,
 
 ```console
-$ gecot optimize greedy_incr aude.json 4
-[   0.0s] GECOT 2.0, algorithm greedy_incr
+$ gecot optimize greedy aude.json 4
+[   0.0s] GECOT 2.0, algorithm greedy
 [   0.0s] Instance /home/user/instances/Aude/aude.json: 15 options, 1 species
 [   0.0s]   trout: 45 vertices (34 habitats, 0 improvable), 88 arcs (30 improvable)
 [   0.0s] Budget 4: 26.67 % of the options' total cost (15)

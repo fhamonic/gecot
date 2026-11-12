@@ -4,10 +4,8 @@
 
 #include <tbb/global_control.h>
 
-#include "gecot/solvers/greedy_decremental.hpp"
-#include "gecot/solvers/greedy_incremental.hpp"
-#include "gecot/solvers/static_decremental.hpp"
-#include "gecot/solvers/static_incremental.hpp"
+#include "gecot/solvers/greedy.hpp"
+#include "gecot/solvers/static.hpp"
 
 #include "instance.hpp"
 #include "parse_instance.hpp"
@@ -36,8 +34,8 @@ option_names solve_aude(auto solver, double budget) {
     return taken;
 }
 
-GTEST_TEST(solvers, static_incr) {
-    const gecot::solvers::StaticIncremental s;
+GTEST_TEST(solvers, static_incremental) {
+    const gecot::solvers::Static s;
     EXPECT_EQ(solve_aude(s, 3),
               (option_names{"AIG-Pou", "AUD-Car_BRU-Uss", "AUD-Far_AUD-Fou"}));
     EXPECT_EQ(solve_aude(s, 7),
@@ -51,8 +49,8 @@ GTEST_TEST(solvers, static_incr) {
                             "QUE-Mas_QUE-Ria", "QUE-Ria", "RT-Lau"}));
 }
 
-GTEST_TEST(solvers, static_decr) {
-    const gecot::solvers::StaticDecremental s;
+GTEST_TEST(solvers, static_decremental) {
+    const gecot::solvers::Static s{.decremental = true};
     EXPECT_EQ(solve_aude(s, 3),
               (option_names{"AUD-Far_AUD-Fou", "BRU-Uss", "QUE-Ria"}));
     EXPECT_EQ(solve_aude(s, 7),
@@ -66,8 +64,8 @@ GTEST_TEST(solvers, static_decr) {
                             "QUE-Mas_QUE-Ria", "QUE-Ria"}));
 }
 
-GTEST_TEST(solvers, greedy_incr) {
-    const gecot::solvers::GreedyIncremental s;
+GTEST_TEST(solvers, greedy_incremental) {
+    const gecot::solvers::Greedy s;
     EXPECT_EQ(solve_aude(s, 3),
               (option_names{"AIG-Pou", "AUD-Car_BRU-Uss", "AUD-Far_AUD-Fou"}));
     EXPECT_EQ(solve_aude(s, 7),
@@ -81,8 +79,8 @@ GTEST_TEST(solvers, greedy_incr) {
                             "QUE-Ria", "RT-Lau", "RT-Lau_QUE-Ria"}));
 }
 
-GTEST_TEST(solvers, greedy_decr) {
-    const gecot::solvers::GreedyDecremental s;
+GTEST_TEST(solvers, greedy_decremental) {
+    const gecot::solvers::Greedy s{.decremental = true};
     EXPECT_EQ(solve_aude(s, 3), (option_names{"AIG-Pou", "AUD-Fou_AUD-Ser_1",
                                               "AUD-Fou_AUD-Ser_2"}));
     EXPECT_EQ(solve_aude(s, 7),
@@ -96,9 +94,17 @@ GTEST_TEST(solvers, greedy_decr) {
                             "QUE-Mas_QUE-Ria", "QUE-Ria"}));
 }
 
-// worst_greedy_incr and worst_greedy_decr first differ at budget 11
-GTEST_TEST(solvers, worst_greedy_incr) {
-    const gecot::solvers::GreedyIncremental s{.worst = true};
+// without decremental, only_dec must not skip the purchases
+GTEST_TEST(solvers, only_dec_without_decremental) {
+    EXPECT_EQ(solve_aude(gecot::solvers::Static{.only_dec = true}, 7),
+              solve_aude(gecot::solvers::Static{}, 7));
+    EXPECT_EQ(solve_aude(gecot::solvers::Greedy{.only_dec = true}, 7),
+              solve_aude(gecot::solvers::Greedy{}, 7));
+}
+
+// the two worst greedy first differ at budget 11
+GTEST_TEST(solvers, worst_greedy_incremental) {
+    const gecot::solvers::Greedy s{.worst = true};
     EXPECT_EQ(solve_aude(s, 3),
               (option_names{"BRU-Mij_2", "BRU-Mij_3", "RT-Lau_QUE-Ria"}));
     EXPECT_EQ(
@@ -112,8 +118,8 @@ GTEST_TEST(solvers, worst_greedy_incr) {
                             "RT-Lau_QUE-Ria"}));
 }
 
-GTEST_TEST(solvers, worst_greedy_decr) {
-    const gecot::solvers::GreedyDecremental s{.worst = true};
+GTEST_TEST(solvers, worst_greedy_decremental) {
+    const gecot::solvers::Greedy s{.decremental = true, .worst = true};
     EXPECT_EQ(solve_aude(s, 3),
               (option_names{"BRU-Mij_2", "BRU-Mij_3", "RT-Lau_QUE-Ria"}));
     EXPECT_EQ(

@@ -1,5 +1,5 @@
-#ifndef GECOT_SOLVERS_GREEDY_DECREMENTAL_HPP
-#define GECOT_SOLVERS_GREEDY_DECREMENTAL_HPP
+#ifndef GECOT_SOLVERS_GREEDY_HPP
+#define GECOT_SOLVERS_GREEDY_HPP
 
 #include <algorithm>
 #include <limits>
@@ -15,10 +15,13 @@
 namespace gecot {
 namespace solvers {
 
-struct GreedyDecremental {
+struct Greedy {
     double feasibility_tol = 0.0;
-    bool only_dec = false;
-    bool worst = false;  // worst choice in both phases
+    // every option within the budget is bought first, then removed one by
+    // one until the budget is met
+    bool decremental = false;
+    bool only_dec = false;  // decremental, without the final purchases
+    bool worst = false;     // worst choice in both phases
 
     template <instance_c I>
     instance_solution_t<I> solve(const I & instance,
@@ -26,11 +29,15 @@ struct GreedyDecremental {
         auto solution = instance.create_option_map(false);
 
         const auto & cases = instance.cases();
-        std::vector<option_t> options;
+        std::vector<option_t> options, free_options;
         double purchased = 0.0;
         for(const option_t & option : instance.options()) {
             if(instance.option_cost(option) > budget + feasibility_tol)
                 continue;
+            if(!decremental) {
+                free_options.emplace_back(option);
+                continue;
+            }
             options.emplace_back(option);
             solution[option] = true;
             purchased += instance.option_cost(option);
@@ -75,10 +82,9 @@ struct GreedyDecremental {
         log_table<spdlog::level::trace, 50, 40, 12, 11> removed(
             {"removed option id"}, {"score loss", log_format::scientific(4)},
             {"solution cost", log_format::scientific(5)});
-        std::vector<option_t> free_options;
         double previous_score = compute_score(
             instance, cases_current_sqm, cases_current_tqm, cases_current_pm);
-        while(purchased > budget + feasibility_tol) {
+        while(!options.empty() && purchased > budget + feasibility_tol) {
             compute_options_cases_decr_pc_num(
                 instance, solution, options, cases_current_sqm,
                 cases_current_tqm, cases_current_pm, cases_vertex_options,
@@ -131,9 +137,12 @@ struct GreedyDecremental {
                         purchased);
         }
 
-        if(!only_dec) {
-            previous_score = compute_score(instance, cases_current_sqm,
-                                           cases_current_tqm, cases_current_pm);
+        if(!decremental || !only_dec) {
+            // the removals left their rounding errors in previous_score
+            if(decremental)
+                previous_score =
+                    compute_score(instance, cases_current_sqm,
+                                  cases_current_tqm, cases_current_pm);
             double budget_left = budget - purchased;
             {
                 const auto [first, last] = std::ranges::remove_if(
@@ -207,4 +216,4 @@ struct GreedyDecremental {
 }  // namespace solvers
 }  // namespace gecot
 
-#endif  // GECOT_SOLVERS_GREEDY_DECREMENTAL_HPP
+#endif  // GECOT_SOLVERS_GREEDY_HPP

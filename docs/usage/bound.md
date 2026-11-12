@@ -48,37 +48,48 @@ The solutions that the bound covers are those of `gecot optimize`: the options o
 {
     "instance_path":  "/home/user/instances/Aix/instance_40x40/instance.json",
     "method":  "path_lp",
-    "computation_time_ms":  3290,
+    "method_parameters": {
+        "solver":                "gurobi",
+        "feasibility-tolerance": 1e-07,
+        "mip-start":             null,
+        "mip-start-algorithm":   "none",
+        "time-limit":            null,
+        "evict-age":             0,
+        "pricing":               "search",
+        "max-activations":       0,
+        "relative-gap":          0
+    },
+    "computation_time_ms":  3423,
     "initial_score":  356238.4908355161,
     "initial_pc_num": {
         "squirrel": 356238.4908355161
     },
     "budget":         8,
-    "bound":          439093.3253832179,
+    "bound":          439093.3253832197,
     "all_options_bound": 468383.42941586697,
     "method_report": {
         "status": "converged",
-        "iterations": 26,
-        "variables": 17382,
-        "constraints": 32972,
+        "iterations": 19,
+        "variables": 17728,
+        "constraints": 33401,
         "pairs": 5675,
         "pool_columns": 0,
         "evicted_columns": 0,
-        "searches": 19441,
-        "relaxation_value": 439093.29035766155,
+        "searches": 20184,
+        "relaxation_value": 439093.29035766335,
         "solution_score": 437866.4004434928
     }
 }
 ```
 
-The `method_report` of a method that is an algorithm is the [report of this algorithm](results.md#json), plus `solution_score`, the score of the solution that the algorithm found on the way.
+`method_parameters` holds the parameters of the method with the values used, as [`algorithm_parameters`](results.md#json) does for an algorithm. The `method_report` of a method that is an algorithm is the [report of this algorithm](results.md#json), plus `solution_score`, the score of the solution that the algorithm found on the way.
 
 ## Certifying a solution
 
 On the 40 × 40 raster landscape of the repository (`test/instances/Aix/instance_40x40`, 4,800 vertices and 27 options) with a budget of 8, the greedy heuristic returns in 0.2 s a solution that scores 437,866.4:
 
 ```console
-$ gecot optimize greedy_incr instance.json 8 -q
+$ gecot optimize greedy instance.json 8 -q
 Status          completed
 Initial score   356238.4908
 Solution score  437866.4004 (+22.91 %)

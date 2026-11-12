@@ -231,11 +231,16 @@ int bound_command(const std::vector<std::string> & args) {
                     .c_str());
             out.print(
                 "{{\n    \"instance_path\":  \"{}\",\n    \"method\":  "
-                "\"{}\",\n    \"computation_time_ms\":  {},\n    "
-                "\"initial_score\":  {},",
+                "\"{}\",",
                 std::filesystem::absolute(instances_description_json)
                     .generic_string(),
-                method->name(), computation_time_ms, prepared.initial_score);
+                method->name());
+            print_json_property(out, "method_parameters",
+                                method->json_parameters());
+            out.print(
+                ",\n    \"computation_time_ms\":  {},\n    "
+                "\"initial_score\":  {},",
+                computation_time_ms, prepared.initial_score);
             print_json_property(
                 out, "initial_pc_num",
                 std::views::transform(

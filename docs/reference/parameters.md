@@ -29,7 +29,7 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 | `-o`, `--output-json <file>` | writes the result as JSON |
 | `--output-csv <file>` | writes the selection as CSV |
 | `--reformulation trivial`, `path_lp` [`trivial`] | the instance given to the algorithm. `trivial`: without the options of cost 0, which are bought, and those over the budget. `path_lp`: also without the options that the path relaxation proves to be in no better solution than its own |
-| `--reformulation-params "<name>=<value> ..."` | parameters of the `path_lp` of `--reformulation path_lp`, as `"time-limit=60 pricing=enumerate"`; its MIP start is the solution of `greedy_incr` by default |
+| `--reformulation-params "<name>=<value> ..."` | parameters of the `path_lp` of `--reformulation path_lp`, as `"time-limit=60 pricing=enumerate"`; its MIP start is the solution of `greedy` by default |
 | `--no-merging` | for comparison: keeps apart the vertices that arcs of probability 1 link |
 | `-v`, `--verbose` | logs the details of the algorithm; `-vv` everything, with the solver's own log on the standard output |
 | `-q`, `--quiet` | logs only the errors |
@@ -58,8 +58,8 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 | `multiflow_benders` | ✓ | ✓ | `--no-root-cuts`, `--no-in-out` |
 | `tree_lp` | ✓ | ✓ | `--evict-age` |
 | `path_lp` | ✓ | – | `--evict-age`, `--pricing`, `--max-activations`, `--relative-gap` |
-| `static_incr`, `greedy_incr`, `worst_greedy_incr`, `worst_greedy_decr` | – | – | `-t` |
-| `static_decr`, `greedy_decr` | – | – | `-t`, `--only-dec` |
+| `static` | – | – | `-t`, `--decremental`, `--only-dec` |
+| `greedy` | – | – | `-t`, `--decremental`, `--only-dec`, `--worst` |
 
 ## Common to the MILP-based algorithms
 
@@ -68,7 +68,7 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 | `--solver <name>` | `gurobi` | the solver, used through mippp. `flow_mip` and `path_lp`: `gurobi`, `cplex`, `copt`, `xpress`, `mosek`, `highs`, `scip`, `cbc`, `glpk`. `tree_lp`: the same without `glpk`. Benders decompositions: `gurobi`, `cplex`, `copt` |
 | `-t`, `--feasibility-tolerance <value>` | `1e-07` | the tolerance for rounding errors: the solver's feasibility tolerance, and the relative error accepted on a candidate of a Benders decomposition |
 | `--mip-start <file>` | | a solution file (JSON, as written by `-o`) to start the solver from. Excludes `--mip-start-algorithm` |
-| `--mip-start-algorithm <name>` | `none` | the heuristic whose solution starts the solver: `none`, `static_incr`, `static_decr`, `greedy_incr`, `greedy_decr`. Its time counts in `--time-limit`. Excludes `--mip-start` |
+| `--mip-start-algorithm <name>` | `none` | the heuristic whose solution starts the solver, run in its incremental form: `none`, `static`, `greedy`. Its time counts in `--time-limit`. Excludes `--mip-start` |
 | `--time-limit <seconds>` | | after this time, the best solution found is returned |
 
 See [Optimizing](../usage/optimize.md#parameters-of-the-algorithms).
@@ -137,7 +137,9 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` and `tre
 | Parameter | Default | Meaning |
 |---|---|---|
 | `-t`, `--feasibility-tolerance <value>` | `1e-07` | the slack allowed when a cost is compared with the budget |
-| `--only-dec` | off | `static_decr` and `greedy_decr`: skips the final purchases that use the budget left |
+| `--decremental` | off | starts from every option bought and removes options until the cost fits the budget, then buys back those that fit in the budget left |
+| `--only-dec` | off | with `--decremental`: skips these final purchases |
+| `--worst` | off | `greedy`, for comparison: the opposite choice at each step, which spends the budget while gaining as little as possible |
 
 ## Parameters of the bound methods
 

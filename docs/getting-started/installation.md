@@ -10,7 +10,7 @@ The [releases page](https://github.com/fhamonic/gecot/releases) of the repositor
 
 !!! warning "The 1.0 release predates this documentation"
 
-    This documentation describes GECOT 2.0. The 1.0 release installs a program named `gecot_optimize`, not `gecot`: its command is `gecot_optimize <algorithm> <instance> <budget>`, its instance files have a single `quality` column per vertex and a `quality_gain` column per improvement, and it has six algorithms, the four heuristics, `mip` and `prep_mip` (now `flow_mip`). Until 2.0 is released, build it from the sources.
+    This documentation describes GECOT 2.0. The 1.0 release installs a program named `gecot_optimize`, not `gecot`: its command is `gecot_optimize <algorithm> <instance> <budget>`, its instance files have a single `quality` column per vertex and a `quality_gain` column per improvement, and it has six algorithms: `mip`, `prep_mip` (now `flow_mip`) and the heuristics under the names `static_incr`, `greedy_incr`, `static_decr` and `greedy_decr` (now `static` and `greedy`, with `--decremental` for the last two). Until 2.0 is released, build it from the sources.
 
 ### Docker
 

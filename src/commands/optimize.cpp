@@ -36,7 +36,8 @@ static bool process_command_line(
     std::optional<std::filesystem::path> & opt_output_csv_file,
     std::optional<tbb::global_control> & opt_tbb_global_control,
     std::shared_ptr<const PathFormulationLPInterface> & path_reformulation,
-    bool & no_merging) {
+    bool & no_merging,
+    std::vector<std::pair<std::string, std::string>> & command_parameters) {
     auto solver_interfaces = make_solver_interfaces();
 
     auto print_available_algorithms = [&solver_interfaces]() {
@@ -94,7 +95,7 @@ static bool process_command_line(
     app.add_option("--reformulation-params", reformulation_params,
                    "Parameters of the path_lp of --reformulation path_lp, as "
                    "\"time-limit=60 pricing=enumerate\"; its MIP start is "
-                   "greedy_incr's solution by default");
+                   "greedy's solution by default");
     app.add_flag("--no-merging", no_merging,
                  "For comparison: keeps apart the vertices that arcs of "
                  "probability 1 link, merged in the instance given to the "
@@ -174,6 +175,11 @@ static bool process_command_line(
     else if(!reformulation_params.empty())
         throw std::logic_error(
             "'--reformulation-params' requires '--reformulation path_lp'");
+    // the options of the command that change the instance of the algorithm
+    for(const char * name :
+        {"--reformulation", "--reformulation-params", "--no-merging"})
+        command_parameters.emplace_back(
+            name + 2, option_json_value(*app.get_option(name)));
 
     return true;
 }
@@ -187,6 +193,7 @@ int optimize_command(const std::vector<std::string> & args) {
     std::optional<tbb::global_control> opt_tbb_global_control;
     std::shared_ptr<const PathFormulationLPInterface> path_reformulation;
     bool no_merging = false;
+    std::vector<std::pair<std::string, std::string>> command_parameters;
 
     std::string program_state = "Parsing arguments";
 
@@ -194,7 +201,8 @@ int optimize_command(const std::vector<std::string> & args) {
         if(!process_command_line(args, solver, instances_description_json,
                                  budget, opt_output_json_file,
                                  opt_output_csv_file, opt_tbb_global_control,
-                                 path_reformulation, no_merging))
+                                 path_reformulation, no_merging,
+                                 command_parameters))
             return EXIT_SUCCESS;
         program_state = "Checking output files";
         check_output_directories({opt_output_json_file, opt_output_csv_file});
@@ -316,11 +324,18 @@ int optimize_command(const std::vector<std::string> & args) {
                     .c_str());
             out.print(
                 "{{\n    \"instance_path\":  \"{}\",\n    \"algorithm\":  "
-                "\"{}\",\n    \"computation_time_ms\":  {},\n    "
-                "\"initial_score\":  {},",
+                "\"{}\",",
                 std::filesystem::absolute(instances_description_json)
                     .generic_string(),
-                solver->name(), computation_time_ms, initial_score);
+                solver->name());
+            print_json_property(out, "algorithm_parameters",
+                                solver->json_parameters());
+            out.print(",");
+            print_json_property(out, "command_parameters", command_parameters);
+            out.print(
+                ",\n    \"computation_time_ms\":  {},\n    "
+                "\"initial_score\":  {},",
+                computation_time_ms, initial_score);
             print_json_property(
                 out, "initial_pc_num",
                 std::views::transform(

@@ -10,30 +10,22 @@
 
 #include "solver_interfaces/flow_benders_interface.hpp"
 #include "solver_interfaces/flow_mip_interface.hpp"
-#include "solver_interfaces/greedy_decremental_interface.hpp"
-#include "solver_interfaces/greedy_incremental_interface.hpp"
+#include "solver_interfaces/greedy_interface.hpp"
 #include "solver_interfaces/multicut_benders_interface.hpp"
 #include "solver_interfaces/multiflow_benders_interface.hpp"
 #include "solver_interfaces/path_formulation_lp_interface.hpp"
-#include "solver_interfaces/static_decremental_interface.hpp"
-#include "solver_interfaces/static_incremental_interface.hpp"
+#include "solver_interfaces/static_interface.hpp"
 #include "solver_interfaces/tree_formulation_lp_interface.hpp"
-#include "solver_interfaces/worst_greedy_decremental_interface.hpp"
-#include "solver_interfaces/worst_greedy_incremental_interface.hpp"
 
 std::vector<std::shared_ptr<AbstractSolverInterface>> make_solver_interfaces() {
-    return {std::make_unique<StaticIncrementalInterface>(),
-            std::make_unique<StaticDecrementalInterface>(),
-            std::make_unique<GreedyIncrementalInterface>(),
-            std::make_unique<GreedyDecrementalInterface>(),
+    return {std::make_unique<StaticInterface>(),
+            std::make_unique<GreedyInterface>(),
             std::make_unique<FlowMipInterface>(),
             std::make_unique<MulticutBendersInterface>(),
             std::make_unique<FlowBendersInterface>(),
             std::make_unique<MultiflowBendersInterface>(),
             std::make_unique<TreeFormulationLPInterface>(),
-            std::make_unique<PathFormulationLPInterface>(),
-            std::make_unique<WorstGreedyIncrementalInterface>(),
-            std::make_unique<WorstGreedyDecrementalInterface>()};
+            std::make_unique<PathFormulationLPInterface>()};
 }
 
 std::vector<std::shared_ptr<AbstractBoundInterface>> make_bound_interfaces() {

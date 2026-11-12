@@ -38,6 +38,10 @@ public:
         const override {
         return solver->parameters();
     }
+    std::vector<std::pair<std::string, std::string>> json_parameters()
+        const override {
+        return solver->json_parameters();
+    }
 
     gecot::bound_report compute(const Instance & instance, const double B,
                                 const bound_context &) const override {

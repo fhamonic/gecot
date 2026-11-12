@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cmath>
+#include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>
@@ -7,6 +9,7 @@
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 #include <CLI/CLI.hpp>
+#include <nlohmann/json.hpp>
 
 #include "gecot/solvers/solve_result.hpp"
 
@@ -21,7 +24,7 @@ inline std::vector<std::pair<std::string, std::string>> option_values(
         if(option->get_lnames().empty()) continue;
         std::string value;
         if(option->get_expected_max() == 0)  // a flag
-            value = option->count() ? "true" : "false";
+            value = option->count() && option->as<bool>() ? "true" : "false";
         else if(option->count())
             value = fmt::format("{}", fmt::join(option->results(), " "));
         else
@@ -29,6 +32,38 @@ inline std::vector<std::pair<std::string, std::string>> option_values(
         values.emplace_back(option->get_lnames().front(),
                             value.empty() ? "none" : value);
     }
+    return values;
+}
+
+// The value of option, its default if not given, as a JSON value: a boolean
+// for a flag, a number for a numeric option, null without a value, else a
+// string. The type is the option's, not the text's: '--preprocessing none'
+// is a string and a MIP start file named 7 too.
+inline std::string option_json_value(const CLI::Option & option) {
+    const std::string type = option.get_type_name();
+    if(option.get_expected_max() == 0)  // a flag
+        return option.count() && option.as<bool>() ? "true" : "false";
+    if(!option.count() && option.get_default_str().empty()) return "null";
+    // JSON has no infinity: '-t inf' stays a text
+    if(type.starts_with("FLOAT") && std::isfinite(option.as<double>()))
+        return fmt::format("{}", option.as<double>());
+    if(type.starts_with("UINT"))
+        return fmt::format("{}", option.as<std::uint64_t>());
+    if(type.starts_with("INT"))
+        return fmt::format("{}", option.as<std::int64_t>());
+    // a path can hold bytes that are not UTF-8, which dump() throws on
+    return nlohmann::json(option.as<std::string>())
+        .dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+}
+
+// the long name and the option_json_value of each option of app
+inline std::vector<std::pair<std::string, std::string>> option_json_values(
+    const CLI::App & app) {
+    std::vector<std::pair<std::string, std::string>> values;
+    for(const CLI::Option * option : app.get_options())
+        if(!option->get_lnames().empty())
+            values.emplace_back(option->get_lnames().front(),
+                                option_json_value(*option));
     return values;
 }
 
@@ -55,6 +90,9 @@ public:
     std::string options_description() const { return app.help(); }
     std::vector<std::pair<std::string, std::string>> parameters() const {
         return option_values(app);
+    }
+    std::vector<std::pair<std::string, std::string>> json_parameters() const {
+        return option_json_values(app);
     }
 
     // the options of a solution that the algorithm may start from

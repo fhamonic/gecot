@@ -29,8 +29,7 @@ $ gecot optimize --list-algorithms
 | `multiflow_benders` | [Benders decomposition](../formulations/benders.md#multiflow_benders-cuts-per-source) with cuts per source and target | optimal |
 | `path_lp` | the [path relaxation](../formulations/relaxations.md), by column generation | a solution and an upper bound |
 | `tree_lp` | the [tree relaxation](../formulations/relaxations.md#the-tree-formulation), by column generation | none: can exceed the budget |
-| `static_incr`, `greedy_incr`, `static_decr`, `greedy_decr` | the [heuristics](../formulations/heuristics.md) | none |
-| `worst_greedy_incr`, `worst_greedy_decr` | the [worst-case](../formulations/heuristics.md#worst-cases) references | none |
+| `static`, `greedy` | the [heuristics](../formulations/heuristics.md), incremental or with `--decremental` | none |
 
 [Choosing an algorithm](choosing.md) compares them.
 
@@ -82,12 +81,12 @@ Ctrl-C has the same effect as the time limit running out, at any moment: see [Re
 
 A solver searches faster from a good solution. Two parameters, which exclude each other, provide one:
 
-- `--mip-start-algorithm <heuristic>` runs `static_incr`, `static_decr`, `greedy_incr` or `greedy_decr` first and starts from its solution;
+- `--mip-start-algorithm <heuristic>` runs `static` or `greedy` first, in its incremental form, and starts from its solution;
 - `--mip-start <file>` starts from a solution file written by `-o`, for instance by a previous run with another algorithm or a smaller time limit. Its options that the instance does not have are ignored.
 
 ```console
-$ gecot optimize flow_mip instance.json 100 --mip-start-algorithm greedy_incr
-$ gecot optimize greedy_incr instance.json 100 -o greedy.json
+$ gecot optimize flow_mip instance.json 100 --mip-start-algorithm greedy
+$ gecot optimize greedy instance.json 100 --decremental -o greedy.json
 $ gecot optimize flow_mip instance.json 100 --mip-start greedy.json
 ```
 
@@ -108,12 +107,12 @@ The start also seeds the cuts of the Benders decompositions and the columns of t
 ```console
 $ gecot optimize flow_mip instance.json 8 --reformulation path_lp
 [   0.0s] Reformulating with path_lp
-[   0.0s] Computing the MIP start with greedy_incr
+[   0.0s] Computing the MIP start with greedy
 [   2.8s] The path relaxation leaves 15 of 27 options
 [   2.8s] Running algorithm 'flow_mip' on the options left
 ```
 
-It pays when the relaxation is tight and the algorithm slow on the whole instance; otherwise it only adds the time of the relaxation. When the relaxation proves its own solution optimal, the algorithm is not run at all. `--reformulation-params "time-limit=60 pricing=enumerate"` passes parameters to this `path_lp`, without their dashes; its MIP start is the solution of `greedy_incr` unless `mip-start-algorithm` says otherwise. The report of the run prefixes the fields of the relaxation with `reformulation_` and adds `remaining_options`.
+It pays when the relaxation is tight and the algorithm slow on the whole instance; otherwise it only adds the time of the relaxation. When the relaxation proves its own solution optimal, the algorithm is not run at all. `--reformulation-params "time-limit=60 pricing=enumerate"` passes parameters to this `path_lp`, without their dashes; its MIP start is the solution of `greedy` unless `mip-start-algorithm` says otherwise. The report of the run prefixes the fields of the relaxation with `reformulation_` and adds `remaining_options`.
 
 ## Several budgets
 

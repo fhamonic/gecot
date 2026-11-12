@@ -1,5 +1,5 @@
-#ifndef GECOT_SOLVERS_STATIC_DECREMENTAL_HPP
-#define GECOT_SOLVERS_STATIC_DECREMENTAL_HPP
+#ifndef GECOT_SOLVERS_STATIC_HPP
+#define GECOT_SOLVERS_STATIC_HPP
 
 #include <algorithm>
 #include <limits>
@@ -15,9 +15,12 @@
 namespace gecot {
 namespace solvers {
 
-struct StaticDecremental {
+struct Static {
     double feasibility_tol = 0.0;
-    bool only_dec = false;
+    // every option within the budget is bought first, then the worst ones
+    // are removed until the budget is met
+    bool decremental = false;
+    bool only_dec = false;  // decremental, without the final purchases
 
     template <instance_c I>
     instance_solution_t<I> solve(const I & instance,
@@ -25,11 +28,15 @@ struct StaticDecremental {
         auto solution = instance.create_option_map(false);
 
         const auto & cases = instance.cases();
-        std::vector<option_t> options;
+        std::vector<option_t> options, free_options;
         double purchased = 0.0;
         for(const option_t & option : instance.options()) {
             if(instance.option_cost(option) > budget + feasibility_tol)
                 continue;
+            if(!decremental) {
+                free_options.emplace_back(option);
+                continue;
+            }
             options.emplace_back(option);
             solution[option] = true;
             purchased += instance.option_cost(option);
@@ -48,65 +55,69 @@ struct StaticDecremental {
         const auto cases_vertex_options =
             compute_cases_vertex_options(instance);
         const auto cases_arc_options = compute_cases_arc_options(instance);
-
-        for(const auto & instance_case : cases) {
-            auto & current_sqm = (cases_current_sqm[instance_case.id()] =
-                                      instance_case.source_quality_map());
-            auto & current_tqm = (cases_current_tqm[instance_case.id()] =
-                                      instance_case.target_quality_map());
-            auto & current_pm = (cases_current_pm[instance_case.id()] =
-                                     instance_case.arc_probability_map());
-            const auto & vertex_options =
-                cases_vertex_options[instance_case.id()];
-            const auto & arc_options = cases_arc_options[instance_case.id()];
-            for(auto && option : options) {
-                for(auto && [u, source_quality_gain, target_quality_gain] :
-                    vertex_options[option]) {
-                    current_sqm[u] += source_quality_gain;
-                    current_tqm[u] += target_quality_gain;
-                }
-                for(auto && [a, enhanced_prob] : arc_options[option])
-                    current_pm[a] = std::max(current_pm[a], enhanced_prob);
-            }
-        }
-
-        log_table<spdlog::level::trace, 50, 40, 12, 11> removed(
-            {"removed option id"},
-            {"loss/cost ratio", log_format::scientific(5)},
-            {"solution cost", log_format::scientific(5)});
-
-        const double max_score = compute_score(
-            instance, cases_current_sqm, cases_current_tqm, cases_current_pm);
-        compute_options_cases_decr_pc_num(
-            instance, solution, options, cases_current_sqm, cases_current_tqm,
-            cases_current_pm, cases_vertex_options, cases_arc_options,
-            options_cases_pc_num);
-
         auto options_ratios = instance.create_option_map(0.0);
-        for(auto && option : options) {
-            options_ratios[option] =
-                (max_score -
-                 instance.eval_criterion(options_cases_pc_num[option])) /
-                instance.option_cost(option);
+
+        if(decremental) {
+            for(const auto & instance_case : cases) {
+                auto & current_sqm = (cases_current_sqm[instance_case.id()] =
+                                          instance_case.source_quality_map());
+                auto & current_tqm = (cases_current_tqm[instance_case.id()] =
+                                          instance_case.target_quality_map());
+                auto & current_pm = (cases_current_pm[instance_case.id()] =
+                                         instance_case.arc_probability_map());
+                const auto & vertex_options =
+                    cases_vertex_options[instance_case.id()];
+                const auto & arc_options =
+                    cases_arc_options[instance_case.id()];
+                for(auto && option : options) {
+                    for(auto && [u, source_quality_gain, target_quality_gain] :
+                        vertex_options[option]) {
+                        current_sqm[u] += source_quality_gain;
+                        current_tqm[u] += target_quality_gain;
+                    }
+                    for(auto && [a, enhanced_prob] : arc_options[option])
+                        current_pm[a] = std::max(current_pm[a], enhanced_prob);
+                }
+            }
+
+            log_table<spdlog::level::trace, 50, 40, 12, 11> removed(
+                {"removed option id"},
+                {"loss/cost ratio", log_format::scientific(5)},
+                {"solution cost", log_format::scientific(5)});
+
+            const double max_score =
+                compute_score(instance, cases_current_sqm, cases_current_tqm,
+                              cases_current_pm);
+            compute_options_cases_decr_pc_num(
+                instance, solution, options, cases_current_sqm,
+                cases_current_tqm, cases_current_pm, cases_vertex_options,
+                cases_arc_options, options_cases_pc_num);
+
+            for(auto && option : options) {
+                options_ratios[option] =
+                    (max_score -
+                     instance.eval_criterion(options_cases_pc_num[option])) /
+                    instance.option_cost(option);
+            }
+
+            std::ranges::sort(
+                options, [&options_ratios](auto && o1, auto && o2) {
+                    return options_ratios[o1] < options_ratios[o2];
+                });
+
+            for(auto && option : options) {
+                if(purchased <= budget + feasibility_tol) break;
+                const double price = instance.option_cost(option);
+                purchased -= price;
+                solution[option] = false;
+                free_options.emplace_back(option);
+                removed.row(instance.option_name(option),
+                            options_ratios[option], purchased);
+            }
+            if(only_dec) return solution;
         }
 
-        std::ranges::sort(options, [&options_ratios](auto && o1, auto && o2) {
-            return options_ratios[o1] < options_ratios[o2];
-        });
-
-        std::vector<option_t> free_options;
-        for(auto && option : options) {
-            if(purchased <= budget + feasibility_tol) break;
-            const double price = instance.option_cost(option);
-            purchased -= price;
-            solution[option] = false;
-            free_options.emplace_back(option);
-            removed.row(instance.option_name(option), options_ratios[option],
-                        purchased);
-        }
-
-        if(!only_dec &&
-           std::ranges::any_of(
+        if(std::ranges::any_of(
                free_options,
                [&instance, budget_left = budget - purchased +
                                          feasibility_tol](const option_t & o) {
@@ -174,4 +185,4 @@ struct StaticDecremental {
 }  // namespace solvers
 }  // namespace gecot
 
-#endif  // GECOT_SOLVERS_STATIC_DECREMENTAL_HPP
+#endif  // GECOT_SOLVERS_STATIC_HPP

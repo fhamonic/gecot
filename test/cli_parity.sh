@@ -88,91 +88,94 @@ case_() { # id args...
 case_ B01 --help
 case_ B02
 case_ B03 -A
-case_ B04 static_incr -P
-case_ B05 greedy_decr -P
+case_ B04 static -P
+case_ B05 greedy -P
 case_ B06 flow_mip -P
 case_ B07 -P
-case_ B08 static_incr "$I" 10 -q
-case_ B09 -a static_incr -i "$I" -B 10 -q
-case_ B10 static_incr "$I" 10 --feasibility-tolerance=1e-5 -q
-case_ B11 static_incr "$I" 10 -t1e-5 -q
-case_ B12 greedy_decr "$I" 10 --only-dec -q
-case_ B13 static_incr "$I" 10 -t 1e-5 -q
-case_ B14 -a static_incr -i "$I" -B 10 --feasibility-tolerance 1e-5
-case_ B15 static_incr "$I" 10 --bogus=3
-case_ B16 static_incr "$I" 10 --bogus 3
-case_ B17 static_incr "$I"
-case_ B18 static_incr "$I" -5
+case_ B08 static "$I" 10 -q
+case_ B09 -a static -i "$I" -B 10 -q
+case_ B10 static "$I" 10 --feasibility-tolerance=1e-5 -q
+case_ B11 static "$I" 10 -t1e-5 -q
+case_ B12 greedy "$I" 10 --decremental --only-dec -q
+case_ B13 static "$I" 10 -t 1e-5 -q
+case_ B14 -a static -i "$I" -B 10 --feasibility-tolerance 1e-5
+case_ B15 static "$I" 10 --bogus=3
+case_ B16 static "$I" 10 --bogus 3
+case_ B17 static "$I"
+case_ B18 static "$I" -5
 case_ B19 nope x 1
-case_ B20 static_incr "$I" 10 -o F.json --max-threads 2 -q
+case_ B20 static "$I" 10 -o F.json --max-threads 2 -q
 # required extras
-case_ R01 static_incr "$I" 10 --output-csv F.csv -q
-case_ R02 static_incr "$I" 10 -o F.json -q
+case_ R01 static "$I" 10 --output-csv F.csv -q
+case_ R02 static "$I" 10 -o F.json -q
 case_ R03 flow_mip "$I" 10 --mip-start "$START" -q
 case_ R04 flow_mip "$I" 10 --mip-start="$START" -q
 case_ R05 flow_mip "$I" 10 --nb-mus 3 -q
 case_ R06 flow_mip "$I" 10 --nb-mus=3 -q
-case_ R07 static_incr "$I" 10 extra
+case_ R07 static "$I" 10 extra
 case_ R08 -v
 # further extras
-case_ E01 greedy_decr "$I" 10 --only-dec -q -t 1e-5
-case_ E02 greedy_decr "$I" 10 -t1e-5 -q --only-dec
-case_ E03 static_incr "$I" 10 -t
-case_ E04 static_incr -t 1e-5 "$I" 10 -q
-case_ E05 static_incr "$I" 10 -t -1e-5 -q
-case_ E06 static_incr "$I" 10 --max-threads -2 -q
-case_ E07 static_incr "$I" 10 --max-threads 0 -q
-case_ E08 static_incr "$I" abc
-case_ E09 static_incr "$I" 10 -qv
-case_ E10 -q static_incr "$I" 10
-case_ E11 -a static_incr "$I" 10 -q
-case_ E12 static_incr "$I" 10
-case_ E13 greedy_decr "$I" 10 --only-dec
+case_ E01 greedy "$I" 10 --decremental --only-dec -q -t 1e-5
+case_ E02 greedy "$I" 10 -t1e-5 -q --only-dec --decremental
+case_ E03 static "$I" 10 -t
+case_ E04 static -t 1e-5 "$I" 10 -q
+case_ E05 static "$I" 10 -t -1e-5 -q
+case_ E06 static "$I" 10 --max-threads -2 -q
+case_ E07 static "$I" 10 --max-threads 0 -q
+case_ E08 static "$I" abc
+case_ E09 static "$I" 10 -qv
+case_ E10 -q static "$I" 10
+case_ E11 -a static "$I" 10 -q
+case_ E12 static "$I" 10
+case_ E13 greedy "$I" 10 --decremental --only-dec
 case_ E14 flow_mip "$I" 10 -m -q
 case_ E15 flow_mip "$I" 10 --resolution 1e-6 -q
 case_ E16 flow_mip "$I" 10 --resolution=1e-6 -q
-case_ E17 static_incr "$I" 10 -q -q
-case_ E18 -a static_incr -a flow_mip -i "$I" -B 10 -q
-case_ E19 static_incr "$I" 10 -o "a b.json" -q
-case_ E20 --algorithm=static_incr --instance="$I" --budget=10 -q
-case_ E21 -a static_incr -i "$I" -B10 -q
-case_ E22 static_incr "$I" 10 --output-json F.json --output-csv F.csv -q
-case_ E23 static_incr "$I" 1e2 -q
-case_ E24 static_incr "$I" 10 -q -h
+case_ E17 static "$I" 10 -q -q
+case_ E18 -a static -a flow_mip -i "$I" -B 10 -q
+case_ E19 static "$I" 10 -o "a b.json" -q
+case_ E20 --algorithm=static --instance="$I" --budget=10 -q
+case_ E21 -a static -i "$I" -B10 -q
+case_ E22 static "$I" 10 --output-json F.json --output-csv F.csv -q
+case_ E23 static "$I" 1e2 -q
+case_ E24 static "$I" 10 -q -h
 case_ E25 flow_mip "$I" 10 --mip-start missing.json -q
 case_ E26 flow_mip "$I" 10 --mip-start=missing.json -q
-case_ E27 static_incr "$I" 10 -- -t
+case_ E27 static "$I" 10 -- -t
 case_ E28 tree_lp "$I" 10 -q
-case_ E29 static_decr "$I" 10 --only-dec -q
-case_ E30 worst_greedy_decr -P
-case_ E31 static_incr /nonexistent.json 10 -q
-case_ E32 static_incr "$I" 10 -o /nonexistent_dir/F.json -q
+case_ E29 static "$I" 10 --decremental --only-dec -q
+case_ E30 greedy "$I" 10 --decremental --worst -q
+case_ E31 static /nonexistent.json 10 -q
+case_ E32 static "$I" 10 -o /nonexistent_dir/F.json -q
 case_ E33 tree_lp "$I" 10 --nb-mus=2 --resolution=1e-6 -q
 case_ E34 multicut_benders "$I" 10 -t 1e-6 -m -q
-case_ E35 worst_greedy_incr "$I" 10 -q
-case_ E36 greedy_incr "$I" 10 -q
+case_ E35 greedy "$I" 10 --worst -q
+case_ E36 greedy "$I" 10 -q
 # space-separated solver values must reach the option, not a 4th positional
-case_ V01 static_incr "$I" 10 -t abc
+case_ V01 static "$I" 10 -t abc
 case_ V02 flow_mip "$I" 10 --nb-mus abc
 case_ V03 tree_lp "$I" 10 --resolution abc
 # abbreviated long options (boost's default style allows guessing)
-case_ G01 static_incr "$I" 10 --quie
-case_ G02 static_incr "$I" 10 --feas=1e-5 -q
-case_ G03 greedy_decr "$I" 10 --only -q
-case_ G04 static_incr "$I" 10 --max 2 -q
+case_ G01 static "$I" 10 --quie
+case_ G02 static "$I" 10 --feas=1e-5 -q
+case_ G03 greedy "$I" 10 --decremental --only -q
+case_ G04 static "$I" 10 --max 2 -q
 case_ G05 --list-alg
-case_ G06 static_incr --list-p
-case_ G07 --alg=static_incr --inst="$I" --bud=10 -q
-case_ G08 static_incr "$I" 10 --output o.json -q
+case_ G06 static --list-p
+case_ G07 --alg=static --inst="$I" --bud=10 -q
+case_ G08 static "$I" 10 --output o.json -q
 # attached spellings of the space-form cases, for the cross-checks below
-case_ X14 -a static_incr -i "$I" -B 10 --feasibility-tolerance=1e-5
+case_ X14 -a static -i "$I" -B 10 --feasibility-tolerance=1e-5
 case_ X34 multicut_benders "$I" 10 -t1e-6 -m -q
 # every algorithm with defaults and full trace logging
-for alg in static_incr static_decr greedy_incr greedy_decr flow_mip \
-    multicut_benders flow_benders multiflow_benders tree_lp worst_greedy_incr \
-    worst_greedy_decr; do
+for alg in static greedy flow_mip multicut_benders flow_benders \
+    multiflow_benders tree_lp; do
     case_ "A-$alg" "$alg" "$I" 10 -v
 done
+case_ A-static-decremental static "$I" 10 --decremental -v
+case_ A-greedy-decremental greedy "$I" 10 --decremental -v
+case_ A-greedy-worst greedy "$I" 10 --worst -v
+case_ A-greedy-decremental-worst greedy "$I" 10 --decremental --worst -v
 
 cross_() { # new_case old_case [tag of the second run, default old]
     local tag=${3:-old}

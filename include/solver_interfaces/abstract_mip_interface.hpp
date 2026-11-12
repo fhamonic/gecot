@@ -23,11 +23,9 @@
 #include "mippp/solvers/xpress/all.hpp"
 
 #include "gecot/preprocessing/compute_big_M_map.hpp"
-#include "gecot/solvers/greedy_decremental.hpp"
-#include "gecot/solvers/greedy_incremental.hpp"
+#include "gecot/solvers/greedy.hpp"
 #include "gecot/solvers/mip_solver_base.hpp"
-#include "gecot/solvers/static_decremental.hpp"
-#include "gecot/solvers/static_incremental.hpp"
+#include "gecot/solvers/static.hpp"
 
 #include "solver_interfaces/abstract_solver_interface.hpp"
 
@@ -95,8 +93,7 @@ protected:
         app.add_option("--mip-start-algorithm", mip_start_algorithm,
                        "Algorithm whose solution is proposed as a MIP start "
                        "to the solver, its time counted in --time-limit")
-            ->check(CLI::IsMember({"none", "static_incr", "static_decr",
-                                   "greedy_incr", "greedy_decr"}))
+            ->check(CLI::IsMember({"none", "static", "greedy"}))
             ->default_val("none")
             ->excludes(mip_start_option);
         app.add_option("--time-limit", solver.time_limit,
@@ -114,13 +111,9 @@ protected:
         const spdlog::stopwatch sw;
         const double tol = solver.feasibility_tol;
         using namespace gecot::solvers;
-        const auto start = mip_start_algorithm == "static_incr"
-                               ? StaticIncremental{tol}.solve(instance, B)
-                           : mip_start_algorithm == "static_decr"
-                               ? StaticDecremental{tol}.solve(instance, B)
-                           : mip_start_algorithm == "greedy_incr"
-                               ? GreedyIncremental{tol}.solve(instance, B)
-                               : GreedyDecremental{tol}.solve(instance, B);
+        const auto start = mip_start_algorithm == "static"
+                               ? Static{tol}.solve(instance, B)
+                               : Greedy{tol}.solve(instance, B);
         solver.mip_start.emplace();
         for(auto && o : instance.options())
             if(start[o]) solver.mip_start->push_back(instance.option_name(o));

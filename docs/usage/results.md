@@ -69,6 +69,26 @@ $ gecot optimize flow_mip three-woods.json 7 -o solution.json
 {
     "instance_path":  "/home/user/three-woods.json",
     "algorithm":  "flow_mip",
+    "algorithm_parameters": {
+        "solver":                "gurobi",
+        "feasibility-tolerance": 1e-07,
+        "mip-start":             null,
+        "mip-start-algorithm":   "none",
+        "time-limit":            null,
+        "resolution":            1e-08,
+        "nb-mus":                0,
+        "mus-sweep":             "decades",
+        "preprocessing":         "all",
+        "all-targets":           false,
+        "no-pruning":            false,
+        "big-m":                 "knapsack",
+        "lp-relaxation":         false
+    },
+    "command_parameters": {
+        "reformulation":        "trivial",
+        "reformulation-params": null,
+        "no-merging":           false
+    },
     "computation_time_ms":  2,
     "initial_score":  18.4,
     "initial_pc_num": {
@@ -90,7 +110,7 @@ $ gecot optimize flow_mip three-woods.json 7 -o solution.json
         "variables": 23,
         "constraints": 22,
         "nonzeros": 60,
-        "model_build_time_ms": 1,
+        "model_build_time_ms": 2,
         "nodes": 0,
         "best_bound": 42.44000000000001,
         "gap": 3.3484577557026403e-16
@@ -102,6 +122,8 @@ $ gecot optimize flow_mip three-woods.json 7 -o solution.json
 |---|---|
 | `instance_path` | the absolute path of the instance file |
 | `algorithm` | the algorithm |
+| `algorithm_parameters` | every [parameter](../reference/parameters.md) of the algorithm under its long name, with the value used, the defaults included: `true` or `false` for a switch, a number, a text, or `null` for a parameter that has no value |
+| `command_parameters` | in the same way, the parameters of `gecot optimize` that change the instance given to the algorithm: `--reformulation`, `--reformulation-params` and `--no-merging` |
 | `computation_time_ms` | the time of the algorithm, in milliseconds |
 | `initial_score`, `solution_score` | the criterion without options and with the solution |
 | `initial_pc_num`, `solution_pc_num` | the score of each case, without options and with the solution |

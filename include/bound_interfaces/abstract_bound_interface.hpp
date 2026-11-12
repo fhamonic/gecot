@@ -52,6 +52,10 @@ public:
         const {
         return option_values(app);
     }
+    virtual std::vector<std::pair<std::string, std::string>> json_parameters()
+        const {
+        return option_json_values(app);
+    }
 
     // the bound and score_stats in the unit of instance
     virtual gecot::bound_report compute(

@@ -19,7 +19,7 @@ namespace {
 // the options are ruled out against the MIP start
 struct PathReformulationInterface : PathFormulationLPInterface {
     PathReformulationInterface() {
-        app.get_option("--mip-start-algorithm")->default_val("greedy_incr");
+        app.get_option("--mip-start-algorithm")->default_val("greedy");
     }
 };
 }  // namespace

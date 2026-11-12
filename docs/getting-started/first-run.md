@@ -131,7 +131,7 @@ The lines that start with a time are the log, on the standard error stream; the 
 
 ## Ranking is not optimizing
 
-Now with a budget of 3, compare the exact algorithm with `greedy_incr`, a heuristic that repeatedly buys the option that gains the most per unit of cost (`-q` silences the log):
+Now with a budget of 3, compare the exact algorithm with `greedy`, a heuristic that repeatedly buys the option that gains the most per unit of cost (`-q` silences the log):
 
 ```console
 $ gecot optimize flow_mip three-woods.json 3 -q
@@ -146,7 +146,7 @@ Options bought  1 of 3:
 ```
 
 ```console
-$ gecot optimize greedy_incr three-woods.json 3 -q
+$ gecot optimize greedy three-woods.json 3 -q
 Status          completed
 Initial score   18.4
 Solution score  24.6 (+33.70 %)

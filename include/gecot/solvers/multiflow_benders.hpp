@@ -382,8 +382,8 @@ struct multiflow_benders : public mip_solver_base {
                 if(!_is_target(instance_case, t)) continue;
                 const auto data = compute_contracted_graph_data(
                     instance, instance_case, budget, t, strong_arcs_map[t],
-                    useless_arcs_map[t], big_M_kind::knapsack, feasibility_tol,
-                    !no_pruning);
+                    useless_arcs_map[t], big_M_kind::knapsack_bnb,
+                    feasibility_tol, !no_pruning);
                 const target_block & block = blocks.emplace_back(data);
                 // M_t bounds F_t: without it the relaxation is unbounded
                 // until t receives a cut

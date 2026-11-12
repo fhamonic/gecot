@@ -26,7 +26,7 @@ namespace solvers {
 
 struct flow_mip : public mip_solver_base {
     // plain for comparison, tight experimental
-    big_M_kind big_Ms = big_M_kind::knapsack;
+    big_M_kind big_Ms = big_M_kind::knapsack_bnb;
     // experimental: the options continuous, for the root relaxation's bound
     bool relax_integrality = false;
 
@@ -126,9 +126,10 @@ struct flow_mip : public mip_solver_base {
                                             vertex_options_map, probability_map,
                                             big_M_vertices)
                         : compute_knapsack_big_M_map(
-                              instance, budget, graph, source_quality_map,
-                              vertex_options_map, probability_map,
-                              big_M_vertices);
+                              instance, budget,
+                              big_Ms == big_M_kind::knapsack_dantzig, graph,
+                              source_quality_map, vertex_options_map,
+                              probability_map, big_M_vertices);
 
                 // an arc per improvement, of base probability 0
                 auto base_probability_map =

@@ -123,9 +123,10 @@ contracted_graph_data<C> compute_contracted_graph_data(
         big_Ms == big_M_kind::plain
             ? compute_big_M_map(graph, source_quality_map, source_options_map,
                                 probability_map, big_M_vertices)
-            : compute_knapsack_big_M_map(instance, budget, graph,
-                                         source_quality_map, source_options_map,
-                                         probability_map, big_M_vertices);
+            : compute_knapsack_big_M_map(
+                  instance, budget, big_Ms == big_M_kind::knapsack_dantzig,
+                  graph, source_quality_map, source_options_map,
+                  probability_map, big_M_vertices);
 
     // make_static_digraph renumbers the vertices in vertex_cmp's order
     const auto vertex_cmp = [](auto && u, auto && v) { return u < v; };

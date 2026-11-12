@@ -92,7 +92,7 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` and `tre
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `--big-m plain`, `knapsack`, `tight` | `knapsack` | the [big-M constants](../formulations/preprocessing.md#big-m-constants). `plain`: with every quality gain, for comparison. `knapsack`: with the gains of the best options within the budget. `tight`: experimental, lowered per arc over the sources that can use it |
+| `--big-m plain`, `knapsack_bnb`, `knapsack_dantzig`, `tight` | `knapsack_bnb` | the [big-M constants](../formulations/preprocessing.md#big-m-constants). `plain`: with every quality gain, for comparison. `knapsack_bnb`: with the gains of the best options within the budget, by branch and bound. `knapsack_dantzig`: with the linear relaxation of that knapsack, looser but faster to compute. `tight`: experimental, lowered per arc over the sources that can use it |
 | `--lp-relaxation` | off | experimental: solves the [continuous relaxation](../formulations/flow.md#what-flow_mip-solves) |
 
 ### `multicut_benders`
@@ -102,13 +102,13 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` and `tre
 | `--groups <n>` | `2` | the groups of targets per case, each with its own cuts. `1`: a single cut per case. `0`: a group per target |
 | `--grouping voronoi`, `consecutive`, `random` | `voronoi` | how the targets are grouped. `voronoi`: the cells of a network Voronoi diagram around targets of value far from each other. `consecutive`: runs of consecutive targets. `random`: at random, as a control |
 | `--grouping-seed <n>` | `0` | the seed of `--grouping random` |
-| `--big-m plain`, `knapsack`, `tight` | `knapsack` | as for `flow_mip` |
+| `--big-m plain`, `knapsack_bnb`, `knapsack_dantzig`, `tight` | `knapsack_bnb` | as for `flow_mip` |
 
 ### `flow_benders`
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `--big-m plain`, `knapsack`, `tight` | `knapsack` | as for `flow_mip` |
+| `--big-m plain`, `knapsack_bnb`, `knapsack_dantzig`, `tight` | `knapsack_bnb` | as for `flow_mip` |
 
 ### `multiflow_benders`
 

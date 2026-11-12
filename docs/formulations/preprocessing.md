@@ -218,7 +218,7 @@ For a scenario $x$ of cost at most $\beta$ and a simple path $Q$, the options th
 
 ## Big-M constants
 
-The constant $M^t_u$ of the constraints $\phi^t_{a^i} \le M^t_u \cdot x_i$ and $f^i_t \le M^t_t \cdot x_i$ must be at least the flow that can reach the vertex $u$ on its way to $t$. The smaller it is, the tighter the linear relaxation, and the faster the search: with a constant $100$ times too large, $x_i = 0.01$ is enough to open an arc completely. `--big-m` chooses among three constants, all computed on the reduced graph $G_t$, where $\overline{\Pi}_{G_t}(s,u)$ is the probability of connection in $G_t$ with every option bought.
+The constant $M^t_u$ of the constraints $\phi^t_{a^i} \le M^t_u \cdot x_i$ and $f^i_t \le M^t_t \cdot x_i$ must be at least the flow that can reach the vertex $u$ on its way to $t$. The smaller it is, the tighter the linear relaxation, and the faster the search: with a constant $100$ times too large, $x_i = 0.01$ is enough to open an arc completely. `--big-m` chooses among four constants, all computed on the reduced graph $G_t$, where $\overline{\Pi}_{G_t}(s,u)$ is the probability of connection in $G_t$ with every option bought.
 
 **`plain`** counts every quality gain:
 
@@ -228,7 +228,7 @@ $$
 
 It is one run of Dijkstra's algorithm from $u$ on the reversed graph. As $G_t$ has fewer arcs than $G$ and keeps every most reliable path to $t$, this bound is no larger than the same sum on $G$.
 
-**`knapsack`**, the default, counts only the gains that the budget can buy together. With $g_i = \sum_{s} w^i_s \cdot \overline{\Pi}_{G_t}(s,u)$ the most that the option $i$ can bring to $u$,
+**`knapsack_bnb`**, the default, counts only the gains that the budget can buy together. With $g_i = \sum_{s} w^i_s \cdot \overline{\Pi}_{G_t}(s,u)$ the most that the option $i$ can bring to $u$,
 
 $$
 \begin{aligned}
@@ -239,7 +239,9 @@ $$
 
 a knapsack problem solved exactly by branch and bound for each vertex that needs a constant.
 
-**`tight`** (experimental) lowers the knapsack constant of each improved copy $a^i$ of an arc $(u,v)$, by keeping only the sources that can use it, those whose best path through $a^i$ with every option is at least as reliable as their best path without any option, and by bounding the probabilities within the budget left by $i$ with a Lagrangian relaxation.
+**`knapsack_dantzig`** replaces this knapsack by its linear relaxation, $x \in [0,1]^\Phi$, solved by taking the options by decreasing $g_i / c_i$ and a fraction of the first one that does not fit. The constant is larger, but it takes a sort of the options per vertex, whereas the branch and bound can take seconds per vertex when many options have nearly the same ratio $g_i / c_i$, for instance when each option brings as much quality as it costs.
+
+**`tight`** (experimental) lowers the `knapsack_bnb` constant of each improved copy $a^i$ of an arc $(u,v)$, by keeping only the sources that can use it, those whose best path through $a^i$ with every option is at least as reliable as their best path without any option, and by bounding the probabilities within the budget left by $i$ with a Lagrangian relaxation.
 
 `--big-m` is a parameter of `flow_mip`, `multicut_benders` and `flow_benders`. `multiflow_benders` has its own constants, one per source and arc, and `tree_lp` uses the plain ones.
 

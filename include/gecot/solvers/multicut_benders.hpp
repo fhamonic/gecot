@@ -61,7 +61,7 @@ struct multicut_benders : public mip_solver_base {
     grouping groups = grouping::voronoi;
     std::size_t random_seed = 0;
     // plain for comparison, tight experimental
-    big_M_kind big_Ms = big_M_kind::knapsack;
+    big_M_kind big_Ms = big_M_kind::knapsack_bnb;
 
     // The targets of a case in the order of their groups, and the position
     // of the first target of each group, then their number. The kernels of

@@ -81,7 +81,7 @@ $ gecot optimize flow_mip three-woods.json 7 -o solution.json
         "preprocessing":         "all",
         "all-targets":           false,
         "no-pruning":            false,
-        "big-m":                 "knapsack",
+        "big-m":                 "knapsack_bnb",
         "lp-relaxation":         false
     },
     "command_parameters": {

@@ -25,7 +25,7 @@ namespace solvers {
 
 struct flow_benders : public mip_solver_base {
     // plain for comparison, tight experimental
-    big_M_kind big_Ms = big_M_kind::knapsack;
+    big_M_kind big_Ms = big_M_kind::knapsack_bnb;
 
     template <case_c C>
     auto _compute_dual_flow(const contracted_graph_data<C> & data,

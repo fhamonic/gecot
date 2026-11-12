@@ -12,15 +12,18 @@
 #include "melon/graph.hpp"
 #include "melon/views/reverse.hpp"
 
+#include "gecot/bounds/lp_knapsack.hpp"
 #include "gecot/concepts/instance.hpp"
 #include "gecot/indices/pc_num.hpp"
 
 namespace gecot {
 
 // plain: the quality that reaches a vertex with every quality gain;
-// knapsack: with the gains of its best options within the budget; tight:
-// knapsack, lowered per improvement by compute_tight_big_M_maps
-enum class big_M_kind { plain, knapsack, tight };
+// knapsack_bnb: with the gains of its best options within the budget;
+// knapsack_dantzig: with the linear relaxation of that knapsack, looser but
+// without the branch and bound's blow-ups; tight: knapsack_bnb, lowered per
+// improvement by compute_tight_big_M_maps
+enum class big_M_kind { plain, knapsack_bnb, knapsack_dantzig, tight };
 
 template <typename GR, typename QM, typename VOM, typename PM>
 auto compute_big_M_map(const GR & graph, const QM & source_quality_map,
@@ -63,7 +66,8 @@ auto compute_big_M_map(const GR & graph, const QM & source_quality_map,
 
 template <instance_c I, typename GR, typename QM, typename VOM, typename PM>
 auto compute_knapsack_big_M_map(const I & instance, const double budget,
-                                const GR & graph, const QM & source_quality_map,
+                                const bool dantzig_bound, const GR & graph,
+                                const QM & source_quality_map,
                                 const VOM & source_options_map,
                                 const PM & probability_map, auto && vertices) {
     auto big_M_map = melon::create_vertex_map<double>(
@@ -84,6 +88,9 @@ auto compute_knapsack_big_M_map(const I & instance, const double budget,
                 reversed_graph, probability_map);
 
             auto option_gains = instance.template create_option_map<double>();
+            std::vector<double> gains, costs;
+            for(auto && o : instance.options())
+                costs.push_back(instance.option_cost(o));
 
             for(auto && s : vertices_subrange) {
                 double M = 0;
@@ -94,6 +101,15 @@ auto compute_knapsack_big_M_map(const I & instance, const double budget,
                     for(const auto & [source_quality_gain, option] :
                         source_options_map[t])
                         option_gains[option] += t_prob * source_quality_gain;
+                }
+                if(dantzig_bound) {
+                    // the options that do not fit would enter as fractions
+                    gains.clear();
+                    for(auto && o : instance.options())
+                        gains.push_back(costs[o] <= budget ? option_gains[o]
+                                                           : 0.0);
+                    big_M_map[s] = M + lp_knapsack(gains, costs, budget);
+                    continue;
                 }
                 melon::knapsack_bnb knapsack(
                     instance.options(), option_gains,

@@ -145,16 +145,20 @@ protected:
                "--big-m",
                [&big_Ms](const std::string & s) {
                    using enum gecot::big_M_kind;
-                   big_Ms = s == "plain"   ? plain
-                            : s == "tight" ? tight
-                                           : knapsack;
+                   big_Ms = s == "plain"              ? plain
+                            : s == "knapsack_dantzig" ? knapsack_dantzig
+                            : s == "tight"            ? tight
+                                                      : knapsack_bnb;
                },
                "The big-Ms: plain, with every quality gain (for comparison); "
-               "knapsack, with the gains of the best options within the "
-               "budget; tight (experimental), knapsack lowered per arc over "
-               "the sources that can use it")
-            ->check(CLI::IsMember({"plain", "knapsack", "tight"}))
-            ->default_val("knapsack");
+               "knapsack_bnb, with the gains of the best options within the "
+               "budget, by branch and bound; knapsack_dantzig, with the "
+               "linear relaxation of that knapsack, looser but faster; tight "
+               "(experimental), knapsack_bnb lowered per arc over the sources "
+               "that can use it")
+            ->check(CLI::IsMember(
+                {"plain", "knapsack_bnb", "knapsack_dantzig", "tight"}))
+            ->default_val("knapsack_bnb");
     }
 
     void add_preprocessing_options(gecot::solvers::mip_solver_base & solver) {

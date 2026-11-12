@@ -63,13 +63,13 @@ bool InstanceCase::contains_arc(const std::string & name) const {
 [[nodiscard]] InstanceCase::vertex_t InstanceCase::vertex_from_name(
     const std::string & name) const {
     if(!contains_vertex(name))
-        throw std::invalid_argument("unknwon vertex id '" + name + "'");
+        throw std::invalid_argument("unknown vertex id '" + name + "'");
     return _vertex_name_to_id_map.at(name);
 }
 [[nodiscard]] InstanceCase::arc_t InstanceCase::arc_from_name(
     const std::string & name) const {
     if(!contains_arc(name))
-        throw std::invalid_argument("unknwon arc id '" + name + "'");
+        throw std::invalid_argument("unknown arc id '" + name + "'");
     return _arc_name_to_id_map.at(name);
 }
 
@@ -125,7 +125,7 @@ const std::string & Instance::option_name(gecot::option_t i) const noexcept {
 }
 gecot::option_t Instance::option_from_name(const std::string & name) const {
     if(!contains_option(name))
-        throw std::invalid_argument("unknwon option id '" + name + "'");
+        throw std::invalid_argument("unknown option id '" + name + "'");
     return _option_name_to_id_map.at(name);
 }
 void Instance::set_criterion(criterion_formula && c) { _criterion = c; }
@@ -134,5 +134,5 @@ gecot::case_id_t Instance::case_id_from_name(const std::string & name) const {
     for(auto && instance_case : _cases) {
         if(instance_case.name() == name) return instance_case.id();
     }
-    throw std::invalid_argument("unknwon case '" + name + "'");
+    throw std::invalid_argument("unknown case '" + name + "'");
 }

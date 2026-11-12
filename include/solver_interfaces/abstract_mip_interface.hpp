@@ -39,7 +39,7 @@ public:
         const std::filesystem::path & solution_path) {
         if(!std::filesystem::exists(solution_path))
             throw std::invalid_argument("File '" + solution_path.string() +
-                                        "' does not exists");
+                                        "' does not exist");
         if(std::filesystem::is_directory(solution_path))
             throw std::invalid_argument("'" + solution_path.string() +
                                         "' is a directory");

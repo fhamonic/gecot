@@ -750,7 +750,7 @@ namespace _details {
 void assert_json_exists(const std::filesystem::path & path) {
     if(!std::filesystem::exists(path))
         throw std::invalid_argument("File '" + path.string() +
-                                    "' does not exists");
+                                    "' does not exist");
     if(std::filesystem::is_directory(path))
         throw std::invalid_argument("'" + path.string() + "' is a directory");
     if(path.extension().compare(".json"))

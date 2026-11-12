@@ -67,6 +67,7 @@ struct flow_benders : public mip_solver_base {
 
     template <lazy_constraint_model M, instance_c I>
     solve_result<I> solve(const I & instance, const double budget) const {
+        _check_criterion(instance);
         spdlog::stopwatch sw;
         auto solution = instance.create_option_map(false);
 

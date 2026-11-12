@@ -33,6 +33,7 @@ auto compute_constrained_strong_and_useless_arcs(
     using vertex_t = melon::vertex_t<graph_t>;
     using arc_t = melon::arc_t<graph_t>;
 
+    detail::check_resolution(instance_case.graph(), probability_resolution);
     spdlog::stopwatch prep_sw;
     spdlog::info("Preprocessing the '{}' graph, budget-aware",
                  instance_case.name());

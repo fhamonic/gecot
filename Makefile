@@ -2,7 +2,7 @@ BUILD_DIR = build
 CONAN_PROFILE = gcc15_c++26
 # CONAN_PROFILE = gcc15_c++26_debug
 
-.PHONY: all test clean format check-format ${BUILD_DIR}
+.PHONY: all test clean format check-format doc ${BUILD_DIR}
 
 all: test package
 
@@ -16,6 +16,9 @@ test: $(BUILD_DIR)
 package: $(BUILD_DIR)
 	@cd $(BUILD_DIR) && \
 	cpack
+
+doc:
+	zensical serve
 
 format:
 	find include src test -name "*.hpp" -o -name "*.cpp" | xargs clang-format -i

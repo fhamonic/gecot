@@ -170,6 +170,20 @@ inline bool is_non_decreasing(const criterion_formula & criterion) {
     return std::visit(detail::monotony_visitor{}, criterion).non_decreasing;
 }
 
+// A sufficient test that the criterion of instance never decreases when a
+// case score increases: it is linear with non-negative weights once its terms
+// are added up, as 2 z - z, whose second term is_non_decreasing refuses, or
+// is_non_decreasing accepts it.
+template <instance_c I>
+bool has_non_decreasing_criterion(const I & instance) {
+    const auto form =
+        linear_form(instance.criterion(), std::ranges::size(instance.cases()));
+    return (form &&
+            std::ranges::all_of(form->weights,
+                                [](const double w) { return w >= 0.0; })) ||
+           is_non_decreasing(instance.criterion());
+}
+
 inline std::vector<case_id_t> criterion_cases(
     const criterion_formula & criterion) {
     std::vector<case_id_t> cases;

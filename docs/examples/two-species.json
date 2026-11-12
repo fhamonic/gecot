@@ -1,0 +1,55 @@
+{
+  "options": [
+    { "id": "hedgerow", "cost": 2 },
+    { "id": "underpass", "cost": 3 },
+    { "id": "plantation", "cost": 2 }
+  ],
+  "cases": {
+    "squirrel": {
+      "vertices": [
+        { "id": "wood_a", "source_quality": 2, "target_quality": 2 },
+        { "id": "wood_b", "source_quality": 1, "target_quality": 1 },
+        { "id": "wood_c", "source_quality": 3, "target_quality": 3 }
+      ],
+      "arcs": [
+        { "id": "a_b", "from": "wood_a", "to": "wood_b", "probability": 0.5 },
+        { "id": "b_a", "from": "wood_b", "to": "wood_a", "probability": 0.5 },
+        { "id": "b_c", "from": "wood_b", "to": "wood_c", "probability": 0.2 },
+        { "id": "c_b", "from": "wood_c", "to": "wood_b", "probability": 0.2 }
+      ],
+      "vertices_improvements": [
+        { "vertex_id": "wood_b", "option_id": "plantation",
+          "source_quality_gain": 1, "target_quality_gain": 1 }
+      ],
+      "arcs_improvements": [
+        { "arc_id": "a_b", "option_id": "hedgerow", "improved_probability": 0.9 },
+        { "arc_id": "b_a", "option_id": "hedgerow", "improved_probability": 0.9 },
+        { "arc_id": "b_c", "option_id": "underpass", "improved_probability": 0.8 },
+        { "arc_id": "c_b", "option_id": "underpass", "improved_probability": 0.8 }
+      ]
+    },
+    "hedgehog": {
+      "vertices": [
+        { "id": "garden", "source_quality": 2, "target_quality": 2 },
+        { "id": "wood_b", "source_quality": 1, "target_quality": 1 },
+        { "id": "wood_c", "source_quality": 1, "target_quality": 1 }
+      ],
+      "arcs": [
+        { "id": "g_b", "from": "garden", "to": "wood_b", "probability": 0.3 },
+        { "id": "b_g", "from": "wood_b", "to": "garden", "probability": 0.3 },
+        { "id": "b_c", "from": "wood_b", "to": "wood_c", "probability": 0.1 },
+        { "id": "c_b", "from": "wood_c", "to": "wood_b", "probability": 0.1 }
+      ],
+      "arcs_improvements": [
+        { "arc_id": "g_b", "option_id": "hedgerow", "improved_probability": 0.6 },
+        { "arc_id": "b_g", "option_id": "hedgerow", "improved_probability": 0.6 },
+        { "arc_id": "b_c", "option_id": "underpass", "improved_probability": 0.9 },
+        { "arc_id": "c_b", "option_id": "underpass", "improved_probability": 0.9 }
+      ]
+    }
+  },
+  "criterion": {
+    "operation": "min",
+    "values": [ "squirrel", [2.5, "hedgehog"] ]
+  }
+}

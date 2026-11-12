@@ -346,6 +346,7 @@ struct multiflow_benders : public mip_solver_base {
         using namespace mippp;
         using namespace mippp::operators;
         using cut = target_block::cut;
+        _check_criterion(instance);
         spdlog::stopwatch sw;
 
         // The master: z with the criterion, x with the budget row, and for

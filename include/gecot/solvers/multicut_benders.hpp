@@ -183,6 +183,7 @@ struct multicut_benders : public mip_solver_base {
         using namespace mippp;
         using namespace mippp::operators;
         using target_data = contracted_graph_data<instance_case_t<I>>;
+        _check_criterion(instance);
         spdlog::stopwatch sw;
 
         // The master: z with the criterion, x with the budget row, and for

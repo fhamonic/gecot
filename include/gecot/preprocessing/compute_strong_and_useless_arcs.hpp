@@ -2,8 +2,11 @@
 #define GECOT_COMPUTE_STRONG_AND_USELESS_ARCS_HPP
 
 #include <algorithm>
+#include <cmath>
+#include <stdexcept>
 #include <utility>
 
+#include <fmt/core.h>
 #include <spdlog/stopwatch.h>
 
 #include <tbb/concurrent_vector.h>
@@ -67,6 +70,23 @@ struct useless_arc_default_traits {
     static constexpr bool store_paths = false;
 };
 
+// The lengths are the integers -log(max(p, resolution)) / log1p(resolution).
+// Throws unless the longest is positive and a path through every vertex at
+// this length fits in 62 bits, the rest being for the penalties of the
+// constrained labelling: lengths that are all 0, or that wrap around, label
+// strong arcs that are not, and the optimum is lost without a warning.
+template <typename G>
+void check_resolution(const G & graph, const double resolution) {
+    const double max_length = -std::log(resolution) / std::log1p(resolution);
+    // false for the NaN of a negative resolution too
+    if(!(max_length > 0 &&
+         max_length * static_cast<double>(graph.num_vertices()) < 0x1p62))
+        throw std::invalid_argument(fmt::format(
+            "resolution {}: must be in ]0, 1[, and not so small that the "
+            "lengths of a path of {} vertices overflow",
+            resolution, graph.num_vertices()));
+}
+
 // the arcs of length 0 on a cycle of such arcs. The improvable ones count: blue
 // spreads on the base lengths, so through them it comes back to the arc's tail
 template <typename G, typename LM>
@@ -113,6 +133,7 @@ auto compute_strong_and_useless_arcs(
     using arc_t = melon::arc_t<graph_t>;
     using log_probability_t = uint64_t;
 
+    detail::check_resolution(instance_case.graph(), probability_resolution);
     spdlog::stopwatch prep_sw;
     spdlog::info("Preprocessing the '{}' graph", instance_case.name());
 

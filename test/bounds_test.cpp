@@ -448,6 +448,25 @@ GTEST_TEST(criterion_analysis, monotony) {
               (std::vector<gecot::case_id_t>{0, 2}));
 }
 
+GTEST_TEST(criterion_analysis, non_decreasing_criterion_of_an_instance) {
+    using gecot::has_non_decreasing_criterion;
+    EXPECT_TRUE(has_non_decreasing_criterion(trivial_cases_instance(
+        2, criterion_min{{criterion_var{0}, criterion_var{1}}})));
+    // 2 z - z: its second term alone decreases
+    const criterion_sum net_positive{
+        {criterion_product{{2.0, criterion_var{0}}},
+         criterion_product{{-1.0, criterion_var{0}}}}};
+    EXPECT_FALSE(gecot::is_non_decreasing(net_positive));
+    EXPECT_TRUE(
+        has_non_decreasing_criterion(trivial_cases_instance(2, net_positive)));
+    EXPECT_FALSE(has_non_decreasing_criterion(trivial_cases_instance(
+        2, criterion_sum{{criterion_var{1},
+                          criterion_product{{-1.0, criterion_var{0}}}}})));
+    // a minimum is not linear: each of its terms must be non-decreasing
+    EXPECT_FALSE(has_non_decreasing_criterion(trivial_cases_instance(
+        2, criterion_min{{net_positive, criterion_var{1}}})));
+}
+
 GTEST_TEST(criterion_analysis, bound_criterion_calls) {
     std::vector<std::vector<double>> calls;
     auto weighted_bound = [&calls](std::span<const double> w) {

@@ -32,6 +32,7 @@ struct flow_mip : public mip_solver_base {
 
     template <typename M, instance_c I>
     solve_result<I> solve(const I & instance, const double budget) const {
+        _check_criterion(instance);
         spdlog::stopwatch sw;
         auto solution = instance.create_option_map(false);
 
@@ -276,8 +277,13 @@ struct flow_mip : public mip_solver_base {
         if(!has_solution) return {_fallback_solution(instance, budget), report};
         const auto model_solution = model.get_solution();
 
+        // Of the relaxation, only the options bought entirely: those bought
+        // by half can cost more than the budget, and their score is then
+        // reported above the bound of the relaxation.
         for(const auto & i : instance.options()) {
-            solution[i] = model_solution[X_vars(i)] > 0.5;
+            solution[i] = relax_integrality
+                              ? model_solution[X_vars(i)] >= 1 - feasibility_tol
+                              : model_solution[X_vars(i)] > 0.5;
         }
 
         return {solution, report};

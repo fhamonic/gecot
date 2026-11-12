@@ -22,6 +22,7 @@
 
 #include "melon/graph.hpp"
 
+#include "gecot/bounds/criterion_analysis.hpp"
 #include "gecot/criterion.hpp"
 #include "gecot/helper.hpp"
 #include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
@@ -123,6 +124,17 @@ struct mip_solver_base {
             return var;
         }
     };
+
+    // The models bound the case scores, and the minimums of the criterion,
+    // from above only. Under a criterion that decreases with a case score
+    // their optimum leaves this score at 0 whatever the options bought, and
+    // is returned as optimal.
+    template <instance_c I>
+    static void _check_criterion(const I & instance) {
+        if(!has_non_decreasing_criterion(instance))
+            throw std::invalid_argument(
+                "the criterion is not non-decreasing in the case scores");
+    }
 
     // a vertex that some options make a target
     template <case_c C>

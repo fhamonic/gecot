@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include <algorithm>
+#include <limits>
 #include <random>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -472,6 +474,38 @@ GTEST_TEST(preprocessing, penalty_rounding) {
         has_constrained_label(instance(as_long), budget, 2, 0, 3, false));
     EXPECT_TRUE(
         has_constrained_label(instance(shorter), budget, 2, 0, 3, false));
+}
+
+GTEST_TEST(preprocessing, unusable_resolutions) {
+    // 0 reaches t = 2 best by 0 -> 2 once its option is bought. With lengths
+    // that are all 0, as a resolution of 0, of 1 or more, or small enough to
+    // overflow gives, blue from 1 ties with red at 2 and 0 -> 1 is labelled
+    // strong: 0 would contract onto 1 and lose that arc
+    const case_spec spec{.num_vertices = 3,
+                         .arcs = {{0, 1}, {1, 2}, {0, 2}},
+                         .probabilities = {0.5, 0.5, 0.1},
+                         .source_qualities = {1, 0, 0},
+                         .target_qualities = {0, 0, 1},
+                         .vertex_options = {},
+                         .arc_options = {{}, {}, {{0.9, 0}}}};
+    const double budget = 1;
+    const Instance instance =
+        build_instance({budget}, {spec}, criterion_var{0});
+    const auto & instance_case = instance.cases()[0];
+    const auto option_predicate = [](const gecot::option_t &) { return true; };
+    for(const double resolution :
+        {0.0, -1e-8, 1.0, 2.0, 1e-30, std::numeric_limits<double>::quiet_NaN(),
+         std::numeric_limits<double>::infinity()}) {
+        SCOPED_TRACE(resolution);
+        EXPECT_THROW(gecot::compute_strong_and_useless_arcs(
+                         instance_case, option_predicate, resolution),
+                     std::invalid_argument);
+        EXPECT_THROW(
+            gecot::compute_constrained_strong_and_useless_arcs(
+                instance, instance_case, budget, option_predicate, resolution),
+            std::invalid_argument);
+    }
+    EXPECT_FALSE(has_constrained_label(instance, budget, 2, 0, 1, true));
 }
 
 GTEST_TEST(preprocessing, contraction_of_a_strong_self_loop) {

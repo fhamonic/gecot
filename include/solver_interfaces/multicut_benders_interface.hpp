@@ -1,26 +1,25 @@
 #pragma once
 
-#include "gecot/solvers/grouped_benders.hpp"
+#include "gecot/solvers/multicut_benders.hpp"
 
 #include "solver_interfaces/abstract_mip_interface.hpp"
 
-class GroupedBendersInterface : public AbstractMipInterface {
+class MulticutBendersInterface : public AbstractMipInterface {
 private:
-    gecot::solvers::grouped_benders solver;
+    gecot::solvers::multicut_benders solver;
 
 public:
-    GroupedBendersInterface() : AbstractMipInterface("grouped_benders") {
+    MulticutBendersInterface() : AbstractMipInterface("multicut_benders") {
         add_mip_options(solver, 1e-7, lazy_constraint_solvers);
         add_preprocessing_options(solver);
         app.add_option("--groups", solver.num_groups,
                        "Groups of targets per graph, each with its own cuts "
-                       "(1: naive_benders' cuts; 0: a group per target, "
-                       "target_benders' cuts)")
+                       "(1: a single cut per graph; 0: a group per target)")
             ->default_val(2);
         app.add_option_function<std::string>(
                "--grouping",
                [this](const std::string & s) {
-                   using grouping = gecot::solvers::grouped_benders::grouping;
+                   using grouping = gecot::solvers::multicut_benders::grouping;
                    solver.groups = s == "voronoi"       ? grouping::voronoi
                                    : s == "consecutive" ? grouping::consecutive
                                                         : grouping::random;
@@ -43,13 +42,17 @@ public:
                "per arc over the sources that can use it")
             ->check(CLI::IsMember({"knapsack", "tight"}))
             ->default_val("knapsack");
+        app.add_flag("--no-preprocessing", solver.no_preprocessing,
+                     "For comparison: skips the computation of the strong and "
+                     "useless arcs, so no graph is contracted and "
+                     "--resolution, --nb-mus and --mus-sweep have no effect");
     }
 
     gecot::solve_result<Instance> solve(const Instance & instance,
                                         const double B) const override;
 
     std::string description() const override {
-        return "Benders decomposition across groups of vertices, between "
-               "naive_benders and target_benders";
+        return "Benders decomposition with a cut per group of targets, "
+               "from a single cut per graph to a cut per target";
     }
 };

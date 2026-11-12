@@ -90,10 +90,9 @@ add_executable(gecot src/gecot.cpp src/instance.cpp src/parse_instance.cpp
     src/commands/bound.cpp
     src/solver_interfaces/mip_interface.cpp
     src/solver_interfaces/preprocessed_mip_interface.cpp
-    src/solver_interfaces/naive_benders_interface.cpp
-    src/solver_interfaces/target_benders_interface.cpp
+    src/solver_interfaces/multicut_benders_interface.cpp
     src/solver_interfaces/flow_benders_interface.cpp
-    src/solver_interfaces/grouped_benders_interface.cpp
+    src/solver_interfaces/multiflow_benders_interface.cpp
     src/solver_interfaces/tree_formulation_lp_interface.cpp
     src/solver_interfaces/path_formulation_lp_interface.cpp
     ${WINDRES_ICON_O})

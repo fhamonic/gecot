@@ -15,7 +15,6 @@ target_compile_definitions(gecot_test PUBLIC PROJECT_SOURCE_DIR="${PROJECT_SOURC
 
 # each gecot header must compile alone
 file(GLOB_RECURSE GECOT_HEADERS CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/include/gecot/*.hpp)
-list(FILTER GECOT_HEADERS EXCLUDE REGEX unprep_target_benders)
 foreach(HEADER ${GECOT_HEADERS})
   file(RELATIVE_PATH HEADER ${PROJECT_SOURCE_DIR}/include ${HEADER})
   string(MAKE_C_IDENTIFIER ${HEADER} TU)

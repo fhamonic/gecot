@@ -1,6 +1,6 @@
-#include "solver_interfaces/target_benders_interface.hpp"
+#include "solver_interfaces/multicut_benders_interface.hpp"
 
-gecot::solve_result<Instance> TargetBendersInterface::solve(
+gecot::solve_result<Instance> MulticutBendersInterface::solve(
     const Instance & instance, const double B) const {
     const auto started = with_mip_start(solver, instance, B);
     return with_solver(

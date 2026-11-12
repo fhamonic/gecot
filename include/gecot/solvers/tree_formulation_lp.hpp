@@ -220,7 +220,7 @@ struct tree_formulation_lp : public mip_solver_base {
             z.push_back(model.add_variable());
             contribution_rows.push_back(model.add_constraint(z.back() <= 0));
             // the vertices of positive quality or quality gain as a target
-            const std::size_t first_target = targets.size();
+            const auto first_target = std::ssize(targets);
             for(const auto & t :
                 std::views::filter(melon::vertices(instance_case.graph()),
                                    [&](const auto & t) {

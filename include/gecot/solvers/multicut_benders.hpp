@@ -209,7 +209,8 @@ struct multicut_benders : public mip_solver_base {
         };
         auto targets =
             instance.template create_case_map<std::vector<target_data>>();
-        auto groups = instance.template create_case_map<std::vector<group>>();
+        auto cases_groups =
+            instance.template create_case_map<std::vector<group>>();
         for(auto && instance_case : instance.cases()) {
             const auto [strong_arcs_map, useless_arcs_map] =
                 _compute_strong_and_useless_arcs(instance, instance_case,
@@ -230,7 +231,7 @@ struct multicut_benders : public mip_solver_base {
                     pb.tick();
                 }
             }
-            auto & case_groups = groups[instance_case.id()];
+            auto & case_groups = cases_groups[instance_case.id()];
             for(std::size_t g = 0; g + 1 < firsts.size(); ++g)
                 case_groups.push_back(
                     {model.add_variable(), firsts[g], firsts[g + 1]});
@@ -296,7 +297,7 @@ struct multicut_benders : public mip_solver_base {
                         targets[k], [&](const target_data & data) {
                             return _dual_flow(data, Y);
                         }));
-                for(const group & g : groups[k]) {
+                for(const group & g : cases_groups[k]) {
                     double value = 0;
                     for(std::size_t i = g.first; i < g.last; ++i)
                         value += flows[i].first;

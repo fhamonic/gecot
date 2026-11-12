@@ -14,7 +14,7 @@ Design note on gecot's `path_lp` solver, the path formulation relaxation solved 
 - **The guarantee is a feasible incumbent plus the Lagrangian bound** L = z_RMP + Σ_p max(0, max_S rc_pS), valid after every complete pricing round. path_lp computes L (1af6651) and, since branch `path-rr-feasible` (2026-11-03), returns a budget-feasible rounding of x with L as its `best_bound`, so `gecot optimize` prints a gap (§3.1). Before, it returned the master's x cast to a set, which exceeded the budget.
 - **In the code** (main 029471d): pairs no option can change folded into a constant; lazy rows; start columns from `--mip-start`; enumerate pricing (budget-aware, any option shape, exponential); search pricing (default; budget-free; single-arc and star options); the max-value skip, the early stop and the unchanged-duals reuse; the dual clamp; `--max-activations`, `--evict-age`, `--relative-gap`. Two validity fixes, for an invalid bound and a crash, wait on `path-rr-search-fixes`.
 - **Useful, not landed** (§3, in the decision page's three tiers). *Small and generic, land first:* time limits and an LP status check; an incremental evaluator. *Land after review:* local search; pruned search pricing; lazy budget pricing, a knapsack-hull end phase and column-cover cuts for instances that converge; generic exact pricing for every option shape (it certifies Aix N2 within 0.38%, where nothing else runs). *Research, not ready to land:* the direct Lagrangian dual; a barrier master with value scaling, and dual completion (modest on bike_small, 449 → 342 rounds; unproven alone on green); pair tolerance.
-- **What stalls, and why** (§4): bike and green. A useful bound needs purchase duals on most (pair, option) entries. Under such duals one pair search costs 20–300 ms instead of 0.4 ms, and bike has 58,966 pairs. Under `--max-activations` most pairs never get rows, price every option as free, and keep the bound near the all-free value: 7.72e6 on bike B=1000, against prep_mip's 6.459e6. Green is limited by coverage and by the master LP, about 90% of a round.
+- **What stalls, and why** (§4): bike and green. A useful bound needs purchase duals on most (pair, option) entries. Under such duals one pair search costs 20–300 ms instead of 0.4 ms, and bike has 58,966 pairs. Under `--max-activations` most pairs never get rows, price every option as free, and keep the bound near the all-free value: 7.72e6 on bike B=1000, against flow_mip's 6.459e6. Green is limited by coverage and by the master LP, about 90% of a round.
 
 ## 1. Problem and relaxation
 
@@ -140,7 +140,7 @@ Multithreaded runs vary in iteration count from run to run, with the same final 
   - Before `path-rr-simplify`, S⁰_p replaced the base column, so `--mip-start` lost the base columns: 1.27× slower than no start over 13 search-priced pairs (Quebec B=1000: 65 rounds against 14). With both: 0.92× over the search-priced pairs, 0.75× over 8 enumerate-priced ones, Quebec B=1000 in 11 rounds (2026-11-01 ablation).
   - With x = X_0 these columns are feasible, and the RMP holds nothing better, so the first master value is score(X_0).
   - Search mode computes S⁰_p with the setup's label search restricted to X_0. Enumerate takes the best pooled column ⊆ X_0; that is exact, because a column dominating a subset of X_0 is itself a subset of X_0.
-  - Checked: with prep_mip's optimum as the start, the first master equals it to about 1e-15 on 8 Aude and Aix instance-budget pairs (0b3f2b2). Search-mode start masters are exact (c7754f5).
+  - Checked: with flow_mip's optimum as the start, the first master equals it to about 1e-15 on 8 Aude and Aix instance-budget pairs (0b3f2b2). Search-mode start masters are exact (c7754f5).
   - The start sets the master's first value, not the bound. Greedy leaves budget slack, so μ = 0 and every λ_po = 0 (§4.6). path_lp returns the start only if it scores more than the rounding of x (§3.1).
 
 ### 2.3 Reduced cost and the Lagrangian bound
@@ -190,7 +190,7 @@ S1 ⊆ S2, v_pS1 ≥ v_pS2:   rc_pS1 − rc_pS2 = π_k (v_pS1 − v_pS2) + Σ_{o
 - **Measured.**
   - Fronts: Aude about 1,000 columns; Aix 30x30 33k labels (76k with endpoint options) in 0.05 s; Aix 40x40 under 7k; Quebec B=1000 391k labels (729k); Quebec B=10000 11.7M labels (28M), enumerated in 5 s (0b3f2b2).
   - Times at landing: Aude 0.01–0.06 s; Aix 30x30 0.35–0.77 s; Quebec B=1000 6.7 s; Quebec B=10000 65 s at 3.3 GB (0b3f2b2); 3.9 s and 32.7 s with lazy rows (8ef534c).
-  - Against prep_mip (f0da701). prep_mip is faster on Quebec (2.2 against 3.8 s at B=1000, 8.4 against 33 s at B=10000) and on Aude (all under 0.1 s). path_lp is faster on Aix: 1.7–3.3× on 30x30, 2.5× on 40x40, and 20 s / 0.6 GB against 47 s / 2.2 GB on 70x70 B=2.
+  - Against flow_mip (f0da701). flow_mip is faster on Quebec (2.2 against 3.8 s at B=1000, 8.4 against 33 s at B=10000) and on Aude (all under 0.1 s). path_lp is faster on Aix: 1.7–3.3× on 30x30, 2.5× on 40x40, and 20 s / 0.6 GB against 47 s / 2.2 GB on 70x70 B=2.
   - It explodes when many cheap options lie along a path: green even at B=0.5; bike never finishes, even at B=50, with up to 1.6e15 non-dominated labels per pair at B=1000 (8429409); Aix N2 B=100 stays in setup over 200 s (study: generic-pricing).
 - **Role since 029471d.** Opt-in `--pricing enumerate`, for small instances whose options search cannot price: Aix, test, min3. N1 and N2 are out of reach of both pricings (enumerate stays in setup on N2; N1 was never run). Where both run, it gives the tighter z_budget: Aude B=3 1,129,774.9224 against 1,138,555.6616 for search.
 - **Fix needed.** Check the clock inside the enumeration parallel_for (§3.2).
@@ -304,7 +304,7 @@ report.best_bound = L_best,  only after a complete pricing round; gecot optimize
   - Main's cast exceeded the budget in 74 of them, the new solution in none.
   - The LP and L are bit-identical except with enumerate on Aix 30x30 B=0.6, where the columns now reach B + tol. The lowest printed gap is −1.5e-15.
   - Where the cast fitted the budget, the new solution contains it.
-  - Share of the optimal gain, against prep_mip or mip:
+  - Share of the optimal gain, against flow_mip or mip:
 
     | Instance | Budget | Share |
     |---|---|---|
@@ -316,7 +316,7 @@ report.best_bound = L_best,  only after a complete pricing round; gecot optimize
 
     On Aix 70x70 B=10 the solution has cost 10, score 2,647,561 against 2,648,030, and a gap of 0.12%.
   - Fuzz, both pricings, default options: 162 of the 173 configurations with a positive optimal gain reach the optimum; the lowest share is 0.47.
-  - With prep_mip's optimum as `--mip-start`, path_lp returns it with a certified gap: Aude B=3 1.6%, Quebec B=1000 0.011%, Aix 30x30 B=8 0.13%, bike_small B=200 0.042%.
+  - With flow_mip's optimum as `--mip-start`, path_lp returns it with a certified gap: Aude B=3 1.6%, Quebec B=1000 0.011%, Aix 30x30 B=8 0.13%, bike_small B=200 0.042%.
   - The reviewers' harnesses, rerun on the final change:
     - 400 random decimal-cost instances: no bound below mip's optimum in any of the four pricing × start modes. Before the enumerate fix, 22 runs without a start and 27 with one printed a negative gap.
     - 427 adversarial instances, 15,570 runs: the only bounds below mip's optimum are on one instance built near the tolerance, where mip's solution exceeds B by 2.5e-7. That is within mip's default `-t` of 1e-6, not within path_lp's 1e-7.
@@ -346,7 +346,7 @@ DROP o: recompute s by a full Dijkstra iff an arc a = (u, v) that o improves is 
 ```
 
 - ADD is exact because p ≤ 1 and max semantics make labels only grow, so the seeded closure is the new fixpoint. DROP is exact because a non-tight arc lies on no optimal path (prefix optimality). Exact per-case values make every criterion exact.
-- **Effect.** The same choices as greedy_incr on 13 instance/budget pairs. Parity fails off-sample: on dupq (an all-zero row of option X before a second row at the same vertex) the prototype buys X = 1.0, while greedy_incr and prep_mip buy Y = 1.25; the touched flag below restores it (verifier). Bike B=1000 / 5000 / 10000: 74.2 / 608 / 1143 s → 1.769 / 12.513 / 22.664 s (16 threads). Quebec: 0.27–0.83 → 0.08–0.11 s. Green: 38.4 → 5.4 s (4 threads). One full evaluation takes 15 ms on bike (16 threads).
+- **Effect.** The same choices as greedy_incr on 13 instance/budget pairs. Parity fails off-sample: on dupq (an all-zero row of option X before a second row at the same vertex) the prototype buys X = 1.0, while greedy_incr and flow_mip buy Y = 1.25; the touched flag below restores it (verifier). Bike B=1000 / 5000 / 10000: 74.2 / 608 / 1143 s → 1.769 / 12.513 / 22.664 s (16 threads). Quebec: 0.27–0.83 → 0.08–0.11 s. Green: 38.4 → 5.4 s (4 threads). One full evaluation takes 15 ms on bike (16 threads).
 - **Fuzz** (600 random instances with cycles, probability-1 arcs, multi-arc options, several options per arc, duplicate rows): committed scores are exact. Predicted gains are wrong when an all-zero quality row precedes another row of the same vertex, by up to 300% on 222 of 300 instances; green and bike, the instances checked, have none (study: primal-side, verifier).
 - **Fixes.** A per-vertex touched flag instead of the zero-gain test; test every predicted gain against a full evaluation; run after `trivial_reformulate_instance`; costs from `compute_solution_cost` with the tolerance; a memory cap with a fallback to `parallel_pc_num` (|sources| × |V| doubles per case: 11.7 MB on bike, 37 MB on green, 236 MB on Aix 70x70); undo logs instead of state copies.
 
@@ -357,7 +357,7 @@ DROP o: recompute s by a full Dijkstra iff an arc a = (u, v) that o improves is 
 - **Bundle greedy.** Synthetic purchase duals λ_po := θ c_o, with θ a multiple of the median log-gain per cost. Per source, a shortest-path tree on ℓ(a) = min(−log p_S(a), min_{o∉S, c_o≤R} [−log p'_oa + θ c_o]); the options on the tree path to t form a bundle. Greedy then picks among single options and bundles by exact gain per cost. This is path_lp's pricing with λ = θ c collapsed to one objective: it buys complementary chains whose links alone gain little.
 - **Non-submodularity.** 616 of the 1,620 options in primal-side's gain sweep (bike has 1,642) gain more at the B=1000 local-search state than at the base state (study: primal-side). So lazy (CELF) greedy is invalid, greedy carries no guarantee, and the incumbent's quality can only come from a bound.
 - **Effect.**
-  - Bike B=1000: greedy 6.39784e6 → 6.418970948e6 (+0.330%) in 88.2 s, the same 22-option set as prep_mip's 600 s incumbent. Bundle greedy alone: 6.418949702e6 in 30.2 s.
+  - Bike B=1000: greedy 6.39784e6 → 6.418970948e6 (+0.330%) in 88.2 s, the same 22-option set as flow_mip's 600 s incumbent. Bundle greedy alone: 6.418949702e6 in 30.2 s.
   - Aix: greedy's gaps of 0.58% / 2.74% / 0.92% (aix30 B=4, B=8, aix40 B=2) closed to the optimum in 0.6–4.5 s.
   - Share of greedy's gap closed: bike_small 16% / 100% / 100% at B=200 / 400 / 800; Quebec 76% / 9% / 0% at B=1000 / 5000 / 20000.
   - Bike B=5000: +0.0006% in 474 s. Bike B=10000: +0.045%, interrupted at 481 s. Bundle greedy reached only spend 1537 in 560 s at B=5000 and made no step at B=10000; against greedy at equal spend its edge is +0.38% / +0.02% interpolated (not the analyst's +0.69% / +0.20%), and −0.07% against the next greedy point. It needs a pre-filter (verifier). Green: no move in 459 s; bundle greedy +0.040% (gap 9.283% → 9.240%). In the verifier's words, "no improvement found in the time allowed": the neighbourhoods were truncated (study: primal-side, verifier).
@@ -384,7 +384,7 @@ drop label (P, D) at v  if  π_k q̄_t P P̄_t(v) (1 + 1e-12) − D < σ_p + max
 
 ### 3.6 Exactness tools for instances that converge (item 7)
 
-- **Status.** Analyst write-up, no separate review (study: tighter-relaxation); about 150 + 80 + 120 lines. These tools turn the 0.01–0.2% LP gaps of §1.4 into proofs. prep_mip already solves most such instances fast (Quebec, Aude and small Aix in 0.02–8.4 s).
+- **Status.** Analyst write-up, no separate review (study: tighter-relaxation); about 150 + 80 + 120 lines. These tools turn the 0.01–0.2% LP gaps of §1.4 into proofs. flow_mip already solves most such instances fast (Quebec, Aude and small Aix in 0.02–8.4 s).
 
 **(a) Lazy budget pricing.** Labels (P, D, W) on the split graph, with W = Σ c_o over the options paid.
 
@@ -449,7 +449,7 @@ dominance: ℓ1 ≽ ℓ2  iff  P1 ≥ P2  and  D1 + Σ_{o∈T2∖T1} λ̃_po ≤
 - **Effect.**
   - Equal to enumerate's LP on worst B=3 (8.06), test B=2 (5.5), Aix30 B=4 and B=8, Aix40 B=2 and B=4, Aix70 B=2 (2412298.1986), the bike crop at B=100, a 2-case min instance and biobj_aude B=5. Equal to search's LP on Quebec B=1000, Aude B=3 and B=8 and the bike crop at B=100.
   - Quebec B=1000 at parity: 5.48 s and 14 rounds, against 5.64 s and 16 rounds. Slower elsewhere: bike crop pricing 5.4–6.7 s against 3.6 s for melon's search; Aix70 B=2, 104 s against 20 s for enumerate.
-  - **Aix N2 B=100** (576 general options, 1,801 arcs improved by several options): converged in 87.6 s and 134 rounds, LP 1463.0565, bound 1463.1893, about 3.8k labels per search. With greedy_incr's 1457.6057 the gap is ≤ 0.383%, 87.3% of the gain. Nothing else runs on N2: enumerate stays in setup over 200 s, and prep_mip runs out of memory at 16 GB. Budget mode changes N2's LP by ≤ 0.002%.
+  - **Aix N2 B=100** (576 general options, 1,801 arcs improved by several options): converged in 87.6 s and 134 rounds, LP 1463.0565, bound 1463.1893, about 3.8k labels per search. With greedy_incr's 1457.6057 the gap is ≤ 0.383%, 87.3% of the gain. Nothing else runs on N2: enumerate stays in setup over 200 s, and flow_mip runs out of memory at 16 GB. Budget mode changes N2's LP by ≤ 0.002%.
   - Budget mode: worst B=3 gives 8.06 against 11.13 unbudgeted (optimum 7.46). Its cost grows with the number of affordable options per path: bike crop B=100 1.08 s against 3.6 s for search, B=400 over 120 s against 14.4 s, full bike B=1000 round 1 unfinished in 600 s.
   - The fewer-options tie-break matters: without it Quebec B=1000 takes over 209 rounds and 120 s, instead of 14 rounds and 5.5 s. It is a heuristic (it counts option uses), valid because it only chooses among labels that dominate each other.
   - **`--probe`**: price every pair once at enumerate's converged duals. The slack Σ_p max(0, r̄_p) is 0 for an exact pricing of the same family, and otherwise measures what the pricing adds to L at the optimum. Exact: 0 on Aix70 B=2 over 43,180 pairs. It is the cheapest test of a pricing's exactness.
@@ -482,7 +482,7 @@ step:         λ ← clip(λ − t s_p g),  s_p = gain_p = V_p − base_p,  t = 
   - bike_small: proved optimal (L − z ≤ 1e-9 z) at B=50 in 0.12 s, B=400 in 0.96 s and B=1600 in 1.7 s. At B=100 the best L is 116845.71, against the optimum 116843.65 and the converged path LP 116857.50; other passages of the same write-up give 116846.06. L falls below the converged path LP after about 60 iterations (0.3 s), while path_lp needs 289 rounds (4.1 s) to converge. The tail is slow: after 500 iterations B=200 stays at +0.033% and B=800 at +0.023% (verifier).
   - 40 random search-shaped instances: L reaches the optimum on 34 (36 with budget columns), against 5 for the converged path LP (verifier).
   - bike_mid: +0.0095% / +0.0084% / +0.020% above the optimum at B=200 / 900 / 1800, in 163–200 s, where path_lp's `lagrangian_bound` is still +4.84% / +3.65% / +2.88% above the optimum after 300 s, its master 0.34–1.89% below it (study: tighter-relaxation, analyst and its run logs).
-  - **Bike B=1000:** 7.817e6 → 6.667e6 in 8 iterations and 561 s, at 806 MB. That is about 5× better in gap than path_lp's column-generation bound (7.72e6, reached only after 786–870 s; verifier; the analyst wrote 20×), and 3.2% looser than prep_mip's 6.459e6 at 8.1 GB. Its knapsack was in effect the LP knapsack (R = 20000, see Conditions), so integrality on full bike is unmeasured.
+  - **Bike B=1000:** 7.817e6 → 6.667e6 in 8 iterations and 561 s, at 806 MB. That is about 5× better in gap than path_lp's column-generation bound (7.72e6, reached only after 786–870 s; verifier; the analyst wrote 20×), and 3.2% looser than flow_mip's 6.459e6 at 8.1 GB. Its knapsack was in effect the LP knapsack (R = 20000, see Conditions), so integrality on full bike is unmeasured.
   - **λ′ passes** (study: master-acceleration): raise the master's budget dual μ to μ′, spread the slack c_o (μ′ − μ) as virtual duals, and re-price: the LP-knapsack version of L(λ). Bike B=1000, round 1, pruned, μ′ = 60: 7.817 → 6.830e6 in 5 passes and 340 s, which the direct Lagrangian's 6.667e6 beats; since that run's knapsack was in effect the LP knapsack, the edge comes from per-pair multipliers, not integrality. Green: 3.247e13 after 6 passes of 7–26 s, worse than the prototype column generation's 3.068e13. bike_small: 3.7e-4 relative above the LP in round 1 after 20 passes (0.3 s), then a stall on degenerate duals. They belong in this item, not as their own option.
 - **Blocker.** Pricing per iteration grows from 0.49 to 138 s, and labels from 6.87e7 to 2.62e9 per iteration. The argmax columns shrink to about 5 options per pair, but every option a pair ever used keeps an intermediate λ, so its front stays biobjective. The analyst's projection of 50–100 iterations is unsupported: 2–4 hours at that rate. Green was never run.
 - **Density controls to try.**
@@ -538,7 +538,7 @@ score(x) ≤ Σ_k C_k + Σ_{p∈R} V_p + Σ_{p∉R} v_p(x)        for every budg
 ```
 
 - So moving R into the constant at V_p keeps a valid bound, looser by at most Σ_{p∈R} (V_p − base_p). Rule: per case, move the pairs with the smallest V_p − base_p while the cumulative slack stays ≤ ε · (case base score). It needs a true V_p (560ce44), φ nondecreasing, and base_p stored per pair rather than derived from the start column.
-- **Effect.** Quebec at ε = 1e-6: pairs 146,987 → 9,168 / 181,521 → 19,215 / 183,381 → 19,672 and times 5.1 → 0.6 s / 27.9 → 2.0 s / 34.1 → 2.2 s at B=1000 / 10000 / 20000; memory 463 → 181 MB; bound +9.5e-7 relative. The top 1% of Quebec's pairs carry 98.2% of the gain. At ε = 1e-4 the bound rises by 9.5e-5 relative, as much as Quebec's whole LP gap. prep_mip already solves Quebec exactly in 8.4 s. Bike and green barely gain (§5).
+- **Effect.** Quebec at ε = 1e-6: pairs 146,987 → 9,168 / 181,521 → 19,215 / 183,381 → 19,672 and times 5.1 → 0.6 s / 27.9 → 2.0 s / 34.1 → 2.2 s at B=1000 / 10000 / 20000; memory 463 → 181 MB; bound +9.5e-7 relative. The top 1% of Quebec's pairs carry 98.2% of the gain. At ε = 1e-4 the bound rises by 9.5e-5 relative, as much as Quebec's whole LP gap. flow_mip already solves Quebec exactly in 8.4 s. Bike and green barely gain (§5).
 - **Fixes.** ε = 0 by default, and ε ≤ relative_gap/10 when a gap target is given; report pairs_dropped and pair_bound_slack; keep base_value per pair. Enumerate mode drops pairs after enumerating them, so it saves no enumeration time.
 
 ## 4. Why the bike and green bounds stall
@@ -547,7 +547,7 @@ score(x) ≤ Σ_k C_k + Σ_{p∈R} V_p + Σ_{p∉R} v_p(x)        for every budg
 
 - Where the optimum is known, the converged path LP is close to it (§1.4), and greedy is close too: bike_small 0 / 0 / 0.0193% / 0.0054% / 0.0006% below the optimum at B=50 / 100 / 200 / 400 / 800; Quebec 0.0109% / 0.0206% / 0 / 0.0182% at B=1000 / 5000 / 10000 / 20000 (study: primal-side).
 - On bike B ≥ 5000 and on green, polishing barely moves the certified gap: bike B=5000 2.077% → 2.076%, B=10000 3.242% → 3.195%, green 9.283% → 9.240%. So the gap must close through the bound.
-- The verifier's correction: the evidence that these incumbents are near-optimal is weak. prep_mip never left its root node there (nodes: 1), and the local search was truncated. The supporting evidence is the crops, and extending it to full bike is the extrapolation of §1.4. Green's 9.3% comes from an unconverged bound (study: primal-side, verifier).
+- The verifier's correction: the evidence that these incumbents are near-optimal is weak. flow_mip never left its root node there (nodes: 1), and the local search was truncated. The supporting evidence is the crops, and extending it to full bike is the extrapolation of §1.4. Green's 9.3% comes from an unconverged bound (study: primal-side, verifier).
 
 ### 4.2 Round 1 buys whole paths
 
@@ -588,10 +588,10 @@ score(x) ≤ Σ_k C_k + Σ_{p∈R} V_p + Σ_{p∉R} v_p(x)        for every budg
 
 | Instance | Incumbent | Bound | Gap | Gain share ≥ | Sources |
 |---|---|---|---|---|---|
-| bike B=1000 | 6.41897e6 | 6.45909e6 | 0.62% | 81.5% | both from prep_mip (600 s, 8.1 GB); local search reaches the incumbent in 88 s. path_lp's own bound: 20.3% (7.72e6); Lagrangian prototype: 3.9% (6.667e6 in 561 s) |
-| bike B=5000 | 6.80864e6 | 6.95043e6 | 2.08% | 80.0% | greedy and local search, prep_mip's bound |
-| bike B=10000 | 7.05972e6 | 7.28527e6 | 3.20% | 78.4% | greedy and local search (cut by its time limit), prep_mip's bound; prep_mip's own incumbent is empty |
-| green B=5 | 2.83266e13 | 3.0944e13 | 9.24% | 36.0% | bundle greedy; path_lp's bound (f0da701, 600 s); prep_mip runs out of memory |
+| bike B=1000 | 6.41897e6 | 6.45909e6 | 0.62% | 81.5% | both from flow_mip (600 s, 8.1 GB); local search reaches the incumbent in 88 s. path_lp's own bound: 20.3% (7.72e6); Lagrangian prototype: 3.9% (6.667e6 in 561 s) |
+| bike B=5000 | 6.80864e6 | 6.95043e6 | 2.08% | 80.0% | greedy and local search, flow_mip's bound |
+| bike B=10000 | 7.05972e6 | 7.28527e6 | 3.20% | 78.4% | greedy and local search (cut by its time limit), flow_mip's bound; flow_mip's own incumbent is empty |
+| green B=5 | 2.83266e13 | 3.0944e13 | 9.24% | 36.0% | bundle greedy; path_lp's bound (f0da701, 600 s); flow_mip runs out of memory |
 | Aix N2 B=100 | 1457.61 | 1463.19 | 0.38% | 87.3% | greedy_incr; generic exact pricing (prototype, 88 s) |
 
 "Gain share" is the share of the possible gain over the base score that the incumbent is guaranteed to reach (study: decision page).
@@ -607,13 +607,13 @@ score(x) ≤ Σ_k C_k + Σ_{p∈R} V_p + Σ_{p∉R} v_p(x)        for every budg
 | Enumerate at scale (landed, §2.4) | Green explodes at B=0.5; bike never finishes at B=50 (1.6e15 labels per pair at B=1000); N2 stays in setup over 200 s; Quebec B=10000 needs 2.2 GB against 457 MB for search | 8429409; c7754f5; study: generic-pricing |
 | Budget pricing on full bike and green | Bike B=1000: the 3-resource search runs out of memory at 13.8 GB uncapped, and round 1 takes 240 s with a 2M-label cap (8,544 pairs capped); the generic budget mode does not finish round 1 in 600 s. A no-op at B ≥ 5000 and on green B=5, where 2.6% and 0.7% of the round-1 columns exceed B. It stays useful on converging instances (§3.6a) | study: tighter-relaxation, generic-pricing |
 | Relaxed charging (λ_po/m_o per element of a general option) | Valid only after aggregating quality entries (instance 253: 27.57 against an optimum of 36 before). Weak: slack 4.9% on Aix40 B=2 and 7.9% on Aix70 B=2 against integrality gaps of 0.034–0.17%, because paths use 0.085–0.54 of an option's elements; column generation stalls (N2 bound +3.65%) | study: generic-pricing |
-| Per-pair budget bound (resource-constrained Dijkstra, multiplier ν on cost) | Bike B=1000: 7.225e6 in seconds, 12.9% above greedy, against prep_mip's 0.62%; round-7 duals add nothing (7.2252e6). 99.9–100% of the budget-free bound at B ≥ 5000; green's gain ratio is 1.000 at B=5. Its cap can push L below z_RMP, so it would need its own stat | study: reduction |
+| Per-pair budget bound (resource-constrained Dijkstra, multiplier ν on cost) | Bike B=1000: 7.225e6 in seconds, 12.9% above greedy, against flow_mip's 0.62%; round-7 duals add nothing (7.2252e6). 99.9–100% of the budget-free bound at B ≥ 5000; green's gain ratio is 1.000 at B=5. Its cap can push L below z_RMP, so it would need its own stat | study: reduction |
 | Integral knapsack at the master's own duals | At an optimal RMP dual with a tight budget, every option the RMP buys ties at ratio μ, so K_LP − K ≤ μ (B − the best tied subset sum ≤ B). bike_small: 0.0134 at B=100, ≤ 0.0036 at B=200–3200; only B=50 (0.707) closed the gap. Needs re-optimised duals (§3.6b, §3.8). The lagrangian-dual verifier recommended it, with the exact knapsack, for converging instances; this measurement overrides that | study: tighter-relaxation; lagrangian-dual, verifier |
 | DW knapsack hull from round 1 | Tails: bike_small B=800, 853 rounds and 178 s with 1.14% of the gain left; B=1600 and B=3200 time out. Kept as an end phase (§3.6b) | study: tighter-relaxation |
 | λ′ passes as their own option | The LP-knapsack version of §3.8: 6.830e6 on bike B=1000, which the direct Lagrangian's 6.667e6 beats (its knapsack was in effect the LP knapsack too, so the edge is the per-pair multipliers, not integrality); passes grow from 21 to 99 s; green 3.247e13 after 6 passes, worse than the prototype column generation's 3.068e13; they stall on bike_small after round 1 (degenerate duals) | study: master-acceleration, lagrangian-dual, verifiers |
 | Snap-to-cap multipliers | Refuted: K(Λ) grows with Λ. One pair, options o1 and o2 of cost 1, B=1, values 10 and 9: L = 10 at λ = (5, 5), and 14 after snapping o2 to its cap 9 | study: lagrangian-dual, verifier |
 | Unit step scaling, naive volume method | Equal to or worse than gain-scaled Polyak on bike_small | study: lagrangian-dual |
-| Reduced-cost option fixing, then prep_mip | Bike: 0 options fixed at the 20.8% or 0.62% gaps. At the round-7 duals, at least about 736 of 1,642 options survive at any realistic gap (906 fixable at 0.001%, 2 at 0.1%). bike_small with converged duals: 58–66% at a 1e-5 gap, not the analyst's 85%. The fast prep_mip runs on 140 and 256 options used sets built from known solutions. The analyst's K form is invalid with criterion constants (cx2: L = 0.9 against 10.9). The primal-side argument from single-option gains omits the −μ c_o term of the reduced cost; its conclusion holds | study: reduction, verifier; primal-side |
+| Reduced-cost option fixing, then flow_mip | Bike: 0 options fixed at the 20.8% or 0.62% gaps. At the round-7 duals, at least about 736 of 1,642 options survive at any realistic gap (906 fixable at 0.001%, 2 at 0.1%). bike_small with converged duals: 58–66% at a 1e-5 gap, not the analyst's 85%. The fast flow_mip runs on 140 and 256 options used sets built from known solutions. The analyst's K form is invalid with criterion constants (cx2: L = 0.9 against 10.9). The primal-side argument from single-option gains omits the −μ c_o term of the reduced cost; its conclusion holds | study: reduction, verifier; primal-side |
 | LP probing for fixing | Fixes 95 of 98 and 102 of 112 options on bike_small, but one column-generation run per option; 0 at a 0.3% gap | study: reduction |
 | Pendant pair aggregation | −8.1% pairs on bike, −4.4% on Quebec, 0% on green | study: reduction |
 | Useless-option and dominance tests | 0 of 1,642 bike options useless: each can improve 22,475 of 63,504 pairs on average. Dominance: no figure reported | study: reduction |
@@ -633,7 +633,7 @@ The owner's six questions from the study's decision page, answered where marked:
 1. **The fixes branch.** Merge `path-rr-search-fixes` as is? Should the parser also reject an improved probability below the base?
 2. **Item 2.** May path_lp's returned solution change from the over-budget cast to a feasible incumbent, with best_bound and a gap (§3.1)? Answered 2026-11-03: yes, for path_lp only; tree_lp keeps its cast.
 3. **Items 4 and 5.** Rebuild greedy_incr on the incremental evaluator? Should local search be `--polish` on the heuristics, or a solver of its own (§3.3, §3.4)?
-4. **The certificate for bike-like instances.** Is prep_mip's bound (8 GB, 600 s) acceptable for now? path_lp would then cover the instances prep_mip cannot hold, like green and N2.
+4. **The certificate for bike-like instances.** Is flow_mip's bound (8 GB, 600 s) acceptable for now? path_lp would then cover the instances flow_mip cannot hold, like green and N2.
 5. **Item 9.** Run the density-control experiment next (§3.8)? It also answers whether full bike's LP is as tight as its crops.
 6. **Item 10.** Land the barrier, through mippp's lp_algorithm selector? Value scaling (open item C5) is needed either way (§3.9).
 

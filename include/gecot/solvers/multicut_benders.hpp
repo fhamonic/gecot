@@ -12,8 +12,6 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 
-#include <tbb/concurrent_vector.h>
-
 #include "mippp/solvers/gurobi/all.hpp"
 
 #include "melon/algorithm/network_voronoi.hpp"
@@ -63,9 +61,6 @@ struct multicut_benders : public mip_solver_base {
     grouping groups = grouping::voronoi;
     std::size_t random_seed = 0;
     bool tight_big_M = false;
-    // for comparison: no strong nor useless arcs, so each target keeps the
-    // whole graph
-    bool no_preprocessing = false;
 
     // The targets of a case in the order of their groups, and the position
     // of the first target of each group, then their number. The kernels of
@@ -219,15 +214,9 @@ struct multicut_benders : public mip_solver_base {
             instance.template create_case_map<std::vector<target_data>>();
         auto groups = instance.template create_case_map<std::vector<group>>();
         for(auto && instance_case : instance.cases()) {
-            using arcs =
-                tbb::concurrent_vector<melon::arc_t<instance_graph_t<I>>>;
             const auto [strong_arcs_map, useless_arcs_map] =
-                no_preprocessing
-                    ? std::make_pair(
-                          melon::create_vertex_map<arcs>(instance_case.graph()),
-                          melon::create_vertex_map<arcs>(instance_case.graph()))
-                    : _compute_strong_and_useless_arcs(instance, instance_case,
-                                                       budget);
+                _compute_strong_and_useless_arcs(instance, instance_case,
+                                                 budget);
             spdlog::debug("Computing contractions and big-Ms of the '{}' graph",
                           instance_case.name());
             auto & case_targets = targets[instance_case.id()];

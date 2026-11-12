@@ -15,6 +15,8 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 
+#include <tbb/concurrent_vector.h>
+
 #include "mippp/model_concepts.hpp"
 #include "mippp/solvers/gurobi/all.hpp"
 
@@ -45,6 +47,9 @@ struct mip_solver_base {
     double probability_resolution = 1e-8;
     int num_mus = 0;
     bool decades_sweep = true;
+    // for comparison: no strong nor useless arcs, so each target keeps the
+    // whole graph
+    bool no_preprocessing = false;
     std::optional<std::vector<std::string>> mip_start;
     std::optional<double> time_limit;
 
@@ -117,6 +122,12 @@ struct mip_solver_base {
     auto _compute_strong_and_useless_arcs(const I & instance,
                                           const C & instance_case,
                                           const double budget) const {
+        if(no_preprocessing) {
+            using arcs = tbb::concurrent_vector<melon::arc_t<case_graph_t<C>>>;
+            return std::make_pair(
+                melon::create_vertex_map<arcs>(instance_case.graph()),
+                melon::create_vertex_map<arcs>(instance_case.graph()));
+        }
         if(num_mus >= 1) {
             return compute_constrained_strong_and_useless_arcs(
                 instance, instance_case, budget,

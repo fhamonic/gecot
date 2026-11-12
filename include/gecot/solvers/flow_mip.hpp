@@ -24,7 +24,7 @@
 namespace gecot {
 namespace solvers {
 
-struct preprocessed_mip : public mip_solver_base {
+struct flow_mip : public mip_solver_base {
     // experimental: compute_tight_big_M_maps' big-Ms
     bool tight_big_M = false;
     // experimental: the options continuous, for the root relaxation's bound
@@ -279,7 +279,7 @@ struct preprocessed_mip : public mip_solver_base {
 
         if(tight_big_M)
             spdlog::debug(
-                "prep_mip tight big-Ms: arcs {:.4g} of the knapsack ones ({} "
+                "flow_mip tight big-Ms: arcs {:.4g} of the knapsack ones ({} "
                 "of {} halved at least), target gains {:.4g}",
                 arc_M_old_sum > 0 ? arc_M_sum / arc_M_old_sum : 1.0,
                 arc_M_halved, arc_M_count,

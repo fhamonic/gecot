@@ -24,7 +24,7 @@ namespace gecot {
 // o improving it, bounding the flow that leaves u on a improved by o, and one
 // per option with a target quality gain at t, bounding the flow F_t reaching t
 // when the option is bought. The graph gives each arc a base probability and
-// the (improved probability, option) pairs of its improvements; prep_mip's
+// the (improved probability, option) pairs of its improvements; flow_mip's
 // graph has an arc of base probability 0 per improvement.
 //
 // A big-M is valid if, for every x within the budget that buys o, some flow

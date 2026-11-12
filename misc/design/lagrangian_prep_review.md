@@ -23,7 +23,7 @@ Caveat: every Aix number below uses the working-tree Aix CSVs, which carry the o
 - **Negative controls.** All three were caught heavily. Dropping the blue penalty in the strong loop gives 1.36M violations; doubling the shares gives 6.3k; dropping the blue penalty in the useless loop gives 0.88M.
 - **Real instances.** Full enumeration on aix30_4, aix40_2 and aix70_2 (one target in eight on aix70_2, 8104 scenarios) found 0 pairs off by more than 1e-9. The CLI optimum is identical for --nb-mus 0 and 10 on Aude B=3, Aude B=5 and Aix30 B=4.
 
-**Strength: the multiplier grid almost never tests its best multiplier.** I reran prep_mip on aix70 at B=2 with --big-m tight, once per setting:
+**Strength: the multiplier grid almost never tests its best multiplier.** I reran flow_mip on aix70 at B=2 with --big-m tight, once per setting:
 
 | --nb-mus | Multipliers actually run | Variables | Lagrangian prep | Total | Optimum |
 |---|---|---|---|---|---|
@@ -53,7 +53,7 @@ Do not test --nb-mus 10 as is: it drops max_mu, so it measures a broken grid. Ei
 | A4 | **mu·B ≥ 2^64**: the uint64 cast (line 45) gives a budget penalty of 0 (UINT64_MAX with -march=native). | **Invalid labels and a wrong optimum**, reproduced end to end with the shipped CLI. | Needs cost ratios of about 1e10 or a tiny --resolution. Real instances are 7-11 orders of magnitude below (Quebec 4.5e11, aix70 B=5 8.6e7). | Skip any mu with mu·B ≥ 2^62: such a mu cannot add a label. |
 | A5 | **UB cast for options with no arc in the case**: c/0 = inf, then 0·inf = NaN or mu·inf, cast at line 111. | The value is never used. GCC's UBSan only flags it with -fsanitize=float-cast-overflow (clang's -fsanitize=undefined does). | Every --nb-mus ≥ 1 run with vertex-only options, options that only touch another case, or options whose arcs fall inside a contracted SCC. | `continue` on empty `arcs_options[i]`, before lines 80 and 109. |
 | A6 | **The bottom of the grid is wasted.** min_mu = 1/max share is a one-unit (1e-8 nat) penalty, so 5-8 of the 10 positive points add nothing: 5/10 on aix70_2, 7/10 on Aix30 B=4, 6/10 on Quebec. | Time only. | All runs. | See "Grid shape" below. |
-| A7 | **No test exercises the function on an affordable scenario.** fuzzy_test checks the all-options scenario, which lies outside X^β for the constrained branch. The constrained branch is wired only to prep_mip and tree_lp. | Coverage. | n/a | Turn the fuzz harness into a gtest: brute force over X^β plus the end-to-end F_t check. Add crafted cases for A1, A2 and A4. |
+| A7 | **No test exercises the function on an affordable scenario.** fuzzy_test checks the all-options scenario, which lies outside X^β for the constrained branch. The constrained branch is wired only to flow_mip and tree_lp. | Coverage. | n/a | Turn the fuzz harness into a gtest: brute force over X^β plus the end-to-end F_t check. Add crafted cases for A1, A2 and A4. |
 
 **Grid shape**, where the verifiers disagree. The useful window depends on the instance:
 - **Aix:** the top step of the grid, [max_mu/5, max_mu].
@@ -73,7 +73,7 @@ Conforming and valid:
 - **Useless loop, source u.** u is a contestable blue source at ⌊μβ⌋, where the thesis fixes u blue at 0 and puts μβ on u's out-arcs. The two agree when lengths are positive. With zero-length cycles the code's version is the valid one, and the thesis version produced invalid labels (1,547 in 3,000 random instances).
 
 **The one real deviation (TC1/LP5): the strong loop lets red win ties** (useless_arc_default_traits, lines 135-138). The thesis lets blue win (lines 126 and 486-488).
-- **Same in N=0.** The unconstrained compute_strong_and_useless_arcs.hpp:145-148 has the same rule, so every prep_mip run is affected, not just --nb-mus.
+- **Same in N=0.** The unconstrained compute_strong_and_useless_arcs.hpp:145-148 has the same rule, so every flow_mip run is affected, not just --nb-mus.
 - **Deliberate.** Commit 83729a6 (2023-06-27) switched both strong loops while debugging the contraction.
 - **Load-bearing.** On raw Aix 30x30, which has 10 zero-length SCCs, blue ties break 2464/2464 end-to-end checks. A self-loop guard still leaves 2450 broken. A second reason: floating-point rounding can make Σ ⌊μ c_i/|A_i|⌋ along a path exceed ⌊μβ⌋ by one unit, and the strict rule absorbs it. This was never observed.
 - **What blue ties would gain.** On the reformulated instances, blue ties were valid in every check (0/987 on Aix30 at 10%, 0/567 exhaustive on Aix30 at 2%, 0/858 on Aix40). They give +28-32% strong labels on Aix (aix70 B=10: 2,037,687 vs 1,593,378), only +0.3% on Quebec, and about 16% more contracted sources.
@@ -124,7 +124,7 @@ The clamp p < 1e-8 → finite length, and flooring each arc's length, make label
 3. **Empty options:** `continue` on empty `arcs_options[i]`. This fixes A5.
 4. **Thesis text:** the C list.
 5. **Experiments for the owner to decide:**
-   - (a) prep_mip end-to-end timings over a budget sweep with the fixed grid. Keep --nb-mus opt-in until then, because of B=5.
+   - (a) flow_mip end-to-end timings over a budget sweep with the fixed grid. Keep --nb-mus opt-in until then, because of B=5.
    - (b) Blue-wins ties behind the integer-zero-SCC guard, on the N=0 path as well, timed end to end.
    - (c) Grid shape: include max_mu, plus 2-3 decades below it.
 6. **Test:** the gtest of A7.

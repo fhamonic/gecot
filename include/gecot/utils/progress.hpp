@@ -26,7 +26,7 @@ inline std::function<void(const progress &)> report_progress =
 // Set, also from a signal handler, to stop the running algorithm: it returns
 // its best result so far, with status "interrupted". A MIP solver sees it only
 // in its progress callback, which the solver may not call during its presolve
-// or root relaxation (prep_mip on Quebec: 2 s after a stop asked at 1 s).
+// or root relaxation (flow_mip on Quebec: 2 s after a stop asked at 1 s).
 inline std::atomic<bool> stop_requested = false;
 
 }  // namespace gecot

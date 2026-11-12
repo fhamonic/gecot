@@ -85,7 +85,7 @@ public:
         , target_big_M_map(std::move(target_big_M_map_)) {}
 };
 
-// the graph prep_mip contracts from the labels of original_t, so an
+// the graph flow_mip contracts from the labels of original_t, so an
 // improvement is an arc of its own, of base probability 0
 template <instance_c I, case_c C>
 contracted_graph_data<C> compute_contracted_graph_data(

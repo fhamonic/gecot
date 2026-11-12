@@ -9,13 +9,12 @@
 #include "bound_interfaces/split_lagrange_interface.hpp"
 
 #include "solver_interfaces/flow_benders_interface.hpp"
+#include "solver_interfaces/flow_mip_interface.hpp"
 #include "solver_interfaces/greedy_decremental_interface.hpp"
 #include "solver_interfaces/greedy_incremental_interface.hpp"
-#include "solver_interfaces/mip_interface.hpp"
 #include "solver_interfaces/multicut_benders_interface.hpp"
 #include "solver_interfaces/multiflow_benders_interface.hpp"
 #include "solver_interfaces/path_formulation_lp_interface.hpp"
-#include "solver_interfaces/preprocessed_mip_interface.hpp"
 #include "solver_interfaces/static_decremental_interface.hpp"
 #include "solver_interfaces/static_incremental_interface.hpp"
 #include "solver_interfaces/tree_formulation_lp_interface.hpp"
@@ -27,8 +26,7 @@ std::vector<std::shared_ptr<AbstractSolverInterface>> make_solver_interfaces() {
             std::make_unique<StaticDecrementalInterface>(),
             std::make_unique<GreedyIncrementalInterface>(),
             std::make_unique<GreedyDecrementalInterface>(),
-            std::make_unique<mipInterface>(),
-            std::make_unique<PreprocessedmipInterface>(),
+            std::make_unique<FlowMipInterface>(),
             std::make_unique<MulticutBendersInterface>(),
             std::make_unique<FlowBendersInterface>(),
             std::make_unique<MultiflowBendersInterface>(),
@@ -46,12 +44,9 @@ std::vector<std::shared_ptr<AbstractBoundInterface>> make_bound_interfaces() {
     // the algorithms whose relaxation proves a bound; tree_lp's pricing can
     // miss improving trees, so its relaxation value bounds nothing
     const std::vector<std::pair<std::string, std::string>> proving_algorithms{
-        {"mip",
-         "Dual bound of the MIP solver, the optimum unless --time-limit stops "
-         "it; needs an incumbent."},
-        {"prep_mip",
-         "Dual bound of the preprocessed MIP, exact up to --resolution; needs "
-         "an incumbent."},
+        {"flow_mip",
+         "Dual bound of the flow MIP, exact up to --resolution; needs an "
+         "incumbent."},
         {"multicut_benders",
          "Dual bound of the multicut Benders master; needs an incumbent."},
         {"flow_benders",

@@ -1,15 +1,15 @@
 #pragma once
 
-#include "gecot/solvers/preprocessed_mip.hpp"
+#include "gecot/solvers/flow_mip.hpp"
 
 #include "solver_interfaces/abstract_mip_interface.hpp"
 
-class PreprocessedmipInterface : public AbstractMipInterface {
+class FlowMipInterface : public AbstractMipInterface {
 private:
-    gecot::solvers::preprocessed_mip solver;
+    gecot::solvers::flow_mip solver;
 
 public:
-    PreprocessedmipInterface() : AbstractMipInterface("prep_mip") {
+    FlowMipInterface() : AbstractMipInterface("flow_mip") {
         add_mip_options(solver);
         add_preprocessing_options(solver);
         app.add_option_function<std::string>(
@@ -29,8 +29,9 @@ public:
                                         const double B) const override;
 
     std::string description() const override {
-        return "mip formulation with preprocessing, from 'Optimizing the "
-               "ecological connectivity of landscapes', F.\u00A0Hamonic, "
+        return "MIP with a generalized flow per target, preprocessed, from "
+               "'Optimizing the ecological connectivity of landscapes', "
+               "F.\u00A0Hamonic, "
                "C.\u00A0H.\u00A0Albert, B.\u00A0Couëtoux, Y.\u00A0Vaxès";
     }
 };

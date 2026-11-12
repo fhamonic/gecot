@@ -170,6 +170,10 @@ protected:
                "cost per arc (needs --nb-mus > 0; experimental)")
             ->check(CLI::IsMember({"decades", "full"}))
             ->default_val("decades");
+        app.add_flag("--no-preprocessing", solver.no_preprocessing,
+                     "For comparison: skips the computation of the strong and "
+                     "useless arcs, so no graph is contracted and "
+                     "--resolution, --nb-mus and --mus-sweep have no effect");
     }
 
 private:

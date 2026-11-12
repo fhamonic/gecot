@@ -42,10 +42,6 @@ public:
                "per arc over the sources that can use it")
             ->check(CLI::IsMember({"knapsack", "tight"}))
             ->default_val("knapsack");
-        app.add_flag("--no-preprocessing", solver.no_preprocessing,
-                     "For comparison: skips the computation of the strong and "
-                     "useless arcs, so no graph is contracted and "
-                     "--resolution, --nb-mus and --mus-sweep have no effect");
     }
 
     gecot::solve_result<Instance> solve(const Instance & instance,

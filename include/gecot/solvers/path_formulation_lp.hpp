@@ -652,6 +652,7 @@ struct path_formulation_lp : public mip_solver_base {
                 report.status = stop_requested ? "interrupted"
                                 : time_up()    ? "time limit reached"
                                                : "master not solved";
+                report_progress({.end = true});
                 spdlog::warn("Column generation stopped: {}", report.status);
                 break;
             }
@@ -847,6 +848,7 @@ struct path_formulation_lp : public mip_solver_base {
                 if(relative_gap > 0 &&
                    report.best_bound.value() - master_value <=
                        relative_gap * master_value) {
+                    report_progress({.end = true});
                     spdlog::debug(
                         "Column generation stopped: relative gap reached");
                     report.status = "relative gap reached";
@@ -883,12 +885,14 @@ struct path_formulation_lp : public mip_solver_base {
                               }))
                     : columns.activate_columns(model, improving, add_column);
             if(!num_activated && !cut_short) {
+                report_progress({.end = true});
                 spdlog::debug("Column generation stopped: converged");
                 break;
             }
             if(stop_requested || time_up()) {
                 report.status =
                     stop_requested ? "interrupted" : "time limit reached";
+                report_progress({.end = true});
                 spdlog::warn("Column generation stopped: {}", report.status);
                 break;
             }

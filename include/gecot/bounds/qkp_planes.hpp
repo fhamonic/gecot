@@ -27,6 +27,7 @@
 #include "gecot/concepts/instance.hpp"
 #include "gecot/indices/parallel_pc_num.hpp"
 #include "gecot/indices/pc_num.hpp"
+#include "gecot/utils/log_table.hpp"
 
 namespace gecot {
 
@@ -264,6 +265,10 @@ struct qkp_planes {
             const double aim = weighted_target.value_or(0.9 * best);
             double step = 2.0;
             std::size_t stall = 0;
+            log_table<spdlog::level::trace, 20, 9, 14, 14> steps(
+                {"iteration", log_format::fixed(0)},
+                {"bound", log_format::general(12)},
+                {"best", log_format::general(12)});
             for(std::size_t iteration = 0; iteration < iterations;
                 ++iteration) {
                 const double b = evaluate(stored, u, &x, &y);
@@ -299,8 +304,7 @@ struct qkp_planes {
                         theta[i * n + j] = (a + M - c) / 2;
                         theta[j * n + i] = (c + M - a) / 2;
                     }
-                spdlog::trace("qkp_planes: iteration {}: bound {}, best {}",
-                              iteration, b, best);
+                steps.row(iteration, b, best);
             }
         }
 

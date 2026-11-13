@@ -136,6 +136,7 @@ struct Greedy {
                         options_ratios[worst_option] * worst_option_price,
                         purchased);
         }
+        removed.end();
 
         if(!decremental || !only_dec) {
             // the removals left their rounding errors in previous_score

@@ -174,6 +174,7 @@ $ gecot optimize multicut_benders instance.json 8 --preprocessing none --time-li
 [   0.0s] Budget 8: 28.17 % of the options' total cost (28.4)
 [   0.1s] Solving the optimization model
 [   2.2s] Ctrl-C stops the algorithm and keeps its best result so far
+[   2.2s] -------------+--------------+-------------
 [   2.2s]     gain     |   max gain   |  guaranteed
 [   2.2s] -------------+--------------+-------------
 [   2.2s]     +20.20 % |     +60.87 % |       33.1 %
@@ -181,14 +182,15 @@ $ gecot optimize multicut_benders instance.json 8 --preprocessing none --time-li
 [  12.5s]     +22.97 % |     +46.92 % |       48.9 %
 [  17.6s]     +22.97 % |     +45.36 % |       50.6 %
 [  22.7s]     +22.97 % |     +44.04 % |       52.1 %
-[  25.5s] warning: Solver stopped: time limit reached
+[  25.0s] -------------+--------------+-------------
+[  25.0s] warning: Solver stopped: time limit reached
 ```
 
 The first lines say what was read: the options, the cases, and for each case its vertices (those of positive quality counted as habitats), its arcs and how many of them some option improves, then the budget as a share of the total cost of the options.
 
 ### Progress
 
-When the algorithm runs for more than two seconds, a table follows its progress, with a new row when a value changes: at most every five seconds, and at least every minute. Its header comes again every 20 rows, and a value that is not known yet reads `-`.
+When the algorithm runs for more than two seconds, a table follows its progress, with a new row when a value changes: at most every five seconds, and at least every minute. Its header comes again every 20 rows, a value that is not known yet reads `-`, and a rule closes the table when the algorithm stops or goes on to another step.
 
 For `flow_mip` and the Benders decompositions:
 
@@ -203,6 +205,7 @@ The run above was stopped by its time limit with a solution proved to reach 52 %
 For `path_lp` and `tree_lp`, each row is a round of the column generation:
 
 ```text
+[   2.1s] -------------+--------------+-------------
 [   2.1s]    round     |  relaxation  |   max gain
 [   2.1s] -------------+--------------+-------------
 [   2.1s]            7 |     +22.06 % |     +24.67 %
@@ -220,10 +223,29 @@ For `path_lp` and `tree_lp`, each row is a round of the column generation:
 |---|---|
 | `-q` | errors only |
 | (default) | the steps of the run, the progress, the warnings |
-| `-v` | also the parameters of the algorithm with their values, the size of the instance after its reformulation, the factor by which the qualities are divided, the numbers of strong and useless arcs, the size of the model; the progress table has a row every second or every round, and a `nodes` column |
+| `-v` | also the parameters of the algorithm with their values, the size of the instance after its reformulation, the factor by which the qualities are divided, a table of the preprocessing of each species, the size of the model; the progress table has a row every second or every round, and a `nodes` column |
 | `-vv` | also the details of each step, such as a table of the options that a heuristic buys or removes, and the solver's own log, which goes to the standard output |
 
 With `-v`, the line `Qualities divided by ...` gives the factor of the [rescaling](../formulations/preprocessing.md#the-instance-given-to-the-algorithms): the solver's own log is in the rescaled unit, everything else in the unit of the instance.
+
+With `-v` again, the algorithms that [preprocess](../formulations/preprocessing.md) the graphs log a table once every species is preprocessed, here for `flow_benders`:
+
+```text
+[   0.0s] Preprocessing the 'squirrel' graph
+[   0.1s] Computing contractions and big-Ms of the 'squirrel' graph
+[   0.1s] -------------+-------------+--------------+------------+-----------
+[   0.1s]   species    | strong arcs | useless arcs |  vertices  |    arcs
+[   0.1s]              | per target  |  per target  | per target | per target
+[   0.1s] -------------+-------------+--------------+------------+-----------
+[   0.1s]     squirrel |     2740.35 |      2347.32 |     213.37 |     558.01
+[   0.1s] -------------+-------------+--------------+------------+-----------
+```
+
+| Column | Meaning |
+|---|---|
+| `strong arcs per target`, `useless arcs per target` | the arcs that the graph of a target loses, contracted or removed, on average over the targets of the species; 0 for a kind that `--preprocessing` switches off |
+| `vertices per target`, `arcs per target` | for `flow_benders`, the size of the graph of a target once preprocessed, on average |
+| `targets per group` | for `multicut_benders`, the number of targets of each group of the species |
 
 ### Ctrl-C
 

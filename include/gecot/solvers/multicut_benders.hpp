@@ -211,6 +211,8 @@ struct multicut_benders : public mip_solver_base {
             instance.template create_case_map<std::vector<target_data>>();
         auto cases_groups =
             instance.template create_case_map<std::vector<group>>();
+        // with the number of targets of each group
+        std::vector<preprocessing_row<std::string>> preprocessing;
         for(auto && instance_case : instance.cases()) {
             const auto [strong_arcs_map, useless_arcs_map] =
                 _compute_strong_and_useless_arcs(instance, instance_case,
@@ -235,16 +237,21 @@ struct multicut_benders : public mip_solver_base {
             for(std::size_t g = 0; g + 1 < firsts.size(); ++g)
                 case_groups.push_back(
                     {model.add_variable(), firsts[g], firsts[g + 1]});
-            spdlog::debug(
-                "  {} groups of {} targets", case_groups.size(),
-                fmt::join(std::views::transform(
-                              case_groups,
-                              [](const group & g) { return g.last - g.first; }),
-                          ", "));
+            preprocessing.emplace_back(
+                instance_case.name(),
+                _average_size(instance_case, strong_arcs_map),
+                _average_size(instance_case, useless_arcs_map),
+                fmt::format("{}", fmt::join(std::views::transform(
+                                                case_groups,
+                                                [](const group & g) {
+                                                    return g.last - g.first;
+                                                }),
+                                            ", ")));
             model.add_constraint(
                 z(instance_case.id()) <=
                 xsum(std::views::transform(case_groups, &group::theta)));
         }
+        _log_preprocessing(preprocessing, log_column<22>{"targets per group"});
 
         auto cut = [&](const target_data & data, const auto & Y,
                        const auto & rho) {

@@ -213,10 +213,15 @@ struct tree_formulation_lp : public mip_solver_base {
         std::vector<pricing_model<I, MILP>> targets;
         std::vector<constraint_t> uniqueness_rows;
         std::vector<std::flat_map<option_t, constraint_t>> purchase_rows;
+        std::vector<preprocessing_row<>> preprocessing;
         for(const auto & instance_case : instance.cases()) {
             const auto [strong_arcs_map, useless_arcs_map] =
                 _compute_strong_and_useless_arcs(instance, instance_case,
                                                  budget);
+            preprocessing.emplace_back(
+                instance_case.name(),
+                _average_size(instance_case, strong_arcs_map),
+                _average_size(instance_case, useless_arcs_map));
             z.push_back(model.add_variable());
             contribution_rows.push_back(model.add_constraint(z.back() <= 0));
             // the vertices of positive quality or quality gain as a target
@@ -241,6 +246,7 @@ struct tree_formulation_lp : public mip_solver_base {
                                x(o)));
             }
         }
+        _log_preprocessing(preprocessing);
         model.set_objective(std::visit(
             formula_variable_visitor{model,
                                      [&](const case_id_t & k) { return z[k]; }},
@@ -429,12 +435,14 @@ struct tree_formulation_lp : public mip_solver_base {
                 },
                 add_tree);
             if(!num_activated && !cut_short) {
+                report_progress({.end = true});
                 spdlog::debug("Column generation stopped: converged");
                 break;
             }
             if(stop_requested || time_up()) {
                 report.status =
                     stop_requested ? "interrupted" : "time limit reached";
+                report_progress({.end = true});
                 spdlog::warn("Column generation stopped: {}", report.status);
                 // Gurobi, CPLEX and COPT give no solution for a master
                 // changed since its last solve, HiGHS a zero value

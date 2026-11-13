@@ -368,10 +368,15 @@ struct multiflow_benders : public mip_solver_base {
 
         std::vector<target_block> blocks;
         std::vector<model_variable_t<M>> F, F_prime;
+        std::vector<preprocessing_row<>> preprocessing;
         for(auto && instance_case : instance.cases()) {
             const auto [strong_arcs_map, useless_arcs_map] =
                 _compute_strong_and_useless_arcs(instance, instance_case,
                                                  budget);
+            preprocessing.emplace_back(
+                instance_case.name(),
+                _average_size(instance_case, strong_arcs_map),
+                _average_size(instance_case, useless_arcs_map));
             spdlog::debug("Computing contractions of the '{}' graph",
                           instance_case.name());
             const auto z_row = model.add_constraint(z(instance_case.id()) <= 0);
@@ -399,6 +404,7 @@ struct multiflow_benders : public mip_solver_base {
                 }
             }
         }
+        _log_preprocessing(preprocessing);
         tbb::parallel_for(
             std::size_t{0}, blocks.size(),
             [&](const std::size_t i) { blocks[i].compute_sources(); });
@@ -408,7 +414,7 @@ struct multiflow_benders : public mip_solver_base {
             for(const auto & source : block.sources)
                 num_source_arcs += source.arcs.size();
         }
-        spdlog::debug("  {} targets, {} sources, {} arcs over the sources",
+        spdlog::debug("{} targets, {} sources, {} arcs over the sources",
                       blocks.size(), num_sources, num_source_arcs);
 
         auto separate = [&](const std::vector<double> & point) {
@@ -494,7 +500,8 @@ struct multiflow_benders : public mip_solver_base {
             in_out = false;
         }
         for(auto && o : instance.options()) model.set_binary(x(o));
-        spdlog::debug("  {} rounds and {} cuts on the relaxation", root_rounds,
+        report_progress({.end = true});
+        spdlog::debug("{} rounds and {} cuts on the relaxation", root_rounds,
                       root_cuts);
 
         // The solver drops a candidate that receives cuts and may never

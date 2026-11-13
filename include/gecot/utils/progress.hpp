@@ -16,6 +16,10 @@ struct progress {
     std::optional<double> relaxation = {};  // a relaxation's value, no bound
     std::optional<std::size_t> nodes = {};  // of the branch-and-bound
     std::optional<std::size_t> round = {};  // of the column generation
+    // Nothing to report but the end of the progress: sent before the
+    // algorithm logs anything else, or these lines come before the rule
+    // that closes the table of its progress.
+    bool end = false;
 };
 
 // Called by the algorithms while they run, possibly on a solver's thread but

@@ -64,20 +64,45 @@ GTEST_TEST(log_table, wraps_and_centers_the_titles) {
     table.row(1.25e-3, 10, 20.0);
     // µ takes two bytes and one column: the lines are compared as text
     EXPECT_EQ(log.lines(),
-              (strings{" µ value  | strong fiber | useless fiber",
+              (strings{"----------+--------------+--------------",
+                       " µ value  | strong fiber | useless fiber",
                        "          | (avg. size)  |  (avg. size)",
                        "----------+--------------+--------------",
                        "0.000e+00 |        1.500 |         2.250",
                        "1.250e-03 |       10.000 |        20.000"}));
 }
 
+GTEST_TEST(log_table, fills_the_last_lines_of_a_title_first) {
+    const captured_log log;
+    log_table<spdlog::level::info, 0, 10, 10, 4> table(
+        {"vertices per target"}, {"arcs per target"}, {""});
+    table.row(1, 2, 3);
+    EXPECT_EQ(
+        log.lines(),
+        (strings{"-----------+------------+-----", " vertices  |    arcs    |",
+                 "per target | per target |", "-----------+------------+-----",
+                 "         1 |          2 |    3"}));
+}
+
+GTEST_TEST(log_table, aligns_the_general_format_on_the_point) {
+    const captured_log log;
+    log_table<spdlog::level::info, 0, 10> table(
+        {"bound", log_format::general(9)});
+    table.row(124714.24409);
+    table.row(13263.146);
+    table.row(12);
+    EXPECT_EQ(log.lines(), (strings{"----------", "  bound", "----------",
+                                    "124714.244", "13263.1460", "12.0000000"}));
+}
+
 GTEST_TEST(log_table, repeats_the_header_after_its_period) {
     const captured_log log;
     log_table<spdlog::level::info, 2, 5> table({"n", log_format::fixed(0)});
     for(int n = 1; n <= 5; ++n) table.row(n);
-    EXPECT_EQ(log.lines(),
-              (strings{"  n", "-----", "    1", "    2", "  n", "-----",
-                       "    3", "    4", "  n", "-----", "    5"}));
+    // a single rule between the rows and the header that follows them
+    EXPECT_EQ(log.lines(), (strings{"-----", "  n", "-----", "    1", "    2",
+                                    "-----", "  n", "-----", "    3", "    4",
+                                    "-----", "  n", "-----", "    5"}));
 }
 
 GTEST_TEST(log_table, prints_texts_and_absent_values) {
@@ -86,10 +111,10 @@ GTEST_TEST(log_table, prints_texts_and_absent_values) {
         {"id"}, {"value", log_format::fixed(1)}, {"count"});
     table.row("µ1", std::optional<double>{2.5}, std::optional<std::size_t>{});
     table.row(std::string("b"), std::optional<double>{}, std::size_t{12});
-    EXPECT_EQ(
-        log.lines(),
-        (strings{"  id   | value  | count", "-------+--------+-------",
-                 "    µ1 |    2.5 |      -", "     b |      - |     12"}));
+    EXPECT_EQ(log.lines(),
+              (strings{"-------+--------+-------", "  id   | value  | count",
+                       "-------+--------+-------", "    µ1 |    2.5 |      -",
+                       "     b |      - |     12"}));
 }
 
 GTEST_TEST(log_table, cuts_the_cells_wider_than_their_column) {
@@ -101,9 +126,9 @@ GTEST_TEST(log_table, cuts_the_cells_wider_than_their_column) {
     table.row("crossing_3ffff_7ffff", 123456789.0);
     table.row("µµµµµµµµµ", -1.0);
     const strings lines = log.lines();
-    ASSERT_EQ(lines.size(), std::size_t{4});
-    EXPECT_EQ(lines[2], "…f_7ffff | 12345…");
-    EXPECT_EQ(lines[3], "…µµµµµµµ |   -1.0");
+    ASSERT_EQ(lines.size(), std::size_t{5});
+    EXPECT_EQ(lines[3], "…f_7ffff | 12345…");
+    EXPECT_EQ(lines[4], "…µµµµµµµ |   -1.0");
     for(const std::string & line : lines)
         EXPECT_LE(gecot::detail::num_characters(line), table.table_width);
 }
@@ -115,11 +140,14 @@ GTEST_TEST(log_table, shows_the_columns_that_a_row_fills) {
     table.row(3, 4);
     table.row(5, 6, 7);
     table.row(8, 9);
-    EXPECT_EQ(log.lines(),
-              (strings{" a   |  b", "-----+-----", "   1 |    2", "   3 |    4",
-                       " a   |  b   |  cc", "     |      |  dd",
-                       "-----+------+-----", "   5 |    6 |    7", " a   |  b",
-                       "-----+-----", "   8 |    9"}));
+    // other columns are another table: the one before is closed
+    EXPECT_EQ(
+        log.lines(),
+        (strings{"-----+-----", " a   |  b", "-----+-----", "   1 |    2",
+                 "   3 |    4", "-----+-----", "-----+------+-----",
+                 " a   |  b   |  cc", "     |      |  dd", "-----+------+-----",
+                 "   5 |    6 |    7", "-----+------+-----", "-----+-----",
+                 " a   |  b", "-----+-----", "   8 |    9"}));
 }
 
 GTEST_TEST(log_table, logs_and_counts_nothing_below_its_level) {
@@ -127,18 +155,55 @@ GTEST_TEST(log_table, logs_and_counts_nothing_below_its_level) {
     log_table<spdlog::level::debug, 1, 4> table({"a"});
     table.row(1);
     table.row(2);
+    table.end();
     EXPECT_TRUE(log.lines().empty());
     spdlog::default_logger()->set_level(spdlog::level::debug);
     table.row(3);
-    EXPECT_EQ(log.lines(), (strings{" a", "----", "   3"}));
+    EXPECT_EQ(log.lines(), (strings{"----", " a", "----", "   3"}));
 }
 
-GTEST_TEST(log_table, restarts_with_its_header) {
+GTEST_TEST(log_table, ends_with_a_rule_and_begins_again_with_its_header) {
+    const captured_log log;
+    log_table<spdlog::level::info, 0, 4> table({"a"});
+    table.end();  // no row: no table to close
+    table.row(1);
+    table.end();
+    table.end();
+    table.row(2);
+    EXPECT_EQ(log.lines(), (strings{"----", " a", "----", "   1", "----",
+                                    "----", " a", "----", "   2"}));
+}
+
+GTEST_TEST(log_table, is_closed_when_destroyed) {
+    const captured_log log;
+    { log_table<spdlog::level::info, 0, 4> without_row({"a"}); }
+    EXPECT_TRUE(log.lines().empty());
+    {
+        log_table<spdlog::level::info, 0, 4> table({"a"});
+        table.row(1);
+    }
+    {
+        log_table<spdlog::level::info, 0, 4> ended({"b"});
+        ended.row(2);
+        ended.end();
+    }
+    EXPECT_EQ(log.lines(), (strings{"----", " a", "----", "   1", "----",
+                                    "----", " b", "----", "   2", "----"}));
+}
+
+GTEST_TEST(log_table, is_copied_without_its_rows) {
     const captured_log log;
     log_table<spdlog::level::info, 0, 4> table({"a"});
     table.row(1);
-    table.restart();
-    table.row(2);
-    EXPECT_EQ(log.lines(),
-              (strings{" a", "----", "   1", " a", "----", "   2"}));
+    {
+        // as in a std::function, that copies what it calls
+        auto copy = table;
+        EXPECT_EQ(log.lines().size(), std::size_t{4});
+        copy.row(2);
+    }
+    // the copy logged its own header and closed its own table
+    EXPECT_EQ(log.lines(), (strings{"----", " a", "----", "   1", "----", " a",
+                                    "----", "   2", "----"}));
+    table.row(3);
+    EXPECT_EQ(log.lines().back(), "   3");
 }

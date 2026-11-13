@@ -230,6 +230,11 @@ progress_watch::progress_watch(const prepared_instance & prepared) {
                               printed_values = std::string{}, started = false](
                                  const gecot::progress & p) mutable {
         using namespace std::chrono_literals;
+        if(p.end) {
+            rounds.end();
+            search.end();
+            return;
+        }
         const auto now = std::chrono::steady_clock::now();
         // a solver calls up to 100000 times a second
         if(!p.round && now - looked < 500ms) return;
@@ -249,6 +254,12 @@ progress_watch::progress_watch(const prepared_instance & prepared) {
             !p.round && score && p.bound
                 ? guaranteed_gain_share(*score * scale, *p.bound * scale, base)
                 : std::nullopt;
+        if(!std::exchange(started, true))
+            spdlog::info(
+                "Ctrl-C stops the algorithm and keeps its best result so "
+                "far");
+        // no row of a search that knows nothing yet, nor delay for its next
+        if(!p.round && !score && !p.bound) return;
         // a row when a value changed, else one a minute; the round and
         // the nodes always change
         auto shown = [&gain](const std::optional<double> & v) {
@@ -261,17 +272,14 @@ progress_watch::progress_watch(const prepared_instance & prepared) {
         if(values == printed_values && now - printed < 60s) return;
         printed = now;
         printed_values = std::move(values);
-        if(!std::exchange(started, true))
-            spdlog::info(
-                "Ctrl-C stops the algorithm and keeps its best result so "
-                "far");
-        // the rows of a table make the other one log its header again
+        // the rows of a table close the other one, left open by an
+        // algorithm that did not report the end of its progress
         if(p.round) {
-            search.restart();
+            search.end();
             p.bound ? rounds.row(*p.round, p.relaxation, p.bound)
                     : rounds.row(*p.round, p.relaxation);
         } else {
-            rounds.restart();
+            rounds.end();
             detailed ? search.row(score, p.bound, share, p.nodes)
                      : search.row(score, p.bound, share);
         }

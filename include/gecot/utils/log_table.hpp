@@ -31,6 +31,13 @@ inline auto scientific(const int precision) {
         return fmt::format("{:.{}e}", value, precision);
     };
 }
+// digits significant digits, the zeros that end them kept: the values of a
+// magnitude are aligned on their point
+inline auto general(const int digits) {
+    return [digits](const double value) {
+        return fmt::format("{:#.{}g}", value, digits);
+    };
+}
 }  // namespace log_format
 
 namespace detail {
@@ -68,9 +75,11 @@ struct log_column {
 };
 
 // Logs a table at level LVL, row by row, in columns of WIDTHS characters
-// separated by " | ". The header, the titles above a rule, is logged before
-// the first row, then again before a row that follows PERIOD rows without
-// one (0: never), or that has not as many columns as the row before it.
+// separated by " | ". The header, the titles between two rules, is logged
+// before the first row, then again before a row that follows PERIOD rows
+// without one (0: never). A last rule closes the table: at end(), before a
+// row that has not as many columns as the row before it, or when the table
+// is destroyed.
 //
 // No line passes 80 characters. The compiler checks that the widths, the
 // separators and the margin of gecot's log lines fit in them, and that each
@@ -98,26 +107,38 @@ private:
     static constexpr std::array<std::size_t, num_columns> _widths{WIDTHS...};
     std::array<std::function<std::string(double)>, num_columns> _formats;
     std::array<std::vector<std::string>, num_columns> _titles;  // their lines
-    std::size_t _num_shown = 0;  // columns of the last header logged, 0: none
-    std::size_t _num_rows = 0;   // logged since
+    std::size_t _num_shown = 0;  // columns of the table begun, 0: none
+    std::size_t _num_rows = 0;   // logged since its last header
 
+    static std::string _rule(const std::size_t num_shown) {
+        std::string rule;
+        for(std::size_t c = 0; c < num_shown; ++c)
+            rule.append(c > 0 ? "-+-" : "").append(_widths[c], '-');
+        return rule;
+    }
+
+    // The last lines are filled first: filled from the first, "arcs per
+    // target" in 10 characters is "arcs per" above "target", beside
+    // "vertices" above "per target".
     static std::vector<std::string> _wrapped(const std::string_view title,
                                              const std::size_t width) {
         std::vector<std::string> lines(1);
-        for(std::size_t begin = 0; begin < title.size();) {
-            const std::size_t end =
-                std::min(title.find(' ', begin), title.size());
+        for(std::size_t end = title.size(); end > 0;) {
+            const std::size_t space = title.rfind(' ', end - 1);
+            const std::size_t begin =
+                space == std::string_view::npos ? 0 : space + 1;
             const std::string_view word = title.substr(begin, end - begin);
             if(lines.back().empty())
                 lines.back() = word;
             else if(detail::num_characters(lines.back()) + 1 +
                         detail::num_characters(word) <=
                     width)
-                lines.back().append(" ").append(word);
+                lines.back().insert(0, " ").insert(0, word);
             else
                 lines.emplace_back(word);
-            begin = end + 1;
+            end = begin == 0 ? 0 : begin - 1;
         }
+        std::ranges::reverse(lines);
         return lines;
     }
 
@@ -156,6 +177,7 @@ private:
     }
 
     void _log_header(const std::size_t num_shown) {
+        spdlog::log(LVL, "{}", _rule(num_shown));
         std::size_t num_lines = 0;
         for(std::size_t c = 0; c < num_shown; ++c)
             num_lines = std::max(num_lines, _titles[c].size());
@@ -174,10 +196,7 @@ private:
             line.erase(line.find_last_not_of(' ') + 1);
             spdlog::log(LVL, "{}", line);
         }
-        std::string rule;
-        for(std::size_t c = 0; c < num_shown; ++c)
-            rule.append(c > 0 ? "-+-" : "").append(_widths[c], '-');
-        spdlog::log(LVL, "{}", rule);
+        spdlog::log(LVL, "{}", _rule(num_shown));
         _num_shown = num_shown;
         _num_rows = 0;
     }
@@ -190,6 +209,12 @@ public:
         for(auto & format : _formats)
             if(!format) format = log_format::plain;
     }
+    // A copy has no row: with those of its source, each copy that a
+    // std::function makes of a table would log their closing rule.
+    log_table(const log_table & other)
+        : _formats(other._formats), _titles(other._titles) {}
+    log_table & operator=(const log_table &) = delete;
+    ~log_table() { end(); }
 
     // Logs a row of the first columns, with a value each: a number, that its
     // column formats; a text; or an optional of either, "-" when empty.
@@ -198,7 +223,8 @@ public:
         requires(sizeof...(V) > 0 && sizeof...(V) <= num_columns)
     void row(const V &... values) {
         if(!spdlog::should_log(LVL)) return;
-        if(_num_shown != sizeof...(V) || (PERIOD > 0 && _num_rows == PERIOD))
+        if(_num_shown != sizeof...(V)) end();
+        if(_num_shown == 0 || (PERIOD > 0 && _num_rows == PERIOD))
             _log_header(sizeof...(V));
         ++_num_rows;
         std::string line;
@@ -209,8 +235,13 @@ public:
         spdlog::log(LVL, "{}", line);
     }
 
-    // the next row logs the header first, as after the lines of another table
-    void restart() { _num_shown = 0; }
+    // Closes the table, if it has rows, before the lines that are not its
+    // own: the next row begins another one, with its header.
+    void end() {
+        if(_num_shown == 0) return;
+        spdlog::log(LVL, "{}", _rule(_num_shown));
+        _num_shown = 0;
+    }
 };
 
 }  // namespace gecot

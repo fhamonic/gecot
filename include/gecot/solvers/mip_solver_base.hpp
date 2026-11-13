@@ -7,10 +7,13 @@
 #include <optional>
 #include <ranges>
 #include <stdexcept>
+#include <string>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
@@ -28,6 +31,7 @@
 #include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
 #include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 #include "gecot/solvers/solve_result.hpp"
+#include "gecot/utils/log_table.hpp"
 #include "gecot/utils/progress.hpp"
 
 namespace gecot {
@@ -176,6 +180,40 @@ struct mip_solver_base {
         return labels;
     }
 
+    // the arcs that a target of the case has in arcs_map, on average
+    template <case_c C>
+    double _average_size(const C & instance_case, const auto & arcs_map) const {
+        std::size_t num_arcs = 0, num_targets = 0;
+        for(auto && t : melon::vertices(instance_case.graph())) {
+            if(!_is_target(instance_case, t)) continue;
+            num_arcs += arcs_map[t].size();
+            ++num_targets;
+        }
+        return static_cast<double>(num_arcs) /
+               static_cast<double>(std::max<std::size_t>(num_targets, 1));
+    }
+
+    // of a case: its name, the _average_size of its strong and of its
+    // useless arcs, then the values of the algorithm's own columns
+    template <typename... V>
+    using preprocessing_row = std::tuple<std::string, double, double, V...>;
+
+    // Logs at -v the table of the cases' preprocessing, once they all are
+    // preprocessed: a row logged after each case would be cut from the
+    // others by the steps of the next one.
+    template <typename... V, std::size_t... WIDTHS>
+    static void _log_preprocessing(
+        const std::vector<preprocessing_row<V...>> & cases,
+        log_column<WIDTHS>... columns) {
+        log_table<spdlog::level::debug, 0, 12, 11, 12, WIDTHS...> table(
+            {"species"}, {"strong arcs per target", log_format::fixed(2)},
+            {"useless arcs per target", log_format::fixed(2)},
+            std::move(columns)...);
+        for(const auto & values : cases)
+            std::apply([&table](const auto &... v) { table.row(v...); },
+                       values);
+    }
+
     // sw starts with solve(): the time limit also counts the preprocessing
     // returns false if the solver found no solution, the caller then returns
     // _fallback_solution
@@ -229,6 +267,7 @@ struct mip_solver_base {
             model.num_variables(), model.num_constraints(),
             model.num_nonzeros());
         model.solve();
+        report_progress({.end = true});
         const auto & s = model.get_status();
         const std::string_view reason = std::visit(
             []<typename S>(const S &) -> std::string_view {

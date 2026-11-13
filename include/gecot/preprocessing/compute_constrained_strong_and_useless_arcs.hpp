@@ -7,7 +7,6 @@
 #include <utility>
 
 #include <fmt/ranges.h>
-#include <spdlog/stopwatch.h>
 
 #include <tbb/concurrent_vector.h>
 
@@ -35,7 +34,6 @@ auto compute_constrained_strong_and_useless_arcs(
     using arc_t = melon::arc_t<graph_t>;
 
     detail::check_resolution(instance_case.graph(), probability_resolution);
-    spdlog::stopwatch prep_sw;
     spdlog::info("Preprocessing the '{}' graph, budget-aware",
                  instance_case.name());
 
@@ -137,7 +135,7 @@ auto compute_constrained_strong_and_useless_arcs(
     // µ = 0 again, seeded by the fiber of the positive multipliers: mus is
     // the test order, not sorted
     if(decades_sweep && mus.size() > 1) mus.push_back(0.0);
-    spdlog::debug("µ sequence: {:.3e}", fmt::join(mus, " "));
+    spdlog::trace("µ sequence: {:.3e}", fmt::join(mus, " "));
 
     std::vector<std::atomic<std::size_t>> stong_counters(mus.size());
     std::vector<std::atomic<std::size_t>> useless_counters(mus.size());
@@ -321,25 +319,6 @@ auto compute_constrained_strong_and_useless_arcs(
                        static_cast<double>(useless_counters[i]) /
                            static_cast<double>(num_arcs));
         }
-
-        std::size_t num_strong, num_useless, num_sinks;
-        num_strong = num_useless = num_sinks = 0;
-        for(auto && v : melon::vertices(graph)) {
-            if(useless_target_vertices_map[v]) continue;
-            num_strong += strong_arcs_map[v].size();
-            num_useless += useless_arcs_map[v].size();
-            ++num_sinks;
-        }
-        spdlog::debug(
-            "  {:>10.2f} strong arcs on average",
-            static_cast<double>(num_strong) / static_cast<double>(num_sinks));
-        spdlog::debug(
-            "  {:>10.2f} useless arcs on average",
-            static_cast<double>(num_useless) / static_cast<double>(num_sinks));
-        spdlog::debug("          (took {} ms)",
-                      std::chrono::duration_cast<std::chrono::milliseconds>(
-                          prep_sw.elapsed())
-                          .count());
     }
 
     return std::make_pair(strong_arcs_map, useless_arcs_map);

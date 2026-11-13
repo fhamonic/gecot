@@ -101,6 +101,8 @@ struct flow_benders : public mip_solver_base {
         // target, in the order of the target's options
         std::vector<mippp::model_variable_t<M>> F_prime_vars;
 
+        // with the vertices and the arcs of the contracted graphs, on average
+        std::vector<preprocessing_row<double, double>> preprocessing;
         for(auto && instance_case : instance.cases()) {
             const auto case_id = instance_case.id();
             const auto & original_graph = instance_case.graph();
@@ -115,10 +117,8 @@ struct flow_benders : public mip_solver_base {
                 _compute_strong_and_useless_arcs(instance, instance_case,
                                                  budget);
 
-            spdlog::stopwatch prep_sw;
-            spdlog::debug(
-                "Computing contractions and big-Ms of the '{}' graph:",
-                instance_case.name());
+            spdlog::debug("Computing contractions and big-Ms of the '{}' graph",
+                          instance_case.name());
             {
                 progress_bar<spdlog::level::info, 64> pb(
                     original_graph.num_vertices());
@@ -154,28 +154,24 @@ struct flow_benders : public mip_solver_base {
                     pb.tick();
                 }
             }
-            if(spdlog::should_log(spdlog::level::debug)) {
-                std::size_t num_vertices, num_arcs, num_graphs;
-                num_vertices = num_arcs = 0u;
-                num_graphs = cases_contracted_data[instance_case.id()].size();
-                for(const auto & [var, data] :
-                    cases_contracted_data[instance_case.id()]) {
-                    num_vertices += data.graph.num_vertices();
-                    num_arcs += data.graph.num_arcs();
-                }
-                spdlog::debug("  {:>10.2f} vertices on average",
-                              static_cast<double>(num_vertices) /
-                                  static_cast<double>(num_graphs));
-                spdlog::debug("  {:>10.2f} arcs on average",
-                              static_cast<double>(num_arcs) /
-                                  static_cast<double>(num_graphs));
-                spdlog::debug(
-                    "          (took {} ms)",
-                    std::chrono::duration_cast<std::chrono::milliseconds>(
-                        prep_sw.elapsed())
-                        .count());
+            std::size_t num_vertices = 0, num_arcs = 0;
+            for(const auto & [var, data] : cases_contracted_data[case_id]) {
+                num_vertices += data.graph.num_vertices();
+                num_arcs += data.graph.num_arcs();
             }
+            const auto num_graphs = static_cast<double>(std::max<std::size_t>(
+                cases_contracted_data[case_id].size(), 1));
+            preprocessing.emplace_back(
+                instance_case.name(),
+                _average_size(instance_case, strong_arcs_map),
+                _average_size(instance_case, useless_arcs_map),
+                static_cast<double>(num_vertices) / num_graphs,
+                static_cast<double>(num_arcs) / num_graphs);
         }
+        _log_preprocessing(
+            preprocessing,
+            log_column<10>{"vertices per target", log_format::fixed(2)},
+            log_column<10>{"arcs per target", log_format::fixed(2)});
 
         auto get_cut_expression =
             [&](const contracted_graph_data<instance_case_t<I>> & data,

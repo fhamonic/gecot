@@ -70,6 +70,7 @@ struct flow_mip : public mip_solver_base {
                target_M_old_sum = 0;
         std::size_t arc_M_count = 0, arc_M_halved = 0;
 
+        std::vector<preprocessing_row<>> preprocessing;
         for(auto && instance_case : instance.cases()) {
             const auto case_id = instance_case.id();
             const auto & original_graph = instance_case.graph();
@@ -90,6 +91,12 @@ struct flow_mip : public mip_solver_base {
             const auto [strong_arcs_map, useless_arcs_map] =
                 _compute_strong_and_useless_arcs(instance, instance_case,
                                                  budget);
+            preprocessing.emplace_back(
+                instance_case.name(),
+                _average_size(instance_case, strong_arcs_map),
+                _average_size(instance_case, useless_arcs_map));
+            spdlog::debug("Computing contractions and big-Ms of the '{}' graph",
+                          instance_case.name());
 
             for(const auto & original_t : melon::vertices(original_graph)) {
                 if(!_is_target(instance_case, original_t)) {
@@ -264,6 +271,7 @@ struct flow_mip : public mip_solver_base {
             }
             model.add_constraint(C_vars(instance_case.id()) <= Xi_vars);
         }
+        _log_preprocessing(preprocessing);
 
         if(big_Ms == big_M_kind::tight)
             spdlog::debug(

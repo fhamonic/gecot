@@ -34,6 +34,7 @@
 #include "gecot/bounds/qkp_planes.hpp"
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
+#include "gecot/utils/log_table.hpp"
 #include "gecot/utils/progress.hpp"
 
 namespace gecot {
@@ -421,8 +422,15 @@ public:
         double best = vertex_bounds.bound, step = 1.0;
         std::size_t stall = 0;
         std::vector<double> values(num_options), x(num_options);
+        // bound: of the iteration, the sum of the pairs' R and of the
+        // knapsack; labels: of the pairs' searches
+        log_table<spdlog::level::debug, 20, 9, 10, 10, 10, 8, 7> sweeps(
+            {"iteration", log_format::fixed(0)},
+            {"bound", log_format::general(9)}, {"best", log_format::general(9)},
+            {"knapsack", log_format::general(9)},
+            {"labels", log_format::scientific(2)},
+            {"options per pair", log_format::fixed(1)});
         for(std::size_t iteration = 0; iteration < iterations; ++iteration) {
-            const double sweep_start = elapsed();
             values = vertex_bounds.option_bounds;
             for(std::size_t e = 0; e < num_entries; ++e)
                 values[corridors[e]] += nu[e];
@@ -484,6 +492,7 @@ public:
                     return a;
                 });
             if(timed_out) {
+                sweeps.end();
                 spdlog::debug(
                     "split_lagrange: stopped in iteration {}, its sweep "
                     "discarded",
@@ -501,17 +510,10 @@ public:
                 step /= 2;
                 stall = 0;
             }
-            spdlog::debug(
-                "split_lagrange: iteration {}: bound {} (Σ R {} + knapsack "
-                "{}), "
-                "best {}, {} labels, {:.1f} options used per pair, {} outside, "
-                "sweep {:.1f} s",
-                iteration, bound, constant_R + totals.sum_R, outer, best,
-                totals.labels,
-                num_pairs ? static_cast<double>(totals.used) /
-                                static_cast<double>(num_pairs)
-                          : 0.0,
-                totals.outside, elapsed() - sweep_start);
+            sweeps.row(iteration, bound, best, outer, totals.labels,
+                       num_pairs ? static_cast<double>(totals.used) /
+                                       static_cast<double>(num_pairs)
+                                 : 0.0);
             const double t = step * (bound - aim.value()) / totals.norm;
             if(totals.norm == 0 || !std::isfinite(t)) break;
             tbb::parallel_for(

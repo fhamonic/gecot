@@ -7,7 +7,6 @@
 #include <utility>
 
 #include <fmt/core.h>
-#include <spdlog/stopwatch.h>
 
 #include <tbb/concurrent_vector.h>
 
@@ -134,7 +133,6 @@ auto compute_strong_and_useless_arcs(
     using log_probability_t = uint64_t;
 
     detail::check_resolution(instance_case.graph(), probability_resolution);
-    spdlog::stopwatch prep_sw;
     spdlog::info("Preprocessing the '{}' graph", instance_case.name());
 
     auto prob_to_length =
@@ -250,27 +248,6 @@ auto compute_strong_and_useless_arcs(
     for(auto && v : melon::vertices(graph)) {
         std::sort(strong_arcs_map[v].begin(), strong_arcs_map[v].end());
         std::sort(useless_arcs_map[v].begin(), useless_arcs_map[v].end());
-    }
-
-    if(spdlog::should_log(spdlog::level::debug)) {
-        std::size_t num_strong, num_useless, num_sinks;
-        num_strong = num_useless = num_sinks = 0;
-        for(auto && v : melon::vertices(graph)) {
-            if(useless_vertices_map[v]) continue;
-            num_strong += strong_arcs_map[v].size();
-            num_useless += useless_arcs_map[v].size();
-            ++num_sinks;
-        }
-        spdlog::debug(
-            "  {:>10.2f} strong arcs on average",
-            static_cast<double>(num_strong) / static_cast<double>(num_sinks));
-        spdlog::debug(
-            "  {:>10.2f} useless arcs on average",
-            static_cast<double>(num_useless) / static_cast<double>(num_sinks));
-        spdlog::debug("          (took {} ms)",
-                      std::chrono::duration_cast<std::chrono::milliseconds>(
-                          prep_sw.elapsed())
-                          .count());
     }
 
     return std::make_pair(strong_arcs_map, useless_arcs_map);

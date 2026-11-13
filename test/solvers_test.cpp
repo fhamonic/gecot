@@ -2,8 +2,7 @@
 #include <set>
 #include <string>
 
-#include <tbb/global_control.h>
-
+#include "gecot/indices/parallel_pc_num.hpp"
 #include "gecot/solvers/greedy.hpp"
 #include "gecot/solvers/static.hpp"
 
@@ -15,10 +14,7 @@
 using option_names = std::set<std::string>;
 
 // Mirrors gecot optimize, whose feasibility tolerance defaults to 1e-7.
-// One thread: parallel reductions vary in the last ulp and can flip near-ties.
 option_names solve_aude(auto solver, double budget) {
-    const tbb::global_control single_thread(
-        tbb::global_control::max_allowed_parallelism, 1);
     solver.feasibility_tol = 1e-7;
     const Instance raw_instance =
         parse_instance(PROJECT_SOURCE_DIR "/test/instances/Aude/aude.json");
@@ -33,6 +29,23 @@ option_names solve_aude(auto solver, double budget) {
             taken.insert(name);
     }
     return taken;
+}
+
+// On every thread of the machine: where the work is cut must not show in
+// the last digits of a score, that choose between two options tied for a
+// heuristic.
+GTEST_TEST(solvers, a_score_is_the_same_at_every_evaluation) {
+    const Instance instance = parse_instance(
+        PROJECT_SOURCE_DIR "/test/instances/Aix/instance_30x30/instance.json");
+    const auto & squirrel = *instance.cases().begin();
+    const auto score = [&squirrel] {
+        return gecot::parallel_pc_num(
+            squirrel.graph(), squirrel.source_quality_map(),
+            squirrel.target_quality_map(), squirrel.arc_probability_map());
+    };
+    const double first = score();
+    for(int evaluation = 0; evaluation < 50; ++evaluation)
+        ASSERT_EQ(score(), first);
 }
 
 GTEST_TEST(solvers, static_incremental) {

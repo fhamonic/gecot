@@ -19,8 +19,13 @@ double parallel_pc_num(const GR & graph, const SQM & source_quality_map,
                        const PM & probability_map) {
     auto vertices_range = melon::vertices(graph);
 
-    double pc_num_sum = tbb::parallel_reduce(
-        tbb::blocked_range(vertices_range.begin(), vertices_range.end()), 0.0,
+    // In blocks of 64 vertices, the same at every run: parallel_reduce cuts
+    // the vertices where a thread happens to steal work, and the last digits
+    // of the sum change with these cuts, enough for a heuristic to choose
+    // between two tied options differently from one run to the next.
+    double pc_num_sum = tbb::parallel_deterministic_reduce(
+        tbb::blocked_range(vertices_range.begin(), vertices_range.end(), 64),
+        0.0,
         [&](auto && vertices_subrange, double init) {
             auto algo = melon::dijkstra(
                 detail::pc_num_dijkstra_traits<

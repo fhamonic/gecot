@@ -485,6 +485,7 @@ struct path_formulation_lp : public mip_solver_base {
         namespace colgen = mippp::colgen;
         using namespace mippp;
         using namespace mippp::operators;
+        check_plain_budget(instance, "path_lp");
         _check_criterion(instance);
         spdlog::stopwatch sw;
         auto time_up = [&] {

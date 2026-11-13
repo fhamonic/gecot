@@ -24,13 +24,15 @@
 
 #include "instance.hpp"
 #include "io_helper.hpp"
+#include "parse_instance.hpp"
 
 #include "solver_interfaces/abstract_solver_interface.hpp"
 
 static bool process_command_line(
     const std::vector<std::string> & args,
     std::shared_ptr<AbstractSolverInterface> & solver,
-    std::filesystem::path & instances_description_json_file, double & budget,
+    std::filesystem::path & instances_description_json_file,
+    std::string & budget,
     std::optional<std::filesystem::path> & opt_output_json_file,
     std::optional<std::filesystem::path> & opt_output_csv_file,
     std::optional<tbb::global_control> & opt_tbb_global_control,
@@ -79,7 +81,10 @@ static bool process_command_line(
         app.add_option("instance,-i,--instance",
                        instances_description_json_file, "Instance JSON file");
     auto * budget_opt =
-        app.add_option("budget,-B,--budget", budget, "Budget value");
+        app.add_option("budget,-B,--budget", budget,
+                       "Budget value, or name=value,... for options of "
+                       "several costs")
+            ->type_name("BUDGET");
     app.add_option("-o,--output-json", opt_output_json_file,
                    "Output solution data in JSON file");
     app.add_option("--output-csv", opt_output_csv_file,
@@ -157,7 +162,8 @@ static bool process_command_line(
         if(!opt->count())
             throw std::logic_error("the option '" + opt->get_name() +
                                    "' is required but missing");
-    if(!std::isfinite(budget) || budget < 0)
+    // the names are checked with the instance
+    if(!budget.contains('=') && !parse_budget_value(budget))
         throw std::logic_error("the budget must be a non-negative number");
     apply_logging(verbosity, quiet);
     if(opt_max_threads.has_value()) {
@@ -186,7 +192,7 @@ static bool process_command_line(
 int optimize_command(const std::vector<std::string> & args) {
     std::shared_ptr<AbstractSolverInterface> solver;
     std::filesystem::path instances_description_json;
-    double budget;
+    std::string budget_text;
     std::optional<std::filesystem::path> opt_output_json_file;
     std::optional<std::filesystem::path> opt_output_csv_file;
     std::optional<tbb::global_control> opt_tbb_global_control;
@@ -198,7 +204,7 @@ int optimize_command(const std::vector<std::string> & args) {
 
     try {
         if(!process_command_line(args, solver, instances_description_json,
-                                 budget, opt_output_json_file,
+                                 budget_text, opt_output_json_file,
                                  opt_output_csv_file, opt_tbb_global_control,
                                  path_reformulation, no_merging,
                                  command_parameters))
@@ -209,9 +215,10 @@ int optimize_command(const std::vector<std::string> & args) {
         log_parameters(solver->parameters());
         program_state = "Parsing instance";
         const prepared_instance prepared = prepare_instance(
-            instances_description_json, budget, "algorithm", !no_merging);
+            instances_description_json, budget_text, "algorithm", !no_merging);
         const Instance & raw_instance = prepared.raw_instance;
         const Instance & instance = prepared.instance;
+        const gecot::budget_t & budget = prepared.budget;
         // the algorithm's scores, bounds and logs are in this unit
         const double score_scale = prepared.score_scale;
         const auto & initial_cases_pc_num = prepared.initial_cases_pc_num;
@@ -242,8 +249,10 @@ int optimize_command(const std::vector<std::string> & args) {
             solution_cases_pc_num[instance_case.id()] *= score_scale;
         const double solution_score =
             raw_instance.eval_criterion(solution_cases_pc_num);
-        const double solution_cost =
-            gecot::compute_solution_cost(instance, solution);
+        std::vector<double> solution_cost;
+        for(std::size_t r = 0; r < budget.size(); ++r)
+            solution_cost.push_back(
+                gecot::compute_solution_cost(instance, solution, r));
         for(const auto & [key, value] : report.score_stats)
             report.stats.emplace_back(key, value * score_scale);
         std::optional<double> best_bound;
@@ -256,17 +265,35 @@ int optimize_command(const std::vector<std::string> & args) {
             // at the optimum, a few ulps below the recomputed score
             best_bound = std::max(bound, solution_score);
         }
-        if(solution_cost > budget + 1e-6 * std::max(1.0, budget))
-            spdlog::warn("The solution costs {:.10g}, over the budget {:.10g}",
-                         solution_cost, budget);
-        // free options were bought by trivial_reformulate_instance
         auto option_value = [&](const gecot::option_t & option) {
             const auto & option_name = raw_instance.option_name(option);
             return static_cast<int>(
-                raw_instance.option_cost(option) == 0 ||
+                prepared.static_options[option] ||
                 (instance.contains_option(option_name) &&
                  solution[instance.option_from_name(option_name)]));
         };
+        for(std::size_t r = 0; r < budget.size(); ++r) {
+            if(solution_cost[r] <= budget[r] + 1e-6 * std::max(1.0, budget[r]))
+                continue;
+            if(budget.size() == 1)
+                spdlog::warn(
+                    "The solution costs {:.10g}, over the budget {:.10g}",
+                    solution_cost[r], budget[r]);
+            else
+                spdlog::warn(
+                    "The solution costs {:.10g} in {}, over the budget {:.10g}",
+                    solution_cost[r], raw_instance.cost_dimension_name(r),
+                    budget[r]);
+        }
+        // on the raw sets, which also checks the reformulation
+        for(std::size_t l = 0; l < raw_instance.conflict_sets().size(); ++l) {
+            const auto bought = std::ranges::count_if(
+                raw_instance.conflict_sets()[l], option_value);
+            if(bought > 1)
+                spdlog::warn(
+                    "The solution buys {} options of the conflict set '{}'",
+                    bought, raw_instance.conflict_set_name(l));
+        }
 
         if(!opt_output_json_file.has_value() &&
            !opt_output_csv_file.has_value()) {
@@ -287,8 +314,14 @@ int optimize_command(const std::vector<std::string> & args) {
                                 share);
                         })
                         .value_or(""));
-            std::println("Cost            {:.10g} of {:.10g}", solution_cost,
-                         budget);
+            for(std::size_t r = 0; r < budget.size(); ++r)
+                if(budget.size() == 1)
+                    std::println("Cost            {:.10g} of {:.10g}",
+                                 solution_cost[r], budget[r]);
+                else
+                    std::println("Cost {:<10} {:.10g} of {:.10g}",
+                                 raw_instance.cost_dimension_name(r),
+                                 solution_cost[r], budget[r]);
             std::println(
                 "Time            {}",
                 format_duration(static_cast<double>(computation_time_ms) /
@@ -345,10 +378,12 @@ int optimize_command(const std::vector<std::string> & args) {
                             instance_case.name(),
                             initial_cases_pc_num[instance_case.id()]);
                     }));
-            std::print(stream,
-                       ",\n    \"budget\":         {},\n    "
-                       "\"solution_score\": {},",
-                       budget, solution_score);
+            std::print(stream, ",");
+            print_json_per_dimension(stream, "budget",
+                                     "\"budget\":         ", raw_instance,
+                                     budget.values);
+            std::print(stream, ",\n    \"solution_score\": {},",
+                       solution_score);
             print_json_property(
                 stream, "solution_pc_num",
                 std::views::transform(
@@ -358,7 +393,11 @@ int optimize_command(const std::vector<std::string> & args) {
                             instance_case.name(),
                             solution_cases_pc_num[instance_case.id()]);
                     }));
-            std::print(stream, ",\n    \"solution_cost\":  {},", solution_cost);
+            std::print(stream, ",");
+            print_json_per_dimension(stream, "solution_cost",
+                                     "\"solution_cost\":  ", raw_instance,
+                                     solution_cost);
+            std::print(stream, ",");
             print_json_property(
                 stream, "solution",
                 std::views::transform(

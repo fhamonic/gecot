@@ -25,6 +25,7 @@
 #include "gecot/bounds/criterion_analysis.hpp"
 #include "gecot/bounds/lp_knapsack.hpp"
 #include "gecot/concepts/instance.hpp"
+#include "gecot/helper.hpp"
 #include "gecot/indices/parallel_pc_num.hpp"
 #include "gecot/indices/pc_num.hpp"
 #include "gecot/utils/log_table.hpp"
@@ -316,6 +317,7 @@ struct qkp_planes {
 
     template <instance_c I>
     bound_report bound(const I & instance, const double budget) const {
+        check_plain_budget(instance, "qkp_planes");
         // the target is the criterion's: the weighted part of a linear one
         std::optional<double> weighted_target;
         if(target) {

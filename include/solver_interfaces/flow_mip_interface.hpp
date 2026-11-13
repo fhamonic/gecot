@@ -17,8 +17,8 @@ public:
                      "Experimental: solve the continuous relaxation");
     }
 
-    gecot::solve_result<Instance> solve(const Instance & instance,
-                                        const double B) const override;
+    gecot::solve_result<Instance> solve(
+        const Instance & instance, const gecot::budget_t & B) const override;
 
     std::string description() const override {
         return "MIP with a generalized flow per target, preprocessed, from "

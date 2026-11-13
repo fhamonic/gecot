@@ -36,8 +36,8 @@ public:
         add_big_M_option(solver.big_Ms);
     }
 
-    gecot::solve_result<Instance> solve(const Instance & instance,
-                                        const double B) const override;
+    gecot::solve_result<Instance> solve(
+        const Instance & instance, const gecot::budget_t & B) const override;
 
     std::string description() const override {
         return "Benders decomposition with a cut per group of targets, "

@@ -553,6 +553,7 @@ public:
 
     template <instance_c I>
     bound_report bound(const I & instance, const double budget) const {
+        check_plain_budget(instance, "split_lagrange");
         std::optional<double> weighted_target;
         bool linear = false;
         if(const auto form = linear_form(instance.criterion(),

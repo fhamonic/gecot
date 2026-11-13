@@ -38,7 +38,8 @@ std::shared_ptr<const PathFormulationLPInterface> make_path_reformulation(
 gecot::solve_result<Instance> solve_path_reformulated(
     const PathFormulationLPInterface & path_lp,
     AbstractSolverInterface & solver, const Instance & instance,
-    const double budget, const bool merge) {
+    const gecot::budget_t & budget, const bool merge) {
+    gecot::check_plain_budget(instance, "--reformulation path_lp");
     auto score = [&](const auto & X) {
         return instance.eval_criterion(
             gecot::compute_solution_cases_pc_num(instance, X));

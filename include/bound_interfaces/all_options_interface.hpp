@@ -8,7 +8,8 @@ class AllOptionsInterface : public AbstractBoundInterface {
 public:
     AllOptionsInterface() : AbstractBoundInterface("all_options") {}
 
-    gecot::bound_report compute(const Instance & instance, const double,
+    gecot::bound_report compute(const Instance & instance,
+                                const gecot::budget_t &,
                                 const bound_context &) const override {
         return gecot::all_options_bound(instance);
     }

@@ -25,6 +25,7 @@ struct Static {
     template <instance_c I>
     instance_solution_t<I> solve(const I & instance,
                                  const double budget) const {
+        check_plain_budget(instance, "static");
         auto solution = instance.create_option_map(false);
 
         const auto & cases = instance.cases();

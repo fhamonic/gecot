@@ -59,7 +59,7 @@ public:
 
     // the bound and score_stats in the unit of instance
     virtual gecot::bound_report compute(
-        const Instance & instance, const double B,
+        const Instance & instance, const gecot::budget_t & B,
         const bound_context & context) const = 0;
     virtual std::string description() const = 0;
 };

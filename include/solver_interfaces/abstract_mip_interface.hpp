@@ -105,15 +105,17 @@ protected:
     // solver with the solution of --mip-start-algorithm as its MIP start
     template <typename S>
     S with_mip_start(S solver, const Instance & instance,
-                     const double B) const {
+                     const gecot::budget_t & B) const {
         if(mip_start_algorithm == "none") return solver;
+        gecot::check_plain_budget(
+            instance, "--mip-start-algorithm " + mip_start_algorithm);
         spdlog::info("Computing the MIP start with {}", mip_start_algorithm);
         const spdlog::stopwatch sw;
         const double tol = solver.feasibility_tol;
         using namespace gecot::solvers;
         const auto start = mip_start_algorithm == "static"
-                               ? Static{tol}.solve(instance, B)
-                               : Greedy{tol}.solve(instance, B);
+                               ? Static{tol}.solve(instance, B.front())
+                               : Greedy{tol}.solve(instance, B.front());
         solver.mip_start.emplace();
         for(auto && o : instance.options())
             if(start[o]) solver.mip_start->push_back(instance.option_name(o));

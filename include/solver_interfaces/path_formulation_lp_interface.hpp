@@ -37,11 +37,11 @@ public:
             ->default_val(0);
     }
 
-    gecot::solve_result<Instance> solve(const Instance & instance,
-                                        const double B) const override;
+    gecot::solve_result<Instance> solve(
+        const Instance & instance, const gecot::budget_t & B) const override;
     // solve, with path_formulation_lp's bound per option
     gecot::solvers::path_formulation_lp::relaxation<Instance> relax(
-        const Instance & instance, const double B) const;
+        const Instance & instance, const gecot::budget_t & B) const;
 
     std::string description() const override {
         return "path formulation relaxation, one column per pair of vertices "

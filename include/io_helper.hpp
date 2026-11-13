@@ -9,14 +9,15 @@
 
 #include <spdlog/spdlog.h>
 
+#include "gecot/utils/log_table.hpp"
+
 template <spdlog::level::level_enum LVL>
 void print_instance_size(auto && instance, const std::string & instance_name) {
     spdlog::log(LVL, "{}: {} options, {} species", instance_name,
                 instance.num_options(), instance.cases().size());
-    if(instance.cases().empty()) return;
-    const std::size_t instance_name_max_length =
-        std::ranges::max(std::ranges::views::transform(
-            instance.cases(), [&](auto && c) { return c.name().size(); }));
+    gecot::log_table<LVL, 0, 11, 8, 8, 10, 7, 10> sizes(
+        {"species"}, {"vertices"}, {"habitats"}, {"improvable vertices"},
+        {"arcs"}, {"improvable arcs"});
     for(const auto & instance_case : instance.cases()) {
         auto && graph = instance_case.graph();
         auto && vertex_options_map = instance_case.vertex_options_map();
@@ -33,13 +34,9 @@ void print_instance_size(auto && instance, const std::string & instance_name) {
         for(auto && a : melon::arcs(graph))
             num_improvable_arcs +=
                 instance_case.arc_options_map()[a].size() > 0;
-        spdlog::log(LVL,
-                    "  {:<{}} {} vertices ({} habitats, {} improvable), {} "
-                    "arcs ({} improvable)",
-                    instance_case.name() + ':', instance_name_max_length + 1,
-                    graph.num_vertices(), num_habitat_vertices,
-                    num_improvable_vertices, graph.num_arcs(),
-                    num_improvable_arcs);
+        sizes.row(instance_case.name(), graph.num_vertices(),
+                  num_habitat_vertices, num_improvable_vertices,
+                  graph.num_arcs(), num_improvable_arcs);
     }
 }
 

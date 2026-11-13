@@ -170,7 +170,12 @@ Each line of the log starts with the seconds elapsed since `gecot` started. On a
 $ gecot optimize multicut_benders instance.json 8 --preprocessing none --time-limit 25
 [   0.0s] GECOT 2.0, algorithm multicut_benders
 [   0.0s] Instance /home/user/instances/Aix/instance_40x40/instance.json: 27 options, 1 species
-[   0.0s]   squirrel: 4800 vertices (752 habitats, 27 improvable), 9440 arcs (100 improvable)
+[   0.0s] ------------+----------+----------+------------+---------+-----------
+[   0.0s]   species   | vertices | habitats | improvable |  arcs   | improvable
+[   0.0s]             |          |          |  vertices  |         |    arcs
+[   0.0s] ------------+----------+----------+------------+---------+-----------
+[   0.0s]    squirrel |     4800 |      752 |         27 |    9440 |        100
+[   0.0s] ------------+----------+----------+------------+---------+-----------
 [   0.0s] Budget 8: 28.17 % of the options' total cost (28.4)
 [   0.1s] Solving the optimization model
 [   2.2s] Ctrl-C stops the algorithm and keeps its best result so far
@@ -186,7 +191,7 @@ $ gecot optimize multicut_benders instance.json 8 --preprocessing none --time-li
 [  25.0s] warning: Solver stopped: time limit reached
 ```
 
-The first lines say what was read: the options, the cases, and for each case its vertices (those of positive quality counted as habitats), its arcs and how many of them some option improves, then the budget as a share of the total cost of the options.
+The first lines say what was read: the options, the cases, and in a table a row per case with its vertices, those of positive quality (`habitats`), those that some option improves, its arcs and those that some option improves; then the budget as a share of the total cost of the options.
 
 ### Progress
 

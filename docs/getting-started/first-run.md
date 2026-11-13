@@ -106,7 +106,12 @@ With a budget of 4:
 $ gecot optimize flow_mip three-woods.json 4
 [   0.0s] GECOT 2.0, algorithm flow_mip
 [   0.0s] Instance /home/user/three-woods.json: 3 options, 1 species
-[   0.0s]   squirrel: 3 vertices (3 habitats, 1 improvable), 4 arcs (4 improvable)
+[   0.0s] ------------+----------+----------+------------+---------+-----------
+[   0.0s]   species   | vertices | habitats | improvable |  arcs   | improvable
+[   0.0s]             |          |          |  vertices  |         |    arcs
+[   0.0s] ------------+----------+----------+------------+---------+-----------
+[   0.0s]    squirrel |        3 |        3 |          1 |       4 |          4
+[   0.0s] ------------+----------+----------+------------+---------+-----------
 [   0.0s] Budget 4: 57.14 % of the options' total cost (7)
 [   0.0s] Preprocessing the 'squirrel' graph
 [   0.0s] Solving the optimization model

@@ -185,7 +185,12 @@ A quick way to check that an instance says what you mean is to run a heuristic o
 $ gecot optimize greedy aude.json 4
 [   0.0s] GECOT 2.0, algorithm greedy
 [   0.0s] Instance /home/user/instances/Aude/aude.json: 15 options, 1 species
-[   0.0s]   trout: 45 vertices (34 habitats, 0 improvable), 88 arcs (30 improvable)
+[   0.0s] ------------+----------+----------+------------+---------+-----------
+[   0.0s]   species   | vertices | habitats | improvable |  arcs   | improvable
+[   0.0s]             |          |          |  vertices  |         |    arcs
+[   0.0s] ------------+----------+----------+------------+---------+-----------
+[   0.0s]       trout |       45 |       34 |          0 |      88 |         30
+[   0.0s] ------------+----------+----------+------------+---------+-----------
 [   0.0s] Budget 4: 26.67 % of the options' total cost (15)
 ```
 

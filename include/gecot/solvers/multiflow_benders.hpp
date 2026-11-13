@@ -373,7 +373,7 @@ struct multiflow_benders : public mip_solver_base {
         for(auto && instance_case : instance.cases()) {
             const auto [strong_arcs_map, useless_arcs_map] =
                 _compute_strong_and_useless_arcs(instance, instance_case,
-                                                 budget);
+                                                 budget_t{{budget}});
             preprocessing.emplace_back(
                 instance_case.name(),
                 _average_size(instance_case, strong_arcs_map),
@@ -387,9 +387,9 @@ struct multiflow_benders : public mip_solver_base {
                 pb.tick();
                 if(!_is_target(instance_case, t)) continue;
                 const auto data = compute_contracted_graph_data(
-                    instance, instance_case, budget, t, strong_arcs_map[t],
-                    useless_arcs_map[t], big_M_kind::knapsack_bnb,
-                    feasibility_tol, !no_pruning);
+                    instance, instance_case, budget_t{{budget}}, t,
+                    strong_arcs_map[t], useless_arcs_map[t],
+                    big_M_kind::knapsack_bnb, feasibility_tol, !no_pruning);
                 const target_block & block = blocks.emplace_back(data);
                 // M_t bounds F_t: without it the relaxation is unbounded
                 // until t receives a cut
@@ -556,7 +556,8 @@ struct multiflow_benders : public mip_solver_base {
             report.score_stats.emplace_back("root_relaxation_value",
                                             *root_value);
         }
-        if(!has_solution) return {_fallback_solution(instance, budget), report};
+        if(!has_solution)
+            return {_fallback_solution(instance, budget_t{{budget}}), report};
         const auto master_solution = model.get_solution();
         auto solution = instance.create_option_map(false);
         for(auto && o : instance.options())

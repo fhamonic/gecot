@@ -179,7 +179,7 @@ struct multicut_benders : public mip_solver_base {
     }
 
     template <lazy_constraint_model M, instance_c I>
-    solve_result<I> solve(const I & instance, const double budget) const {
+    solve_result<I> solve(const I & instance, const budget_t & budget) const {
         using namespace mippp;
         using namespace mippp::operators;
         using target_data = contracted_graph_data<instance_case_t<I>>;
@@ -198,9 +198,7 @@ struct multicut_benders : public mip_solver_base {
         model.set_objective(formula.variable(instance.criterion()));
         const auto x = model.add_binary_variables(
             instance.options().size(), [](const option_t & o) { return o; });
-        model.add_constraint(xsum(instance.options(), [&](auto && o) {
-                                 return instance.option_cost(o) * x(o);
-                             }) <= budget);
+        _add_budget_rows(model, instance, budget, x);
 
         // θ_g and the targets [first, last) of its case that g holds
         struct group {

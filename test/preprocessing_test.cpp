@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <algorithm>
+#include <cstdint>
 #include <limits>
 #include <random>
 #include <stdexcept>
@@ -17,6 +18,7 @@
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/indices/pc_num.hpp"
+#include "gecot/preprocessing/compute_big_M_map.hpp"
 #include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
 #include "gecot/preprocessing/compute_contracted_generalized_flow_graph.hpp"
 #include "gecot/preprocessing/compute_generalized_flow_graph.hpp"
@@ -536,4 +538,82 @@ GTEST_TEST(preprocessing, contraction_of_a_strong_self_loop) {
                          contracted_graph, contracted_source_quality_map,
                          contracted_probability_map, contracted_t),
                      0.75);
+}
+
+namespace {
+// the best total gain of the options within the budget of every dimension
+double brute_force_knapsack(const std::vector<double> & gains,
+                            const std::vector<std::vector<double>> & costs,
+                            const std::vector<double> & budget) {
+    double best = 0;
+    for(std::uint32_t mask = 0; mask < (1u << gains.size()); ++mask) {
+        double gain = 0;
+        std::vector<double> cost(budget.size(), 0.0);
+        for(std::size_t o = 0; o < gains.size(); ++o) {
+            if(!((mask >> o) & 1)) continue;
+            gain += gains[o];
+            for(std::size_t r = 0; r < budget.size(); ++r)
+                cost[r] += costs[o][r];
+        }
+        bool fits = true;
+        for(std::size_t r = 0; r < budget.size(); ++r)
+            fits = fits && cost[r] <= budget[r];
+        if(fits) best = std::max(best, gain);
+    }
+    return best;
+}
+}  // namespace
+
+// a vertex without arc: its big-M is its quality plus a knapsack of the gains
+GTEST_TEST(preprocessing, knapsack_big_M_per_cost_dimension) {
+    std::mt19937 rng(5);
+    std::uniform_int_distribution<int> cost(0, 4), gain(0, 9);
+    for(int round = 0; round < 200; ++round) {
+        const std::size_t num_options = 9;
+        std::vector<std::vector<double>> costs;
+        std::vector<double> gains;
+        case_spec spec{1, {}, {}, {3.0}, {3.0}, {{}}, {}};
+        for(gecot::option_t o = 0; o < num_options; ++o) {
+            // many options free in one dimension, as for an area
+            costs.push_back(
+                {static_cast<double>(cost(rng)),
+                 static_cast<double>(cost(rng) * static_cast<int>(o % 2))});
+            gains.push_back(gain(rng));
+            spec.vertex_options[0].emplace_back(gains.back(), 0.0, o);
+        }
+        const std::vector<double> budget = {
+            static_cast<double>(cost(rng) + cost(rng)),
+            static_cast<double>(cost(rng))};
+        const Instance instance = build_instance({"money", "area"}, costs, {},
+                                                 {spec}, criterion_var{0});
+        const auto & instance_case = instance.cases()[0];
+        const auto & graph = instance_case.graph();
+        auto source_options_map = melon::create_vertex_map<
+            std::vector<std::pair<double, gecot::option_t>>>(graph, {});
+        for(auto && [sqg, tqg, o] : instance_case.vertex_options_map()[0])
+            source_options_map[0].emplace_back(sqg, o);
+        const auto big_M = [&](const std::vector<double> & b, bool dantzig) {
+            return gecot::compute_knapsack_big_M_map(
+                instance, gecot::budget_t{b}, dantzig, graph,
+                instance_case.source_quality_map(), source_options_map,
+                instance_case.arc_probability_map(), melon::vertices(graph))[0];
+        };
+        // exact on each dimension alone, cost-0 options included
+        std::vector<std::vector<double>> money, area;
+        for(auto && c : costs) {
+            money.push_back({c[0]});
+            area.push_back({c[1]});
+        }
+        const double money_knapsack =
+            brute_force_knapsack(gains, money, {budget[0]});
+        const double area_knapsack =
+            brute_force_knapsack(gains, area, {budget[1]});
+        // the least of the two, at least the knapsack of both
+        EXPECT_NEAR(big_M(budget, false),
+                    3.0 + std::min(money_knapsack, area_knapsack), 1e-9);
+        EXPECT_GE(big_M(budget, false) + 1e-9,
+                  3.0 + brute_force_knapsack(gains, costs, budget));
+        EXPECT_GE(big_M(budget, true) + 1e-9,
+                  3.0 + brute_force_knapsack(gains, costs, budget));
+    }
 }

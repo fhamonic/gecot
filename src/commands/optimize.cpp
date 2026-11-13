@@ -91,9 +91,10 @@ static bool process_command_line(
                    "Output solution value in CSV file");
     app.add_option("--reformulation", reformulation,
                    "Instance given to the algorithm, trivial: without the "
-                   "options of cost 0, bought, or over the budget; path_lp: "
-                   "also without the options that the path relaxation proves "
-                   "to be in no better solution than its own")
+                   "options over the budget, and those of cost 0, bought "
+                   "unless a conflict set makes them a choice; path_lp: also "
+                   "without the options that the path relaxation proves to be "
+                   "in no better solution than its own")
         ->check(CLI::IsMember({"trivial", "path_lp"}))
         ->default_val("trivial");
     app.add_option("--reformulation-params", reformulation_params,

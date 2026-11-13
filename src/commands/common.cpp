@@ -189,7 +189,7 @@ prepared_instance prepare_instance(const std::filesystem::path & instance_file,
     print_instance_size<spdlog::level::info>(raw_instance);
     const std::size_t num_dimensions = raw_instance.num_cost_dimensions();
     if(num_dimensions > 1 || !raw_instance.conflict_sets().empty())
-        spdlog::info("{} cost dimensions, {} conflict sets", num_dimensions,
+        spdlog::info("Cost dimensions: {}, conflict sets: {}", num_dimensions,
                      raw_instance.conflict_sets().size());
     gecot::budget_t budget = parse_budget(raw_instance, budget_text);
     for(std::size_t r = 0; r < num_dimensions; ++r) {

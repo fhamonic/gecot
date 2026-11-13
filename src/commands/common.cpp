@@ -196,8 +196,9 @@ prepared_instance prepare_instance(const std::filesystem::path & instance_file,
                      format_percent(budget / options_total_cost * 100, false),
                      options_total_cost);
 
-    auto [instance, quality_scale] =
-        trivial_reformulate_instance(raw_instance, budget, merge);
+    auto [instance, quality_scale, static_options] =
+        trivial_reformulate_instance(raw_instance, gecot::budget_t{{budget}},
+                                     merge);
 
     spdlog::debug("Removed {} options and {} species",
                   raw_instance.num_options() - instance.num_options(),

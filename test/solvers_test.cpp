@@ -19,7 +19,8 @@ option_names solve_aude(auto solver, double budget) {
     const Instance raw_instance =
         parse_instance(PROJECT_SOURCE_DIR "/test/instances/Aude/aude.json");
     const Instance instance =
-        trivial_reformulate_instance(raw_instance, budget).first;
+        trivial_reformulate_instance(raw_instance, gecot::budget_t{{budget}})
+            .instance;
     const auto solution = solver.solve(instance, budget);
     option_names taken;
     for(auto && option : raw_instance.options()) {

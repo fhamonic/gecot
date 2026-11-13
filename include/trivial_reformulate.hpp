@@ -50,15 +50,54 @@ struct formula_scale_visitor {
     }
 };
 
+template <gecot::instance_c I>
+std::vector<std::string> cost_dimensions_names(const I & instance) {
+    std::vector<std::string> names;
+    for(std::size_t r = 0; r < instance.num_cost_dimensions(); ++r)
+        names.push_back(instance.cost_dimension_name(r));
+    return names;
+}
+
+template <gecot::instance_c I>
+std::vector<double> option_costs(const I & instance, const gecot::option_t o) {
+    std::vector<double> costs;
+    for(std::size_t r = 0; r < instance.num_cost_dimensions(); ++r)
+        costs.push_back(instance.option_cost(o, r));
+    return costs;
+}
+
+// the conflict sets on the options that option_map keeps, under their new ids;
+// a set left with one option or none constrains nothing
+template <gecot::instance_c I>
+void add_conflict_sets(const I & instance, Instance & new_instance,
+                       const auto & option_map) {
+    for(std::size_t l = 0; l < instance.conflict_sets().size(); ++l) {
+        std::vector<gecot::option_t> set;
+        for(auto && o : instance.conflict_sets()[l])
+            if(option_map[o]) set.push_back(option_map[o].value());
+        if(set.size() >= 2)
+            new_instance.add_conflict_set(instance.conflict_set_name(l),
+                                          std::move(set));
+    }
+}
+
+template <gecot::instance_c I>
+struct reformulation {
+    Instance instance;
+    double quality_scale;
+    // the options of the original instance that are always bought
+    gecot::instance_solution_t<I> static_options;
+};
+
 // returns the instance with its qualities divided by the returned power of 2,
 // so its scores are divided by its square. Gurobi's absolute tolerances gave
 // wrong optima on scores near 1e11, and near 1e-2 on bike with its qualities
 // divided by the largest: the largest case score is brought into [1e5, 4e5),
 // and an instance whose cases score less is left unscaled
 template <gecot::instance_c I>
-std::pair<Instance, double> trivial_reformulate_instance(
-    const I & instance, double budget = std::numeric_limits<double>::max(),
-    const bool merge = true) {
+reformulation<I> trivial_reformulate_instance(const I & instance,
+                                              const gecot::budget_t & budget,
+                                              const bool merge = true) {
     // one factor for all cases: a sum or a min criterion weighs them
     const auto base_cases_pc_num = gecot::compute_base_cases_pc_num(instance);
     double max_case_score = 0;
@@ -73,26 +112,46 @@ std::pair<Instance, double> trivial_reformulate_instance(
         std::visit(formula_scale_visitor{quality_scale * quality_scale},
                    instance.criterion()));
 
+    reformulated_instance.set_cost_dimensions(cost_dimensions_names(instance));
+
+    // an option over the budget of a dimension is never bought
+    auto affordable = instance.create_option_map(true);
+    for(auto && o : instance.options())
+        for(std::size_t r = 0; r < budget.size(); ++r)
+            if(instance.option_cost(o, r) > budget[r]) affordable[o] = false;
+    // a set of one affordable option or none constrains nothing
+    auto in_conflict = instance.create_option_map(false);
+    for(auto && set : instance.conflict_sets())
+        if(std::ranges::count_if(set, [&](auto o) { return affordable[o]; }) >=
+           2)
+            for(auto && o : set) in_conflict[o] = true;
+
     auto reformulated_option_map =
         instance.template create_option_map<std::optional<gecot::option_t>>();
-    // free options are always bought: applied to the cases instead
-    auto free_options = instance.create_option_map(false);
+    // free options are always bought, unless they exclude others: applied to
+    // the cases instead
+    auto static_options = instance.create_option_map(false);
     for(auto && original_option : instance.options()) {
-        const double cost = instance.option_cost(original_option);
-        free_options[original_option] = (cost == 0);
-        if(cost > budget || cost == 0) continue;
+        if(!affordable[original_option]) continue;
+        const auto costs = option_costs(instance, original_option);
+        static_options[original_option] =
+            !in_conflict[original_option] &&
+            std::ranges::all_of(costs, [](double c) { return c == 0; });
+        if(static_options[original_option]) continue;
         auto option = reformulated_instance.add_option(
-            instance.option_name(original_option), {cost});
+            instance.option_name(original_option), costs);
         reformulated_option_map[original_option].emplace(option);
     }
+    add_conflict_sets(instance, reformulated_instance, reformulated_option_map);
 
     for(auto && instance_case : instance.cases()) {
         trivial_reformulate_case(instance_case, reformulated_instance,
-                                 reformulated_option_map, free_options,
+                                 reformulated_option_map, static_options,
                                  quality_scale, merge);
     }
 
-    return {std::move(reformulated_instance), quality_scale};
+    return {std::move(reformulated_instance), quality_scale,
+            std::move(static_options)};
 }
 
 // the instance without the options that keep rejects, the others under their
@@ -102,13 +161,15 @@ Instance restrict_instance(const I & instance, const auto & keep,
                            const bool merge = true) {
     Instance restricted_instance;
     restricted_instance.set_criterion(instance.criterion());
+    restricted_instance.set_cost_dimensions(cost_dimensions_names(instance));
     auto restricted_option_map =
         instance.template create_option_map<std::optional<gecot::option_t>>();
     for(auto && option : instance.options())
         if(keep(option))
             restricted_option_map[option].emplace(
                 restricted_instance.add_option(instance.option_name(option),
-                                               {instance.option_cost(option)}));
+                                               option_costs(instance, option)));
+    add_conflict_sets(instance, restricted_instance, restricted_option_map);
     for(auto && instance_case : instance.cases())
         trivial_reformulate_case(instance_case, restricted_instance,
                                  restricted_option_map,

@@ -6,8 +6,6 @@
 #include <cmath>
 #include <utility>
 
-#include <fmt/ranges.h>
-
 #include <tbb/concurrent_vector.h>
 
 #include "melon/algorithm/competing_dijkstras.hpp"
@@ -135,7 +133,7 @@ auto compute_constrained_strong_and_useless_arcs(
     // µ = 0 again, seeded by the fiber of the positive multipliers: mus is
     // the test order, not sorted
     if(decades_sweep && mus.size() > 1) mus.push_back(0.0);
-    spdlog::trace("µ sequence: {:.3e}", fmt::join(mus, " "));
+    spdlog::trace("µ sequence: {:n:.3e}", mus);
 
     std::vector<std::atomic<std::size_t>> stong_counters(mus.size());
     std::vector<std::atomic<std::size_t>> useless_counters(mus.size());

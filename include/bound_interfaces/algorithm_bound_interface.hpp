@@ -2,13 +2,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <format>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include <fmt/core.h>
 
 #include "gecot/helper.hpp"
 
@@ -47,7 +46,7 @@ public:
                                 const bound_context &) const override {
         auto [solution, report] = solver->solve(instance, B);
         if(!report.best_bound)
-            throw std::runtime_error(fmt::format(
+            throw std::runtime_error(std::format(
                 "'{}' proved no bound (status: {})", name(), report.status));
         const double solution_score = instance.eval_criterion(
             gecot::compute_solution_cases_pc_num(instance, solution));
@@ -55,7 +54,7 @@ public:
         // bits at the optimum
         if(report.best_bound.value() <
            solution_score - 1e-9 * std::max(1.0, std::abs(solution_score)))
-            throw std::runtime_error(fmt::format(
+            throw std::runtime_error(std::format(
                 "'{}' bounds the score by {}, below its solution's {}", name(),
                 report.best_bound.value(), solution_score));
         gecot::bound_report bound_report{

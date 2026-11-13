@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <limits>
 #include <optional>
 #include <queue>
@@ -16,8 +17,6 @@
 #include <tuple>
 #include <utility>
 #include <vector>
-
-#include <fmt/core.h>
 
 #include <spdlog/spdlog.h>
 
@@ -92,7 +91,7 @@ struct split_lagrange {
                        instance.option_cost(option) > budget)
                         continue;
                     if(arc_option != no_option && arc_option != option)
-                        throw std::invalid_argument(fmt::format(
+                        throw std::invalid_argument(std::format(
                             "split_lagrange: arc '{}' of '{}' is improved by "
                             "options '{}' and '{}'",
                             instance_case.arc_name(a), instance_case.name(),
@@ -105,7 +104,7 @@ struct split_lagrange {
                 const auto t = melon::arc_target(graph, a);
                 if(entering_option[t] != no_option &&
                    entering_option[t] != arc_option)
-                    throw std::invalid_argument(fmt::format(
+                    throw std::invalid_argument(std::format(
                         "split_lagrange: vertex '{}' of '{}' is entered by "
                         "arcs improved by options '{}' and '{}'",
                         instance_case.vertex_name(t), instance_case.name(),
@@ -116,7 +115,7 @@ struct split_lagrange {
             for(auto && option : instance.options())
                 if(!option_arcs[option].empty() &&
                    !common_vertex(graph, option_arcs[option]))
-                    throw std::invalid_argument(fmt::format(
+                    throw std::invalid_argument(std::format(
                         "split_lagrange: the arcs of '{}' improved by option "
                         "'{}' share no vertex",
                         instance_case.name(), instance.option_name(option)));

@@ -3,12 +3,12 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <format>
 #include <random>
 #include <ranges>
 #include <utility>
 #include <vector>
 
-#include <fmt/ranges.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 
@@ -241,12 +241,10 @@ struct multicut_benders : public mip_solver_base {
                 instance_case.name(),
                 _average_size(instance_case, strong_arcs_map),
                 _average_size(instance_case, useless_arcs_map),
-                fmt::format("{}", fmt::join(std::views::transform(
-                                                case_groups,
-                                                [](const group & g) {
-                                                    return g.last - g.first;
-                                                }),
-                                            ", ")));
+                std::format("{:n}", std::views::transform(
+                                        case_groups, [](const group & g) {
+                                            return g.last - g.first;
+                                        })));
             model.add_constraint(
                 z(instance_case.id()) <=
                 xsum(std::views::transform(case_groups, &group::theta)));

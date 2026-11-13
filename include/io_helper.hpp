@@ -3,18 +3,16 @@
 
 #include <iostream>
 #include <ostream>
+#include <print>
 #include <string>
-
-#include <fmt/os.h>
 
 #include <spdlog/spdlog.h>
 
 #include "gecot/utils/log_table.hpp"
 
 template <spdlog::level::level_enum LVL>
-void print_instance_size(auto && instance, const std::string & instance_name) {
-    spdlog::log(LVL, "{}: {} options, {} species", instance_name,
-                instance.num_options(), instance.cases().size());
+void print_instance_size(auto && instance) {
+    spdlog::log(LVL, "Options count: {}", instance.num_options());
     gecot::log_table<LVL, 0, 11, 8, 8, 10, 7, 10> sizes(
         {"species"}, {"vertices"}, {"habitats"}, {"improvable vertices"},
         {"arcs"}, {"improvable arcs"});
@@ -46,18 +44,18 @@ inline void print_paragraph(std::size_t offset, std::size_t column_width,
     while(str.size() - line_start > column_width) {
         std::size_t n = str.rfind(' ', line_start + column_width);
         if(n <= line_start) {
-            fmt::print("{:<{}}\n{: ^{}}",
+            std::print("{:<{}}\n{: ^{}}",
                        str.substr(line_start, column_width - 1),
                        column_width - offset, "", offset);
             line_start += column_width - 1;
         } else {
-            fmt::print("{:<{}}\n{: ^{}}",
+            std::print("{:<{}}\n{: ^{}}",
                        str.substr(line_start, n - line_start),
                        column_width - offset, "", offset);
             line_start = n + 1;
         }
     }
-    fmt::println("{:<{}}", str.substr(line_start), column_width - offset);
+    std::println("{:<{}}", str.substr(line_start), column_width - offset);
 }
 
 #endif  // IO_HELPER_HPP

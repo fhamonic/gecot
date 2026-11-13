@@ -1,8 +1,7 @@
 #include <cstdlib>
+#include <print>
 #include <string>
 #include <vector>
-
-#include <fmt/core.h>
 
 #include <spdlog/spdlog.h>
 
@@ -10,7 +9,7 @@
 #include "commands/common.hpp"
 
 static void print_usage() {
-    fmt::print(R"(Usage:
+    std::print(R"(Usage:
   gecot --help
   gecot --version
   gecot optimize --help

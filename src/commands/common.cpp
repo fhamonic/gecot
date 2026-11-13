@@ -2,18 +2,20 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cerrno>
 #include <chrono>
 #include <cmath>
 #include <csignal>
+#include <format>
 #include <iterator>
+#include <print>
 #include <ranges>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
-
-#include <fmt/core.h>
 
 #include <spdlog/pattern_formatter.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -42,7 +44,7 @@ class elapsed_flag : public spdlog::custom_flag_formatter {
 public:
     void format(const spdlog::details::log_msg &, const std::tm &,
                 spdlog::memory_buf_t & dest) override {
-        fmt::format_to(std::back_inserter(dest), "{:6.1f}s", elapsed_seconds());
+        std::format_to(std::back_inserter(dest), "{:6.1f}s", elapsed_seconds());
     }
     std::unique_ptr<custom_flag_formatter> clone() const override {
         return std::make_unique<elapsed_flag>();
@@ -55,7 +57,7 @@ public:
     void format(const spdlog::details::log_msg & msg, const std::tm &,
                 spdlog::memory_buf_t & dest) override {
         if(msg.level < spdlog::level::warn) return;
-        fmt::format_to(std::back_inserter(dest), "{}: ",
+        std::format_to(std::back_inserter(dest), "{}: ",
                        msg.level == spdlog::level::warn ? "warning" : "error");
     }
     std::unique_ptr<custom_flag_formatter> clone() const override {
@@ -73,7 +75,7 @@ extern "C" void request_stop(int) {
 }  // namespace
 
 void print_soft_name() {
-    fmt::print(
+    std::print(
         "GECOT — Graph-based Ecological Connectivity "
         "Optimization Tool\nVersion: {} (built on {})\n\n",
         PROJECT_VERSION, __DATE__);
@@ -111,16 +113,16 @@ void apply_logging(int verbosity, bool quiet) {
 
 std::string format_score(double score) {
     // without an exponent: scores reach 1e11
-    return std::abs(score) < 1e10 ? fmt::format("{:.10g}", score)
-                                  : fmt::format("{:.0f}", score);
+    return std::abs(score) < 1e10 ? std::format("{:.10g}", score)
+                                  : std::format("{:.0f}", score);
 }
 
 std::string format_percent(double percent, bool sign) {
     // not -3.78e-12 % for a relaxation at the initial score
     if(std::abs(percent) < 1e-9) percent = 0;
     std::string s = percent != 0 && std::abs(percent) < 0.01
-                        ? fmt::format("{:.2e}", percent)
-                        : fmt::format("{:.2f}", percent);
+                        ? std::format("{:.2e}", percent)
+                        : std::format("{:.2f}", percent);
     if(sign && percent >= 0) s.insert(0, "+");
     return s + " %";
 }
@@ -141,10 +143,10 @@ std::optional<double> guaranteed_gain_share(double score, double bound,
 
 std::string format_duration(double seconds) {
     const auto s = static_cast<long>(seconds);
-    if(seconds < 1) return fmt::format("{:.0f} ms", seconds * 1000);
-    if(seconds < 60) return fmt::format("{:.1f} s", seconds);
-    if(seconds < 3600) return fmt::format("{} min {:02} s", s / 60, s % 60);
-    return fmt::format("{} h {:02} min", s / 3600, s % 3600 / 60);
+    if(seconds < 1) return std::format("{:.0f} ms", seconds * 1000);
+    if(seconds < 60) return std::format("{:.1f} s", seconds);
+    if(seconds < 3600) return std::format("{} min {:02} s", s / 60, s % 60);
+    return std::format("{} h {:02} min", s / 3600, s % 3600 / 60);
 }
 
 void log_parameters(
@@ -154,7 +156,7 @@ void log_parameters(
         parameters, [](auto && p) { return p.first.size(); }));
     spdlog::debug("Parameters:");
     for(const auto & [name, value] : parameters)
-        spdlog::debug("  {:<{}} {}", name, name_max_length, value);
+        spdlog::debug("    {:<{}} {}", name, name_max_length, value);
 }
 
 void check_output_directories(
@@ -169,13 +171,22 @@ void check_output_directories(
     }
 }
 
+std::unique_ptr<std::FILE, void (*)(std::FILE *)> open_output_file(
+    const std::filesystem::path & file) {
+    std::FILE * stream = std::fopen(file.string().c_str(), "w");
+    if(!stream)
+        throw std::system_error(errno, std::generic_category(),
+                                "cannot open '" + file.string() + "'");
+    return {stream, [](std::FILE * f) { std::fclose(f); }};
+}
+
 prepared_instance prepare_instance(const std::filesystem::path & instance_file,
                                    double budget, std::string_view noun,
                                    const bool merge) {
     Instance raw_instance = parse_instance(instance_file);
-    print_instance_size<spdlog::level::info>(
-        raw_instance,
-        "Instance " + std::filesystem::absolute(instance_file).string());
+    spdlog::info("Instance: {}",
+                 std::filesystem::absolute(instance_file).string());
+    print_instance_size<spdlog::level::info>(raw_instance);
     double options_total_cost = 0;
     for(auto && o : raw_instance.options())
         options_total_cost += raw_instance.option_cost(o);
@@ -187,8 +198,11 @@ prepared_instance prepare_instance(const std::filesystem::path & instance_file,
 
     auto [instance, quality_scale] =
         trivial_reformulate_instance(raw_instance, budget, merge);
-    print_instance_size<spdlog::level::debug>(
-        instance, "Without the options of cost 0 or over the budget");
+
+    spdlog::debug("Removed {} options and {} species",
+                  raw_instance.num_options() - instance.num_options(),
+                  raw_instance.cases().size() - instance.cases().size());
+    print_instance_size<spdlog::level::debug>(instance);
     if(instance.num_options() == 0) {
         spdlog::warn("Budget doesn't allow purchasing any options");
     }
@@ -200,10 +214,10 @@ prepared_instance prepare_instance(const std::filesystem::path & instance_file,
     const double base_score =
         instance.eval_criterion(gecot::compute_base_cases_pc_num(instance)) *
         score_scale;
-    spdlog::debug(
-        "Qualities divided by {:g}: the {}'s scores are divided by {:g}, its "
-        "initial score is {:g}",
-        quality_scale, noun, score_scale, initial_score / score_scale);
+    spdlog::debug("Qualities scaled by 1/{:g}: {}'s scores scaled by 1/{:g}",
+                  quality_scale, noun, score_scale);
+    spdlog::debug("Initial score: {:g} (was {:g})", initial_score / score_scale,
+                  initial_score);
 
     return {std::move(raw_instance),         std::move(instance), score_scale,
             std::move(initial_cases_pc_num), initial_score,       base_score};
@@ -221,7 +235,7 @@ progress_watch::progress_watch(const prepared_instance & prepared) {
     gecot::log_table<spdlog::level::info, 20, 12, 12, 12, 12> search(
         {"gain", gain}, {"max gain", gain},
         {"guaranteed",
-         [](const double share) { return fmt::format("{:.1f} %", share); }},
+         [](const double share) { return std::format("{:.1f} %", share); }},
         {"nodes", gecot::log_format::fixed(0)});
     gecot::report_progress = [scale = prepared.score_scale,
                               base = prepared.base_score, gain, rounds, search,
@@ -268,7 +282,7 @@ progress_watch::progress_watch(const prepared_instance & prepared) {
         std::string values = p.round
                                  ? shown(p.relaxation) + '|' + shown(p.bound)
                                  : shown(score) + '|' + shown(p.bound) + '|' +
-                                       fmt::format("{}", share.value_or(-1));
+                                       std::format("{}", share.value_or(-1));
         if(values == printed_values && now - printed < 60s) return;
         printed = now;
         printed_values = std::move(values);

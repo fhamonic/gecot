@@ -3,10 +3,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <format>
 #include <stdexcept>
 #include <utility>
-
-#include <fmt/core.h>
 
 #include <tbb/concurrent_vector.h>
 
@@ -80,7 +79,7 @@ void check_resolution(const G & graph, const double resolution) {
     // false for the NaN of a negative resolution too
     if(!(max_length > 0 &&
          max_length * static_cast<double>(graph.num_vertices()) < 0x1p62))
-        throw std::invalid_argument(fmt::format(
+        throw std::invalid_argument(std::format(
             "resolution {}: must be in ]0, 1[, and not so small that the "
             "lengths of a path of {} vertices overflow",
             resolution, graph.num_vertices()));

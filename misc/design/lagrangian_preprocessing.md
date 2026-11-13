@@ -776,7 +776,7 @@ End to end, flow_mip `--big-m tight --max-threads 4`, Gurobi seeds through `guro
   - options without arcs skipped in both option loops; `max_arc_cost` tracked;
   - `max_mu = min(max_mu, 0x1p62 / max({budget, max_arc_cost, 1.0}))`; under decades, `min_mu = max(min_mu, max_mu / 1000)`;
   - the grid built by index, `min_mu * pow(max_mu / min_mu, k / N)` for k < N and exactly max_mu at k = N, each kept if `mus.back() < mu && mu <= max_mu`;
-  - a final μ = 0 under decades if any positive point exists; a trace line "µ sequence", printed with `fmt::join` from the new `#include <fmt/ranges.h>`;
+  - a final μ = 0 under decades if any positive point exists; a trace line "µ sequence", printed with `fmt::join` from the new `#include <fmt/ranges.h>` (since gecot dropped fmt, with std::format's `{:n:.3e}`, comma-separated);
   - `dead_seed` and an `erase_if` over `mu_fiber` before the fiber seeds in each loop (frontier); `w != v` / `w != u` guards; per-pass `fiber_gain` counters replace `mu_fiber.size()`;
   - the useless-loop stop `if(fiber_map[v]) break;`;
   - comments on the cap, the grid formula, the final μ = 0, frontier and the seed order.
@@ -838,7 +838,7 @@ On the build of 80bb8a4e [S3 testBuild]:
 Checked and found correct [S3 review, S3 critic]:
 - **Grid edge cases.** k=0 gives exactly min_mu and the last point is exactly max_mu; points are deduplicated only when max/min is within a few ulps of 1. min ≥ max gives [0, max, (0)]; max = 0, or no option with arcs, gives [0] with no final 0; an infinite max is capped; min = DBL_MAX gives [0, cap, 0]; N=1 gives [0, min, max, 0]; a header-level N=0 gives [0, max, 0], which only library callers can reach (the CLI routes 0 to the unconstrained function). Grid N is a subsequence of grids 2N and 3N over 3.5M random cells [S3 review].
 - **The test's `std::ranges::includes`** needs sorted input: both label maps are sorted before return (header lines 276-279 at 4d4c14c, 269-272 at 80bb8a4e; `compute_strong_and_useless_arcs.hpp:191-195`, from 748d20a) [S3 critic, check 7].
-- **The new `<fmt/ranges.h>` include.** spdlog uses the external fmt 10.2.1, already a direct dependency; the header covers `join` in fmt 10 and 11+, and the `{:.3e}` output was checked [S3 review].
+- **The new `<fmt/ranges.h>` include.** spdlog uses the external fmt 10.2.1, already a direct dependency; the header covers `join` in fmt 10 and 11+, and the `{:.3e}` output was checked [S3 review]. Superseded: gecot no longer depends on fmt, spdlog is built on std::format (`use_std_fmt`) and the include is gone.
 
 ## 11. Caveats and open items
 

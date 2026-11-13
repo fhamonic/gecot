@@ -2,12 +2,12 @@
 
 #include <cmath>
 #include <cstdint>
+#include <format>
+#include <ranges>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include <fmt/format.h>
-#include <fmt/ranges.h>
 #include <CLI/CLI.hpp>
 #include <nlohmann/json.hpp>
 
@@ -26,7 +26,8 @@ inline std::vector<std::pair<std::string, std::string>> option_values(
         if(option->get_expected_max() == 0)  // a flag
             value = option->count() && option->as<bool>() ? "true" : "false";
         else if(option->count())
-            value = fmt::format("{}", fmt::join(option->results(), " "));
+            value = option->results() | std::views::join_with(' ') |
+                    std::ranges::to<std::string>();
         else
             value = option->get_default_str();
         values.emplace_back(option->get_lnames().front(),
@@ -46,11 +47,11 @@ inline std::string option_json_value(const CLI::Option & option) {
     if(!option.count() && option.get_default_str().empty()) return "null";
     // JSON has no infinity: '-t inf' stays a text
     if(type.starts_with("FLOAT") && std::isfinite(option.as<double>()))
-        return fmt::format("{}", option.as<double>());
+        return std::format("{}", option.as<double>());
     if(type.starts_with("UINT"))
-        return fmt::format("{}", option.as<std::uint64_t>());
+        return std::format("{}", option.as<std::uint64_t>());
     if(type.starts_with("INT"))
-        return fmt::format("{}", option.as<std::int64_t>());
+        return std::format("{}", option.as<std::int64_t>());
     // a path can hold bytes that are not UTF-8, which dump() throws on
     return nlohmann::json(option.as<std::string>())
         .dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);

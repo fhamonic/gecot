@@ -5,8 +5,8 @@
 #include <cstddef>
 #include <cstdio>
 #include <mutex>
+#include <print>
 
-#include <fmt/core.h>
 #include <spdlog/details/os.h>
 #include <spdlog/spdlog.h>
 
@@ -25,7 +25,7 @@ private:
 
 private:
     void _print_bar(std::size_t progress) {
-        fmt::print(stderr, "[{0:=^{1}}>{0: ^{2}}] {3:>3}%\r", "", progress,
+        std::print(stderr, "[{0:=^{1}}>{0: ^{2}}] {3:>3}%\r", "", progress,
                    BAR_LENGTH - progress, 100 * progress / BAR_LENGTH);
         fflush(stderr);
     }
@@ -41,7 +41,7 @@ public:
     }
     ~progress_bar() {
         if(!_shown) return;
-        fmt::print(stderr, "{0: ^{1}}\r", "", BAR_LENGTH + 8);
+        std::print(stderr, "{0: ^{1}}\r", "", BAR_LENGTH + 8);
         fflush(stderr);
     }
     void tick(const std::size_t incr = 1) {

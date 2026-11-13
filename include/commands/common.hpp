@@ -1,16 +1,16 @@
 #ifndef COMMANDS_COMMON_HPP
 #define COMMANDS_COMMON_HPP
 
+#include <cstdio>
 #include <filesystem>
 #include <initializer_list>
 #include <memory>
 #include <optional>
+#include <print>
 #include <ranges>
 #include <string>
 #include <string_view>
 #include <vector>
-
-#include <fmt/os.h>
 
 #include "melon/container/static_map.hpp"
 
@@ -41,6 +41,9 @@ void log_parameters(
 // throws if the directory of a given output file does not exist
 void check_output_directories(
     std::initializer_list<std::optional<std::filesystem::path>> files);
+// opened for writing, throws if it cannot be, closed with the pointer
+std::unique_ptr<std::FILE, void (*)(std::FILE *)> open_output_file(
+    const std::filesystem::path & file);
 
 struct prepared_instance {
     Instance raw_instance;
@@ -87,9 +90,9 @@ std::vector<std::shared_ptr<AbstractSolverInterface>> make_solver_interfaces();
 std::vector<std::shared_ptr<AbstractBoundInterface>> make_bound_interfaces();
 
 template <typename R>
-void print_json_property(fmt::ostream & out, const std::string & property_name,
+void print_json_property(std::FILE * stream, const std::string & property_name,
                          R && pairs_range) {
-    out.print("\n    \"{}\": {{", property_name);
+    std::print(stream, "\n    \"{}\": {{", property_name);
     const std::size_t key_max_length =
         (std::ranges::empty(pairs_range)
              ? 0
@@ -99,11 +102,11 @@ void print_json_property(fmt::ostream & out, const std::string & property_name,
         3;
     bool first_line = true;
     for(const auto & [key, value] : pairs_range) {
-        out.print("{}\n        {:<{}} {}", first_line ? "" : ",",
-                  std::string("\"") + key + "\":", key_max_length, value);
+        std::print(stream, "{}\n        {:<{}} {}", first_line ? "" : ",",
+                   std::string("\"") + key + "\":", key_max_length, value);
         first_line = false;
     }
-    out.print("\n    }}");
+    std::print(stream, "\n    }}");
 }
 
 #endif  // COMMANDS_COMMON_HPP

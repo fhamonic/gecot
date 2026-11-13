@@ -2,6 +2,7 @@
 #define GECOT_BOUNDS_CRITERION_ANALYSIS_HPP
 
 #include <algorithm>
+#include <format>
 #include <limits>
 #include <optional>
 #include <span>
@@ -9,8 +10,6 @@
 #include <string_view>
 #include <variant>
 #include <vector>
-
-#include <fmt/core.h>
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/criterion.hpp"
@@ -212,7 +211,7 @@ double bound_criterion(const I & instance, std::string_view method,
     }
     if(!is_non_decreasing(criterion))
         throw std::invalid_argument(
-            fmt::format("{}: the criterion is not non-decreasing in the case "
+            std::format("{}: the criterion is not non-decreasing in the case "
                         "scores",
                         method));
     auto case_bounds = instance.template create_case_map<double>();

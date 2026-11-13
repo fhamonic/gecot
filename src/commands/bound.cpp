@@ -2,14 +2,13 @@
 #include <chrono>
 #include <cmath>
 #include <filesystem>
+#include <format>
 #include <iostream>
 #include <limits>
 #include <optional>
+#include <print>
 
 #include <CLI/CLI.hpp>
-
-#include <fmt/core.h>
-#include <fmt/os.h>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
@@ -37,17 +36,17 @@ static bool process_command_line(
     auto methods = make_bound_interfaces();
 
     auto print_available_methods = [&methods]() {
-        fmt::println("Available methods:");
+        std::println("Available methods:");
         const std::size_t method_name_max_length =
             std::ranges::max(std::ranges::views::transform(
                 methods, [&](auto && m) { return m->name().size(); }));
         const std::size_t offset = method_name_max_length + 8;
 
         for(auto & m : methods) {
-            fmt::print("  {:<{}}", m->name(), offset - 2);
+            std::print("  {:<{}}", m->name(), offset - 2);
             print_paragraph(offset, 80 - offset, m->description());
         }
-        fmt::println("");
+        std::println("");
     };
 
     bool help = false, list_methods = false, list_params = false, quiet = false;
@@ -195,7 +194,7 @@ int bound_command(const std::vector<std::string> & args) {
         const double bound = report.bound * score_scale;
         if(bound < base_score * score_scale -
                        1e-9 * std::max(1.0, std::abs(base_score * score_scale)))
-            throw std::runtime_error(fmt::format(
+            throw std::runtime_error(std::format(
                 "the bound {} is below the score {} of buying only the options "
                 "of cost 0",
                 bound, base_score * score_scale));
@@ -208,58 +207,60 @@ int bound_command(const std::vector<std::string> & args) {
             report.stats.emplace_back(key, value * score_scale);
 
         if(!opt_output_json_file.has_value()) {
-            fmt::println("Status             {}", report.status);
-            fmt::println("Initial score      {}",
+            std::println("Status             {}", report.status);
+            std::println("Initial score      {}",
                          format_score(prepared.initial_score));
-            fmt::println("Upper bound        {} (at most {})",
+            std::println("Upper bound        {} (at most {})",
                          format_score(bound),
                          format_gain(bound, prepared.initial_score));
             if(all_options_bound)
-                fmt::println("All options bound  {}",
+                std::println("All options bound  {}",
                              format_score(all_options_bound.value()));
-            fmt::println("Budget             {:.10g}", budget);
-            fmt::println(
+            std::println("Budget             {:.10g}", budget);
+            std::println(
                 "Time               {}",
                 format_duration(static_cast<double>(computation_time_ms) /
                                 1000.0));
         }
 
         if(opt_output_json_file.has_value()) {
-            auto out = fmt::output_file(
-                std::filesystem::absolute(opt_output_json_file.value())
-                    .string()
-                    .c_str());
-            out.print(
-                "{{\n    \"instance_path\":  \"{}\",\n    \"method\":  "
-                "\"{}\",",
-                std::filesystem::absolute(instances_description_json)
-                    .generic_string(),
-                method->name());
-            print_json_property(out, "method_parameters",
+            const auto file = open_output_file(
+                std::filesystem::absolute(opt_output_json_file.value()));
+            std::FILE * stream = file.get();
+            std::print(stream,
+                       "{{\n    \"instance_path\":  \"{}\",\n    \"method\":  "
+                       "\"{}\",",
+                       std::filesystem::absolute(instances_description_json)
+                           .generic_string(),
+                       method->name());
+            print_json_property(stream, "method_parameters",
                                 method->json_parameters());
-            out.print(
-                ",\n    \"computation_time_ms\":  {},\n    "
-                "\"initial_score\":  {},",
-                computation_time_ms, prepared.initial_score);
+            std::print(stream,
+                       ",\n    \"computation_time_ms\":  {},\n    "
+                       "\"initial_score\":  {},",
+                       computation_time_ms, prepared.initial_score);
             print_json_property(
-                out, "initial_pc_num",
+                stream, "initial_pc_num",
                 std::views::transform(
                     instance.cases(), [&prepared](const auto & instance_case) {
                         return std::make_pair(
                             instance_case.name(),
                             prepared.initial_cases_pc_num[instance_case.id()]);
                     }));
-            out.print(
+            std::print(
+                stream,
                 ",\n    \"budget\":         {},\n    \"bound\":          {},",
                 budget, bound);
             if(all_options_bound)
-                out.print("\n    \"all_options_bound\": {},",
-                          all_options_bound.value());
-            out.print("\n    \"method_report\": {{\n        \"status\": \"{}\"",
-                      report.status);
+                std::print(stream, "\n    \"all_options_bound\": {},",
+                           all_options_bound.value());
+            std::print(
+                stream,
+                "\n    \"method_report\": {{\n        \"status\": \"{}\"",
+                report.status);
             for(const auto & [key, value] : report.stats)
-                out.print(",\n        \"{}\": {}", key, value);
-            out.print("\n    }}\n}}");
+                std::print(stream, ",\n        \"{}\": {}", key, value);
+            std::print(stream, "\n    }}\n}}");
 
             spdlog::info("Bound written to {}",
                          std::filesystem::absolute(opt_output_json_file.value())

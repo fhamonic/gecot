@@ -4,11 +4,10 @@
 #include <atomic>
 #include <condition_variable>
 #include <optional>
+#include <print>
 #include <tuple>
 #include <utility>
 #include <vector>
-
-#include <fmt/core.h>
 
 #include <tbb/blocked_range.h>
 #include <tbb/blocked_range2d.h>

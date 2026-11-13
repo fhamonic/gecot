@@ -6,6 +6,7 @@ class CompressorRecipe(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     generators = "CMakeToolchain", "CMakeDeps"
     build_policy = "missing"
+    default_options = {"spdlog/*:use_std_fmt": True}
 
     def requirements(self):
         self.requires("nlohmann_json/3.11.3", override=True)

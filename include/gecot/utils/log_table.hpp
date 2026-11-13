@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <format>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -11,7 +12,6 @@
 #include <utility>
 #include <vector>
 
-#include <fmt/core.h>
 #include <spdlog/spdlog.h>
 
 namespace gecot {
@@ -19,23 +19,23 @@ namespace gecot {
 // formats for the numbers of a log_column
 namespace log_format {
 inline std::string plain(const double value) {
-    return fmt::format("{}", value);
+    return std::format("{}", value);
 }
 inline auto fixed(const int precision) {
     return [precision](const double value) {
-        return fmt::format("{:.{}f}", value, precision);
+        return std::format("{:.{}f}", value, precision);
     };
 }
 inline auto scientific(const int precision) {
     return [precision](const double value) {
-        return fmt::format("{:.{}e}", value, precision);
+        return std::format("{:.{}e}", value, precision);
     };
 }
 // digits significant digits, the zeros that end them kept: the values of a
 // magnitude are aligned on their point
 inline auto general(const int digits) {
     return [digits](const double value) {
-        return fmt::format("{:#.{}g}", value, digits);
+        return std::format("{:#.{}g}", value, digits);
     };
 }
 }  // namespace log_format

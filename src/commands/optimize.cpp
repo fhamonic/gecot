@@ -1,17 +1,16 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <iostream>
 #include <limits>
 #include <optional>
+#include <print>
 #include <ranges>
 #include <vector>
 
 #include <CLI/CLI.hpp>
-
-#include <fmt/core.h>
-#include <fmt/os.h>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
@@ -41,7 +40,7 @@ static bool process_command_line(
     auto solver_interfaces = make_solver_interfaces();
 
     auto print_available_algorithms = [&solver_interfaces]() {
-        fmt::println("Available algorithms:");
+        std::println("Available algorithms:");
         const std::size_t algorithm_name_max_length = std::ranges::max(
             std::ranges::views::transform(solver_interfaces, [&](auto && s) {
                 return s->name().size();
@@ -49,10 +48,10 @@ static bool process_command_line(
         const std::size_t offset = algorithm_name_max_length + 8;
 
         for(auto & s : solver_interfaces) {
-            fmt::print("  {:<{}}", s->name(), offset - 2);
+            std::print("  {:<{}}", s->name(), offset - 2);
             print_paragraph(offset, 80 - offset, s->description());
         }
-        fmt::println("");
+        std::println("");
         return false;
     };
 
@@ -271,37 +270,37 @@ int optimize_command(const std::vector<std::string> & args) {
 
         if(!opt_output_json_file.has_value() &&
            !opt_output_csv_file.has_value()) {
-            fmt::println("Status          {}", report.status);
-            fmt::println("Initial score   {}", format_score(initial_score));
-            fmt::println("Solution score  {} ({})",
+            std::println("Status          {}", report.status);
+            std::println("Initial score   {}", format_score(initial_score));
+            std::println("Solution score  {} ({})",
                          format_score(solution_score),
                          format_gain(solution_score, initial_score));
             if(best_bound)
-                fmt::println(
+                std::println(
                     "Upper bound     {}{}", format_score(best_bound.value()),
                     guaranteed_gain_share(solution_score, best_bound.value(),
                                           prepared.base_score)
                         .transform([](double share) {
-                            return fmt::format(
+                            return std::format(
                                 " (at least {:.1f} % of the best possible "
                                 "gain)",
                                 share);
                         })
                         .value_or(""));
-            fmt::println("Cost            {:.10g} of {:.10g}", solution_cost,
+            std::println("Cost            {:.10g} of {:.10g}", solution_cost,
                          budget);
-            fmt::println(
+            std::println(
                 "Time            {}",
                 format_duration(static_cast<double>(computation_time_ms) /
                                 1000.0));
             if(instance.cases().size() > 1) {
-                fmt::println("Per species");
+                std::println("Per species");
                 const std::size_t name_max_length = std::ranges::max(
                     std::views::transform(instance.cases(), [](auto && c) {
                         return c.name().size();
                     }));
                 for(const auto & instance_case : instance.cases())
-                    fmt::println(
+                    std::println(
                         "    {:<{}} {} ({})", instance_case.name() + ':',
                         name_max_length + 1,
                         format_score(solution_cases_pc_num[instance_case.id()]),
@@ -311,33 +310,34 @@ int optimize_command(const std::vector<std::string> & args) {
             const auto bought = std::ranges::to<std::vector>(std::views::filter(
                 raw_instance.options(),
                 [&](auto && option) { return option_value(option); }));
-            fmt::println("Options bought  {} of {}{}", bought.size(),
+            std::println("Options bought  {} of {}{}", bought.size(),
                          raw_instance.num_options(), bought.empty() ? "" : ":");
             for(auto && option : bought)
-                fmt::println("    {}", raw_instance.option_name(option));
+                std::println("    {}", raw_instance.option_name(option));
         }
 
         if(opt_output_json_file.has_value()) {
-            auto out = fmt::output_file(
-                std::filesystem::absolute(opt_output_json_file.value())
-                    .string()
-                    .c_str());
-            out.print(
+            const auto file = open_output_file(
+                std::filesystem::absolute(opt_output_json_file.value()));
+            std::FILE * stream = file.get();
+            std::print(
+                stream,
                 "{{\n    \"instance_path\":  \"{}\",\n    \"algorithm\":  "
                 "\"{}\",",
                 std::filesystem::absolute(instances_description_json)
                     .generic_string(),
                 solver->name());
-            print_json_property(out, "algorithm_parameters",
+            print_json_property(stream, "algorithm_parameters",
                                 solver->json_parameters());
-            out.print(",");
-            print_json_property(out, "command_parameters", command_parameters);
-            out.print(
-                ",\n    \"computation_time_ms\":  {},\n    "
-                "\"initial_score\":  {},",
-                computation_time_ms, initial_score);
+            std::print(stream, ",");
+            print_json_property(stream, "command_parameters",
+                                command_parameters);
+            std::print(stream,
+                       ",\n    \"computation_time_ms\":  {},\n    "
+                       "\"initial_score\":  {},",
+                       computation_time_ms, initial_score);
             print_json_property(
-                out, "initial_pc_num",
+                stream, "initial_pc_num",
                 std::views::transform(
                     instance.cases(),
                     [&initial_cases_pc_num](const auto & instance_case) {
@@ -345,12 +345,12 @@ int optimize_command(const std::vector<std::string> & args) {
                             instance_case.name(),
                             initial_cases_pc_num[instance_case.id()]);
                     }));
-            out.print(
-                ",\n    \"budget\":         {},\n    "
-                "\"solution_score\": {},",
-                budget, solution_score);
+            std::print(stream,
+                       ",\n    \"budget\":         {},\n    "
+                       "\"solution_score\": {},",
+                       budget, solution_score);
             print_json_property(
-                out, "solution_pc_num",
+                stream, "solution_pc_num",
                 std::views::transform(
                     instance.cases(),
                     [&solution_cases_pc_num](const auto & instance_case) {
@@ -358,21 +358,22 @@ int optimize_command(const std::vector<std::string> & args) {
                             instance_case.name(),
                             solution_cases_pc_num[instance_case.id()]);
                     }));
-            out.print(",\n    \"solution_cost\":  {},", solution_cost);
+            std::print(stream, ",\n    \"solution_cost\":  {},", solution_cost);
             print_json_property(
-                out, "solution",
+                stream, "solution",
                 std::views::transform(
                     raw_instance.options(),
                     [&raw_instance, &option_value](const auto & option) {
                         return std::make_pair(raw_instance.option_name(option),
                                               option_value(option));
                     }));
-            out.print(
+            std::print(
+                stream,
                 ",\n    \"algorithm_report\": {{\n        \"status\": \"{}\"",
                 report.status);
             for(const auto & [key, value] : report.stats)
-                out.print(",\n        \"{}\": {}", key, value);
-            out.print("\n    }}\n}}");
+                std::print(stream, ",\n        \"{}\": {}", key, value);
+            std::print(stream, "\n    }}\n}}");
 
             spdlog::info("Solution written to {}",
                          std::filesystem::absolute(opt_output_json_file.value())
@@ -380,12 +381,13 @@ int optimize_command(const std::vector<std::string> & args) {
         }
 
         if(opt_output_csv_file.has_value()) {
-            auto out =
-                fmt::output_file(opt_output_csv_file.value().string().c_str());
-            out.print("option_id,value\n");
+            const auto file = open_output_file(opt_output_csv_file.value());
+            std::FILE * stream = file.get();
+            std::print(stream, "option_id,value\n");
             for(auto && option : raw_instance.options()) {
-                out.print("\"{}\",{}\n", raw_instance.option_name(option),
-                          option_value(option));
+                std::print(stream, "\"{}\",{}\n",
+                           raw_instance.option_name(option),
+                           option_value(option));
             }
             spdlog::info("Solution written to {}",
                          std::filesystem::absolute(opt_output_csv_file.value())

@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cmath>
 #include <concepts>
+#include <format>
 #include <optional>
 #include <ranges>
 #include <stdexcept>
@@ -303,7 +304,7 @@ struct mip_solver_base {
                   .count()}}};
         if(!status::solution_available(s)) {
             if(!mip_start)
-                throw std::runtime_error(fmt::format(
+                throw std::runtime_error(std::format(
                     "the solver stopped without a solution: {}", reason));
             spdlog::warn(
                 "Solver stopped without a solution: {}, returning "

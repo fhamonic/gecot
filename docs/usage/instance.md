@@ -157,7 +157,7 @@ A conflict set is a group of options of which at most one is bought: alternative
 ]
 ```
 
-A set is needed only where the effects of two options must not add up. Options that improve the same arc already compete, the best probability counts, so a second one adds nothing to the score. Their quality gains add up, though, and a set is what forbids, for instance, two restorations of one patch, or two actions on one dam that serve different species. [Modeling with costs and conflicts](modeling.md#exclusive-choices-on-one-element) shows such choices.
+A set changes the best score where the effects of two options would add up. Options that improve the same arc already compete, the best probability counts, so a second one adds nothing to the score; the set then only keeps the plan from listing it when the budget allows. Their quality gains add up, though, and a set is what forbids, for instance, two restorations of one patch, or two actions on one dam that serve different species. [Modeling with costs and conflicts](modeling.md#exclusive-choices-on-one-element) shows such choices.
 
 !!! warning "Supported algorithms"
 

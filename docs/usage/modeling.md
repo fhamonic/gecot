@@ -78,7 +78,7 @@ Wood B can now be restored in two ways, in [`three-woods-alternatives.json`](../
 Without the set, the best use of a budget of 5 is to plant wood B twice over: a quality of 4 that no real restoration gives.
 
 - **Levels of one action.** Give each level its whole effect, here +1 and +2, and put the levels in one set. Increments that add up would need an order between them, which a set cannot express.
-- **When a set is not needed.** Options that improve the same arc already compete: the arc takes the best of their probabilities, and a second one adds nothing. A set is needed when the gains add up, on vertices, and when the alternatives improve several arcs or serve different cases: two crossings at one site, one for the deer and one for the squirrels, both count if both are allowed.
+- **Alternatives on one arc.** Options that improve the same arc already compete: the arc takes the best of their probabilities, so a set does not change the best score. With budget to spare, though, GECOT may also list the alternative that adds nothing; the set keeps the plan to one. A set changes the best score when the gains add up, on vertices, and when the alternatives improve several arcs or serve different cases: two crossings at one site, one for the deer and one for the squirrels, both count if both are allowed.
 - **Pairwise conflicts.** Sets may overlap. Two options that only exclude each other form a set of two.
 
 ## Actions that harm the landscape
@@ -114,7 +114,7 @@ In [`three-woods-works.json`](../examples/three-woods-works.json), the works of 
 
 Up to a budget of 5 the underpass is not worth a third of wood C. At 7, it is: the underpass with the hedgerow and the plantation scores 31.36, against 28.76 for keeping the wood intact. The last column is the original three woods, where the works harm nothing.
 
-**Reading the results.** The *initial score* is the score with nothing bought, so here the landscape after the harm: 12.6. The landscape as it is scores 18.4, the score of `wood_c_intact` alone, and that is the reference for the gains. The printed gains, `+148.89 %` at a budget of 7, and the guaranteed share are relative to the landscape after the harm.
+**Reading the results.** The *initial score* is the score with nothing bought, so here the landscape after the harm: 12.6. The landscape as it is scores 18.4, the score of `wood_c_intact` alone, and that is the reference for the gains. The printed gains, `+148.89 %` at a budget of 7, are relative to the landscape after the harm, and so is the guaranteed share while the harmful action fits in the budget.
 
 ```console
 $ gecot optimize flow_mip three-woods-works.json 7 -q

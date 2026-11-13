@@ -246,9 +246,9 @@ GTEST_TEST(parse_instance, budget) {
     EXPECT_EQ(parse_budget(plain, " 2.5 ").values, std::vector<double>{2.5});
     EXPECT_EQ(parse_budget(plain, "1e2").values, std::vector<double>{100.0});
     EXPECT_EQ(parse_budget(plain, "cost=3").values, std::vector<double>{3.0});
-    // CLI11 read these as 105, 1000 and 25
-    for(const char * text : {"10,5", "1,000", "2,5", "-1", "abc", "1e400",
-                             "nan", "", "cost=", "price=3"})
+    // CLI11 read the first five as 105, 1000, 25, 1000 and 1000, and "" as 0
+    for(const char * text : {"10,5", "1,000", "2,5", "1_000", "1'000", "", "-1",
+                             "abc", "1e400", "nan", "cost=", "price=3"})
         EXPECT_THROW(parse_budget(plain, text), std::invalid_argument) << text;
 
     const Instance named = three_woods(named_costs, conflicts);

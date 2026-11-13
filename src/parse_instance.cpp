@@ -623,7 +623,8 @@ void parse_conflicts(Instance & instance, const nlohmann::json & json_object,
 }
 
 std::optional<double> parse_budget_value(const std::string & text) {
-    // as CLI11 reads a double: strtold, then a cast
+    // rounded as CLI11 reads a double, strtold then a cast, but without its
+    // digit separators ('_', '\'', ',') and with no empty text read as 0
     const char * begin = text.c_str();
     char * end = nullptr;
     const long double value = std::strtold(begin, &end);

@@ -105,7 +105,8 @@ With a budget of 4:
 ```console
 $ gecot optimize flow_mip three-woods.json 4
 [   0.0s] GECOT 2.0, algorithm flow_mip
-[   0.0s] Instance /home/user/three-woods.json: 3 options, 1 species
+[   0.0s] Instance: /home/user/three-woods.json
+[   0.0s] Options count: 3
 [   0.0s] ------------+----------+----------+------------+---------+-----------
 [   0.0s]   species   | vertices | habitats | improvable |  arcs   | improvable
 [   0.0s]             |          |          |  vertices  |         |    arcs
@@ -194,5 +195,6 @@ No solution of cost at most 3 scores more than 28.70, so the heuristic solution,
 ## Next steps
 
 - Describe your own landscape: [Instance files](../usage/instance.md).
+- Budgets of several kinds, exclusive actions, actions that harm the landscape: [Modeling](../usage/modeling.md).
 - The parameters of `gecot optimize`, time limits and solvers: [Optimizing](../usage/optimize.md).
 - Which algorithm for which instance: [Choosing an algorithm](../usage/choosing.md).

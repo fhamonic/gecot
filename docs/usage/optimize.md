@@ -10,7 +10,7 @@ $ gecot optimize <algorithm> <instance> <budget> [<parameters> ...]
 |---|---|
 | `<algorithm>` | one of the algorithms listed by `gecot optimize --list-algorithms` |
 | `<instance>` | the [instance file](instance.md), a `.json` file |
-| `<budget>` | a non-negative number, in the unit of the costs of the options; for options with [several costs](instance.md#several-costs), `name=value,...` with each dimension once, as `money=5,area=3` (also accepted with one dimension, as `cost=5`) |
+| `<budget>` | a non-negative number, in the unit of the costs of the options, without digit separators (`1000`, not `1,000`); for options with [several costs](instance.md#several-costs), `name=value,...` with each dimension once, in any order and without spaces, as `money=5,area=3` (also accepted with one dimension, as `cost=5`) |
 | `<parameters>` | the options of the command and the parameters of the algorithm, in any order |
 
 The three arguments can also be given by name, with `-a`, `-i` and `-B`. `gecot optimize --help` prints the options of the command, and `gecot optimize <algorithm> --list-params` the parameters of an algorithm.
@@ -31,7 +31,7 @@ $ gecot optimize --list-algorithms
 | `tree_lp` | the [tree relaxation](../formulations/relaxations.md#the-tree-formulation), by column generation | none: can exceed the budget |
 | `static`, `greedy` | the [heuristics](../formulations/heuristics.md), incremental or with `--decremental` | none |
 
-[Choosing an algorithm](choosing.md) compares them.
+[Choosing an algorithm](choosing.md) compares them. With [conflict sets or several costs](instance.md#conflict-sets), only `flow_mip`, `multicut_benders` and `flow_benders` run for now.
 
 ## Options of the command
 
@@ -72,7 +72,7 @@ $ gecot optimize multicut_benders instance.json 100 --time-limit 600
 
 - The time counts from the start of the algorithm: the preprocessing, the construction of the model and the computation of a MIP start by `--mip-start-algorithm` are included. Reading the instance is not.
 - The column generations of `path_lp` and `tree_lp` stop at the end of their current round, so they can run a little over.
-- If the solver has found no solution when the time runs out, GECOT returns the MIP start if there is one, with a warning, and fails otherwise. With a short limit on a large instance, give a MIP start.
+- If the solver has found no solution when the time runs out, GECOT returns the MIP start if there is one, with a warning, and fails otherwise. It also fails if that MIP start exceeds a budget or buys two options of a conflict set. With a short limit on a large instance, give a MIP start.
 - The heuristics have no time limit.
 
 Ctrl-C has the same effect as the time limit running out, at any moment: see [Results and logs](results.md#ctrl-c).
@@ -81,7 +81,7 @@ Ctrl-C has the same effect as the time limit running out, at any moment: see [Re
 
 A solver searches faster from a good solution. Two parameters, which exclude each other, provide one:
 
-- `--mip-start-algorithm <heuristic>` runs `static` or `greedy` first, in its incremental form, and starts from its solution;
+- `--mip-start-algorithm <heuristic>` runs `static` or `greedy` first, in its incremental form, and starts from its solution, which is not available yet with [conflict sets or several costs](instance.md#conflict-sets);
 - `--mip-start <file>` starts from a solution file written by `-o`, for instance by a previous run with another algorithm or a smaller time limit. Its options that the instance does not have are ignored.
 
 ```console
@@ -102,7 +102,7 @@ The start also seeds the cuts of the Benders decompositions and the columns of t
 
 ## Removing options first
 
-`--reformulation path_lp` runs the path relaxation before the algorithm and removes the options that it proves to be in no solution better than the one it found. The algorithm then works on fewer options, from that solution.
+`--reformulation path_lp` runs the path relaxation before the algorithm and removes the options that it proves to be in no solution better than the one it found. The algorithm then works on fewer options, from that solution. It does not run yet on instances with [conflict sets or several costs](instance.md#conflict-sets).
 
 ```console
 $ gecot optimize flow_mip instance.json 8 --reformulation path_lp
@@ -128,7 +128,7 @@ done
 
 The directory of an output file must exist: GECOT checks it before it starts, and does not create it.
 
-The solution of a budget is a valid MIP start for any larger budget: pass it with `--mip-start`.
+The solution of a budget is a valid MIP start for any larger budget, larger in every dimension with [several costs](instance.md#several-costs): pass it with `--mip-start`.
 
 ## Exit code
 

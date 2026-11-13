@@ -48,7 +48,7 @@ q^x_u &= q_u + \sum_{i \in \Phi} q^i_u \cdot x_i\,, \\
 \end{aligned}
 $$
 
-The gains of several options on the same vertex add up, whereas their improvements of the same arc compete: only the best probability counts. $\Pi^x(s,t)$ denotes the probability of a most reliable path in $G^x$. The scenario that buys every option gives the largest values, written
+The gains of several options on the same vertex add up, whereas their improvements of the same arc compete: only the best probability counts. To make options exclusive instead, put them in a [conflict set](#several-costs-and-conflict-sets); see the [modeling page](../usage/modeling.md). $\Pi^x(s,t)$ denotes the probability of a most reliable path in $G^x$. The scenario that buys every option gives the largest values, written
 
 $$
 \begin{aligned}
@@ -103,16 +103,16 @@ $$
 
 The value of the criterion in a scenario is called its **score**. The *initial score* is the score of the scenario that buys nothing, and the *gain* of a solution is its score minus the initial score.
 
+With a single case and $q = w$ this is the *Budget-Constrained PC Optimization* problem (BC-PC-Opt) of the thesis, called *Max-PC* in the article. It is NP-hard, and unless $P = NP$ no polynomial algorithm guarantees more than a fraction $1 - \frac{1}{e} \simeq 0.632$ of the optimum, already when each option improves a single arc. This is why GECOT offers both [exact algorithms](flow.md), which prove how good their solution is, and [heuristics](heuristics.md), which do not.
+
 ### Several costs and conflict sets
 
 Two generalizations add constraints of the same kind, rows on $x$ with non-negative coefficients; they are supported for now by `flow_mip`, `multicut_benders` and `flow_benders` only.
 
 - **Several costs.** Each option has a cost $c_{i,r} \ge 0$ in each dimension $r \in R$, money and area for instance, and each dimension a budget $\beta_r$: the single budget row becomes $\sum_{i \in \Phi} c_{i,r} \cdot x_i \le \beta_r$ for every $r \in R$.
-- **Conflict sets.** Sets $\Omega_1, \dots, \Omega_L \subseteq \Phi$ of alternative options, of which at most one is bought: $\sum_{i \in \Omega_l} x_i \le 1$ for every set $l$. The sets may overlap.
+- **Conflict sets.** Sets $\Omega_l \subseteq \Phi$ of alternative options, of which at most one is bought: $\sum_{i \in \Omega_l} x_i \le 1$ for every set $l$. The sets may overlap.
 
-Buying nothing stays feasible, and buying more never lowers a score, so every bound computed while ignoring these constraints stays an upper bound, only looser. The [instance file page](../usage/instance.md#several-costs) gives the syntax.
-
-With a single case and $q = w$ this is the *Budget-Constrained PC Optimization* problem (BC-PC-Opt) of the thesis, called *Max-PC* in the article. It is NP-hard, and unless $P = NP$ no polynomial algorithm guarantees more than a fraction $1 - \frac{1}{e} \simeq 0.632$ of the optimum, already when each option improves a single arc. This is why GECOT offers both [exact algorithms](flow.md), which prove how good their solution is, and [heuristics](heuristics.md), which do not.
+Buying nothing stays feasible, and buying more never lowers a score, so every bound computed while ignoring these constraints stays an upper bound, only looser. The instance file page gives the syntax of [several costs](../usage/instance.md#several-costs) and of [conflict sets](../usage/instance.md#conflict-sets), and the [modeling page](../usage/modeling.md) what they can express.
 
 ## Why the options interact
 

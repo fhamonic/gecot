@@ -37,7 +37,7 @@ The scores are recomputed from the options bought, not taken from the solver: a 
 
 The **guaranteed share** compares gains, not scores: with $s$ the score of the solution, $b$ the upper bound and $s_0$ the score with only the options bought statically (see below), it is $(s - s_0) / (b - s_0)$, rounded down to one decimal. An optimal solution can therefore read 99.9 %, its bound being equal to its score only up to the solver's tolerance.
 
-The options of cost 0 are always bought and listed, and they do not count in the initial score. The exception is an option of cost 0 in a [conflict set](instance.md#conflict-sets) with another affordable option: it stays a choice, listed only if the solution buys it, and $s_0$ does not count it.
+The options of cost 0 are always bought and listed, and they do not count in the initial score. The exception is an option of cost 0 in a [conflict set](instance.md#conflict-sets) with another affordable option: it stays a choice, listed only if the solution buys it, and $s_0$ does not count it. [Modeling with costs and conflicts](modeling.md#actions-that-harm-the-landscape) uses such an option, and shows how to read the scores then.
 
 With [several costs](instance.md#several-costs), the `Cost` line is one line per dimension, as `Cost money      5 of 9`.
 
@@ -171,7 +171,8 @@ Each line of the log starts with the seconds elapsed since `gecot` started. On a
 ```console
 $ gecot optimize multicut_benders instance.json 8 --preprocessing none --time-limit 25
 [   0.0s] GECOT 2.0, algorithm multicut_benders
-[   0.0s] Instance /home/user/instances/Aix/instance_40x40/instance.json: 27 options, 1 species
+[   0.0s] Instance: /home/user/instances/Aix/instance_40x40/instance.json
+[   0.0s] Options count: 27
 [   0.0s] ------------+----------+----------+------------+---------+-----------
 [   0.0s]   species   | vertices | habitats | improvable |  arcs   | improvable
 [   0.0s]             |          |          |  vertices  |         |    arcs
@@ -193,7 +194,7 @@ $ gecot optimize multicut_benders instance.json 8 --preprocessing none --time-li
 [  25.0s] warning: Solver stopped: time limit reached
 ```
 
-The first lines say what was read: the options, the cases, and in a table a row per case with its vertices, those of positive quality (`habitats`), those that some option improves, its arcs and those that some option improves; then the budget as a share of the total cost of the options.
+The first lines say what was read: the options, the cases, and in a table a row per case with its vertices, those of positive quality (`habitats`), those that some option improves, its arcs and those that some option improves; then, with several costs or conflict sets, how many there are, as `Cost dimensions: 2, conflict sets: 2`, and the budget as a share of the total cost of the options, a line per dimension with several costs, as `Budget money=5: 71.43 % of the options' total (7)`.
 
 ### Progress
 
@@ -233,7 +234,7 @@ For `path_lp` and `tree_lp`, each row is a round of the column generation:
 | `-v` | also the parameters of the algorithm with their values, the size of the instance after its reformulation, the factor by which the qualities are divided, a table of the preprocessing of each species, the size of the model; the progress table has a row every second or every round, and a `nodes` column |
 | `-vv` | also the details of each step, such as a table of the options that a heuristic buys or removes, and the solver's own log, which goes to the standard output |
 
-With `-v`, the line `Qualities divided by ...` gives the factor of the [rescaling](../formulations/preprocessing.md#the-instance-given-to-the-algorithms): the solver's own log is in the rescaled unit, everything else in the unit of the instance.
+With `-v`, the line `Qualities scaled by 1/...` gives the factor of the [rescaling](../formulations/preprocessing.md#the-instance-given-to-the-algorithms): the solver's own log is in the rescaled unit, everything else in the unit of the instance.
 
 With `-v` again, the algorithms that [preprocess](../formulations/preprocessing.md) the graphs log a table once every species is preprocessed, here for `flow_benders`:
 
@@ -268,8 +269,8 @@ Ctrl-C stops the algorithm and keeps its best result so far, with the status `in
 | Warning | Meaning |
 |---|---|
 | `Budget doesn't allow purchasing any options` | every option costs more than the budget, or costs 0 |
-| `The solution costs ..., over the budget ...` (with several costs, `The solution costs ... in <dimension>, ...`) | `tree_lp` returned its relaxation, see [above](#status) |
-| `The solution buys ... options of the conflict set '...'` | should not happen with the algorithms that support conflict sets; report it |
+| `The solution costs ..., over the budget ...` | `tree_lp` returned its relaxation, see [above](#status) |
+| `The solution costs ... in <dimension>, over the budget ...`, `The solution buys ... options of the conflict set '...'` | should not happen with the algorithms that support several costs and conflict sets; report it |
 | `Solver stopped: time limit reached` | the result is the best so far, not a proved optimum |
 | `Solver stopped without a solution: ..., returning the MIP start` | the solver found nothing in the time given |
 | `This solver has no time limit: --time-limit ignored` and similar | the solver lacks a feature that a parameter asks for |

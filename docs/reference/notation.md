@@ -13,13 +13,13 @@ The symbols of the [formulation pages](../formulations/problem.md), next to the 
 | $\pi_a$, $\pi_{uv}$ | probability of the arc $a = (u,v)$ | column `probability` |
 | $\Phi$ | the options | the table `options` |
 | $c_i$ | cost of the option $i$ | column `cost` |
-| $c_{i,r}$ | cost of the option $i$ in the dimension $r \in R$ | the columns of `csv_columns.cost`, or an inline cost object |
-| $\Omega_l$ | a conflict set: at most one of its options is bought | table `conflicts` |
+| $c_{i,r}$ ★ | cost of the option $i$ in the dimension $r \in R$ | the columns of `csv_columns.cost`, or an inline cost object |
+| $\Omega_l$ ★ | a conflict set: at most one of its options is bought | table `conflicts` |
 | $w^i_u$ | source quality gain of $u$ with the option $i$ | column `source_quality_gain` |
 | $q^i_u$ ★ | target quality gain of $u$ with the option $i$ | column `target_quality_gain` |
 | $\pi^i_a$ | probability of $a$ with the option $i$ | column `improved_probability` |
 | $\beta$ | the budget | argument `<budget>` |
-| $\beta_r$ | the budget of the dimension $r$ | argument `<budget>`, as `name=value,...` |
+| $\beta_r$ ★ | the budget of the dimension $r$ | argument `<budget>`, as `name=value,...` |
 | $\mathcal{C}$ ★ | the criterion, a function of the scores of the cases | key `criterion` |
 
 ## Scenarios and score
@@ -56,7 +56,7 @@ The symbols of the [formulation pages](../formulations/problem.md), next to the 
 | $[\,l^-_a, l^+_a\,]$ | interval of the length $-\log \pi$ of the arc $a$ | |
 | $l^x_a$, $d^x(s,t)$ | length of an arc and distance in the scenario $x$ | |
 | $F^x(u,v)$, $F(u,v)$ | fiber of the arc $(u,v)$ in the scenario $x$, and in every scenario | |
-| $r$ | resolution of the integer lengths | parameter `--resolution` |
+| $\varepsilon$ | resolution of the integer lengths | parameter `--resolution` |
 | $G_t$ | reduced graph of the target $t$ | |
 | $\mu$, $\lambda^\mu_a$ | Lagrange multiplier of the budget-aware labelling, and the lengths it penalizes | parameters `--nb-mus`, `--mus-sweep` |
 | $A_i$ | the arcs that the option $i$ improves | |
@@ -87,7 +87,7 @@ The symbols of the [formulation pages](../formulations/problem.md), next to the 
 | $e_i$ | the scenario that buys the option $i$ alone | |
 | $\Delta^+_i(x)$, $\Delta^-_i(x)$ | gain and loss of the option $i$ per unit of cost, in the scenario $x$ | |
 | $b$ | an upper bound on the score of the scenarios within the budget | field `bound`, line `Upper bound` |
-| $s_0$ | score with only the options bought statically: of cost 0, and in no conflict set with another affordable option | |
+| $s_0$ | score with only the options bought statically: of cost 0 in every dimension, and in no conflict set with another affordable option | |
 | $H$, $l_i$, $Q_{ij}$ | constant, linear and quadratic terms of the bound of `qkp_planes` | |
 | $\theta_{ij}$, $u_i$ | split of the quadratic terms, and the resulting bound on what the option $i$ brings | parameter `--theta` |
 | $\nu_{pi}$, $R_p(\nu)$ | prices of `split_lagrange`, and the best priced value of a pair | |

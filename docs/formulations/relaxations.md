@@ -2,6 +2,8 @@
 
 `path_lp` and `tree_lp` do not solve the problem: they solve a *linear relaxation* of it, in which each pair of vertices, or each target, may choose its own set of options. The relaxation has exponentially many variables and is solved by column generation. It gives what the exact algorithms cannot give on large instances within a short time: an upper bound on the optimum, a good solution, and for each option a bound on what the solutions that buy it can score.
 
+For now, both stop with an error on an instance with [conflict sets](../usage/instance.md#conflict-sets) or [several costs](../usage/instance.md#several-costs), and so does `gecot optimize --reformulation path_lp`: the programs below have a single budget row and no conflict row.
+
 ## The path formulation
 
 A *pair* is a couple $p = (s,t)$ of vertices of a case $k$. If the options of a set $S \subseteq \Phi$ are bought, the pair is worth

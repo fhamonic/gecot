@@ -50,7 +50,7 @@ Three things set it apart from ranking the actions one by one:
 
 - **[Using GECOT](usage/instance.md)**
 
-    Describe a landscape and its actions in an [instance file](usage/instance.md), [optimize](usage/optimize.md) it, read the [results](usage/results.md), and [choose an algorithm](usage/choosing.md).
+    Describe a landscape and its actions in an [instance file](usage/instance.md), [model](usage/modeling.md) budgets of several kinds and exclusive actions, [optimize](usage/optimize.md) it, read the [results](usage/results.md), and [choose an algorithm](usage/choosing.md).
 
 - **[Formulations](formulations/problem.md)**
 

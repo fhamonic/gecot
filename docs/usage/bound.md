@@ -38,7 +38,7 @@ Time               3.4 s
 | `Initial score` | the score of the landscape as it is |
 | `Upper bound` | no solution within the budget scores more; in parentheses, the largest possible gain over the initial score |
 | `All options bound` | the score with every option bought, as a reference |
-| `Budget`, `Time` | the budget and the time of the method |
+| `Budget`, `Time` | the budget and the time of the method; with [several costs](instance.md#several-costs), a `Budget` line per dimension, as `Budget money       5` |
 
 The solutions that the bound covers are those of `gecot optimize`: the options of cost 0 are always bought, unless a [conflict set](instance.md#conflict-sets) makes them a choice.
 
@@ -82,7 +82,7 @@ The solutions that the bound covers are those of `gecot optimize`: the options o
 }
 ```
 
-`method_parameters` holds the parameters of the method with the values used, as [`algorithm_parameters`](results.md#json) does for an algorithm. The `method_report` of a method that is an algorithm is the [report of this algorithm](results.md#json), plus `solution_score`, the score of the solution that the algorithm found on the way.
+`method_parameters` holds the parameters of the method with the values used, as [`algorithm_parameters`](results.md#json) does for an algorithm. The `method_report` of a method that is an algorithm is the [report of this algorithm](results.md#json), plus `solution_score`, the score of the solution that the algorithm found on the way. With [several costs](instance.md#several-costs), `budget` is an object with a number per dimension, as `{"area": 4, "money": 5}`.
 
 ## Certifying a solution
 
@@ -119,5 +119,6 @@ How good is it? Each method answers with a bound $b$. The solution gains 81,627.
 `gecot bound` fails rather than print a bound it cannot stand behind:
 
 - the criterion is not non-decreasing in the score of every case, or the options do not have the shape that `split_lagrange` needs;
+- the instance has [conflict sets](instance.md#conflict-sets) or [several costs](instance.md#several-costs), which the method does not support yet (see [Methods](#methods));
 - an exact algorithm stopped before finding any solution, and so before proving a bound: give it more time or a MIP start;
 - the bound computed is below the score of buying nothing, which would be a contradiction.

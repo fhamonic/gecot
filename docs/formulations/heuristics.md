@@ -2,6 +2,8 @@
 
 The heuristics build a solution by ranking the options by what they gain per unit of cost. They need no solver, evaluate any criterion, and run on landscapes that no exact algorithm can handle, but they give **no guarantee**: their solution can be far from the optimum, and nothing in their output tells how far. A [bound](bounds.md) tells it afterwards.
 
+They do not handle [conflict sets](../usage/instance.md#conflict-sets) or [several costs](../usage/instance.md#several-costs) yet: on such an instance, `static` and `greedy` stop with an error.
+
 ## Gain and loss of an option
 
 Let $\mathcal{C}(x)$ be the score of a scenario $x$, and $e_i$ the scenario that buys the option $i$ alone. In a scenario $x$ that does not buy $i$, the *gain* of $i$ per unit of cost is
@@ -58,7 +60,7 @@ so the incremental direction buys `plantation` first, after which nothing fits, 
 | `greedy --decremental` | 437,866.4 | +22.91 % | 0.5 s |
 | optimum (`multiflow_benders`) | 438,893.1 | +23.20 % | 1.2 s |
 
-`greedy` is often close, as here in both directions, and sometimes far: Hamonic et al. (2023) compare it with the optimum on real landscapes. A cheap way to use it safely is to pass its solution to an exact algorithm, with `--mip-start-algorithm greedy`: the exact algorithm starts from it and, if it runs out of time, returns the best solution it has with a proven bound.
+`greedy` is often close, as here in both directions, and sometimes far: Hamonic et al. (2023) compare it with the optimum on real landscapes. A cheap way to use it safely is to pass its solution to an exact algorithm, with `--mip-start-algorithm greedy`: the exact algorithm starts from it and, if it runs out of time, returns the best solution it has with a proven bound. On an instance with conflict sets or several costs, `--mip-start-algorithm` stops with an error for now.
 
 ## Worst cases
 

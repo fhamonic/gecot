@@ -11,7 +11,7 @@ Every step can be switched off to measure what it brings: the [last section](#wh
 
 Before any algorithm runs, `gecot optimize` and `gecot bound` rewrite the instance. The results are always reported for the instance as it was given: every one of its options is listed, and the scores are in its unit.
 
-**Options of cost 0 are bought.** They are applied to the graphs, and the solution lists them as bought. The *initial score* is still the score of the landscape without them. An option of cost 0 in a [conflict set](../usage/instance.md#conflict-sets) with another affordable option is not: buying it would exclude that option, so it stays a decision of cost 0.
+**Options that cost 0 in every [cost dimension](../usage/instance.md#several-costs) are bought.** They are applied to the graphs, and the solution lists them as bought. The *initial score* is still the score of the landscape without them. An option of cost 0 in a [conflict set](../usage/instance.md#conflict-sets) with another affordable option is not: buying it would exclude that option, so it stays a decision of cost 0. The [modeling page](../usage/modeling.md) uses this rule to express the negative effects of an option.
 
 **Options that cost more than the budget are removed**, in any of their [cost dimensions](../usage/instance.md#several-costs). A conflict set left with one option or none is dropped, as it constrains nothing.
 
@@ -24,7 +24,7 @@ w^i_m &= \sum_{u \in T} w^i_u\,, & q^i_m &= \sum_{u \in T} q^i_u \qquad (i \in \
 \end{aligned}
 $$
 
-and the score is unchanged in every scenario. These sets are the strongly connected components of the graph of the arcs of probability $1$, found in $O(|V| + |A|)$ time. This is what makes raster landscapes tractable: the cells of a habitat patch, linked by arcs of probability $1$, become one vertex. The arcs that a free option raises to probability $1$ count; the arcs that only a paid option raises to $1$ do not, as the merge must hold in every scenario. `gecot optimize --no-merging` keeps the vertices apart.
+and the score is unchanged in every scenario. These sets are the strongly connected components of the graph of the arcs of probability $1$, found in $O(|V| + |A|)$ time. This is what makes raster landscapes tractable: the cells of a habitat patch, linked by arcs of probability $1$, become one vertex. The arcs that a free option raises to probability $1$ count, unless a conflict set leaves this option a choice; the arcs that only a paid option raises to $1$ do not, as the merge must hold in every scenario. `gecot optimize --no-merging` keeps the vertices apart.
 
 **Qualities are rescaled.** Solvers work with absolute tolerances, which are too coarse for scores of $10^{11}$ and too fine for scores of $10^{-2}$. All the qualities are divided by a power of two chosen so that the largest initial score of a case lies in $[10^5, 4 \cdot 10^5)$; an instance whose cases score less is left as it is. The scores are multiplied back before they are printed. Only the solver's own log (`-vv`) is in the scaled unit.
 
@@ -32,7 +32,7 @@ If no option is left, there is nothing to decide: the run ends with the status `
 
 ### Removing options with the path relaxation
 
-`gecot optimize --reformulation path_lp` goes one step further. It first runs the [path relaxation](relaxations.md), which returns a solution of score $s$ and, for each option $i$, an upper bound $b_i$ on the score of every solution that buys $i$. An option with $b_i \le s$ is in no solution better than the one in hand, so it is removed. The algorithm then runs on the options left, starting from the solution of the relaxation, and the result is the better of the two solutions. When no option is left, or when the bound of the relaxation already equals $s$, the solution is optimal and the algorithm is not run. `--reformulation-params` passes parameters to this `path_lp`, as in `--reformulation-params "time-limit=60 pricing=enumerate"`; its MIP start is the solution of `greedy` unless told otherwise.
+`gecot optimize --reformulation path_lp` goes one step further. It first runs the [path relaxation](relaxations.md), which returns a solution of score $s$ and, for each option $i$, an upper bound $b_i$ on the score of every solution that buys $i$. An option with $b_i \le s$ is in no solution better than the one in hand, so it is removed. The algorithm then runs on the options left, starting from the solution of the relaxation, and the result is the better of the two solutions. When no option is left, or when the bound of the relaxation already equals $s$, the solution is optimal and the algorithm is not run. `--reformulation-params` passes parameters to this `path_lp`, as in `--reformulation-params "time-limit=60 pricing=enumerate"`; its MIP start is the solution of `greedy` unless told otherwise. Like `path_lp`, it does not accept [several costs or conflict sets](problem.md#several-costs-and-conflict-sets) yet.
 
 ## The graph of a target
 
@@ -143,13 +143,13 @@ for all the sets $S(t)$ and $W(t)$ of a case, which is $O(|V|^2 \log |V|)$ on th
 
 ### Resolution
 
-The lengths are integers: with $r$ the value of `--resolution` ($10^{-8}$ by default),
+The lengths are integers: with $\varepsilon$ the value of `--resolution` ($10^{-8}$ by default),
 
 $$
-l = \left\lfloor \frac{-\ln \max\{\pi, r\}}{\ln(1 + r)} \right\rfloor\,.
+l = \left\lfloor \frac{-\ln \max\{\pi, \varepsilon\}}{\ln(1 + \varepsilon)} \right\rfloor\,.
 $$
 
-A probability below $r$ is thus treated as $r$, and two paths are told apart only if their probabilities differ by a factor of about $1 + h \cdot r$, for paths of $h$ arcs. Integer lengths make the comparisons of the labelling exact, at the price of this resolution: an arc can be labelled against a path that beats it by less. The optimum that the algorithms prove is therefore exact *up to the resolution*. This matters only when the gains at stake are of that order, for instance a budget that only buys options that are negligible at the scale of the landscape: then compare with `--preprocessing none`, which uses no label.
+A probability below $\varepsilon$ is thus treated as $\varepsilon$, and two paths are told apart only if their probabilities differ by a factor of about $1 + h \cdot \varepsilon$, for paths of $h$ arcs. Integer lengths make the comparisons of the labelling exact, at the price of this resolution: an arc can be labelled against a path that beats it by less. The optimum that the algorithms prove is therefore exact *up to the resolution*. This matters only when the gains at stake are of that order, for instance a budget that only buys options that are negligible at the scale of the landscape: then compare with `--preprocessing none`, which uses no label.
 
 The resolution must lie strictly between 0 and 1, and GECOT also refuses one so small that the lengths of a path could overflow their 64-bit integers: from about $5 \cdot 10^{-12}$ down on a graph of a million vertices, $5 \cdot 10^{-14}$ on one of ten thousand. Between these limits any value is accepted, however coarse: keep it well below the probabilities of the instance, which the labels otherwise no longer tell apart.
 
@@ -204,7 +204,7 @@ $$
 \lambda^\mu_a = \min\Big\{ l^+_a\,,\; \min_{i \,:\, a \in A_i} \Big( l^i_a + \mu \cdot \frac{c_i}{|A_i|} \Big) \Big\}\,.
 $$
 
-For a scenario $x$ of cost at most $\beta$ and a simple path $Q$, the options that $x$ buys pay at most $\mu \cdot \beta$ along $Q$, so $l^x(Q) \ge \lambda^\mu(Q) - \mu \cdot \beta$. The colouring algorithm run with the lower lengths $\lambda^\mu$, the paths through $(u,v)$ being handicapped by $\mu \cdot \beta$, therefore yields labels that are valid within the budget. Each multiplier gives its own labels, and they accumulate: $\mu = 0$ gives the labels of the previous sections, and larger multipliers add to them.
+For a scenario $x$ of cost at most $\beta$ and a simple path $Q$, the options that $x$ buys pay at most $\mu \cdot \beta$ along $Q$, so $l^x(Q) \ge \lambda^\mu(Q) - \mu \cdot \beta$. The colouring algorithm run with the lower lengths $\lambda^\mu$, the paths through $(u,v)$ being handicapped by $\mu \cdot \beta$, therefore yields labels that are valid within the budget. Each multiplier gives its own labels, and they accumulate: $\mu = 0$ gives the labels of the previous sections, and larger multipliers add to them. With [several costs](problem.md#several-costs-and-conflict-sets), $c_i$ and $\beta$ are the costs and the budget of the first cost dimension in alphabetical order; ignoring the other dimensions and the conflict sets only weakens the labels.
 
 `--nb-mus N` turns this on, with $N + 1$ positive multipliers in geometric progression up to the largest useful one, after $\mu = 0$. It is experimental, and off by default ($N = 0$):
 
@@ -233,11 +233,11 @@ M^t_u = {} & \sum_{s \in V(G_t)} w_s \cdot \overline{\Pi}_{G_t}(s,u) \\
 \end{aligned}
 $$
 
-a knapsack problem solved exactly by branch and bound for each vertex that needs a constant.
+a knapsack problem solved exactly by branch and bound for each vertex that needs a constant. With [several costs](problem.md#several-costs-and-conflict-sets), each cost dimension gives such a knapsack, with its own costs and budget, and the maximum above is the least of their values; the conflict sets are ignored.
 
 **`knapsack_dantzig`** replaces this knapsack by its linear relaxation, $x \in [0,1]^\Phi$, solved by taking the options by decreasing $g_i / c_i$ and a fraction of the first one that does not fit. The constant is larger, but it takes a sort of the options per vertex, whereas the branch and bound can take seconds per vertex when many options have nearly the same ratio $g_i / c_i$, for instance when each option brings as much quality as it costs.
 
-**`tight`** (experimental) lowers the `knapsack_bnb` constant of each improved copy $a^i$ of an arc $(u,v)$, by keeping only the sources that can use it, those whose best path through $a^i$ with every option is at least as reliable as their best path without any option, and by bounding the probabilities within the budget left by $i$ with a Lagrangian relaxation.
+**`tight`** (experimental) lowers the `knapsack_bnb` constant of each improved copy $a^i$ of an arc $(u,v)$, by keeping only the sources that can use it, those whose best path through $a^i$ with every option is at least as reliable as their best path without any option, and by bounding the probabilities within the budget left by $i$ with a Lagrangian relaxation, in the first cost dimension when there are several.
 
 `--big-m` is a parameter of `flow_mip`, `multicut_benders` and `flow_benders`. `multiflow_benders` has its own constants, one per source and arc, and `tree_lp` uses the plain ones.
 

@@ -1,0 +1,29 @@
+{
+    "config": {
+        "place": "Marseille, Huveaune valley",
+        "bbox": [
+            5.424,
+            43.27,
+            5.4865,
+            43.316
+        ],
+        "group_resolution": 9
+    },
+    "osm_date": "2026-11-01T00:00:00Z",
+    "summary": {
+        "vertices": 4609,
+        "arcs": 11502,
+        "area_km2": 25.9,
+        "population": 89689,
+        "source_vertices": 474,
+        "points_of_interest": 229,
+        "target_vertices": 127,
+        "streets_km": {
+            "with a lane": 24.1,
+            "improvable": 46.2,
+            "other": 294.3
+        },
+        "options": 263,
+        "total_cost": 46166.2
+    }
+}

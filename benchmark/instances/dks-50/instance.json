@@ -1,0 +1,19 @@
+{
+    "options": {
+        "csv_file": "options.csv"
+    },
+    "cases": {
+        "dks": {
+            "vertices": {
+                "csv_file": "vertices.csv"
+            },
+            "arcs": {
+                "csv_file": "arcs.csv"
+            },
+            "vertices_improvements": {
+                "csv_file": "vertices_improvements.csv"
+            }
+        }
+    },
+    "criterion": "dks"
+}

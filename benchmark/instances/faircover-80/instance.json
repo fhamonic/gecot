@@ -1,0 +1,108 @@
+{
+    "options": {
+        "csv_file": "options.csv"
+    },
+    "cases": {
+        "g0": {
+            "vertices": {
+                "csv_file": "g0_vertices.csv"
+            },
+            "arcs": {
+                "csv_file": "g0_arcs.csv"
+            },
+            "arcs_improvements": {
+                "csv_file": "g0_arcs_improvements.csv"
+            }
+        },
+        "g1": {
+            "vertices": {
+                "csv_file": "g1_vertices.csv"
+            },
+            "arcs": {
+                "csv_file": "g1_arcs.csv"
+            },
+            "arcs_improvements": {
+                "csv_file": "g1_arcs_improvements.csv"
+            }
+        },
+        "g2": {
+            "vertices": {
+                "csv_file": "g2_vertices.csv"
+            },
+            "arcs": {
+                "csv_file": "g2_arcs.csv"
+            },
+            "arcs_improvements": {
+                "csv_file": "g2_arcs_improvements.csv"
+            }
+        },
+        "g3": {
+            "vertices": {
+                "csv_file": "g3_vertices.csv"
+            },
+            "arcs": {
+                "csv_file": "g3_arcs.csv"
+            },
+            "arcs_improvements": {
+                "csv_file": "g3_arcs_improvements.csv"
+            }
+        },
+        "g4": {
+            "vertices": {
+                "csv_file": "g4_vertices.csv"
+            },
+            "arcs": {
+                "csv_file": "g4_arcs.csv"
+            },
+            "arcs_improvements": {
+                "csv_file": "g4_arcs_improvements.csv"
+            }
+        },
+        "g5": {
+            "vertices": {
+                "csv_file": "g5_vertices.csv"
+            },
+            "arcs": {
+                "csv_file": "g5_arcs.csv"
+            },
+            "arcs_improvements": {
+                "csv_file": "g5_arcs_improvements.csv"
+            }
+        },
+        "g6": {
+            "vertices": {
+                "csv_file": "g6_vertices.csv"
+            },
+            "arcs": {
+                "csv_file": "g6_arcs.csv"
+            },
+            "arcs_improvements": {
+                "csv_file": "g6_arcs_improvements.csv"
+            }
+        },
+        "g7": {
+            "vertices": {
+                "csv_file": "g7_vertices.csv"
+            },
+            "arcs": {
+                "csv_file": "g7_arcs.csv"
+            },
+            "arcs_improvements": {
+                "csv_file": "g7_arcs_improvements.csv"
+            }
+        }
+    },
+    "criterion": {
+        "operation": "min",
+        "values": [
+            "g0",
+            "g1",
+            "g2",
+            "g3",
+            "g4",
+            "g5",
+            "g6",
+            "g7"
+        ]
+    }
+}

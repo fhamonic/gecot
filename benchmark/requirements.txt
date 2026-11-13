@@ -1,0 +1,11 @@
+geopandas
+h3>=4
+matplotlib
+numpy
+osmnx>=2
+py7zr
+pyogrio
+pyproj
+rasterio
+requests
+shapely>=2

@@ -1,0 +1,48 @@
+{
+    "options": {
+        "csv_file": "options.csv"
+    },
+    "cases": {
+        "deer": {
+            "vertices": {
+                "csv_file": "deer_vertices.csv"
+            },
+            "arcs": {
+                "csv_file": "deer_arcs.csv"
+            },
+            "vertices_improvements": {
+                "csv_file": "deer_vertices_improvements.csv"
+            },
+            "arcs_improvements": {
+                "csv_file": "deer_arcs_improvements.csv"
+            }
+        },
+        "dormouse": {
+            "vertices": {
+                "csv_file": "dormouse_vertices.csv"
+            },
+            "arcs": {
+                "csv_file": "dormouse_arcs.csv"
+            },
+            "vertices_improvements": {
+                "csv_file": "dormouse_vertices_improvements.csv"
+            },
+            "arcs_improvements": {
+                "csv_file": "dormouse_arcs_improvements.csv"
+            }
+        }
+    },
+    "criterion": {
+        "operation": "min",
+        "values": [
+            [
+                5.006821602883742e-07,
+                "deer"
+            ],
+            [
+                2.2441673175915983e-06,
+                "dormouse"
+            ]
+        ]
+    }
+}

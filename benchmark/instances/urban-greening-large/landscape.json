@@ -1,0 +1,49 @@
+{
+    "config": {
+        "place": "Marseille, 8th to 10th arrondissements",
+        "department": 13,
+        "bbox": [
+            5.375,
+            43.245,
+            5.44,
+            43.285
+        ],
+        "resolution": 10,
+        "options": {
+            "greening": {
+                "share": 0.5,
+                "min_share": 0.05,
+                "group_resolution": 9,
+                "unit_cost": 0.1
+            }
+        }
+    },
+    "summary": {
+        "cells": 1576,
+        "cell_spacing_m": 131.3,
+        "area_km2": 23.5,
+        "habitat_cells": 400,
+        "cells_options_turn_into_habitat": 62,
+        "cover": {
+            "open": 0.48,
+            "woody": 0.228,
+            "crop": 0.0,
+            "water": 0.005,
+            "rail": 0.0,
+            "street": 0.075,
+            "highway": 0.007,
+            "built": 0.206
+        },
+        "barrier_pairs": {
+            "major": 24,
+            "secondary": 301
+        },
+        "options": {
+            "greening": {
+                "count": 228,
+                "total_cost": 79220.4
+            }
+        },
+        "total_cost": 79220.4
+    }
+}

@@ -1,0 +1,38 @@
+{
+    "bike-town": {
+        "place": "Aix-en-Provence, town centre",
+        "bbox": [5.435, 43.518, 5.462, 43.537],
+        "group_resolution": 9
+    },
+    "bike-suburb": {
+        "place": "Marseille, Huveaune valley",
+        "bbox": [5.424, 43.27, 5.4865, 43.316],
+        "group_resolution": 9
+    },
+    "bike-squirrel-town": {
+        "place": "Aix-en-Provence, town centre",
+        "bbox": [5.435, 43.518, 5.462, 43.537],
+        "group_resolution": 9,
+        "squirrel": {
+            "department": 13,
+            "resolution": 10,
+            "lane_cost": 0.4,
+            "strip_width": 3,
+            "strip_cost": 0.1,
+            "rope_bridge": {"spacing": 250, "max_sites": 40, "cost": 20, "probability": 0.8}
+        }
+    },
+    "bike-squirrel-suburb": {
+        "place": "Marseille, Huveaune valley",
+        "bbox": [5.424, 43.27, 5.4865, 43.316],
+        "group_resolution": 9,
+        "squirrel": {
+            "department": 13,
+            "resolution": 9,
+            "lane_cost": 0.4,
+            "strip_width": 3,
+            "strip_cost": 0.1,
+            "rope_bridge": {"spacing": 400, "max_sites": 40, "cost": 20, "probability": 0.8}
+        }
+    }
+}

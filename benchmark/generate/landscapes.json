@@ -1,0 +1,80 @@
+{
+    "urban-greening": {
+        "place": "Marseille, 8th and 9th arrondissements",
+        "department": 13,
+        "bbox": [5.375, 43.245, 5.42, 43.275],
+        "resolution": 10,
+        "options": {
+            "greening": {"share": 0.5, "min_share": 0.05, "group_resolution": 9, "unit_cost": 0.1}
+        }
+    },
+    "urban-greening-large": {
+        "place": "Marseille, 8th to 10th arrondissements",
+        "department": 13,
+        "bbox": [5.375, 43.245, 5.44, 43.285],
+        "resolution": 10,
+        "options": {
+            "greening": {"share": 0.5, "min_share": 0.05, "group_resolution": 9, "unit_cost": 0.1}
+        }
+    },
+    "rural-planting": {
+        "place": "Eyragues: farmland, hedgerows and woods",
+        "department": 13,
+        "bbox": [4.838, 43.829, 4.882, 43.861],
+        "resolution": 10,
+        "options": {
+            "planting": {"share": 0.2, "min_share": 0.5, "group_resolution": 9, "unit_cost": 0.002}
+        }
+    },
+    "periurban-mixed": {
+        "place": "south of Aix-en-Provence: Les Milles and Luynes",
+        "department": 13,
+        "bbox": [5.36, 43.46, 5.46, 43.52],
+        "resolution": 9,
+        "options": {
+            "greening": {"share": 0.5, "min_share": 0.03, "group_resolution": 8, "unit_cost": 0.1},
+            "planting": {"share": 0.2, "min_share": 0.5, "group_resolution": 8, "unit_cost": 0.002},
+            "crossing": {"spacing": 700, "max_sites": 40, "cost": {"major": 3000, "secondary": 1000}}
+        }
+    },
+    "natural-crossing": {
+        "place": "plateau de l'Arbois: garrigue and pine woods cut by the high-speed line and the D9",
+        "department": 13,
+        "bbox": [5.29, 43.445, 5.36, 43.49],
+        "resolution": 9,
+        "options": {
+            "crossing": {"spacing": 350, "max_sites": 60, "cost": {"major": 3000, "secondary": 1000}}
+        }
+    },
+    "species-natural": {
+        "place": "plateau de l'Arbois: garrigue and pine woods cut by the high-speed line and the D9",
+        "department": 13,
+        "bbox": [5.29, 43.445, 5.36, 43.49],
+        "resolution": 9,
+        "species": {
+            "deer": {"dispersal": 3, "barrier": {"major": 0.02, "secondary": 0.5}},
+            "squirrel": {"dispersal": 1, "barrier": {"major": 0.05, "secondary": 0.3}},
+            "dormouse": {"dispersal": 0.4, "barrier": {"major": 0.02, "secondary": 0.15}}
+        },
+        "options": {
+            "crossing": {"spacing": 350, "max_sites": 60, "cost": {"major": 3000, "secondary": 1000}},
+            "rope_bridge": {"cost": 100, "probability": 0.8, "species": ["squirrel", "dormouse"]}
+        }
+    },
+    "species-periurban": {
+        "place": "south of Aix-en-Provence: Les Milles and Luynes",
+        "department": 13,
+        "bbox": [5.36, 43.46, 5.46, 43.52],
+        "resolution": 9,
+        "species": {
+            "deer": {"dispersal": 3, "barrier": {"major": 0.02, "secondary": 0.5}},
+            "dormouse": {"dispersal": 0.4, "barrier": {"major": 0.02, "secondary": 0.15}}
+        },
+        "options": {
+            "greening": {"share": 0.5, "min_share": 0.03, "group_resolution": 8, "unit_cost": 0.1},
+            "planting": {"share": 0.2, "min_share": 0.5, "group_resolution": 8, "unit_cost": 0.002},
+            "crossing": {"spacing": 700, "max_sites": 40, "cost": {"major": 3000, "secondary": 1000}},
+            "rope_bridge": {"cost": 100, "probability": 0.8, "species": ["dormouse"]}
+        }
+    }
+}

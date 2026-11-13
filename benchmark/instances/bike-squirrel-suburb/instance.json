@@ -1,0 +1,57 @@
+{
+    "options": {
+        "csv_file": "options.csv"
+    },
+    "cases": {
+        "bike": {
+            "vertices": {
+                "csv_file": "bike_vertices.csv"
+            },
+            "arcs": {
+                "csv_file": "bike_arcs.csv"
+            },
+            "arcs_improvements": {
+                "csv_file": "bike_arcs_improvements.csv"
+            }
+        },
+        "squirrel": {
+            "vertices": {
+                "csv_file": "squirrel_vertices.csv"
+            },
+            "arcs": {
+                "csv_file": "squirrel_arcs.csv"
+            },
+            "vertices_improvements": {
+                "csv_file": "squirrel_vertices_improvements.csv"
+            },
+            "arcs_improvements": {
+                "csv_file": "squirrel_arcs_improvements.csv"
+            }
+        }
+    },
+    "criterion": {
+        "operation": "min",
+        "values": [
+            {
+                "operation": "sum",
+                "values": [
+                    [
+                        4.960489197966917e-07,
+                        "bike"
+                    ],
+                    -3.2441474933333625
+                ]
+            },
+            {
+                "operation": "sum",
+                "values": [
+                    [
+                        2.766321284563482e-05,
+                        "squirrel"
+                    ],
+                    -5.439658281571689
+                ]
+            }
+        ]
+    }
+}

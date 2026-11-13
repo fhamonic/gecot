@@ -1,0 +1,51 @@
+{
+    "config": {
+        "place": "plateau de l'Arbois: garrigue and pine woods cut by the high-speed line and the D9",
+        "department": 13,
+        "bbox": [
+            5.29,
+            43.445,
+            5.36,
+            43.49
+        ],
+        "resolution": 9,
+        "options": {
+            "crossing": {
+                "spacing": 350,
+                "max_sites": 60,
+                "cost": {
+                    "major": 3000,
+                    "secondary": 1000
+                }
+            }
+        }
+    },
+    "summary": {
+        "cells": 275,
+        "cell_spacing_m": 346.7,
+        "area_km2": 28.6,
+        "habitat_cells": 238,
+        "cells_options_turn_into_habitat": 0,
+        "cover": {
+            "open": 0.218,
+            "woody": 0.715,
+            "crop": 0.001,
+            "water": 0.026,
+            "rail": 0.002,
+            "street": 0.016,
+            "highway": 0.005,
+            "built": 0.018
+        },
+        "barrier_pairs": {
+            "major": 93,
+            "secondary": 11
+        },
+        "options": {
+            "crossing": {
+                "count": 28,
+                "total_cost": 78000.0
+            }
+        },
+        "total_cost": 78000
+    }
+}

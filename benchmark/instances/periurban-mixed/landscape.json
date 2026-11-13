@@ -1,0 +1,71 @@
+{
+    "config": {
+        "place": "south of Aix-en-Provence: Les Milles and Luynes",
+        "department": 13,
+        "bbox": [
+            5.36,
+            43.46,
+            5.46,
+            43.52
+        ],
+        "resolution": 9,
+        "options": {
+            "greening": {
+                "share": 0.5,
+                "min_share": 0.03,
+                "group_resolution": 8,
+                "unit_cost": 0.1
+            },
+            "planting": {
+                "share": 0.2,
+                "min_share": 0.5,
+                "group_resolution": 8,
+                "unit_cost": 0.002
+            },
+            "crossing": {
+                "spacing": 700,
+                "max_sites": 40,
+                "cost": {
+                    "major": 3000,
+                    "secondary": 1000
+                }
+            }
+        }
+    },
+    "summary": {
+        "cells": 517,
+        "cell_spacing_m": 346.8,
+        "area_km2": 53.8,
+        "habitat_cells": 302,
+        "cells_options_turn_into_habitat": 63,
+        "cover": {
+            "open": 0.449,
+            "woody": 0.44,
+            "crop": 0.011,
+            "water": 0.005,
+            "rail": 0.002,
+            "street": 0.03,
+            "highway": 0.008,
+            "built": 0.055
+        },
+        "barrier_pairs": {
+            "major": 97,
+            "secondary": 144
+        },
+        "options": {
+            "greening": {
+                "count": 52,
+                "total_cost": 64338.4
+            },
+            "planting": {
+                "count": 45,
+                "total_cost": 3191.1
+            },
+            "crossing": {
+                "count": 32,
+                "total_cost": 56000.0
+            }
+        },
+        "total_cost": 123529.5
+    }
+}

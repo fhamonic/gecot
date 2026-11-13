@@ -1,0 +1,176 @@
+id,kind,cost,street,length,cells
+lane_0,lane,13.6716,"",19.5,8a3968bb5137fff
+lane_1,lane,3.22792,"",4.6,8a3968bb19a7fff
+lane_2,lane,3.36158,"",4.8,8a3968bb1917fff 8a3968bb19a7fff
+lane_3,lane,10.3667,"",14.8,8a3968bb5137fff
+lane_4,lane,2.65294,"",3.8,8a3968bb19a7fff
+lane_5,lane,2.58044,"",3.7,8a3968bb1917fff
+lane_6,lane,1.05935,"",1.5,8a3968bb1917fff
+lane_7,lane,8.39822,"",12.0,8a3968bb0b0ffff
+lane_8,lane,2.18409,"",3.1,8a3968bb0b0ffff
+lane_9,lane,3.44333,"",4.9,8a3968bb0b0ffff
+lane_10,lane,9.72179,"",13.9,8a3968bb0b0ffff
+lane_11,lane,4.42423,"",6.3,8a3968bb0b0ffff
+lane_12,lane,5.88188,"",8.4,8a3968bb0b0ffff
+lane_13,lane,6.24249,"",8.9,8a3968bb57a7fff
+lane_14,lane,3.99073,"",5.7,8a3968bb0b0ffff
+lane_15,lane,6.32257,"",9.0,8a3968bb0b0ffff
+lane_16,lane,5.17607,"",7.4,8a3968bb57affff
+lane_17,lane,2.79869,"",4.0,8a3968bb57affff
+lane_18,lane,4.05026,"",5.8,8a3968bb57affff
+lane_19,lane,3.42193,"",4.9,8a3968bb19a7fff
+lane_20,lane,5.03431,"",7.2,8a3968bb19a7fff
+lane_21,lane,7.55791,"",10.8,8a3968bb19a7fff
+lane_22,lane,7.78069,"",11.1,8a3968bb1917fff 8a3968bb19a7fff
+lane_23,lane,6.16101,"",8.8,8a3968bb57affff
+lane_24,lane,4.76186,"",6.8,8a3968bb5d9ffff
+lane_25,lane,15.5375,"",22.2,8a3968bb5d9ffff
+lane_26,lane,14.29,"",20.4,8a3968bb5d9ffff
+lane_27,lane,13.7461,"",19.6,8a3968bb5137fff 8a3968bb589ffff
+lane_28,lane,1.40644,"",2.0,8a3968bb562ffff
+lane_29,lane,4.05749,"",5.8,8a3968bb562ffff 8a3968bb5677fff
+lane_30,lane,5.40084,"",7.7,8a3968bb562ffff
+lane_31,lane,5.6065,"",8.0,8a3968bb562ffff
+lane_32,lane,2.81699,"",4.0,8a3968bb562ffff
+lane_33,lane,7.0755,"",10.1,8a3968bb562ffff
+lane_34,lane,3.64,"",9.1,
+lane_35,lane,1.6,"",4.0,
+lane_36,lane,3.56,"",8.9,
+lane_37,lane,2.24,"",5.6,
+lane_38,lane,2.48,"",6.2,
+lane_39,lane,4.68,"",11.7,
+lane_40,lane,3.52,"",8.8,
+lane_41,lane,238.547,"Avenue Anatole France",340.4,8a3968bb57a7fff 8a3968bb57affff 8a3968bb57b7fff
+lane_42,lane,46.4805,"Avenue Benjamin Abram",66.4,8a3968bb57b7fff
+lane_43,lane,237.815,"Avenue Georges Pompidou",339.7,8a3968bb5507fff 8a3968bb5527fff 8a3968bb5537fff
+lane_44,lane,72.3891,"Avenue Henri Mouret",103.4,8a3968bb5597fff 8a3968bb55b7fff
+lane_45,lane,38.3693,"Avenue Henri Pontier",54.8,8a3968bb5137fff 8a3968bb589ffff
+lane_46,lane,109.694,"Avenue Henri Pontier",156.6,8a3968bb5897fff 8a3968bb589ffff
+lane_47,lane,336.568,"Avenue Henri Pontier",480.3,8a3968bb5c27fff 8a3968bb5c2ffff 8a3968bb5c37fff 8a3968bb5d5ffff
+lane_48,lane,303.959,"Avenue Henri Pontier",433.7,8a3968bb5897fff 8a3968bb5c67fff 8a3968bb5d5ffff
+lane_49,lane,33.2924,"Avenue Henri Pontier",47.5,8a3968bb5d5ffff
+lane_50,lane,126.572,"Avenue Jean Dalmas",180.8,8a3968bb5c97fff 8a3968bb5cb7fff 8a3968bb5d9ffff
+lane_51,lane,23.8857,"Avenue Jean Dalmas",34.1,8a3968bb5d9ffff
+lane_52,lane,117.283,"Avenue Jean Moulin",167.4,8a3968bb5a8ffff 8a3968bb5a97fff 8a3968bb5a9ffff
+lane_53,lane,252.543,"Avenue Jean et Marcel Fontenaille",360.4,8a3968bb5ad7fff 8a3968bb5adffff
+lane_54,lane,47.3845,"Avenue Jules Ferry",67.7,8a3968bb0a67fff 8a3968bb0b4ffff
+lane_55,lane,33.0913,"Avenue Jules Ferry",47.3,8a3968bb0b4ffff
+lane_56,lane,98.9373,"Avenue Jules Ferry",141.4,8a3968bb0b4ffff 8a3968bb56b7fff 8a3968bb579ffff
+lane_57,lane,206.279,"Avenue Jules Ferry",294.7,8a3968bb5787fff 8a3968bb579ffff 8a3968bb57affff
+lane_58,lane,246.524,"Avenue Jules Isaac",352.2,8a3968bb5157fff 8a3968bb5167fff 8a3968bb5177fff
+lane_59,lane,138.506,"Avenue Jules Isaac",197.8,8a3968bb5167fff 8a3968bb5b97fff 8a3968bb5bb7fff
+lane_60,lane,34.0441,"Avenue Lucien Gautier",48.6,8a3968bb56c7fff 8a3968bb56f7fff
+lane_61,lane,122.423,"Avenue Lucien Gautier / Traverse Paul Beltçaguy",174.8,8a3968bb5657fff 8a3968bb56c7fff 8a3968bb56e7fff 8a3968bb56effff
+lane_62,lane,129.45,"Avenue Marius Jouveau",210.6,8a3968bb5c37fff 8a3968bb5d8ffff
+lane_63,lane,49.657,"Avenue Maurice Blondel",70.9,8a3968bb54effff
+lane_64,lane,185.101,"Avenue Max Juvénal",264.2,8a3968bb5427fff 8a3968bb542ffff
+lane_65,lane,331.256,"Avenue Max Juvénal",472.7,8a3968bb5427fff 8a3968bb5507fff 8a3968bb550ffff 8a3968bb551ffff
+lane_66,lane,12.1743,"Avenue Max Juvénal",17.4,8a3968bb55b7fff
+lane_67,lane,204.231,"Avenue Max Juvénal / Rue Gustave Desplaces",291.6,8a3968bb540ffff 8a3968bb542ffff
+lane_68,lane,125.634,"Avenue Napoléon Bonaparte",179.3,8a3968bb5547fff 8a3968bb555ffff 8a3968bb5577fff
+lane_69,lane,99.53,"Avenue Pasteur",142.2,8a3968bb5117fff 8a3968bb5137fff
+lane_70,lane,63.4111,"Avenue Pasteur",90.6,8a3968bb5137fff 8a3968bb589ffff
+lane_71,lane,188.288,"Avenue Philippe Solari",269.0,8a3968bb5887fff 8a3968bb589ffff 8a3968bb58a7fff
+lane_72,lane,7.41582,"Avenue Pierre Brossolette",10.6,8a3968bb0b07fff 8a3968bb0b17fff
+lane_73,lane,305.015,"Avenue Pierre Brossolette",435.8,8a3968bb0b07fff 8a3968bb0b27fff 8a3968bb541ffff 8a3968bb548ffff 8a3968bb54affff
+lane_74,lane,6.89149,"Avenue Robert Schuman",13.3,8a3968bb0b57fff
+lane_75,lane,86.1582,"Avenue Robert Schuman",123.1,8a3968bb0b57fff
+lane_76,lane,40.0995,"Avenue Robert Schuman",57.3,8a3968bb54cffff 8a3968bb5797fff
+lane_77,lane,41.2493,"Avenue Saint-Jérôme",58.9,8a3968bb1d77fff 8a3968bb56dffff
+lane_78,lane,169.463,"Avenue Saint-Jérôme",241.8,8a3968bb5617fff 8a3968bb561ffff 8a3968bb578ffff
+lane_79,lane,229.798,"Avenue Saint-Jérôme",328.1,8a3968bb561ffff 8a3968bb56c7fff 8a3968bb56dffff 8a3968bb56f7fff
+lane_80,lane,133.549,"Avenue Saint-Jérôme",190.6,8a3968bb5787fff 8a3968bb578ffff 8a3968bb57affff
+lane_81,lane,8.19508,"Avenue Sainte-Victoire",11.7,8a3968bb506ffff
+lane_82,lane,41.956,"Avenue Victor Hugo",59.9,8a3968bb5467fff
+lane_83,lane,14.0569,"Avenue Victor Hugo",20.1,8a3968bb54effff
+lane_84,lane,268.294,"Avenue Winston Churchill",382.8,8a3968bb0b07fff 8a3968bb0b0ffff 8a3968bb0b17fff
+lane_85,lane,156.077,"Avenue Winston Churchill",222.7,8a3968bb0b0ffff 8a3968bb0b57fff 8a3968bb0b77fff
+lane_86,lane,107.322,"Avenue de l'Europe",153.1,8a3968bb42cffff 8a3968bb42effff 8a3968bb55b7fff
+lane_87,lane,143.895,"Avenue de la Violette",205.3,8a3968bb5127fff 8a3968bb588ffff 8a3968bb589ffff 8a3968bb58d7fff
+lane_88,lane,195.787,"Avenue de la Violette",279.3,8a3968bb5167fff 8a3968bb58d7fff 8a3968bb58dffff
+lane_89,lane,68.0593,"Avenue des Belges",97.2,8a3968bb542ffff 8a3968bb5477fff 8a3968bb555ffff
+lane_90,lane,207.961,"Avenue des Déportés de la Résistance Aixoise",297.1,8a3968bb1917fff 8a3968bb1987fff 8a3968bb1997fff 8a3968bb199ffff 8a3968bb19a7fff
+lane_91,lane,83.4054,"Avenue des Déportés de la Résistance Aixoise",119.2,8a3968bb5287fff
+lane_92,lane,134.16,"Avenue des Écoles Militaires Saint-Cyr et Maixent",191.4,8a3968bb5287fff 8a3968bb528ffff 8a3968bb52affff
+lane_93,lane,45.1819,"Avenue du Docteur Aurientis",64.5,8a3968bb531ffff 8a3968bb53affff
+lane_94,lane,128.192,"Avenue du Docteur Aurientis",183.0,8a3968bb504ffff 8a3968bb5317fff 8a3968bb53a7fff 8a3968bb53affff
+lane_95,lane,18.3988,"Avenue du Maréchal de Lattre de Tassigny",26.3,8a3968bb5c37fff
+lane_96,lane,117.275,"Avenue du Maréchal de Lattre de Tassigny",167.5,8a3968bb5c17fff 8a3968bb5c8ffff 8a3968bb5caffff
+lane_97,lane,12.8646,"Avenue du Maréchal de Lattre de Tassigny",18.4,8a3968bb5d07fff
+lane_98,lane,45.6428,"Avenue du Maréchal de Lattre de Tassigny / Place Nelson Mandela",65.2,8a3968bb5c8ffff 8a3968bb5caffff
+lane_99,lane,57.1094,"Avenue du Parc",81.6,8a3968bb57a7fff
+lane_100,lane,33.2939,"Boulevard Aristide Briand",47.5,8a3968bb5027fff 8a3968bb5157fff
+lane_101,lane,221.407,"Boulevard Aristide Briand",315.9,8a3968bb5027fff 8a3968bb5107fff 8a3968bb510ffff 8a3968bb5117fff 8a3968bb511ffff
+lane_102,lane,17.0559,"Boulevard Aristide Briand",24.3,8a3968bb5157fff
+lane_103,lane,86.2874,"Boulevard Carnot",123.2,8a3968bb50cffff 8a3968bb50effff
+lane_104,lane,108.395,"Boulevard Carnot",154.8,8a3968bb50cffff 8a3968bb5397fff 8a3968bb5767fff
+lane_105,lane,218.494,"Boulevard Carnot",312.1,8a3968bb5747fff 8a3968bb5757fff 8a3968bb5767fff
+lane_106,lane,82.7018,"Boulevard François et Émile Zola",118.0,8a3968bb5067fff 8a3968bb5a97fff
+lane_107,lane,164.422,"Boulevard François et Émile Zola",234.6,8a3968bb502ffff 8a3968bb5067fff 8a3968bb5157fff 8a3968bb515ffff
+lane_108,lane,26.9266,"Boulevard François et Émile Zola",38.4,8a3968bb5a97fff
+lane_109,lane,48.6126,"Boulevard Jean Jaurès",69.4,8a3968bb5117fff 8a3968bb5c4ffff
+lane_110,lane,123.655,"Boulevard Jean Jaurès",176.5,8a3968bb5c4ffff 8a3968bb5c5ffff
+lane_111,lane,57.0429,"Boulevard Jean Jaurès / Rue de la Molle",81.4,8a3968bb5c57fff 8a3968bb5c5ffff
+lane_112,lane,48.0681,"Boulevard de la République",68.6,8a3968bb552ffff 8a3968bb5577fff
+lane_113,lane,67.839,"Boulevard de la République",96.8,8a3968bb5577fff
+lane_114,lane,32.1698,"Boulevard de la République",45.9,8a3968bb5c8ffff
+lane_115,lane,113.887,"Boulevard de la République",162.6,8a3968bb552ffff 8a3968bb5c8ffff 8a3968bb5cd7fff
+lane_116,lane,41.2521,"Boulevard de la République / Place Nelson Mandela",58.9,8a3968bb5c8ffff
+lane_117,lane,99.1905,"Boulevard du Roi René",141.5,8a3968bb545ffff 8a3968bb57a7fff
+lane_118,lane,77.905,"Boulevard du Roi René",111.2,8a3968bb5627fff 8a3968bb5757fff
+lane_119,lane,144.534,"Boulevard du Roi René",206.2,8a3968bb5627fff 8a3968bb5717fff 8a3968bb571ffff 8a3968bb57affff
+lane_120,lane,41.4857,"Boulevard du Roi René",59.2,8a3968bb5757fff
+lane_121,lane,90.502,"Boulevard du Roi René",129.1,8a3968bb5717fff 8a3968bb57a7fff
+lane_122,lane,31.0464,"Carrefour de la Légion d'Honneur",44.3,8a3968bb55b7fff
+lane_123,lane,17.5219,"Cours Gambetta",25.0,8a3968bb18b7fff
+lane_124,lane,191.281,"Cours Gambetta",273.2,8a3968bb560ffff 8a3968bb562ffff 8a3968bb5677fff 8a3968bb5757fff
+lane_125,lane,21.0196,"Cours Gambetta",30.0,8a3968bb560ffff 8a3968bb5657fff
+lane_126,lane,41.0576,"Cours Gambetta",58.6,8a3968bb5757fff
+lane_127,lane,168.995,"Cours Saint-Louis",241.4,8a3968bb500ffff 8a3968bb502ffff 8a3968bb5057fff
+lane_128,lane,52.1704,"Cours Saint-Louis",74.5,8a3968bb5057fff 8a3968bb50effff
+lane_129,lane,12.3834,"Cours d'Orbitelle",17.7,8a3968bb57affff
+lane_130,lane,86.6869,"Cours d'Orbitelle",123.8,8a3968bb5717fff 8a3968bb57affff
+lane_131,lane,193.416,"Cours des Arts et Metiers",276.1,8a3968bb504ffff 8a3968bb505ffff 8a3968bb50effff
+lane_132,lane,38.9834,"Cours des Arts et Metiers",55.6,8a3968bb50effff
+lane_133,lane,137.515,"Cours des Arts et Metiers",196.3,8a3968bb504ffff 8a3968bb5307fff 8a3968bb5337fff
+lane_134,lane,144.172,"Cours des Minimes",205.7,8a3968bb5c87fff 8a3968bb5c8ffff 8a3968bb5c97fff
+lane_135,lane,18.8621,"Cours des Minimes / Place Nelson Mandela",26.9,8a3968bb5c8ffff
+lane_136,lane,62.7147,"Place Bellegarde",89.6,8a3968bb502ffff 8a3968bb5157fff
+lane_137,lane,52.7054,"Place Lucien Paye",75.3,8a3968bb54cffff 8a3968bb5797fff 8a3968bb57b7fff
+lane_138,lane,41.5893,"Place Nelson Mandela",59.4,8a3968bb5c8ffff
+lane_139,lane,34.5022,"Place Nelson Mandela / Rue de l'Entrepot",49.3,8a3968bb5c8ffff
+lane_140,lane,23.4001,"Place du Général de Gaulle",33.4,8a3968bb5467fff 8a3968bb555ffff
+lane_141,lane,34.1474,"Place du Général de Gaulle",48.8,8a3968bb555ffff
+lane_142,lane,37.1208,"Place du Lieutenant Colonel Louis Arné",53.0,8a3968bb531ffff
+lane_143,lane,70.6394,"Rond-Point El Sadate",100.9,8a3968bb5417fff 8a3968bb541ffff
+lane_144,lane,50.1438,"Rond-Point Fontaine du Commandant Jean Dubouy",71.6,8a3968bb5287fff
+lane_145,lane,75.2976,"Rond-Point François Turpin",107.5,8a3968bb5507fff 8a3968bb5517fff 8a3968bb5537fff
+lane_146,lane,90.1825,"Route de Galice",134.4,8a3968bb5c97fff 8a3968bb5cb7fff
+lane_147,lane,34.3676,"Rue Gustave Desplaces",49.1,8a3968bb540ffff
+lane_148,lane,184.284,"Rue Gustave Desplaces",263.2,8a3968bb540ffff 8a3968bb54e7fff 8a3968bb54effff
+lane_149,lane,4.064,"Rue Irma Moreau",5.8,8a3968bb5527fff
+lane_150,lane,83.9546,"Rue Lapierre",119.8,8a3968bb542ffff
+lane_151,lane,180.836,"Rue Saint-Thomas de Villeneuve",258.3,8a3968bb530ffff 8a3968bb531ffff 8a3968bb532ffff
+lane_152,lane,102.697,"Rue Saint-Thomas de Villeneuve",146.6,8a3968bb5ad7fff
+lane_153,lane,61.4513,"Rue de l'Entrepot",87.8,8a3968bb5527fff 8a3968bb5c8ffff
+lane_154,lane,71.4704,"Rue de la Molle",102.0,8a3968bb5c17fff 8a3968bb5c1ffff 8a3968bb5caffff
+lane_155,lane,29.7589,"Rue de la Molle",42.5,8a3968bb5caffff
+lane_156,lane,71.6199,"Rue du Chapître",102.2,8a3968bb5127fff 8a3968bb5137fff
+lane_157,lane,129.437,"Rue du RICM",184.9,8a3968bb5287fff 8a3968bb52a7fff 8a3968bb538ffff
+lane_158,lane,16.3051,"Rue du RICM",23.3,8a3968bb531ffff
+lane_159,lane,148.398,"Rue du RICM",212.0,8a3968bb531ffff 8a3968bb538ffff 8a3968bb53affff
+lane_160,lane,6.9875,"Traverse Notre-Dame",10.0,8a3968bb5127fff
+lane_161,lane,32.2138,"Traverse Notre-Dame",46.0,8a3968bb5127fff 8a3968bb589ffff
+lane_162,lane,38.2153,"Traverse Paul Beltçaguy",54.6,8a3968bb5657fff
+lane_163,lane,15.321,"Traverse Paul Beltçaguy",21.9,8a3968bb5657fff
+rope_8a3968bb0b67fff_8a3968bb5797fff,rope_bridge,20,"",0.0,8a3968bb0b67fff 8a3968bb5797fff
+rope_8a3968bb0967fff_8a3968bb096ffff,rope_bridge,20,"",0.0,8a3968bb0967fff 8a3968bb096ffff
+rope_8a3968bb0b07fff_8a3968bb0b17fff,rope_bridge,20,"",0.0,8a3968bb0b07fff 8a3968bb0b17fff
+rope_8a3968bb5407fff_8a3968bb542ffff,rope_bridge,20,"",0.0,8a3968bb5407fff 8a3968bb542ffff
+rope_8a3968bb54e7fff_8a3968bb54f7fff,rope_bridge,20,"",0.0,8a3968bb54e7fff 8a3968bb54f7fff
+rope_8a3968bb0b4ffff_8a3968bb0b5ffff,rope_bridge,20,"",0.0,8a3968bb0b4ffff 8a3968bb0b5ffff
+rope_8a3968bb1d47fff_8a3968bb1d77fff,rope_bridge,20,"",0.0,8a3968bb1d47fff 8a3968bb1d77fff
+rope_8a3968bb5c97fff_8a3968bb5cb7fff,rope_bridge,20,"",0.0,8a3968bb5c97fff 8a3968bb5cb7fff
+rope_8a3968bb5507fff_8a3968bb5517fff,rope_bridge,20,"",0.0,8a3968bb5507fff 8a3968bb5517fff
+rope_8a3968bb55a7fff_8a3968bb55b7fff,rope_bridge,20,"",0.0,8a3968bb55a7fff 8a3968bb55b7fff
+rope_8a3968bb5d47fff_8a3968bb5d6ffff,rope_bridge,20,"",0.0,8a3968bb5d47fff 8a3968bb5d6ffff

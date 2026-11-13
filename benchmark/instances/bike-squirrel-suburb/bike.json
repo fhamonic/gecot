@@ -1,0 +1,57 @@
+{
+    "config": {
+        "place": "Marseille, Huveaune valley",
+        "bbox": [
+            5.424,
+            43.27,
+            5.4865,
+            43.316
+        ],
+        "group_resolution": 9,
+        "squirrel": {
+            "department": 13,
+            "resolution": 9,
+            "lane_cost": 0.4,
+            "strip_width": 3,
+            "strip_cost": 0.1,
+            "rope_bridge": {
+                "spacing": 400,
+                "max_sites": 40,
+                "cost": 20,
+                "probability": 0.8
+            }
+        }
+    },
+    "osm_date": "2026-11-01T00:00:00Z",
+    "summary": {
+        "vertices": 4609,
+        "arcs": 11502,
+        "area_km2": 25.9,
+        "population": 89689,
+        "source_vertices": 474,
+        "points_of_interest": 229,
+        "target_vertices": 127,
+        "streets_km": {
+            "with a lane": 24.1,
+            "improvable": 46.2,
+            "other": 294.3
+        },
+        "options": {
+            "lane": 263,
+            "rope_bridge": 30
+        },
+        "total_cost": 32721.1,
+        "cells": 250,
+        "habitat_cells": 114,
+        "initial_and_largest_scores": {
+            "bike": [
+                8555905.121359501,
+                10571835.325198783
+            ],
+            "squirrel": [
+                232787.79357647352,
+                268936.8846303638
+            ]
+        }
+    }
+}

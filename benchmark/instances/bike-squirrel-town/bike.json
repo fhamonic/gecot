@@ -1,0 +1,57 @@
+{
+    "config": {
+        "place": "Aix-en-Provence, town centre",
+        "bbox": [
+            5.435,
+            43.518,
+            5.462,
+            43.537
+        ],
+        "group_resolution": 9,
+        "squirrel": {
+            "department": 13,
+            "resolution": 10,
+            "lane_cost": 0.4,
+            "strip_width": 3,
+            "strip_cost": 0.1,
+            "rope_bridge": {
+                "spacing": 250,
+                "max_sites": 40,
+                "cost": 20,
+                "probability": 0.8
+            }
+        }
+    },
+    "osm_date": "2026-11-01T00:00:00Z",
+    "summary": {
+        "vertices": 1624,
+        "arcs": 4230,
+        "area_km2": 4.6,
+        "population": 27060,
+        "source_vertices": 112,
+        "points_of_interest": 680,
+        "target_vertices": 86,
+        "streets_km": {
+            "with a lane": 11.3,
+            "improvable": 17.5,
+            "other": 73.0
+        },
+        "options": {
+            "lane": 164,
+            "rope_bridge": 11
+        },
+        "total_cost": 12456.8,
+        "cells": 310,
+        "habitat_cells": 29,
+        "initial_and_largest_scores": {
+            "bike": [
+                12854232.89931608,
+                13698321.474711621
+            ],
+            "squirrel": [
+                94.72576288496609,
+                110.23613434407262
+            ]
+        }
+    }
+}

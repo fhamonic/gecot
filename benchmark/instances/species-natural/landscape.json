@@ -1,0 +1,91 @@
+{
+    "config": {
+        "place": "plateau de l'Arbois: garrigue and pine woods cut by the high-speed line and the D9",
+        "department": 13,
+        "bbox": [
+            5.29,
+            43.445,
+            5.36,
+            43.49
+        ],
+        "resolution": 9,
+        "species": {
+            "deer": {
+                "dispersal": 3,
+                "barrier": {
+                    "major": 0.02,
+                    "secondary": 0.5
+                }
+            },
+            "squirrel": {
+                "dispersal": 1,
+                "barrier": {
+                    "major": 0.05,
+                    "secondary": 0.3
+                }
+            },
+            "dormouse": {
+                "dispersal": 0.4,
+                "barrier": {
+                    "major": 0.02,
+                    "secondary": 0.15
+                }
+            }
+        },
+        "options": {
+            "crossing": {
+                "spacing": 350,
+                "max_sites": 60,
+                "cost": {
+                    "major": 3000,
+                    "secondary": 1000
+                }
+            },
+            "rope_bridge": {
+                "cost": 100,
+                "probability": 0.8,
+                "species": [
+                    "squirrel",
+                    "dormouse"
+                ]
+            }
+        }
+    },
+    "summary": {
+        "cells": 275,
+        "cell_spacing_m": 346.7,
+        "area_km2": 28.6,
+        "habitat_cells": 238,
+        "cells_options_turn_into_habitat": 0,
+        "cover": {
+            "open": 0.218,
+            "woody": 0.715,
+            "crop": 0.001,
+            "water": 0.026,
+            "rail": 0.002,
+            "street": 0.016,
+            "highway": 0.005,
+            "built": 0.018
+        },
+        "barrier_pairs": {
+            "major": 93,
+            "secondary": 11
+        },
+        "options": {
+            "crossing": {
+                "count": 28,
+                "total_cost": 78000.0
+            },
+            "rope_bridge": {
+                "count": 28,
+                "total_cost": 2800.0
+            }
+        },
+        "total_cost": 80800,
+        "initial_scores": {
+            "deer": 1036431.8483206586,
+            "squirrel": 793619.1775077175,
+            "dormouse": 432619.35509805183
+        }
+    }
+}

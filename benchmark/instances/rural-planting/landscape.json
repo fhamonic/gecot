@@ -1,0 +1,49 @@
+{
+    "config": {
+        "place": "Eyragues: farmland, hedgerows and woods",
+        "department": 13,
+        "bbox": [
+            4.838,
+            43.829,
+            4.882,
+            43.861
+        ],
+        "resolution": 10,
+        "options": {
+            "planting": {
+                "share": 0.2,
+                "min_share": 0.5,
+                "group_resolution": 9,
+                "unit_cost": 0.002
+            }
+        }
+    },
+    "summary": {
+        "cells": 857,
+        "cell_spacing_m": 130.3,
+        "area_km2": 12.6,
+        "habitat_cells": 271,
+        "cells_options_turn_into_habitat": 122,
+        "cover": {
+            "open": 0.495,
+            "woody": 0.278,
+            "crop": 0.108,
+            "water": 0.003,
+            "rail": 0.0,
+            "street": 0.019,
+            "highway": 0.0,
+            "built": 0.097
+        },
+        "barrier_pairs": {
+            "major": 0,
+            "secondary": 67
+        },
+        "options": {
+            "planting": {
+                "count": 122,
+                "total_cost": 1711.7
+            }
+        },
+        "total_cost": 1711.7
+    }
+}

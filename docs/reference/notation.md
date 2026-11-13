@@ -88,10 +88,3 @@ The symbols of the [formulation pages](../formulations/problem.md), next to the 
 | $H$, $l_i$, $Q_{ij}$ | constant, linear and quadratic terms of the bound of `qkp_planes` | |
 | $\theta_{ij}$, $u_i$ | split of the quadratic terms, and the resulting bound on what the option $i$ brings | parameter `--theta` |
 | $\nu_{pi}$, $R_p(\nu)$ | prices of `split_lagrange`, and the best priced value of a pair | |
-
-## Differences with the thesis
-
-- The thesis has one weight $w_u$ per vertex, and its objective is $\sum_t w_t \cdot f_t$. GECOT separates the quality of a vertex as a source, $w_u$, which is what the flows carry, from its quality as a target, $q_u$, which multiplies the flow $f_t$. Giving both the same value recovers the thesis.
-- The thesis optimizes one graph. GECOT has a graph per case and maximizes a criterion $\mathcal{C}$ of their scores.
-- The definition of the useless arcs $\mathbb{W}(t)$ is written here with the inequality that the text of the thesis describes: see [Preprocessing](../formulations/preprocessing.md#strong-and-useless-arcs).
-- A few symbols are reused from one page to another, each time as the literature of the method writes them: $\theta$ (the value of a group of targets in `multicut_benders`, the split of the quadratic terms in `qkp_planes`), $\sigma$ (the dual variable of a big-M constraint in the decompositions, of a uniqueness constraint in the relaxations), $\lambda$ (the penalized lengths $\lambda^\mu_a$ of the preprocessing, the dual variables $\lambda_{pi}$ of the relaxations) and $y$ (the reference scenario of a cut, the columns $y_{pS}$ of the relaxations).

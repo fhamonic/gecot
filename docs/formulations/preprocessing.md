@@ -104,10 +104,6 @@ $$
 W(t) \subseteq \mathbb{W}(t)\,, \qquad S(t) \subseteq \mathbb{S}(t)\,.
 $$
 
-!!! note "Difference with the thesis"
-
-    The thesis writes the definition of $\mathbb{W}(t)$ with the inequality $\Pi^x(u,t) < \pi^x_{uv} \cdot \Pi^x(v,t)$, which no arc can satisfy. The definition above is the one its text and its algorithm use: the paths through $(u,v)$ are strictly less reliable than the best.
-
 ### Interval lengths and fibers
 
 Most reliable paths are shortest paths for the lengths $-\log \pi$. Give each arc $a$ the interval of lengths

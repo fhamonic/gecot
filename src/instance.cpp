@@ -90,7 +90,28 @@ Instance::options() const noexcept {
         gecot::option_t{0}, static_cast<gecot::option_t>(num_options()));
 }
 [[nodiscard]] double Instance::option_cost(gecot::option_t o) const {
+    if(num_cost_dimensions() != 1)
+        throw std::logic_error("the options have several costs");
     return _options_costs[o];
+}
+[[nodiscard]] double Instance::option_cost(gecot::option_t o,
+                                           std::size_t r) const {
+    return _options_costs[o * num_cost_dimensions() + r];
+}
+[[nodiscard]] std::size_t Instance::num_cost_dimensions() const noexcept {
+    return _cost_dimensions_names.size();
+}
+[[nodiscard]] const std::string & Instance::cost_dimension_name(
+    std::size_t r) const {
+    return _cost_dimensions_names.at(r);
+}
+[[nodiscard]] const std::vector<std::vector<gecot::option_t>> &
+Instance::conflict_sets() const noexcept {
+    return _conflict_sets;
+}
+[[nodiscard]] const std::string & Instance::conflict_set_name(
+    std::size_t l) const {
+    return _conflict_sets_names.at(l);
 }
 [[nodiscard]] const std::vector<InstanceCase> & Instance::cases()
     const noexcept {
@@ -100,25 +121,35 @@ Instance::options() const noexcept {
     return _criterion;
 }
 [[nodiscard]] std::size_t Instance::num_options() const noexcept {
-    return _options_costs.size();
+    return _options_names.size();
+}
+void Instance::set_cost_dimensions(std::vector<std::string> names) {
+    assert(num_options() == 0 && !names.empty());
+    _cost_dimensions_names = std::move(names);
 }
 gecot::option_t Instance::add_option(std::string identifier,
-                                     double c) noexcept {
+                                     const std::vector<double> & costs) {
     assert(!_option_name_to_id_map.contains(identifier));
+    if(costs.size() != num_cost_dimensions())
+        throw std::invalid_argument(
+            "option '" + identifier + "' has " + std::to_string(costs.size()) +
+            " costs instead of " + std::to_string(num_cost_dimensions()));
     gecot::option_t i = static_cast<gecot::option_t>(num_options());
     _options_names.emplace_back(identifier);
-    _options_costs.emplace_back(c);
+    _options_costs.insert(_options_costs.end(), costs.begin(), costs.end());
     _option_name_to_id_map[identifier] = i;
     return i;
+}
+void Instance::add_conflict_set(std::string name,
+                                std::vector<gecot::option_t> options) {
+    _conflict_sets_names.emplace_back(std::move(name));
+    _conflict_sets.emplace_back(std::move(options));
 }
 bool Instance::contains_option(gecot::option_t i) const noexcept {
     return i < static_cast<gecot::option_t>(num_options());
 }
 bool Instance::contains_option(std::string identifier) const noexcept {
     return _option_name_to_id_map.contains(identifier);
-}
-void Instance::set_option_cost(gecot::option_t i, double cost) noexcept {
-    _options_costs[i] = cost;
 }
 const std::string & Instance::option_name(gecot::option_t i) const noexcept {
     return _options_names[i];

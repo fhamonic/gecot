@@ -82,7 +82,7 @@ std::pair<Instance, double> trivial_reformulate_instance(
         free_options[original_option] = (cost == 0);
         if(cost > budget || cost == 0) continue;
         auto option = reformulated_instance.add_option(
-            instance.option_name(original_option), cost);
+            instance.option_name(original_option), {cost});
         reformulated_option_map[original_option].emplace(option);
     }
 
@@ -108,7 +108,7 @@ Instance restrict_instance(const I & instance, const auto & keep,
         if(keep(option))
             restricted_option_map[option].emplace(
                 restricted_instance.add_option(instance.option_name(option),
-                                               instance.option_cost(option)));
+                                               {instance.option_cost(option)}));
     for(auto && instance_case : instance.cases())
         trivial_reformulate_case(instance_case, restricted_instance,
                                  restricted_option_map,

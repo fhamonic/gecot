@@ -19,6 +19,15 @@ concept range_of =
 using option_t = unsigned int;
 using case_id_t = std::size_t;
 
+// one budget per cost dimension, in the order of the instance; no range
+// interface, so that std::format cannot print it as a list by mistake
+struct budget_t {
+    std::vector<double> values;
+    [[nodiscard]] double operator[](std::size_t r) const { return values[r]; }
+    [[nodiscard]] std::size_t size() const noexcept { return values.size(); }
+    [[nodiscard]] double front() const { return values.front(); }
+};
+
 template <typename _Tp>
 using case_graph_t = std::decay_t<decltype(std::declval<_Tp &>().graph())>;
 
@@ -103,10 +112,13 @@ using instance_probability_map_t = case_probability_map_t<instance_case_t<_Tp>>;
 
 template <typename _Tp>
 concept instance_c =
-    requires(_Tp i, option_t o, std::string s,
+    requires(_Tp i, option_t o, std::size_t r, std::string s,
              instance_case_map_t<_Tp, double> case_values) {
         { i.options() } -> detail::range_of<option_t>;
         { i.option_cost(o) } -> std::convertible_to<double>;
+        { i.option_cost(o, r) } -> std::convertible_to<double>;
+        { i.num_cost_dimensions() } -> std::convertible_to<std::size_t>;
+        { i.conflict_sets() } -> std::ranges::range;
         { i.option_name(o) } -> std::convertible_to<std::string>;
         { i.contains_option(s) } -> std::convertible_to<bool>;
         { i.option_from_name(s) } -> std::convertible_to<option_t>;

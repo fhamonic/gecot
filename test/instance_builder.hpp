@@ -25,15 +25,21 @@ struct case_spec {
     std::vector<std::vector<std::pair<double, gecot::option_t>>> arc_options;
 };
 
-inline Instance build_instance(const std::vector<double> & option_costs,
-                               const std::vector<case_spec> & cases,
-                               criterion_formula criterion) {
+// options of several costs, named after the dimensions, and conflict sets
+inline Instance build_instance(
+    const std::vector<std::string> & cost_dimensions,
+    const std::vector<std::vector<double>> & option_costs,
+    const std::vector<std::vector<gecot::option_t>> & conflict_sets,
+    const std::vector<case_spec> & cases, criterion_formula criterion) {
     using graph_t = melon::static_digraph;
     using vertex_t = melon::vertex_t<graph_t>;
     using arc_t = melon::arc_t<graph_t>;
     Instance instance;
+    instance.set_cost_dimensions(cost_dimensions);
     for(std::size_t o = 0; o < option_costs.size(); ++o)
         instance.add_option("o" + std::to_string(o), option_costs[o]);
+    for(std::size_t l = 0; l < conflict_sets.size(); ++l)
+        instance.add_conflict_set("s" + std::to_string(l), conflict_sets[l]);
     for(std::size_t k = 0; k < cases.size(); ++k) {
         const case_spec & spec = cases[k];
         melon::static_digraph_builder<graph_t, double, std::size_t> builder(
@@ -76,6 +82,14 @@ inline Instance build_instance(const std::vector<double> & option_costs,
     }
     instance.set_criterion(std::move(criterion));
     return instance;
+}
+
+inline Instance build_instance(const std::vector<double> & option_costs,
+                               const std::vector<case_spec> & cases,
+                               criterion_formula criterion) {
+    std::vector<std::vector<double>> costs;
+    for(const double cost : option_costs) costs.push_back({cost});
+    return build_instance({"cost"}, costs, {}, cases, std::move(criterion));
 }
 
 #endif  // GECOT_TEST_INSTANCE_BUILDER_HPP

@@ -23,8 +23,9 @@
 
 namespace {
 
-// the best score over every subset of the options within the budget
-double brute_force_optimum(const Instance & instance, double budget) {
+// the best score over every feasible subset of the options
+double brute_force_optimum(const Instance & instance,
+                           const gecot::budget_t & budget) {
     const std::size_t num_options = instance.num_options();
     EXPECT_LE(num_options, 20u);
     const auto cases_vertex_options =
@@ -34,18 +35,17 @@ double brute_force_optimum(const Instance & instance, double budget) {
     double best = -std::numeric_limits<double>::infinity();
     for(std::uint32_t mask = 0; mask < (std::uint32_t{1} << num_options);
         ++mask) {
-        double cost = 0;
-        for(auto && o : instance.options()) {
-            solution[o] = (mask >> o) & 1;
-            if(solution[o]) cost += instance.option_cost(o);
-        }
-        if(cost > budget) continue;
+        for(auto && o : instance.options()) solution[o] = (mask >> o) & 1;
+        if(!gecot::is_feasible(instance, solution, budget, 0.0)) continue;
         best = std::max(
             best,
             instance.eval_criterion(gecot::compute_solution_cases_pc_num(
                 instance, solution, cases_vertex_options, cases_arc_options)));
     }
     return best;
+}
+double brute_force_optimum(const Instance & instance, const double budget) {
+    return brute_force_optimum(instance, gecot::budget_t{{budget}});
 }
 
 Instance reformulated(const char * path, double budget) {

@@ -2,6 +2,7 @@
 #define GECOT_SOLVERS_GREEDY_HPP
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <ranges>
 #include <vector>
@@ -84,6 +85,26 @@ struct Greedy {
             {"solution cost", log_format::scientific(5)});
         double previous_score = compute_score(
             instance, cases_current_sqm, cases_current_tqm, cases_current_pm);
+        // The scores are sums whose order changes from run to run, and
+        // their last digits with it: among options of equal ratios, these
+        // digits would choose. The option of lowest id is chosen among those
+        // whose ratio is within 1e-12 of the score, per unit of cost, of the
+        // best one. Over the incremental steps of the benchmark, the best
+        // ratio and the next were within 3e-15, tied, or 6e-9 apart at
+        // least; with --worst, where the ratios near zero compete, real
+        // differences fall inside the window and are ties too.
+        const auto first_tied = [&](std::vector<option_t> & candidates,
+                                    const auto best_it) {
+            auto first_it = best_it;
+            for(auto it = candidates.begin(); it != candidates.end(); ++it)
+                if(*it < *first_it &&
+                   std::abs(options_ratios[*it] - options_ratios[*best_it]) <=
+                       1e-12 * std::abs(previous_score) *
+                           (1 / instance.option_cost(*it) +
+                            1 / instance.option_cost(*best_it)))
+                    first_it = it;
+            return first_it;
+        };
         while(!options.empty() && purchased > budget + feasibility_tol) {
             compute_options_cases_decr_pc_num(
                 instance, solution, options, cases_current_sqm,
@@ -98,9 +119,9 @@ struct Greedy {
             const auto by_ratio = [&options_ratios](auto && o1, auto && o2) {
                 return options_ratios[o1] < options_ratios[o2];
             };
-            auto worst_option_it =
-                worst ? std::ranges::max_element(options, by_ratio)
-                      : std::ranges::min_element(options, by_ratio);
+            auto worst_option_it = first_tied(
+                options, worst ? std::ranges::max_element(options, by_ratio)
+                               : std::ranges::min_element(options, by_ratio));
             option_t worst_option = *worst_option_it;
             const double worst_option_price =
                 instance.option_cost(worst_option);
@@ -172,9 +193,10 @@ struct Greedy {
                                                         auto && o2) {
                     return options_ratios[o1] < options_ratios[o2];
                 };
-                auto best_option_it =
+                auto best_option_it = first_tied(
+                    free_options,
                     worst ? std::ranges::min_element(free_options, by_ratio)
-                          : std::ranges::max_element(free_options, by_ratio);
+                          : std::ranges::max_element(free_options, by_ratio));
                 option_t best_option = *best_option_it;
                 const double best_option_price =
                     instance.option_cost(best_option);

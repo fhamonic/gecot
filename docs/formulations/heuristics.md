@@ -34,6 +34,8 @@ With `--decremental`, `--only-dec` skips these final purchases.
 
 The incremental steps, these final purchases included, buy as long as an option fits, even one that gains nothing.
 
+When several options are tied for the best gain or the smallest loss, `greedy` takes the first of them in the order of the instance. Tied means that their gains, or losses, differ by less than $10^{-12}$ of the score per unit of cost: within the rounding of the scores, which changes from one run to the next and would otherwise choose among them.
+
 The releases of GECOT before 2.0 name these four `static_incr`, `greedy_incr`, `static_decr` and `greedy_decr`.
 
 ## Why they can miss the optimum

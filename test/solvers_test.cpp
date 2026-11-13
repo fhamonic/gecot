@@ -8,6 +8,7 @@
 #include "gecot/solvers/static.hpp"
 
 #include "instance.hpp"
+#include "instance_builder.hpp"
 #include "parse_instance.hpp"
 #include "trivial_reformulate.hpp"
 
@@ -131,4 +132,53 @@ GTEST_TEST(solvers, worst_greedy_decremental) {
                             "AUD-Fou_AUD-Ser_2", "AUD-Puy_AUD-Car", "BRU-Mij_1",
                             "BRU-Mij_2", "BRU-Mij_3", "QUE-Mas_QUE-Ria",
                             "RT-Lau", "RT-Lau_QUE-Ria"}));
+}
+
+namespace {
+
+// Three vertices of quality 1 and the arcs of probability 0.1 from the last
+// two to the first, that o0 and o1, of cost 1, improve to the given
+// probabilities: the score is 3.2 before them.
+Instance two_arcs(const double o0_probability, const double o1_probability) {
+    const case_spec c{3,
+                      {{1, 0}, {2, 0}},
+                      {0.1, 0.1},
+                      {1, 1, 1},
+                      {1, 1, 1},
+                      {},
+                      {{{o0_probability, 0}}, {{o1_probability, 1}}}};
+    return build_instance({1, 1}, {c}, criterion_var{0});
+}
+
+std::vector<gecot::option_t> bought(const gecot::solvers::Greedy & solver,
+                                    const Instance & instance) {
+    const auto solution = solver.solve(instance, 1);
+    std::vector<gecot::option_t> options;
+    for(auto && o : instance.options())
+        if(solution[o]) options.push_back(o);
+    return options;
+}
+
+}  // namespace
+
+// The gains differ by 5e-14, which a strict comparison sees at every run on
+// these scores of 3.2: the size of the rounding that, on the scores of a
+// landscape, makes it choose one option or the other from run to run.
+GTEST_TEST(solvers, greedy_gives_a_tie_to_the_first_option) {
+    using gecot::solvers::Greedy;
+    using options = std::vector<gecot::option_t>;
+    const double more = 0.5 * (1 + 1e-13), less = 0.5 * (1 - 1e-13);
+    EXPECT_EQ(bought(Greedy{}, two_arcs(0.5, more)), options{0});
+    EXPECT_EQ(bought(Greedy{.worst = true}, two_arcs(0.5, less)), options{0});
+    // removed first: o1 stays
+    EXPECT_EQ(bought(Greedy{.decremental = true}, two_arcs(0.5, less)),
+              options{1});
+    EXPECT_EQ(
+        bought(Greedy{.decremental = true, .worst = true}, two_arcs(0.5, more)),
+        options{1});
+    // o0 gains nothing, under the probability of its arc: a window relative
+    // to the ratios would have no width here
+    EXPECT_EQ(bought(Greedy{}, two_arcs(0.05, 0.1 + 1e-14)), options{0});
+    // one millionth more is not a tie
+    EXPECT_EQ(bought(Greedy{}, two_arcs(0.5, 0.5 * (1 + 1e-6))), options{1});
 }

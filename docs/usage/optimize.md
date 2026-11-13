@@ -10,7 +10,7 @@ $ gecot optimize <algorithm> <instance> <budget> [<parameters> ...]
 |---|---|
 | `<algorithm>` | one of the algorithms listed by `gecot optimize --list-algorithms` |
 | `<instance>` | the [instance file](instance.md), a `.json` file |
-| `<budget>` | a non-negative number, in the unit of the costs of the options |
+| `<budget>` | a non-negative number, in the unit of the costs of the options; for options with [several costs](instance.md#several-costs), `name=value,...` with each dimension once, as `money=5,area=3` (also accepted with one dimension, as `cost=5`) |
 | `<parameters>` | the options of the command and the parameters of the algorithm, in any order |
 
 The three arguments can also be given by name, with `-a`, `-i` and `-B`. `gecot optimize --help` prints the options of the command, and `gecot optimize <algorithm> --list-params` the parameters of an algorithm.

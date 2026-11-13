@@ -11,9 +11,9 @@ Every step can be switched off to measure what it brings: the [last section](#wh
 
 Before any algorithm runs, `gecot optimize` and `gecot bound` rewrite the instance. The results are always reported for the instance as it was given: every one of its options is listed, and the scores are in its unit.
 
-**Options of cost 0 are bought.** They are applied to the graphs, and the solution lists them as bought. The *initial score* is still the score of the landscape without them.
+**Options of cost 0 are bought.** They are applied to the graphs, and the solution lists them as bought. The *initial score* is still the score of the landscape without them. An option of cost 0 in a [conflict set](../usage/instance.md#conflict-sets) with another affordable option is not: buying it would exclude that option, so it stays a decision of cost 0.
 
-**Options that cost more than the budget are removed.**
+**Options that cost more than the budget are removed**, in any of their [cost dimensions](../usage/instance.md#several-costs). A conflict set left with one option or none is dropped, as it constrains nothing.
 
 **Vertices linked by arcs of probability 1 are merged.** If two vertices $u$ and $v$ are connected with probability $\Pi(u,v) = \Pi(v,u) = 1$, the flow passes from one to the other without loss, so $f_u = f_v$ in every scenario. The same holds for a set $T$ of vertices that are pairwise connected with probability $1$: it is contracted into a single vertex $m$ with
 

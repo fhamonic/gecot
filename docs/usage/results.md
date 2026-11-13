@@ -35,9 +35,11 @@ Options bought  2 of 3:
 
 The scores are recomputed from the options bought, not taken from the solver: a score printed is the score of the selection printed.
 
-The **guaranteed share** compares gains, not scores: with $s$ the score of the solution, $b$ the upper bound and $s_0$ the score without any paid option, it is $(s - s_0) / (b - s_0)$, rounded down to one decimal. An optimal solution can therefore read 99.9 %, its bound being equal to its score only up to the solver's tolerance.
+The **guaranteed share** compares gains, not scores: with $s$ the score of the solution, $b$ the upper bound and $s_0$ the score with only the options bought statically (see below), it is $(s - s_0) / (b - s_0)$, rounded down to one decimal. An optimal solution can therefore read 99.9 %, its bound being equal to its score only up to the solver's tolerance.
 
-The options of cost 0 are always bought and listed, and they do not count in the initial score.
+The options of cost 0 are always bought and listed, and they do not count in the initial score. The exception is an option of cost 0 in a [conflict set](instance.md#conflict-sets) with another affordable option: it stays a choice, listed only if the solution buys it, and $s_0$ does not count it.
+
+With [several costs](instance.md#several-costs), the `Cost` line is one line per dimension, as `Cost money      5 of 9`.
 
 ### Status
 
@@ -127,7 +129,7 @@ $ gecot optimize flow_mip three-woods.json 7 -o solution.json
 | `computation_time_ms` | the time of the algorithm, in milliseconds |
 | `initial_score`, `solution_score` | the criterion without options and with the solution |
 | `initial_pc_num`, `solution_pc_num` | the score of each case, without options and with the solution |
-| `budget`, `solution_cost` | the budget and the cost of the solution |
+| `budget`, `solution_cost` | the budget and the cost of the solution; with several costs, an object with a number per dimension, as `{"area": 4, "money": 9}` |
 | `solution` | for each option of the instance, 1 if it is bought and 0 otherwise |
 | `algorithm_report` | the status and what the algorithm reports about its run |
 
@@ -266,7 +268,8 @@ Ctrl-C stops the algorithm and keeps its best result so far, with the status `in
 | Warning | Meaning |
 |---|---|
 | `Budget doesn't allow purchasing any options` | every option costs more than the budget, or costs 0 |
-| `The solution costs ..., over the budget ...` | `tree_lp` returned its relaxation, see [above](#status) |
+| `The solution costs ..., over the budget ...` (with several costs, `The solution costs ... in <dimension>, ...`) | `tree_lp` returned its relaxation, see [above](#status) |
+| `The solution buys ... options of the conflict set '...'` | should not happen with the algorithms that support conflict sets; report it |
 | `Solver stopped: time limit reached` | the result is the best so far, not a proved optimum |
 | `Solver stopped without a solution: ..., returning the MIP start` | the solver found nothing in the time given |
 | `This solver has no time limit: --time-limit ignored` and similar | the solver lacks a feature that a parameter asks for |

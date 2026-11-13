@@ -18,7 +18,7 @@ The arguments are those of [`gecot optimize`](optimize.md), with a method in pla
 | `path_lp` | the Lagrangian bound of the path relaxation | a linear solver |
 | `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` | the bound proved by the exact algorithm | a MILP solver; the optimum when the status is `optimal` |
 
-The [bounds page](../formulations/bounds.md) explains what each one computes. Every method needs a criterion that is non-decreasing in the score of every case and refuses the others; see the [instance files](instance.md#criterion).
+The [bounds page](../formulations/bounds.md) explains what each one computes. Every method needs a criterion that is non-decreasing in the score of every case and refuses the others; see the [instance files](instance.md#criterion). On an instance with [conflict sets](instance.md#conflict-sets) or [several costs](instance.md#several-costs), only `all_options`, `flow_mip`, `multicut_benders` and `flow_benders` are supported for now.
 
 ## Reading the result
 
@@ -40,7 +40,7 @@ Time               3.4 s
 | `All options bound` | the score with every option bought, as a reference |
 | `Budget`, `Time` | the budget and the time of the method |
 
-The solutions that the bound covers are those of `gecot optimize`: the options of cost 0 are always bought.
+The solutions that the bound covers are those of `gecot optimize`: the options of cost 0 are always bought, unless a [conflict set](instance.md#conflict-sets) makes them a choice.
 
 `-o <file>` writes the result as JSON instead:
 

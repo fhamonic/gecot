@@ -28,7 +28,7 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 | `-P`, `--list-params` | lists the parameters of the chosen algorithm |
 | `-o`, `--output-json <file>` | writes the result as JSON |
 | `--output-csv <file>` | writes the selection as CSV |
-| `--reformulation trivial`, `path_lp` [`trivial`] | the instance given to the algorithm. `trivial`: without the options of cost 0, which are bought, and those over the budget. `path_lp`: also without the options that the path relaxation proves to be in no better solution than its own |
+| `--reformulation trivial`, `path_lp` [`trivial`] | the instance given to the algorithm. `trivial`: without the options of cost 0 outside the conflict sets, which are bought, and those over the budget. `path_lp`: also without the options that the path relaxation proves to be in no better solution than its own |
 | `--reformulation-params "<name>=<value> ..."` | parameters of the `path_lp` of `--reformulation path_lp`, as `"time-limit=60 pricing=enumerate"`; its MIP start is the solution of `greedy` by default |
 | `--no-merging` | for comparison: keeps apart the vertices that arcs of probability 1 link |
 | `-v`, `--verbose` | logs the details of the algorithm; `-vv` everything, with the solver's own log on the standard output |

@@ -20,6 +20,8 @@ The algorithms of GECOT differ in what they promise. Start from what you need:
 | `tree_lp` | a relaxation, possibly over the budget | to study the tree relaxation |
 | `greedy --worst` | a deliberately bad solution | as a worst-case reference |
 
+With [conflict sets](instance.md#conflict-sets) or [several costs](instance.md#several-costs), only `multicut_benders`, `flow_benders` and `flow_mip` run for now; the others stop with an error.
+
 "Exact" always means up to the [tolerances](../formulations/flow.md#what-flow_mip-solves) of the solver and the [resolution](../formulations/preprocessing.md#resolution) of the preprocessing. Under `--time-limit` or after Ctrl-C, the exact algorithms return their best solution with the bound proved so far.
 
 ## An example

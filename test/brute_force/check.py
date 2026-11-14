@@ -89,6 +89,7 @@ def write_instances(out):
     cases.append((aude_variant("aude_cd", lambda i: {"money": money(i), "area": 0 if i == 6 else area[i]}),
                   ["money=2,area=2", "money=5,area=4", "money=8,area=6"]))
     cases.append((aude_variant("aude_c1", money), ["2", "3", "5"]))
+    cases.append((star(out), ["money=3,area=2", "money=5,area=3", "money=8,area=1"]))
     # (instance, its budget, twin, the twin's budget, budget values)
     same = lambda b: b
     oracles = [(aude_variant("aude_dup", lambda i: {"money": money(i), "copy": money(i)}),
@@ -99,6 +100,43 @@ def write_instances(out):
                 lambda b: "zz={},aa={}".format(*b), f"{out}/aude_cd.json",
                 lambda b: "money={},area={}".format(*b), [(2, 2), (5, 4), (8, 6)])]
     return cases, oracles
+
+
+def star(out):
+    """An instance of the shape split_lagrange prices: each option improves the
+    arcs entering one vertex, with two costs and overlapping sets."""
+    rng = random.Random(5)
+    names = [f"v{i}" for i in range(7)]
+    vertices = [{"id": v, "source_quality": rng.randint(1, 3), "target_quality": rng.randint(1, 3)}
+                for v in names]
+    edges = [(i, (i + 1) % 7) for i in range(7)] + [(0, 3), (2, 5), (4, 6)]
+    arcs = [{"id": f"{names[u]}_{names[v]}", "from": names[u], "to": names[v],
+             "probability": round(rng.uniform(0.2, 0.6), 2)}
+            for a, b in edges for u, v in ((a, b), (b, a))]
+    options = [{"id": f"enter_{v}", "cost": {"money": rng.randint(1, 3), "area": rng.randint(0, 2)}}
+               for v in names[1:]]
+    options += [{"id": f"restore_{v}", "cost": {"money": rng.randint(1, 2), "area": rng.randint(0, 1)}}
+                for v in ("v0", "v3")]
+    improvements = [{"arc_id": a["id"], "option_id": f"enter_{a['to']}",
+                     "improved_probability": min(1.0, a["probability"] + 0.35)}
+                    for a in arcs if a["to"] != "v0"]
+    gains = [{"vertex_id": v, "option_id": f"restore_{v}", "source_quality_gain": 2,
+              "target_quality_gain": 1} for v in ("v0", "v3")]
+    gains.append({"vertex_id": "v2", "option_id": "enter_v2", "source_quality_gain": 1,
+                  "target_quality_gain": 1})
+    sets = {"a": ["enter_v1", "enter_v4"], "b": ["enter_v2", "restore_v3", "enter_v5"],
+            "c": ["enter_v5", "enter_v6"], "d": ["restore_v0", "enter_v6"]}
+    j = {"options": options,
+         "conflicts": [{"set_id": k, "option_id": o} for k, l in sets.items() for o in l],
+         "cases": {"star": {"vertices": vertices, "arcs": arcs, "vertices_improvements": gains,
+                            "arcs_improvements": improvements}},
+         "criterion": "star"}
+    json.dump(j, open(f"{out}/star.json", "w"))
+    return f"{out}/star.json"
+
+
+# split_lagrange refusing the shape of the options
+SHAPE = ("is improved by options", "is entered by arcs improved by", "share no vertex")
 
 
 def run(binary, path, budget, config, out):
@@ -120,7 +158,7 @@ def main():
         sys.exit(__doc__)
     binary = os.path.abspath(sys.argv[1])
     configs = sys.argv[2:] or CONFIGS
-    failures, runs = [], 0
+    failures, runs, refused = [], 0, 0
     with tempfile.TemporaryDirectory() as out:
         cases, oracles = write_instances(out)
         for path, budgets in cases:
@@ -133,7 +171,8 @@ def main():
                     runs += 1
                     result, error = run(binary, path, b, config, out)
                     if config.startswith("bound "):
-                        if result is None and "split_lagrange: " in error:
+                        if result is None and any(m in error for m in SHAPE):
+                            refused += 1
                             print(f"  {config:42s} refused: {error[:80]}")
                             continue
                         ok = result is not None \
@@ -179,7 +218,7 @@ def main():
                           f"{'ok' if ok else 'FAIL'}")
                     if not ok:
                         failures.append(f"oracle {os.path.basename(path)} {b} {config}: {s1} != {s2}")
-    print(f"{runs} runs, {len(failures)} failures")
+    print(f"{runs} runs, {len(failures)} failures, {refused} bounds refused by the shape check")
     for f in failures:
         print("FAIL", f)
     sys.exit(1 if failures else 0)

@@ -780,6 +780,19 @@ GTEST_TEST(bounds, qkp_planes_drops_the_products_of_a_conflict_set) {
     EXPECT_GE(qkp(one), brute_force_optimum(one, 2) - 1e-9);
 }
 
+// two options that fit alone in both budgets, together in the area only
+GTEST_TEST(bounds, qkp_planes_takes_the_least_knapsack_of_the_dimensions) {
+    const case_spec site{
+        2, {{0, 1}}, {0.5}, {1, 1}, {1, 1}, {{{1, 1, 0}}, {{1, 1, 1}}}, {{}}};
+    const Instance instance = build_instance(
+        {"area", "money"}, {{1, 2}, {1, 2}}, {}, {site}, criterion_var{0});
+    auto qkp = [&](double money) {
+        return gecot::qkp_planes{}.bound(instance, {{2, money}}).bound;
+    };
+    EXPECT_LT(qkp(2), qkp(4));
+    EXPECT_GE(qkp(2), brute_force_optimum(instance, {{2, 2}}) - 1e-9);
+}
+
 GTEST_TEST(trivial_reformulation, keeps_free_options_that_exclude_others) {
     const Instance raw = three_woods_conflict();
     // buying the free plantation statically would give the infeasible

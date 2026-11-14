@@ -30,7 +30,7 @@ public:
 
     gecot::solve_result<Instance> solve(
         const Instance & instance, const gecot::budget_t & B) const override {
-        return {solver.solve(instance, B.front())};
+        return {solver.solve(instance, B)};
     };
 
     std::string description() const override {

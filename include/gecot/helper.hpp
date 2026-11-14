@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <condition_variable>
 #include <optional>
 #include <print>
@@ -162,15 +163,63 @@ bool is_feasible(const I & instance, const S & solution,
     });
 }
 
+// one cost dimension and no conflict set
+template <instance_c I>
+bool has_plain_budget(const I & instance) {
+    return instance.num_cost_dimensions() == 1 &&
+           std::ranges::empty(instance.conflict_sets());
+}
+
 // for the algorithms that read a single budget and no conflict set
 template <instance_c I>
 void check_plain_budget(const I & instance, const std::string & method) {
-    if(instance.num_cost_dimensions() != 1 ||
-       !std::ranges::empty(instance.conflict_sets()))
+    if(!has_plain_budget(instance))
         throw std::invalid_argument(
             method +
             ": conflict sets and several cost dimensions are not supported "
             "yet");
+}
+
+// the first cost dimension of positive budget, 0 if none: the unit of the
+// heuristics' costs
+inline std::size_t reference_dimension(const budget_t & budget) {
+    for(std::size_t r = 0; r < budget.size(); ++r)
+        if(budget[r] > 0) return r;
+    return 0;
+}
+
+// the cost that the heuristics divide a gain by: the sum over the dimensions
+// of the costs over their budgets, in the unit of the reference dimension, so
+// exactly the cost with a single dimension
+template <instance_c I>
+auto compute_heuristic_costs(const I & instance, const budget_t & budget) {
+    const std::size_t r0 = reference_dimension(budget);
+    auto costs = instance.create_option_map(0.0);
+    for(auto && o : instance.options()) {
+        costs[o] = instance.option_cost(o, r0);
+        for(std::size_t r = 0; r < budget.size(); ++r)
+            if(r != r0 && budget[r] > 0 && instance.option_cost(o, r) > 0)
+                costs[o] += instance.option_cost(o, r) / budget[r] * budget[r0];
+        if(!std::isfinite(costs[o]) ||
+           (costs[o] != 0 && !std::isnormal(costs[o])))
+            throw std::logic_error("the costs of option '" +
+                                   instance.option_name(o) +
+                                   "' are out of the range of the heuristics");
+    }
+    return costs;
+}
+
+// for each option, the indices of its conflict sets
+template <instance_c I>
+auto compute_options_conflict_sets(const I & instance) {
+    auto options_sets =
+        instance.template create_option_map<std::vector<std::size_t>>();
+    std::size_t l = 0;
+    for(auto && set : instance.conflict_sets()) {
+        for(auto && o : set) options_sets[o].push_back(l);
+        ++l;
+    }
+    return options_sets;
 }
 
 template <instance_c I, melon::mapping<option_t> S>

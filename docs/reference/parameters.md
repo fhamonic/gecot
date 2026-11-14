@@ -68,7 +68,7 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 | `--solver <name>` | `gurobi` | the solver, used through mippp. `flow_mip` and `path_lp`: `gurobi`, `cplex`, `copt`, `xpress`, `mosek`, `highs`, `scip`, `cbc`, `glpk`. `tree_lp`: the same without `glpk`. Benders decompositions: `gurobi`, `cplex`, `copt` |
 | `-t`, `--feasibility-tolerance <value>` | `1e-07` | the tolerance for rounding errors: the solver's feasibility tolerance, and the relative error accepted on a candidate of a Benders decomposition |
 | `--mip-start <file>` | | a solution file (JSON, as written by `-o`) to start the solver from. Excludes `--mip-start-algorithm` |
-| `--mip-start-algorithm <name>` | `none` | the heuristic whose solution starts the solver, run in its incremental form: `none`, `static`, `greedy`. Its time counts in `--time-limit`. Excludes `--mip-start`. Not on [every instance](../usage/choosing.md#conflict-sets-and-several-costs) yet |
+| `--mip-start-algorithm <name>` | `none` | the heuristic whose solution starts the solver, run in its incremental form: `none`, `static`, `greedy`. Its time counts in `--time-limit`. Excludes `--mip-start` |
 | `--time-limit <seconds>` | | after this time, the best solution found is returned |
 
 See [Optimizing](../usage/optimize.md#parameters-of-the-algorithms).
@@ -137,7 +137,7 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` and `tre
 | Parameter | Default | Meaning |
 |---|---|---|
 | `-t`, `--feasibility-tolerance <value>` | `1e-07` | the slack allowed when a cost is compared with the budget |
-| `--decremental` | off | starts from every option bought and removes options until the cost fits the budget, then buys back those that fit in the budget left |
+| `--decremental` | off | starts from every option bought and removes options until the cost fits the budget, then buys back those that fit in the budget left. With a single cost and no conflict set only |
 | `--only-dec` | off | with `--decremental`: skips these final purchases |
 | `--worst` | off | `greedy`, for comparison: the opposite choice at each step, which spends the budget while gaining as little as possible |
 

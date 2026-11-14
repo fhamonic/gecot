@@ -29,8 +29,9 @@ CONFIGS = [
     "multicut_benders", "multicut_benders --big-m tight", "multicut_benders --groups 0",
     "flow_benders", "flow_benders --big-m knapsack_dantzig", "flow_benders --nb-mus 3",
 ]
-# lower and upper bounds, not exact: only feasibility and the score are checked
-RELAXED = ("--lp-relaxation",)
+# not exact, the relaxations and the heuristics: only feasibility and the
+# score are checked
+RELAXED = ("--lp-relaxation", "static", "greedy")
 
 
 def write_instances(out):

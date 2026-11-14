@@ -85,7 +85,8 @@ The symbols of the [formulation pages](../formulations/problem.md), next to the 
 | Symbol | Meaning | In GECOT |
 |---|---|---|
 | $e_i$ | the scenario that buys the option $i$ alone | |
-| $\Delta^+_i(x)$, $\Delta^-_i(x)$ | gain and loss of the option $i$ per unit of cost, in the scenario $x$ | |
+| $\Delta^+_i(x)$, $\Delta^-_i(x)$ | gain and loss of the option $i$ per unit of cost, in the scenario $x$ (of $D_i$ with several costs) | |
+| $D_i$ ★ | the cost that the heuristics divide a gain by: $c_i$ with a single cost | |
 | $b$ | an upper bound on the score of the scenarios within the budget | field `bound`, line `Upper bound` |
 | $s_0$ | score with only the options bought statically: of cost 0 in every dimension, and in no conflict set with another affordable option | |
 | $H$, $l_i$, $Q_{ij}$ | constant, linear and quadratic terms of the bound of `qkp_planes` | |

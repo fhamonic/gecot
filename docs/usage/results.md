@@ -234,7 +234,7 @@ For `path_lp` and `tree_lp`, each row is a round of the column generation:
 | `-q` | errors only |
 | (default) | the steps of the run, the progress, the warnings |
 | `-v` | also the parameters of the algorithm with their values, the size of the instance after its reformulation, the factor by which the qualities are divided, a table of the preprocessing of each species, the size of the model; the progress table has a row every second or every round, and a `nodes` column |
-| `-vv` | also the details of each step, such as a table of the options that a heuristic buys or removes, and the solver's own log, which goes to the standard output |
+| `-vv` | also the details of each step, such as a table of the options that a heuristic buys or removes (a swap of `greedy` reads `a -> b`), and the solver's own log, which goes to the standard output |
 
 With `-v`, the line `Qualities scaled by 1/...` gives the factor of the [rescaling](../formulations/preprocessing.md#the-instance-given-to-the-algorithms): the solver's own log is in the rescaled unit, everything else in the unit of the instance.
 

@@ -18,7 +18,7 @@ The algorithms of GECOT differ in what they promise. Start from what you need:
 | `greedy` | a solution, without guarantee | for a quick solution, a MIP start, a very large landscape |
 | `static` | a solution, without guarantee | as the ranking method to compare with |
 | `tree_lp` | a relaxation, possibly over the budget | to study the tree relaxation |
-| `greedy --worst` | a deliberately bad solution | as a worst-case reference |
+| `greedy --worst` | a deliberately bad solution | as a worst-case reference, except with [conflict sets](../formulations/heuristics.md#conflict-sets-and-several-costs) |
 
 With [conflict sets](instance.md#conflict-sets) or [several costs](instance.md#several-costs), not every algorithm runs yet: see [below](#conflict-sets-and-several-costs).
 
@@ -72,14 +72,16 @@ Instances with [conflict sets](instance.md#conflict-sets) or [several costs](ins
 | | Supported |
 |---|---|
 | `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` | yes |
-| `static`, `greedy`, `path_lp` | not yet |
+| `static`, `greedy`, `greedy --worst` | yes, [with conflict rules](../formulations/heuristics.md#conflict-sets-and-several-costs) |
+| `static --decremental`, `greedy --decremental` | no |
+| `path_lp` | not yet |
 | `tree_lp` | no |
 | bounds `all_options`, `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` | yes |
 | bounds `qkp_planes`, `split_lagrange`, `path_lp` | not yet |
-| `--mip-start <file>` | yes |
-| `--mip-start-algorithm`, `--reformulation path_lp` | not yet |
+| `--mip-start <file>`, `--mip-start-algorithm` | yes |
+| `--reformulation path_lp` | not yet |
 
-The others stop with the error `conflict sets and several cost dimensions are not supported yet`. The check is made once the options over the budget are removed: with a single cost, a budget that leaves no conflict set with two affordable options runs with every algorithm. A starting solution can still be given with `--mip-start`.
+The others stop with the error `conflict sets and several cost dimensions are not supported yet`, and `--decremental` with its own error. The check is made once the options over the budget are removed: with a single cost, a budget that leaves no conflict set with two affordable options runs with every algorithm.
 
 ## What the solvers support
 

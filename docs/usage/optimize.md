@@ -29,7 +29,7 @@ $ gecot optimize --list-algorithms
 | `multiflow_benders` | [Benders decomposition](../formulations/benders.md#multiflow_benders-cuts-per-source) with cuts per source and target | optimal |
 | `path_lp` | the [path relaxation](../formulations/relaxations.md), by column generation | a solution and an upper bound |
 | `tree_lp` | the [tree relaxation](../formulations/relaxations.md#the-tree-formulation), by column generation | none: can exceed the budget |
-| `static`, `greedy` | the [heuristics](../formulations/heuristics.md), incremental or with `--decremental` | none |
+| `static`, `greedy` | the [heuristics](../formulations/heuristics.md), incremental or, with a single cost and no conflict set, with `--decremental` | none |
 
 [Choosing an algorithm](choosing.md) compares them. With [conflict sets or several costs](instance.md#conflict-sets), not every algorithm [runs yet](choosing.md#conflict-sets-and-several-costs).
 
@@ -81,7 +81,7 @@ Ctrl-C has the same effect as the time limit running out, at any moment: see [Re
 
 A solver searches faster from a good solution. Two parameters, which exclude each other, provide one:
 
-- `--mip-start-algorithm <heuristic>` runs `static` or `greedy` first, in its incremental form, and starts from its solution (not [on every instance](choosing.md#conflict-sets-and-several-costs) yet);
+- `--mip-start-algorithm <heuristic>` runs `static` or `greedy` first, in its incremental form, and starts from its solution;
 - `--mip-start <file>` starts from a solution file written by `-o`, for instance by a previous run with another algorithm or a smaller time limit. Its options that the instance does not have are ignored.
 
 ```console

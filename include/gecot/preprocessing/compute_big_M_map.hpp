@@ -1,8 +1,10 @@
 #ifndef GECOT_COMPUTE_BIG_M_MAP_HPP
 #define GECOT_COMPUTE_BIG_M_MAP_HPP
 
+#include <algorithm>
 #include <limits>
 #include <optional>
+#include <vector>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -65,7 +67,7 @@ auto compute_big_M_map(const GR & graph, const QM & source_quality_map,
 }
 
 template <instance_c I, typename GR, typename QM, typename VOM, typename PM>
-auto compute_knapsack_big_M_map(const I & instance, const double budget,
+auto compute_knapsack_big_M_map(const I & instance, const budget_t & budget,
                                 const bool dantzig_bound, const GR & graph,
                                 const QM & source_quality_map,
                                 const VOM & source_options_map,
@@ -88,9 +90,18 @@ auto compute_knapsack_big_M_map(const I & instance, const double budget,
                 reversed_graph, probability_map);
 
             auto option_gains = instance.template create_option_map<double>();
-            std::vector<double> gains, costs;
-            for(auto && o : instance.options())
-                costs.push_back(instance.option_cost(o));
+            auto dimension_gains =
+                instance.template create_option_map<double>();
+            std::vector<double> gains;
+            std::vector<std::vector<double>> costs(budget.size());
+            for(std::size_t r = 0; r < budget.size(); ++r)
+                for(auto && o : instance.options())
+                    costs[r].push_back(instance.option_cost(o, r));
+            auto fits = [&](const option_t o) {
+                for(std::size_t r = 0; r < budget.size(); ++r)
+                    if(costs[r][o] > budget[r]) return false;
+                return true;
+            };
 
             for(auto && s : vertices_subrange) {
                 double M = 0;
@@ -102,20 +113,38 @@ auto compute_knapsack_big_M_map(const I & instance, const double budget,
                         source_options_map[t])
                         option_gains[option] += t_prob * source_quality_gain;
                 }
-                if(dantzig_bound) {
-                    // the options that do not fit would enter as fractions
-                    gains.clear();
-                    for(auto && o : instance.options())
-                        gains.push_back(costs[o] <= budget ? option_gains[o]
-                                                           : 0.0);
-                    big_M_map[s] = M + lp_knapsack(gains, costs, budget);
-                    continue;
+                // each cost dimension alone is a relaxation, and so is
+                // ignoring the conflict sets: the least of the knapsacks
+                double knapsack_value = std::numeric_limits<double>::infinity();
+                for(std::size_t r = 0; r < budget.size(); ++r) {
+                    if(dantzig_bound) {
+                        // the options that do not fit would enter as fractions
+                        gains.clear();
+                        for(auto && o : instance.options())
+                            gains.push_back(fits(o) ? option_gains[o] : 0.0);
+                        knapsack_value =
+                            std::min(knapsack_value,
+                                     lp_knapsack(gains, costs[r], budget[r]));
+                        continue;
+                    }
+                    // the options free in r are in every solution: in the
+                    // branch and bound, they make it explode. Their gains are
+                    // zeroed, not their items removed, for the same order.
+                    double free_gains = 0.0;
+                    for(auto && o : instance.options()) {
+                        dimension_gains[o] = option_gains[o];
+                        if(costs[r][o] > 0) continue;
+                        free_gains += option_gains[o];
+                        dimension_gains[o] = 0.0;
+                    }
+                    melon::knapsack_bnb knapsack(
+                        instance.options(), dimension_gains,
+                        [&](auto && o) { return costs[r][o]; }, budget[r]);
+                    knapsack_value =
+                        std::min(knapsack_value,
+                                 free_gains + knapsack.run().solution_value());
                 }
-                melon::knapsack_bnb knapsack(
-                    instance.options(), option_gains,
-                    [&instance](auto && o) { return instance.option_cost(o); },
-                    budget);
-                big_M_map[s] = M + knapsack.run().solution_value();
+                big_M_map[s] = M + knapsack_value;
             }
         });
 

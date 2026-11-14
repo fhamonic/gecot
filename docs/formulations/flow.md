@@ -74,6 +74,8 @@ $$
 
 For a single case with $q = w$ and $\mathcal{C}(z) = z$, this is the formulation of BC-PC-Opt in the thesis. It has $|\Phi|$ binary variables and, for each case, about $|V_k| \cdot |\Psi_k|$ flow variables and $|V_k|^2$ flow constraints: its size is what limits it, and what the [preprocessing](preprocessing.md) attacks.
 
+With [several costs or conflict sets](problem.md#several-costs-and-conflict-sets), the budget row is written once per cost dimension $r$, as $\sum_{i \in \Phi} c_{i,r} \cdot x_i \le \beta_r$, and each conflict set $\Omega_l$ adds the row $\sum_{i \in \Omega_l} x_i \le 1$.
+
 ### Linearizing the criterion
 
 The objective $\mathcal{C}(z)$ is written with one variable $v$ per sub-formula of the criterion:
@@ -96,7 +98,7 @@ and the objective maximizes the variable of the whole formula. A product of two 
 
 `flow_mip` builds this program and hands it to a MILP solver through [mippp](https://github.com/fhamonic/mippp), with a few differences that do not change its optimum:
 
-- the instance is first [reformulated](preprocessing.md#the-instance-given-to-the-algorithms): options of cost $0$ are bought, options over the budget are removed, vertices linked by arcs of probability $1$ are merged, and qualities are rescaled;
+- the instance is first [reformulated](preprocessing.md#the-instance-given-to-the-algorithms): options of cost $0$ are bought unless a conflict set makes them a choice, options over the budget are removed, vertices linked by arcs of probability $1$ are merged, and qualities are rescaled;
 - the flows of a target $t$ live on its own reduced graph $G_t$, without the arcs that are useless for $t$ and with its strong arcs contracted, and vertices that can never be targets ($\overline{q}_t = 0$) have no flow at all;
 - the constants $M^t_u$ are computed on $G_t$ [within the budget](preprocessing.md#big-m-constants).
 

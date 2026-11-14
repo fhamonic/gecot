@@ -104,9 +104,14 @@ using gecot::criterion_var;
 
 class Instance {
 private:
+    std::vector<std::string> _cost_dimensions_names = {"cost"};
+    // the costs of option o in every dimension, from o * dimensions on
     std::vector<double> _options_costs;
     std::vector<std::string> _options_names;
     phmap::node_hash_map<std::string, gecot::option_t> _option_name_to_id_map;
+    // at most one option of each set is bought
+    std::vector<std::vector<gecot::option_t>> _conflict_sets;
+    std::vector<std::string> _conflict_sets_names;
 
     std::vector<InstanceCase> _cases;
     criterion_formula _criterion;
@@ -114,7 +119,14 @@ private:
 public:
     [[nodiscard]] std::ranges::iota_view<gecot::option_t, gecot::option_t>
     options() const noexcept;
+    // throws if the instance has several cost dimensions
     [[nodiscard]] double option_cost(gecot::option_t o) const;
+    [[nodiscard]] double option_cost(gecot::option_t o, std::size_t r) const;
+    [[nodiscard]] std::size_t num_cost_dimensions() const noexcept;
+    [[nodiscard]] const std::string & cost_dimension_name(std::size_t r) const;
+    [[nodiscard]] const std::vector<std::vector<gecot::option_t>> &
+    conflict_sets() const noexcept;
+    [[nodiscard]] const std::string & conflict_set_name(std::size_t l) const;
     template <typename V>
     [[nodiscard]] auto create_option_map() const {
         return melon::static_map<gecot::option_t, V>(num_options());
@@ -144,10 +156,14 @@ public:
     Instance() = default;
 
     [[nodiscard]] std::size_t num_options() const noexcept;
-    gecot::option_t add_option(std::string identifier, double c) noexcept;
+    // before any option is added
+    void set_cost_dimensions(std::vector<std::string> names);
+    gecot::option_t add_option(std::string identifier,
+                               const std::vector<double> & costs);
+    void add_conflict_set(std::string name,
+                          std::vector<gecot::option_t> options);
     bool contains_option(gecot::option_t i) const noexcept;
     bool contains_option(std::string identifier) const noexcept;
-    void set_option_cost(gecot::option_t i, double cost) noexcept;
     const std::string & option_name(gecot::option_t i) const noexcept;
     gecot::option_t option_from_name(const std::string & name) const;
     template <class... T>

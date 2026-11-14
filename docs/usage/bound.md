@@ -18,7 +18,7 @@ The arguments are those of [`gecot optimize`](optimize.md), with a method in pla
 | `path_lp` | the Lagrangian bound of the path relaxation | a linear solver |
 | `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` | the bound proved by the exact algorithm | a MILP solver; the optimum when the status is `optimal` |
 
-The [bounds page](../formulations/bounds.md) explains what each one computes. Every method needs a criterion that is non-decreasing in the score of every case and refuses the others; see the [instance files](instance.md#criterion).
+The [bounds page](../formulations/bounds.md) explains what each one computes. Every method needs a criterion that is non-decreasing in the score of every case and refuses the others; see the [instance files](instance.md#criterion). Every method accepts [conflict sets](instance.md#conflict-sets) and [several costs](instance.md#several-costs).
 
 ## Reading the result
 
@@ -38,9 +38,9 @@ Time               3.4 s
 | `Initial score` | the score of the landscape as it is |
 | `Upper bound` | no solution within the budget scores more; in parentheses, the largest possible gain over the initial score |
 | `All options bound` | the score with every option bought, as a reference |
-| `Budget`, `Time` | the budget and the time of the method |
+| `Budget`, `Time` | the budget and the time of the method; with [several costs](instance.md#several-costs), a `Budget` line per dimension, as `Budget money       5` |
 
-The solutions that the bound covers are those of `gecot optimize`: the options of cost 0 are always bought.
+The solutions that the bound covers are those of `gecot optimize`: the options of cost 0 are always bought, unless a [conflict set](instance.md#conflict-sets) makes them a choice.
 
 `-o <file>` writes the result as JSON instead:
 
@@ -82,7 +82,7 @@ The solutions that the bound covers are those of `gecot optimize`: the options o
 }
 ```
 
-`method_parameters` holds the parameters of the method with the values used, as [`algorithm_parameters`](results.md#json) does for an algorithm. The `method_report` of a method that is an algorithm is the [report of this algorithm](results.md#json), plus `solution_score`, the score of the solution that the algorithm found on the way.
+`method_parameters` holds the parameters of the method with the values used, as [`algorithm_parameters`](results.md#json) does for an algorithm. The `method_report` of a method that is an algorithm is the [report of this algorithm](results.md#json), plus `solution_score`, the score of the solution that the algorithm found on the way. With [several costs](instance.md#several-costs), `budget` is an object with a number per dimension, as `{"area": 4, "money": 5}`.
 
 ## Certifying a solution
 

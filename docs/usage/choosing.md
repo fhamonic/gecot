@@ -18,7 +18,9 @@ The algorithms of GECOT differ in what they promise. Start from what you need:
 | `greedy` | a solution, without guarantee | for a quick solution, a MIP start, a very large landscape |
 | `static` | a solution, without guarantee | as the ranking method to compare with |
 | `tree_lp` | a relaxation, possibly over the budget | to study the tree relaxation |
-| `greedy --worst` | a deliberately bad solution | as a worst-case reference |
+| `greedy --worst` | a deliberately bad solution | as a worst-case reference, except with [conflict sets](../formulations/heuristics.md#conflict-sets-and-several-costs) |
+
+With [conflict sets](instance.md#conflict-sets) or [several costs](instance.md#several-costs), not every algorithm runs yet: see [below](#conflict-sets-and-several-costs).
 
 "Exact" always means up to the [tolerances](../formulations/flow.md#what-flow_mip-solves) of the solver and the [resolution](../formulations/preprocessing.md#resolution) of the preprocessing. Under `--time-limit` or after Ctrl-C, the exact algorithms return their best solution with the bound proved so far.
 
@@ -62,6 +64,22 @@ The result is at least as good as the heuristic's and comes with a guaranteed sh
 **Several species with a minimum criterion.** Prefer an exact algorithm. A heuristic ranks the options by the gain of the criterion, and with a minimum only the options that help the worst-off case have any: its choices among the others are arbitrary.
 
 **You compare with a ranking method.** `static` is the ranking of the options by their individual gain, `greedy` its iterated version, and the gap to the optimum measures what the interactions between the options are worth on your landscape.
+
+## Conflict sets and several costs
+
+Instances with [conflict sets](instance.md#conflict-sets) or [several costs](instance.md#several-costs), and what they [can express](modeling.md), are supported by every algorithm but `tree_lp` and the decremental heuristics:
+
+| | Supported |
+|---|---|
+| `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders`, `path_lp` | yes |
+| `static`, `greedy`, `greedy --worst` | yes, [with conflict rules](../formulations/heuristics.md#conflict-sets-and-several-costs) |
+| `static --decremental`, `greedy --decremental` | no |
+| `tree_lp` | no |
+| every bound of `gecot bound` | yes |
+| `--mip-start <file>`, `--mip-start-algorithm` | yes |
+| `--reformulation path_lp` | yes |
+
+`tree_lp` stops with the error `conflict sets and several cost dimensions are not supported yet`, and `--decremental` with its own error. The check is made once the options over the budget are removed: with a single cost, a budget that leaves no conflict set with two affordable options runs with every algorithm.
 
 ## What the solvers support
 

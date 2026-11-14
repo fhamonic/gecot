@@ -59,7 +59,7 @@ Usage:
 POSITIONALS:
   algorithm TEXT              Algorithm to use
   instance TEXT               Instance JSON file
-  budget FLOAT                Budget value
+  budget BUDGET               Budget value, or name=value,... for options of several costs
 
 OPTIONS:
   -h,     --help              Display this help message
@@ -67,14 +67,15 @@ OPTIONS:
   -P,     --list-params       List the parameters of the chosen algorithm
   -a,     --algorithm TEXT    Algorithm to use
   -i,     --instance TEXT     Instance JSON file
-  -B,     --budget FLOAT      Budget value
+  -B,     --budget BUDGET     Budget value, or name=value,... for options of several costs
   -o,     --output-json TEXT  Output solution data in JSON file
           --output-csv TEXT   Output solution value in CSV file
           --reformulation TEXT:{trivial,path_lp} [trivial]
-                              Instance given to the algorithm, trivial: without the options of
-                              cost 0, bought, or over the budget; path_lp: also without the
-                              options that the path relaxation proves to be in no better
-                              solution than its own
+                              Instance given to the algorithm, trivial: without the options
+                              over the budget, and those of cost 0, bought unless a conflict
+                              set makes them a choice; path_lp: also without the options that
+                              the path relaxation proves to be in no better solution than its
+                              own
           --reformulation-params TEXT
                               Parameters of the path_lp of --reformulation path_lp, as
                               "time-limit=60 pricing=enumerate"; its MIP start is greedy's
@@ -88,7 +89,7 @@ OPTIONS:
                               Limits the number of threads used
 ```
 
-`gecot bound` computes an upper bound on the scores `gecot optimize` can reach within the budget, the options of cost 0 being always bought, which certifies how far a solution is from the optimum:
+`gecot bound` computes an upper bound on the scores `gecot optimize` can reach within the budget, the options of cost 0 being always bought unless a conflict set makes them a choice, which certifies how far a solution is from the optimum:
 
 ```
 $ gecot bound --help
@@ -105,7 +106,7 @@ Usage:
 POSITIONALS:
   method TEXT                 Bound method to use
   instance TEXT               Instance JSON file
-  budget FLOAT                Budget value
+  budget BUDGET               Budget value, or name=value,... for options of several costs
 
 OPTIONS:
   -h,     --help              Display this help message
@@ -113,7 +114,7 @@ OPTIONS:
   -P,     --list-params       List the parameters of the chosen method
           --method TEXT       Bound method to use
   -i,     --instance TEXT     Instance JSON file
-  -B,     --budget FLOAT      Budget value
+  -B,     --budget BUDGET     Budget value, or name=value,... for options of several costs
   -o,     --output-json TEXT  Output bound data in JSON file
   -v,     --verbose [0]       Log the methods' details, -vv everything with the solver's own
                               log on stdout

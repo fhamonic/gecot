@@ -25,8 +25,8 @@ public:
             ->needs(decremental);
     }
 
-    gecot::solve_result<Instance> solve(const Instance & instance,
-                                        const double B) const override {
+    gecot::solve_result<Instance> solve(
+        const Instance & instance, const gecot::budget_t & B) const override {
         return {solver.solve(instance, B)};
     };
 

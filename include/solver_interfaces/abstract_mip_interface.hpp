@@ -105,7 +105,7 @@ protected:
     // solver with the solution of --mip-start-algorithm as its MIP start
     template <typename S>
     S with_mip_start(S solver, const Instance & instance,
-                     const double B) const {
+                     const gecot::budget_t & B) const {
         if(mip_start_algorithm == "none") return solver;
         spdlog::info("Computing the MIP start with {}", mip_start_algorithm);
         const spdlog::stopwatch sw;

@@ -33,8 +33,8 @@ namespace solvers {
 
 // Benders decomposition with a flow per source and target.
 //
-// Buying the options X within the budget, c(X) <= B, the quality that
-// reaches a target t is
+// Buying the options X within the budgets and the conflict sets, the quality
+// that reaches a target t is
 //     F_t(X) = q_t(X) + Σ_{s≠t} q_s(X) P_st(X),
 // the source qualities with their gains, each times the probability of its
 // most reliable path to t; t scores (tq_t + Σ_{o∈X} Δtq_to) F_t(X) and the
@@ -63,7 +63,7 @@ namespace solvers {
 //     s.t. z_k <= Σ_{t∈k} (tq_t F_t + Σ_o Δtq_to F'_to)
 //          F'_to <= F_t,  F'_to <= M_t x_o
 //          F_t <= cut_ρ(x)               for each ρ separated
-//          Σ_o c_o x_o <= B,  x binary
+//          Σ_o c_{o,r} x_o <= B_r,  Σ_{o∈S} x_o <= 1,  x binary
 //
 // The cut of a point x̄, fractional or not, takes for each source the ρ of
 // its largest flow at x̄. It is separated first on the linear relaxation,
@@ -342,16 +342,16 @@ struct multiflow_benders : public mip_solver_base {
     };
 
     template <lazy_constraint_model M, instance_c I>
-    solve_result<I> solve(const I & instance, const double budget) const {
+    solve_result<I> solve(const I & instance, const budget_t & budget) const {
         using namespace mippp;
         using namespace mippp::operators;
         using cut = target_block::cut;
         _check_criterion(instance);
         spdlog::stopwatch sw;
 
-        // The master: z with the criterion, x with the budget row, and for
-        // each target its block, F_t and its F'_to, in the order of the
-        // block's target quality gains.
+        // The master: z with the criterion, x with the budget and conflict
+        // rows, and for each target its block, F_t and its F'_to, in the
+        // order of the block's target quality gains.
         M model;
         model.set_optimality_tolerance(1e-10);
         model.set_feasibility_tolerance(feasibility_tol);
@@ -362,9 +362,7 @@ struct multiflow_benders : public mip_solver_base {
         model.set_objective(formula.variable(instance.criterion()));
         const auto x = model.add_binary_variables(
             instance.options().size(), [](const option_t & o) { return o; });
-        model.add_constraint(xsum(instance.options(), [&](auto && o) {
-                                 return instance.option_cost(o) * x(o);
-                             }) <= budget);
+        _add_budget_rows(model, instance, budget, x);
 
         std::vector<target_block> blocks;
         std::vector<model_variable_t<M>> F, F_prime;

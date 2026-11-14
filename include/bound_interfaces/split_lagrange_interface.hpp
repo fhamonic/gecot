@@ -42,7 +42,8 @@ public:
             ->default_val("best");
     }
 
-    gecot::bound_report compute(const Instance & instance, const double B,
+    gecot::bound_report compute(const Instance & instance,
+                                const gecot::budget_t & B,
                                 const bound_context & context) const override {
         gecot::split_lagrange m = method;
         if(target) m.target = target.value() / context.score_scale;

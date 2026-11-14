@@ -89,7 +89,7 @@ public:
 // improvement is an arc of its own, of base probability 0
 template <instance_c I, case_c C>
 contracted_graph_data<C> compute_contracted_graph_data(
-    const I & instance, const C & instance_case, const double budget,
+    const I & instance, const C & instance_case, const budget_t & budget,
     const auto & original_t, const auto & strong_arcs,
     const auto & useless_arcs, const big_M_kind big_Ms, const double tolerance,
     const bool pruning) {
@@ -157,7 +157,7 @@ contracted_graph_data<C> compute_contracted_graph_data(
     {
         const auto [tight_arc_big_M_map, tight_target_big_M] =
             compute_tight_big_M_maps(
-                instance, budget, tolerance, graph, source_quality_map,
+                instance, budget[0], tolerance, graph, source_quality_map,
                 source_options_map, base_probability_map, arc_options_map, t,
                 std::views::transform(
                     original_vertex_options_map[original_t],

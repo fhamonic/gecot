@@ -59,8 +59,8 @@ struct split_lagrange {
     std::optional<double> target;
     qkp_planes vertex_side;
 
-    // On each case, the improved arcs (by an option of cost at most budget)
-    // must satisfy:
+    // On each case, the improved arcs (by an option that fits alone in the
+    // budget) must satisfy:
     //  R1: an arc is improved by at most one option;
     //  R2: the improved arcs of an option share a vertex, so a simple path
     //      uses them consecutively and pays the option once;
@@ -70,7 +70,7 @@ struct split_lagrange {
     // only the cases of positive weight are checked: the others are not
     // priced.
     template <instance_c I>
-    static void check_structure(const I & instance, const double budget,
+    static void check_structure(const I & instance, const budget_t & budget,
                                 std::span<const double> case_weights = {}) {
         constexpr option_t no_option = std::numeric_limits<option_t>::max();
         for(auto && instance_case : instance.cases()) {
@@ -88,7 +88,7 @@ struct split_lagrange {
                 for(auto && [improved_probability, option] :
                     arc_options_map[a]) {
                     if(!(improved_probability > probability_map[a]) ||
-                       instance.option_cost(option) > budget)
+                       !fits_alone(instance, option, budget))
                         continue;
                     if(arc_option != no_option && arc_option != option)
                         throw std::invalid_argument(std::format(
@@ -331,7 +331,7 @@ public:
 
     template <instance_c I>
     weighted_result weighted(
-        const I & instance, const double budget,
+        const I & instance, const budget_t & budget,
         std::span<const double> case_weights,
         std::optional<double> weighted_target = std::nullopt) const {
         check_structure(instance, budget, case_weights);
@@ -342,8 +342,12 @@ public:
                 .count();
         };
         const std::size_t num_options = std::ranges::size(instance.options());
-        std::vector<double> costs(num_options);
-        for(auto && o : instance.options()) costs[o] = instance.option_cost(o);
+        // per dimension
+        std::vector<std::vector<double>> costs(
+            budget.size(), std::vector<double>(num_options));
+        for(std::size_t r = 0; r < budget.size(); ++r)
+            for(auto && o : instance.options())
+                costs[r][o] = instance.option_cost(o, r);
 
         const auto vertex_bounds =
             vertex_side.weighted(instance, budget, case_weights);
@@ -433,11 +437,17 @@ public:
             values = vertex_bounds.option_bounds;
             for(std::size_t e = 0; e < num_entries; ++e)
                 values[corridors[e]] += nu[e];
-            const double outer = lp_knapsack(values, costs, budget, x);
+            const double outer = lp_knapsack(values, costs, budget.values, x);
             if(!aim) {
-                // a solution within the budget: below the bound's minimum
+                // a solution within the budget: below the bound's minimum. x
+                // fits the dimension of the least knapsack only.
                 auto solution = instance.template create_option_map<bool>();
-                for(auto && o : instance.options()) solution[o] = (x[o] == 1.0);
+                for(auto && o : instance.options()) {
+                    solution[o] = (x[o] == 1.0);
+                    if(solution[o] && !has_plain_budget(instance) &&
+                       !is_feasible(instance, solution, budget, 0.0))
+                        solution[o] = false;
+                }
                 aim = weighted_score(instance, solution, case_weights);
                 spdlog::trace("split_lagrange: steps aim at {}", aim.value());
             }
@@ -531,7 +541,7 @@ public:
     // prices nu of the options, by the label search: for the tests
     template <instance_c I, case_c C>
     static double pair_value(const I & instance, const C & instance_case,
-                             const double budget, const std::uint32_t s,
+                             const budget_t & budget, const std::uint32_t s,
                              const std::uint32_t t,
                              std::span<const double> nu) {
         const case_data c =
@@ -552,7 +562,7 @@ public:
     }
 
     template <instance_c I>
-    bound_report bound(const I & instance, const double budget) const {
+    bound_report bound(const I & instance, const budget_t & budget) const {
         std::optional<double> weighted_target;
         bool linear = false;
         if(const auto form = linear_form(instance.criterion(),
@@ -588,7 +598,8 @@ public:
 private:
     template <instance_c I, case_c C>
     static case_data make_case_data(const I & instance, const C & instance_case,
-                                    const double budget, const double weight) {
+                                    const budget_t & budget,
+                                    const double weight) {
         const auto & graph = instance_case.graph();
         const auto & probability_map = instance_case.arc_probability_map();
         const auto & arc_options_map = instance_case.arc_options_map();
@@ -605,7 +616,7 @@ private:
             double improved = probability_map[a];
             for(auto && [improved_probability, o] : arc_options_map[a])
                 if(improved_probability > probability_map[a] &&
-                   instance.option_cost(o) <= budget) {
+                   fits_alone(instance, o, budget)) {
                     option = o;
                     improved = std::max(improved, improved_probability);
                 }

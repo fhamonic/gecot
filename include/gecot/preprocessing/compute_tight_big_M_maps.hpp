@@ -51,6 +51,9 @@ namespace gecot {
 // free. So P_wu(x) <= e^{λ B'} P_λ(w, u), the most reliable path where each
 // improvement's probability is tolled by e^{-λ c_o' s_o'}; λ = 0 gives P̄_wu,
 // and the bound takes the least over a few λ.
+//
+// The costs and the budget are those of the cost dimension 0: dropping the
+// other dimensions and the conflict sets relaxes the problem.
 template <instance_c I, typename GR, typename QM, typename SOM, typename BPM,
           typename IM>
 auto compute_tight_big_M_maps(const I & instance, const double budget,
@@ -75,7 +78,7 @@ auto compute_tight_big_M_maps(const I & instance, const double budget,
     for(auto && a : melon::arcs(graph)) {
         improved_probability_map[a] = base_probability_map[a];
         for(auto && [p, o] : improvements_map[a]) {
-            if(instance.option_cost(o) > budget) continue;
+            if(instance.option_cost(o, 0) > budget) continue;
             option_arcs_of[o].push_back(a);
             improved_probability_map[a] =
                 std::max(improved_probability_map[a], p);
@@ -120,12 +123,12 @@ auto compute_tight_big_M_maps(const I & instance, const double budget,
             if(sc.lambda == 0.0) return improved_probability_map[e];
             double p = base_probability_map[e];
             for(auto && [ip, o] : improvements_map[e]) {
-                if(instance.option_cost(o) > budget) continue;
-                p = std::max(
-                    p, o == sc.free_option
-                           ? ip
-                           : ip * std::exp(-sc.lambda *
-                                           instance.option_cost(o) * share[o]));
+                if(instance.option_cost(o, 0) > budget) continue;
+                p = std::max(p, o == sc.free_option
+                                    ? ip
+                                    : ip * std::exp(-sc.lambda *
+                                                    instance.option_cost(o, 0) *
+                                                    share[o]));
             }
             return p;
         });
@@ -141,7 +144,7 @@ auto compute_tight_big_M_maps(const I & instance, const double budget,
                             const vertex_t from, const option_t o, auto && keep,
                             std::vector<std::pair<vertex_t, double>> & reach) {
         const double left =
-            std::max(0.0, budget - instance.option_cost(o) + tolerance);
+            std::max(0.0, budget - instance.option_cost(o, 0) + tolerance);
         sc.free_option = o;
         if(sc.best.size() < vertex_id_bound)
             sc.best.assign(vertex_id_bound, 0.0);
@@ -183,15 +186,21 @@ auto compute_tight_big_M_maps(const I & instance, const double budget,
             }
         }
         std::vector<option_t> items;
-        for(auto && option : instance.options())
-            if(option_gains[option] > 0) items.push_back(option);
+        for(auto && option : instance.options()) {
+            if(!(option_gains[option] > 0)) continue;
+            // in every solution: in the branch and bound, they make it explode
+            if(instance.option_cost(option, 0) == 0)
+                M += option_gains[option];
+            else
+                items.push_back(option);
+        }
         if(!items.empty()) {
             melon::knapsack_bnb knapsack(
                 items, option_gains,
                 [&instance](auto && option) {
-                    return instance.option_cost(option);
+                    return instance.option_cost(option, 0);
                 },
-                budget - instance.option_cost(o) + tolerance);
+                budget - instance.option_cost(o, 0) + tolerance);
             M += knapsack.run().solution_value();
         }
         return M;

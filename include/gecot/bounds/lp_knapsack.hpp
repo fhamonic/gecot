@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
+#include <limits>
 #include <span>
 #include <vector>
 
@@ -41,6 +42,26 @@ inline double lp_knapsack(std::span<const double> values,
             if(!x.empty()) x[i] = fraction;
         }
         break;
+    }
+    return value;
+}
+
+// The least over the dimensions r of the above with costs[r] and
+// capacities[r], each a relaxation of the knapsack of every dimension. x, if
+// given, receives the solution of the least.
+inline double lp_knapsack(std::span<const double> values,
+                          const std::vector<std::vector<double>> & costs,
+                          std::span<const double> capacities,
+                          std::span<double> x = {}) {
+    assert(costs.size() == capacities.size());
+    double value = std::numeric_limits<double>::infinity();
+    std::vector<double> x_r(x.size());
+    for(std::size_t r = 0; r < costs.size(); ++r) {
+        const double v = lp_knapsack(values, costs[r], capacities[r], x_r);
+        if(v < value) {
+            value = v;
+            std::ranges::copy(x_r, x.begin());
+        }
     }
     return value;
 }

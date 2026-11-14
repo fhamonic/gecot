@@ -2,6 +2,8 @@
 
 The heuristics build a solution by ranking the options by what they gain per unit of cost. They need no solver, evaluate any criterion, and run on landscapes that no exact algorithm can handle, but they give **no guarantee**: their solution can be far from the optimum, and nothing in their output tells how far. A [bound](bounds.md) tells it afterwards.
 
+Their incremental direction handles [conflict sets and several costs](#conflict-sets-and-several-costs); `--decremental` does not.
+
 ## Gain and loss of an option
 
 Let $\mathcal{C}(x)$ be the score of a scenario $x$, and $e_i$ the scenario that buys the option $i$ alone. In a scenario $x$ that does not buy $i$, the *gain* of $i$ per unit of cost is
@@ -60,13 +62,32 @@ so the incremental direction buys `plantation` first, after which nothing fits, 
 
 `greedy` is often close, as here in both directions, and sometimes far: Hamonic et al. (2023) compare it with the optimum on real landscapes. A cheap way to use it safely is to pass its solution to an exact algorithm, with `--mip-start-algorithm greedy`: the exact algorithm starts from it and, if it runs out of time, returns the best solution it has with a proven bound.
 
+## Conflict sets and several costs
+
+On an instance with [conflict sets](../usage/instance.md#conflict-sets) or [several costs](../usage/instance.md#several-costs), the incremental `static` and `greedy` change in four ways.
+
+- **The cost of an option** that divides its gain is
+  $$
+  D_i = \beta_{r_0} \sum_{r \in R,\ \beta_r > 0} \frac{c_{i,r}}{\beta_r}\,,
+  $$
+  its costs relative to their budgets, in the unit of $r_0$, the first dimension of positive budget. With a single cost, $D_i = c_i$. An option fits when it fits in what is left of every budget.
+- **Conflicts.** Once an option is bought, the other options of its conflict sets are no longer candidates.
+- **Free options.** An option of cost 0 in a conflict set, which stays a choice, comes before every paid option if it gains something, after them if it loses, and otherwise counts as a gain of 0.
+- **Swaps.** When nothing fits any more, `greedy` swaps a bought option for another of its conflict sets, the best swap that fits and scores more, then buys again what fits, and so on until no swap scores more. `static` and `greedy --worst` make no swap.
+
+On [`three-woods-works.json`](../examples/three-woods-works.json) at a budget of 7, both heuristics buy the free `wood_c_intact` first, then the hedgerow and the plantation (28.76). `static` stops there. `greedy` then swaps `wood_c_intact` for the underpass and reaches the optimum, 31.36.
+
+The swaps change one option at a time. An option in a conflict set with each of two bought options is never reached: with [harms of different extents](../usage/modeling.md#actions-that-harm-the-landscape), the heuristics keep both layers of the wood and never buy the action that destroys them. `greedy --worst` is not a lower reference either: on the conflicts instance of the repository, `test/instances/conflicts`, it scores 28.76 at `money=7,area=5`, more than `greedy` (25.6), which the swaps do not get out of.
+
+`--decremental` starts from every option bought, which buys every conflict set twice over, and does not handle these instances: it stops with the error `greedy --decremental: conflict sets and several cost dimensions are not supported, run greedy without --decremental`, and the same for `static`. The check is made on the instance once the options over the budget are removed, so a budget that leaves no conflict set with two affordable options still runs.
+
 ## Worst cases
 
 `greedy --worst` is the mirror image of the greedy heuristic: it buys at each step the option of *smallest* gain and, with `--decremental`, removes at each step the option of *largest* loss. It spends the budget while gaining as little as possible, and serves as a reference: the gap between its score and the optimum is the range within which the choice of the options matters.
 
 ## Parameters
 
-The heuristics take `-t`, the tolerance used when comparing a cost with the budget ($10^{-7}$ by default), `--decremental` and, with it, `--only-dec`; `greedy` also takes `--worst`. They always end with the status `completed`: Ctrl-C does not interrupt them.
+The heuristics take `-t`, the tolerance used when comparing a cost with the budget ($10^{-7}$ by default, in every dimension), `--decremental` and, with it, `--only-dec`, both with a single cost and no conflict set; `greedy` also takes `--worst`. They always end with the status `completed`: Ctrl-C does not interrupt them.
 
 ## Reference
 

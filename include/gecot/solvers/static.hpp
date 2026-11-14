@@ -2,6 +2,7 @@
 #define GECOT_SOLVERS_STATIC_HPP
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <ranges>
 #include <vector>
@@ -18,21 +19,33 @@ namespace solvers {
 struct Static {
     double feasibility_tol = 0.0;
     // every option within the budget is bought first, then the worst ones
-    // are removed until the budget is met
+    // are removed until the budget is met; with a single cost and no
+    // conflict set
     bool decremental = false;
     bool only_dec = false;  // decremental, without the final purchases
 
     template <instance_c I>
     instance_solution_t<I> solve(const I & instance,
-                                 const double budget) const {
+                                 const budget_t & budget) const {
+        if(decremental && !has_plain_budget(instance))
+            throw std::invalid_argument(
+                "static --decremental: conflict sets and several cost "
+                "dimensions are not supported, run static without "
+                "--decremental");
         auto solution = instance.create_option_map(false);
 
         const auto & cases = instance.cases();
         std::vector<option_t> options, free_options;
         double purchased = 0.0;
+        const auto fits_alone = [&](const option_t & option) {
+            for(std::size_t r = 0; r < budget.size(); ++r)
+                if(instance.option_cost(option, r) >
+                   budget[r] + feasibility_tol)
+                    return false;
+            return true;
+        };
         for(const option_t & option : instance.options()) {
-            if(instance.option_cost(option) > budget + feasibility_tol)
-                continue;
+            if(!fits_alone(option)) continue;
             if(!decremental) {
                 free_options.emplace_back(option);
                 continue;
@@ -106,7 +119,7 @@ struct Static {
                 });
 
             for(auto && option : options) {
-                if(purchased <= budget + feasibility_tol) break;
+                if(purchased <= budget.front() + feasibility_tol) break;
                 const double price = instance.option_cost(option);
                 purchased -= price;
                 solution[option] = false;
@@ -117,12 +130,18 @@ struct Static {
             if(only_dec) return solution;
         }
 
-        if(std::ranges::any_of(
-               free_options,
-               [&instance, budget_left = budget - purchased +
-                                         feasibility_tol](const option_t & o) {
-                   return instance.option_cost(o) <= budget_left;
-               })) {
+        // the cost spent in each dimension
+        std::vector<double> spent;
+        for(std::size_t r = 0; r < budget.size(); ++r)
+            spent.push_back(r == 0 ? purchased : 0.0);
+        const auto fits = [&](const option_t & o) {
+            for(std::size_t r = 0; r < budget.size(); ++r)
+                if(!(instance.option_cost(o, r) <=
+                     budget[r] - spent[r] + feasibility_tol))
+                    return false;
+            return true;
+        };
+        if(std::ranges::any_of(free_options, fits)) {
             log_table<spdlog::level::trace, 50, 40, 12, 11> added(
                 {"added option id"},
                 {"gain/cost ratio", log_format::scientific(5)},
@@ -157,24 +176,54 @@ struct Static {
                 cases_current_pm, cases_vertex_options, cases_arc_options,
                 options_cases_pc_num);
 
+            // divides the gains: the cost with a single dimension
+            const auto costs = compute_heuristic_costs(instance, budget);
+            const std::size_t r0 = reference_dimension(budget);
             for(const option_t & option : free_options) {
+                const double gain =
+                    instance.eval_criterion(options_cases_pc_num[option]) -
+                    decremental_score;
                 options_ratios[option] =
-                    (instance.eval_criterion(options_cases_pc_num[option]) -
-                     decremental_score) /
-                    instance.option_cost(option);
+                    costs[option] == 0 ? gain : gain / costs[option];
             }
-            std::ranges::sort(
-                free_options, [&options_ratios](auto && o1, auto && o2) {
-                    return options_ratios[o1] > options_ratios[o2];
-                });
+            // a free option, whose ratio would be infinite or undefined,
+            // comes first if it gains, last if it loses, and otherwise
+            // counts as a gain of 0
+            const auto tier = [&](const option_t & o) {
+                if(costs[o] != 0) return 0;
+                const double eps = 1e-12 * std::abs(decremental_score);
+                return (options_ratios[o] > eps) - (options_ratios[o] < -eps);
+            };
+            const auto key = [&](const option_t & o) {
+                return costs[o] == 0 && tier(o) == 0 ? 0.0 : options_ratios[o];
+            };
+            std::ranges::sort(free_options, [&](auto && o1, auto && o2) {
+                const int t1 = tier(o1), t2 = tier(o2);
+                return t1 != t2 ? t1 > t2 : key(o1) > key(o2);
+            });
 
+            const auto options_sets = compute_options_conflict_sets(instance);
+            // a conflict set of the option holds a bought option
+            const auto blocked = [&](const option_t & option) {
+                return std::ranges::any_of(
+                    options_sets[option], [&](auto && l) {
+                        return std::ranges::any_of(
+                            instance.conflict_sets()[l], [&](auto && other) {
+                                return other != option && solution[other];
+                            });
+                    });
+            };
             for(const option_t & option : free_options) {
-                const double price = instance.option_cost(option);
-                if(purchased + price > budget + feasibility_tol) continue;
-                purchased += price;
+                bool over = false;
+                for(std::size_t r = 0; r < budget.size(); ++r)
+                    over = over || spent[r] + instance.option_cost(option, r) >
+                                       budget[r] + feasibility_tol;
+                if(over || blocked(option)) continue;
+                for(std::size_t r = 0; r < budget.size(); ++r)
+                    spent[r] += instance.option_cost(option, r);
                 solution[option] = true;
                 added.row(instance.option_name(option), options_ratios[option],
-                          budget - purchased);
+                          budget[r0] - spent[r0]);
             }
         }
 

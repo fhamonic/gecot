@@ -1,3 +1,10 @@
+#include <algorithm>
+#include <cctype>
+#include <cmath>
+#include <cstdlib>
+#include <ranges>
+#include <string_view>
+
 #include "parse_instance.hpp"
 
 static const nlohmann::json instance_schema = R"(
@@ -20,7 +27,21 @@ static const nlohmann::json instance_schema = R"(
                                     "type": "string"
                                 },
                                 "cost": {
-                                    "type": "string"
+                                    "oneOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "propertyNames": {
+                                                "pattern": "^[^=,]+$"
+                                            },
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            },
+                                            "minProperties": 1
+                                        }
+                                    ]
                                 }
                             },
                             "additionalProperties": false
@@ -40,13 +61,74 @@ static const nlohmann::json instance_schema = R"(
                                 "type": "string"
                             },
                             "cost": {
-                                "type": "number",
-                                "minimum": 0
+                                "oneOf": [
+                                    {
+                                        "type": "number",
+                                        "minimum": 0
+                                    },
+                                    {
+                                        "type": "object",
+                                        "propertyNames": {
+                                            "pattern": "^[^=,]+$"
+                                        },
+                                        "additionalProperties": {
+                                            "type": "number",
+                                            "minimum": 0
+                                        },
+                                        "minProperties": 1
+                                    }
+                                ]
                             }
                         },
                         "required": [
                             "id",
                             "cost"
+                        ]
+                    }
+                }
+            ]
+        },
+        "conflicts": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "csv_file": {
+                            "type": "string"
+                        },
+                        "csv_columns": {
+                            "type": "object",
+                            "properties": {
+                                "set_id": {
+                                    "type": "string"
+                                },
+                                "option_id": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": false
+                        }
+                    },
+                    "required": [
+                        "csv_file"
+                    ],
+                    "additionalProperties": false
+                },
+                {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "set_id": {
+                                "type": "string"
+                            },
+                            "option_id": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "set_id",
+                            "option_id"
                         ]
                     }
                 }
@@ -401,14 +483,22 @@ void parse_columns_aliases(
 void parse_options(Instance & instance, const nlohmann::json & json_object,
                    const std::filesystem::path & parent_path) {
     auto add_option = [&](const std::string & option_id,
-                          const double option_cost) {
+                          const std::vector<double> & option_costs) {
         if(instance.contains_option(option_id))
             throw std::invalid_argument("option id '" + option_id +
                                         "' appears multiple times");
-        if(option_cost < 0)
-            throw std::invalid_argument('\'' + std::to_string(option_cost) +
-                                        "' is not a valid cost");
-        instance.add_option(option_id, option_cost);
+        for(const double option_cost : option_costs)
+            if(!(option_cost >= 0))
+                throw std::invalid_argument('\'' + std::to_string(option_cost) +
+                                            "' is not a valid cost");
+        instance.add_option(option_id, option_costs);
+    };
+    // a cost object names the cost dimensions, in the order of its keys
+    auto set_dimensions = [&](const nlohmann::json & cost) {
+        std::vector<std::string> dimensions;
+        for(auto && [dimension, value] : cost.items())
+            dimensions.push_back(dimension);
+        instance.set_cost_dimensions(std::move(dimensions));
     };
 
     if(json_object.is_object()) {
@@ -416,15 +506,29 @@ void parse_options(Instance & instance, const nlohmann::json & json_object,
         if(options_csv_path.is_relative())
             options_csv_path = (parent_path / options_csv_path);
         std::string id_column = "id";
-        std::string cost_column = "cost";
-        parse_columns_aliases(json_object, {id_column, cost_column});
+        std::vector<std::string> cost_columns = {"cost"};
+        parse_columns_aliases(json_object, {id_column});
+        if(json_object.contains("csv_columns") &&
+           json_object["csv_columns"].contains("cost")) {
+            const auto & cost = json_object["csv_columns"]["cost"];
+            if(cost.is_object()) {
+                set_dimensions(cost);
+                cost_columns.clear();
+                for(auto && column : cost)
+                    cost_columns.push_back(column.get<std::string>());
+            } else
+                cost_columns = {cost.get<std::string>()};
+        }
 
         csv::CSVReader reader(options_csv_path.string());
         std::size_t line_no = 2;
         try {
+            std::vector<double> costs;
             for(auto & row : reader) {
-                add_option(row[id_column].get<std::string>(),
-                           row[cost_column].get<double>());
+                costs.clear();
+                for(auto && column : cost_columns)
+                    costs.push_back(row[column].get<double>());
+                add_option(row[id_column].get<std::string>(), costs);
                 ++line_no;
             }
         } catch(const std::exception & e) {
@@ -433,10 +537,154 @@ void parse_options(Instance & instance, const nlohmann::json & json_object,
                                         ": " + e.what());
         }
     } else {
+        const bool named_costs =
+            !json_object.empty() && json_object[0]["cost"].is_object();
+        if(named_costs) set_dimensions(json_object[0]["cost"]);
         for(auto && option : json_object) {
-            add_option(option["id"], option["cost"]);
+            const std::string option_id = option["id"];
+            const auto & cost = option["cost"];
+            if(!named_costs) {
+                if(cost.is_object())
+                    throw std::invalid_argument(
+                        "option '" + option_id +
+                        "' has named costs, the first option a number");
+                add_option(option_id, {cost.get<double>()});
+                continue;
+            }
+            if(!cost.is_object() ||
+               cost.size() != instance.num_cost_dimensions())
+                throw std::invalid_argument(
+                    "option '" + option_id +
+                    "' must have the cost dimensions of the first option");
+            std::vector<double> costs;
+            for(std::size_t r = 0; r < instance.num_cost_dimensions(); ++r) {
+                const auto & dimension = instance.cost_dimension_name(r);
+                if(!cost.contains(dimension))
+                    throw std::invalid_argument(
+                        "option '" + option_id +
+                        "' must have the cost dimensions of the first option");
+                costs.push_back(cost[dimension].get<double>());
+            }
+            add_option(option_id, costs);
         }
     }
+}
+
+void parse_conflicts(Instance & instance, const nlohmann::json & json_object,
+                     const std::filesystem::path & parent_path) {
+    std::vector<std::string> sets_names;
+    std::vector<std::vector<gecot::option_t>> sets;
+    phmap::node_hash_map<std::string, std::size_t> set_index;
+    auto add_member = [&](const std::string & set_id,
+                          const std::string & option_id) {
+        const auto [it, inserted] = set_index.try_emplace(set_id, sets.size());
+        if(inserted) {
+            sets_names.push_back(set_id);
+            sets.emplace_back();
+        }
+        const gecot::option_t option = instance.option_from_name(option_id);
+        auto & set = sets[it->second];
+        // as a row coefficient of 2 it would forbid the option
+        if(std::ranges::contains(set, option))
+            throw std::invalid_argument("option id '" + option_id +
+                                        "' appears multiple times in "
+                                        "conflict set '" +
+                                        set_id + "'");
+        set.push_back(option);
+    };
+
+    if(json_object.is_object()) {
+        std::filesystem::path conflicts_csv_path = json_object["csv_file"];
+        if(conflicts_csv_path.is_relative())
+            conflicts_csv_path = (parent_path / conflicts_csv_path);
+        std::string set_id_column = "set_id";
+        std::string option_id_column = "option_id";
+        parse_columns_aliases(json_object, {set_id_column, option_id_column});
+
+        csv::CSVReader reader(conflicts_csv_path.string());
+        std::size_t line_no = 2;
+        try {
+            for(auto & row : reader) {
+                add_member(row[set_id_column].get<std::string>(),
+                           row[option_id_column].get<std::string>());
+                ++line_no;
+            }
+        } catch(const std::exception & e) {
+            throw std::invalid_argument(conflicts_csv_path.filename().string() +
+                                        " line " + std::to_string(line_no) +
+                                        ": " + e.what());
+        }
+    } else {
+        for(auto && member : json_object)
+            add_member(member["set_id"], member["option_id"]);
+    }
+    for(std::size_t l = 0; l < sets.size(); ++l)
+        instance.add_conflict_set(std::move(sets_names[l]), std::move(sets[l]));
+}
+
+std::optional<double> parse_budget_value(const std::string & text) {
+    // rounded as CLI11 reads a double, strtold then a cast, but without its
+    // digit separators ('_', '\'', ',') and with no empty text read as 0
+    const char * begin = text.c_str();
+    char * end = nullptr;
+    const long double value = std::strtold(begin, &end);
+    if(end == begin) return std::nullopt;
+    while(std::isspace(static_cast<unsigned char>(*end))) ++end;
+    const double budget = static_cast<double>(value);
+    if(*end != '\0' || !std::isfinite(budget) || budget < 0)
+        return std::nullopt;
+    return budget;
+}
+
+gecot::budget_t parse_budget(const Instance & instance,
+                             const std::string & text) {
+    const std::size_t num_dimensions = instance.num_cost_dimensions();
+    if(!text.contains('=')) {
+        if(num_dimensions > 1) {
+            std::string items;
+            for(std::size_t r = 0; r < num_dimensions; ++r)
+                items += (r ? "," : "") + instance.cost_dimension_name(r) +
+                         "=<value>";
+            throw std::invalid_argument(
+                "the options have several costs: the budget is " + items);
+        }
+        const auto budget = parse_budget_value(text);
+        if(!budget)
+            throw std::invalid_argument(
+                "the budget must be a non-negative number");
+        return {{*budget}};
+    }
+    std::vector<std::optional<double>> values(num_dimensions);
+    for(auto && item_range : std::views::split(text, ',')) {
+        const std::string item{std::string_view(item_range)};
+        const std::size_t equal = item.find('=');
+        if(equal == std::string::npos)
+            throw std::invalid_argument("the budget item '" + item +
+                                        "' is not name=value");
+        const std::string name = item.substr(0, equal);
+        std::size_t r = 0;
+        while(r < num_dimensions && instance.cost_dimension_name(r) != name)
+            ++r;
+        if(r == num_dimensions)
+            throw std::invalid_argument("the budget names '" + name +
+                                        "', which is not a cost dimension");
+        if(values[r])
+            throw std::invalid_argument("the budget of '" + name +
+                                        "' is given twice");
+        values[r] = parse_budget_value(item.substr(equal + 1));
+        if(!values[r])
+            throw std::invalid_argument("the budget of '" + name +
+                                        "' must be a non-negative number");
+    }
+    gecot::budget_t budget;
+    for(std::size_t r = 0; r < num_dimensions; ++r) {
+        if(!values[r])
+            throw std::invalid_argument("the budget of '" +
+                                        instance.cost_dimension_name(r) +
+                                        "' is missing");
+        budget.values.push_back(*values[r]);
+    }
+    return budget;
 }
 
 void parse_vertices_options(InstanceCase & instance_case,
@@ -724,6 +972,8 @@ Instance parse_instance_json(const nlohmann::json & instance_json,
 
     auto options_json = instance_json["options"];
     parse_options(instance, options_json, relative_path);
+    if(instance_json.contains("conflicts"))
+        parse_conflicts(instance, instance_json["conflicts"], relative_path);
 
     for(auto && [case_name, case_json] : instance_json["cases"].items()) {
         InstanceCase & instance_case =

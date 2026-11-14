@@ -181,22 +181,34 @@ std::unique_ptr<std::FILE, void (*)(std::FILE *)> open_output_file(
 }
 
 prepared_instance prepare_instance(const std::filesystem::path & instance_file,
-                                   double budget, std::string_view noun,
-                                   const bool merge) {
+                                   const std::string & budget_text,
+                                   std::string_view noun, const bool merge) {
     Instance raw_instance = parse_instance(instance_file);
     spdlog::info("Instance: {}",
                  std::filesystem::absolute(instance_file).string());
     print_instance_size<spdlog::level::info>(raw_instance);
-    double options_total_cost = 0;
-    for(auto && o : raw_instance.options())
-        options_total_cost += raw_instance.option_cost(o);
-    if(options_total_cost > 0)
-        spdlog::info("Budget {:g}: {} of the options' total cost ({:g})",
-                     budget,
-                     format_percent(budget / options_total_cost * 100, false),
-                     options_total_cost);
+    const std::size_t num_dimensions = raw_instance.num_cost_dimensions();
+    if(num_dimensions > 1 || !raw_instance.conflict_sets().empty())
+        spdlog::info("Cost dimensions: {}, conflict sets: {}", num_dimensions,
+                     raw_instance.conflict_sets().size());
+    gecot::budget_t budget = parse_budget(raw_instance, budget_text);
+    for(std::size_t r = 0; r < num_dimensions; ++r) {
+        double options_total_cost = 0;
+        for(auto && o : raw_instance.options())
+            options_total_cost += raw_instance.option_cost(o, r);
+        if(options_total_cost <= 0) continue;
+        const auto share =
+            format_percent(budget[r] / options_total_cost * 100, false);
+        if(num_dimensions == 1)
+            spdlog::info("Budget {:g}: {} of the options' total cost ({:g})",
+                         budget[r], share, options_total_cost);
+        else
+            spdlog::info("Budget {}={:g}: {} of the options' total ({:g})",
+                         raw_instance.cost_dimension_name(r), budget[r], share,
+                         options_total_cost);
+    }
 
-    auto [instance, quality_scale] =
+    auto [instance, quality_scale, static_options] =
         trivial_reformulate_instance(raw_instance, budget, merge);
 
     spdlog::debug("Removed {} options and {} species",
@@ -219,8 +231,31 @@ prepared_instance prepare_instance(const std::filesystem::path & instance_file,
     spdlog::debug("Initial score: {:g} (was {:g})", initial_score / score_scale,
                   initial_score);
 
-    return {std::move(raw_instance),         std::move(instance), score_scale,
-            std::move(initial_cases_pc_num), initial_score,       base_score};
+    return {std::move(raw_instance),
+            std::move(instance),
+            score_scale,
+            std::move(initial_cases_pc_num),
+            initial_score,
+            base_score,
+            std::move(budget),
+            std::move(static_options)};
+}
+
+void print_json_per_dimension(std::FILE * stream, const std::string & property,
+                              const std::string & line,
+                              const Instance & instance,
+                              const std::vector<double> & values) {
+    if(values.size() == 1) {
+        std::print(stream, "\n    {}{}", line, values.front());
+        return;
+    }
+    print_json_property(stream, property,
+                        std::views::transform(
+                            std::views::iota(std::size_t{0}, values.size()),
+                            [&](const std::size_t r) {
+                                return std::make_pair(
+                                    instance.cost_dimension_name(r), values[r]);
+                            }));
 }
 
 progress_watch::progress_watch(const prepared_instance & prepared) {

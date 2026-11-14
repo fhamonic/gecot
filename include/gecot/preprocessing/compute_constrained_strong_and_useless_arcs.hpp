@@ -94,8 +94,11 @@ auto compute_constrained_strong_and_useless_arcs(
     double max_mu = 0;
     double max_arc_cost = 0;
     for(auto && i : instance.options()) {
-        if(!option_predicate(i) || arcs_options[i].empty()) continue;
-        const double arc_cost = instance.option_cost(i) /
+        // a free option would push max_mu to the cap: every pass a no-op
+        if(!option_predicate(i) || arcs_options[i].empty() ||
+           instance.option_cost(i, 0) == 0)
+            continue;
+        const double arc_cost = instance.option_cost(i, 0) /
                                 static_cast<double>(arcs_options[i].size());
         max_arc_cost = std::max(max_arc_cost, arc_cost);
         for(auto && [a, enhanced_prob] : arcs_options[i]) {
@@ -143,7 +146,7 @@ auto compute_constrained_strong_and_useless_arcs(
         auto mu_length_map = base_length_map;
         for(auto && i : instance.options()) {
             if(!option_predicate(i) || arcs_options[i].empty()) continue;
-            const double arc_cost = instance.option_cost(i) /
+            const double arc_cost = instance.option_cost(i, 0) /
                                     static_cast<double>(arcs_options[i].size());
             const log_probability_t penalty = arc_cost_to_penalty(mu, arc_cost);
             for(auto && [a, enhanced_prob] : arcs_options[i]) {

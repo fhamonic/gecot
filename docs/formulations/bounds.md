@@ -6,17 +6,19 @@ $$
 \frac{s - s_0}{b - s_0}
 $$
 
-is a share of the best possible gain that the solution is *proved* to reach. This is the percentage that `gecot optimize` prints next to its upper bound, where $s_0$ is the score with only the options of cost $0$ bought. `gecot bound` computes such bounds on their own, to certify a solution obtained otherwise, a heuristic one for instance. Its methods go from free and loose to costly and exact.
+is a share of the best possible gain that the solution is *proved* to reach. This is the percentage that `gecot optimize` prints next to its upper bound, where $s_0$ is the score with only the options [bought statically](preprocessing.md#the-instance-given-to-the-algorithms): those of cost $0$, unless a [conflict set](../usage/instance.md#conflict-sets) makes them a choice, as when a free option [models the harm of another](../usage/modeling.md#actions-that-harm-the-landscape). `gecot bound` computes such bounds on their own, to certify a solution obtained otherwise, a heuristic one for instance. Its methods go from free and loose to costly and exact.
+
+Every method accepts [conflict sets and several costs](problem.md#several-costs-and-conflict-sets). Buying nothing stays feasible and buying more never lowers a score, so a method that ignores some of these constraints still gives an upper bound, only a looser one.
 
 ## `all_options`
 
-The score with every option bought, whatever its cost:
+The score with every option bought, except those that cost more than the budget, which are [removed](preprocessing.md#the-instance-given-to-the-algorithms) beforehand:
 
 $$
 b = \mathcal{C}\Big( \big( PC_{\text{num}}(G^{\overline{x}}_k) \big)_{k \in K} \Big)\,, \qquad \overline{x} = (1, \dots, 1)\,.
 $$
 
-Buying more options never lowers the score of a case, so this bounds every scenario as long as the criterion is non-decreasing in the scores of the cases. It ignores the budget: it is tight only when the budget buys almost everything, but it costs one evaluation of the score, and `gecot bound` prints it next to the bound of every other method as a reference.
+Buying more options never lowers the score of a case, so this bounds every scenario as long as the criterion is non-decreasing in the scores of the cases. It ignores the budget and the [conflict sets](../usage/instance.md#conflict-sets): it is tight only when the budget buys almost everything, but it costs one evaluation of the score, and `gecot bound` prints it next to the bound of every other method as a reference.
 
 ## `qkp_planes`
 
@@ -55,6 +57,8 @@ both knapsacks being continuous ones, solved by sorting the options by ratio.
 
 The probabilities stay at their best value: without quality gains, the bound is the one of `all_options`.
 
+With several costs, an option counts only if it fits alone in the budget of every dimension, and each knapsack is solved for each dimension, with its costs and its budget: each alone is a relaxation, and the least value is kept. Two options of a conflict set are never both bought, so their terms $Q_{ij}$ and $Q_{ji}$ are dropped; the knapsacks otherwise ignore the conflict sets.
+
 ## `split_lagrange`
 
 This method also takes the budget into account for the arcs. It splits the score into the part due to the quality gains, bounded by the $u_i$ of `qkp_planes`, and the part of the base qualities, a sum over the pairs $p = (s,t)$:
@@ -81,7 +85,7 @@ $$
 b = \sum_{p} R_p(\nu) + \max_{x \in [0,1]^\Phi} \Big\{ \sum_{i \in \Phi} \Big( u_i + \sum_{p} \nu_{pi} \Big) \cdot x_i \;:\; \sum_{i \in \Phi} c_i \cdot x_i \le \beta \Big\}\,.
 $$
 
-It holds for any prices, and `--iterations` subgradient steps (30 by default) lower it, each step pricing every pair of habitats. `--time-limit` stops them and returns the best bound of the complete steps, and `--target` is the score that the steps aim at.
+With several costs, this knapsack is the least of those of the dimensions, as for `qkp_planes`, and the conflict sets are ignored. The bound holds for any prices, and `--iterations` subgradient steps (30 by default) lower it, each step pricing every pair of habitats. `--time-limit` stops them and returns the best bound of the complete steps, and `--target` is the score that the steps aim at.
 
 To price a pair exactly, the method needs the options to have a simple shape, which it checks on each case, among the options that the budget can afford:
 

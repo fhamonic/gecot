@@ -24,13 +24,15 @@
 
 #include "instance.hpp"
 #include "io_helper.hpp"
+#include "parse_instance.hpp"
 
 #include "bound_interfaces/abstract_bound_interface.hpp"
 
 static bool process_command_line(
     const std::vector<std::string> & args,
     std::shared_ptr<AbstractBoundInterface> & method,
-    std::filesystem::path & instances_description_json_file, double & budget,
+    std::filesystem::path & instances_description_json_file,
+    std::string & budget,
     std::optional<std::filesystem::path> & opt_output_json_file,
     std::optional<tbb::global_control> & opt_tbb_global_control) {
     auto methods = make_bound_interfaces();
@@ -72,7 +74,10 @@ static bool process_command_line(
         app.add_option("instance,-i,--instance",
                        instances_description_json_file, "Instance JSON file");
     auto * budget_opt =
-        app.add_option("budget,-B,--budget", budget, "Budget value");
+        app.add_option("budget,-B,--budget", budget,
+                       "Budget value, or name=value,... for options of "
+                       "several costs")
+            ->type_name("BUDGET");
     app.add_option("-o,--output-json", opt_output_json_file,
                    "Output bound data in JSON file");
     app.add_flag("-v,--verbose", verbosity,
@@ -133,7 +138,8 @@ static bool process_command_line(
         if(!opt->count())
             throw std::logic_error("the option '" + opt->get_name() +
                                    "' is required but missing");
-    if(!std::isfinite(budget) || budget < 0)
+    // the names are checked with the instance
+    if(!budget.contains('=') && !parse_budget_value(budget))
         throw std::logic_error("the budget must be a non-negative number");
     apply_logging(verbosity, quiet);
     if(opt_max_threads.has_value()) {
@@ -152,7 +158,7 @@ static bool process_command_line(
 int bound_command(const std::vector<std::string> & args) {
     std::shared_ptr<AbstractBoundInterface> method;
     std::filesystem::path instances_description_json;
-    double budget;
+    std::string budget_text;
     std::optional<std::filesystem::path> opt_output_json_file;
     std::optional<tbb::global_control> opt_tbb_global_control;
 
@@ -160,7 +166,7 @@ int bound_command(const std::vector<std::string> & args) {
 
     try {
         if(!process_command_line(args, method, instances_description_json,
-                                 budget, opt_output_json_file,
+                                 budget_text, opt_output_json_file,
                                  opt_tbb_global_control))
             return EXIT_SUCCESS;
         program_state = "Checking output files";
@@ -170,12 +176,13 @@ int bound_command(const std::vector<std::string> & args) {
         log_parameters(method->parameters());
         program_state = "Parsing instance";
         const prepared_instance prepared =
-            prepare_instance(instances_description_json, budget, "method");
+            prepare_instance(instances_description_json, budget_text, "method");
         const Instance & instance = prepared.instance;
+        const gecot::budget_t & budget = prepared.budget;
         // the method's scores, bounds and logs are in this unit
         const double score_scale = prepared.score_scale;
-        // the solutions are those of 'gecot optimize', the options of cost 0
-        // bought: buying no other is one
+        // the solutions are those of 'gecot optimize', the options bought
+        // statically bought: buying no other is one
         const double base_score = prepared.base_score / score_scale;
 
         program_state = "Running method '" + method->name() + '\'';
@@ -196,7 +203,7 @@ int bound_command(const std::vector<std::string> & args) {
                        1e-9 * std::max(1.0, std::abs(base_score * score_scale)))
             throw std::runtime_error(std::format(
                 "the bound {} is below the score {} of buying only the options "
-                "of cost 0",
+                "bought statically",
                 bound, base_score * score_scale));
         program_state = "Printing bound";
         std::optional<double> all_options_bound;
@@ -216,7 +223,12 @@ int bound_command(const std::vector<std::string> & args) {
             if(all_options_bound)
                 std::println("All options bound  {}",
                              format_score(all_options_bound.value()));
-            std::println("Budget             {:.10g}", budget);
+            for(std::size_t r = 0; r < budget.size(); ++r)
+                if(budget.size() == 1)
+                    std::println("Budget             {:.10g}", budget[r]);
+                else
+                    std::println("Budget {:<11} {:.10g}",
+                                 instance.cost_dimension_name(r), budget[r]);
             std::println(
                 "Time               {}",
                 format_duration(static_cast<double>(computation_time_ms) /
@@ -247,10 +259,11 @@ int bound_command(const std::vector<std::string> & args) {
                             instance_case.name(),
                             prepared.initial_cases_pc_num[instance_case.id()]);
                     }));
-            std::print(
-                stream,
-                ",\n    \"budget\":         {},\n    \"bound\":          {},",
-                budget, bound);
+            std::print(stream, ",");
+            print_json_per_dimension(stream, "budget",
+                                     "\"budget\":         ", instance,
+                                     budget.values);
+            std::print(stream, ",\n    \"bound\":          {},", bound);
             if(all_options_bound)
                 std::print(stream, "\n    \"all_options_bound\": {},",
                            all_options_bound.value());

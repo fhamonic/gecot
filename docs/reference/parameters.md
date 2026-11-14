@@ -23,12 +23,12 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 |---|---|
 | `-a`, `--algorithm <name>` | the algorithm, also the first positional argument |
 | `-i`, `--instance <file>` | the instance JSON file, also the second positional argument |
-| `-B`, `--budget <value>` | the budget, also the third positional argument |
+| `-B`, `--budget <value>` | the budget, also the third positional argument: a non-negative number, or `name=value,...` for options with [several costs](../usage/instance.md#several-costs) |
 | `-A`, `--list-algorithms` | lists the algorithms |
 | `-P`, `--list-params` | lists the parameters of the chosen algorithm |
 | `-o`, `--output-json <file>` | writes the result as JSON |
 | `--output-csv <file>` | writes the selection as CSV |
-| `--reformulation trivial`, `path_lp` [`trivial`] | the instance given to the algorithm. `trivial`: without the options of cost 0, which are bought, and those over the budget. `path_lp`: also without the options that the path relaxation proves to be in no better solution than its own |
+| `--reformulation trivial`, `path_lp` [`trivial`] | the instance given to the algorithm. `trivial`: without the options over the budget, in any dimension, and those of cost 0, which are bought unless a [conflict set](../usage/instance.md#conflict-sets) makes them a choice. `path_lp`: also without the options that the path relaxation proves to be in no better solution than its own |
 | `--reformulation-params "<name>=<value> ..."` | parameters of the `path_lp` of `--reformulation path_lp`, as `"time-limit=60 pricing=enumerate"`; its MIP start is the solution of `greedy` by default |
 | `--no-merging` | for comparison: keeps apart the vertices that arcs of probability 1 link |
 | `-v`, `--verbose` | logs the details of the algorithm; `-vv` everything, with the solver's own log on the standard output |
@@ -42,7 +42,7 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 |---|---|
 | `--method <name>` | the method, also the first positional argument |
 | `-i`, `--instance <file>` | the instance JSON file, also the second positional argument |
-| `-B`, `--budget <value>` | the budget, also the third positional argument |
+| `-B`, `--budget <value>` | the budget, also the third positional argument: a non-negative number, or `name=value,...` for options with [several costs](../usage/instance.md#several-costs) |
 | `-M`, `--list-methods` | lists the methods |
 | `-P`, `--list-params` | lists the parameters of the chosen method |
 | `-o`, `--output-json <file>` | writes the result as JSON |
@@ -80,7 +80,7 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` and `tre
 | Parameter | Default | Meaning |
 |---|---|---|
 | `--resolution <value>` | `1e-08` | the [resolution](../formulations/preprocessing.md#resolution) of the probabilities in the labelling of the strong and useless arcs. Strictly between 0 and 1, and not so small that the integer lengths of a path overflow: other values are refused |
-| `--nb-mus <n>` | `0` | the number of geometric steps between the Lagrange multipliers of the [budget-aware labelling](../formulations/preprocessing.md#taking-the-budget-into-account), which tests $n + 1$ positive multipliers after 0. `0`: no budget-aware labelling. Experimental: 20, or 9 on large instances |
+| `--nb-mus <n>` | `0` | the number of geometric steps between the Lagrange multipliers of the [budget-aware labelling](../formulations/preprocessing.md#taking-the-budget-into-account), which tests $n + 1$ positive multipliers after 0. `0`: no budget-aware labelling. Experimental: 20, or 9 on large instances. With [several costs](../usage/instance.md#several-costs), it reads only the first dimension, in alphabetical order: valid, but looser |
 | `--mus-sweep decades`, `full` | `decades` | the range of the positive multipliers, up to the largest useful one. `decades`: at most the 3 decades below it, and 0 again at the end. `full`: from the inverse of the largest option cost per arc. Needs `--nb-mus` above 0. Experimental |
 | `--preprocessing all`, `strong`, `useless`, `none` | `all` | for comparison, what the labels are used for. `strong`: only the contraction of the strong arcs. `useless`: only the removal of the useless arcs. `none`: neither; `--resolution`, `--nb-mus` and `--mus-sweep` then have no effect |
 | `--all-targets` | off | for comparison: the vertices that can never be targets get a flow like the others |
@@ -92,7 +92,7 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` and `tre
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `--big-m plain`, `knapsack_bnb`, `knapsack_dantzig`, `tight` | `knapsack_bnb` | the [big-M constants](../formulations/preprocessing.md#big-m-constants). `plain`: with every quality gain, for comparison. `knapsack_bnb`: with the gains of the best options within the budget, by branch and bound. `knapsack_dantzig`: with the linear relaxation of that knapsack, looser but faster to compute. `tight`: experimental, lowered per arc over the sources that can use it |
+| `--big-m plain`, `knapsack_bnb`, `knapsack_dantzig`, `tight` | `knapsack_bnb` | the [big-M constants](../formulations/preprocessing.md#big-m-constants). `plain`: with every quality gain, for comparison. `knapsack_bnb`: with the gains of the best options within the budget, by branch and bound. `knapsack_dantzig`: with the linear relaxation of that knapsack, looser but faster to compute. `tight`: experimental, lowered per arc over the sources that can use it. With [several costs](../usage/instance.md#several-costs), the knapsacks are solved per dimension and the least is kept, and `tight` reads only the first dimension, in alphabetical order |
 | `--lp-relaxation` | off | experimental: solves the [continuous relaxation](../formulations/flow.md#what-flow_mip-solves) |
 
 ### `multicut_benders`
@@ -137,7 +137,7 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` and `tre
 | Parameter | Default | Meaning |
 |---|---|---|
 | `-t`, `--feasibility-tolerance <value>` | `1e-07` | the slack allowed when a cost is compared with the budget |
-| `--decremental` | off | starts from every option bought and removes options until the cost fits the budget, then buys back those that fit in the budget left |
+| `--decremental` | off | starts from every option bought and removes options until the cost fits the budget, then buys back those that fit in the budget left. With a single cost and no conflict set only |
 | `--only-dec` | off | with `--decremental`: skips these final purchases |
 | `--worst` | off | `greedy`, for comparison: the opposite choice at each step, which spends the budget while gaining as little as possible |
 

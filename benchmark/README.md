@@ -50,9 +50,10 @@ Columns of a result file:
 | `status` | of GECOT's report: `optimal`, `time limit reached`, `interrupted`, `completed` (a heuristic); `failed` if there is no result |
 | `wall_time` | seconds, the whole process |
 | `time` | seconds, as GECOT reports it |
-| `initial_score`, `score`, `bound`, `cost` | score without any option, score and cost of the solution, upper bound proven by the algorithm (empty if none) |
+| `initial_score`, `score`, `bound`, `cost` | score without any option, score and cost of the solution (a JSON object per dimension with several costs), upper bound proven by the algorithm (empty if none) |
 | `nodes` | of the branch and bound, when reported |
 | `exit` | exit code, or `ctrl-c`, `killed` |
+| `feasible` | `True` if the solution fits every budget and buys at most one option of each conflict set; `compare.py` keeps the others out of the best known scores |
 
 `compare.py` prints two Markdown tables: one line per run, then a summary per
 result file. Gains are over the initial score:

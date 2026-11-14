@@ -35,9 +35,11 @@ Options bought  2 of 3:
 
 The scores are recomputed from the options bought, not taken from the solver: a score printed is the score of the selection printed.
 
-The **guaranteed share** compares gains, not scores: with $s$ the score of the solution, $b$ the upper bound and $s_0$ the score without any paid option, it is $(s - s_0) / (b - s_0)$, rounded down to one decimal. An optimal solution can therefore read 99.9 %, its bound being equal to its score only up to the solver's tolerance.
+The **guaranteed share** compares gains, not scores: with $s$ the score of the solution, $b$ the upper bound and $s_0$ the score with only the options bought statically (see below), it is $(s - s_0) / (b - s_0)$, rounded down to one decimal. An optimal solution can therefore read 99.9 %, its bound being equal to its score only up to the solver's tolerance.
 
-The options of cost 0 are always bought and listed, and they do not count in the initial score.
+The options of cost 0 are always bought and listed, and they do not count in the initial score. The exception is an option of cost 0 in a [conflict set](instance.md#conflict-sets) with another affordable option: it stays a choice, listed only if the solution buys it, and $s_0$ does not count it. [Modeling with costs and conflicts](modeling.md#actions-that-harm-the-landscape) uses such an option, and shows how to read the scores then.
+
+With [several costs](instance.md#several-costs), the `Cost` line is one line per dimension, as `Cost money      5 of 9`.
 
 ### Status
 
@@ -55,7 +57,7 @@ A solver can also end with `limit reached`, `solver failure` or `unknown status`
 
 !!! warning "Solutions over the budget"
 
-    `tree_lp` returns the options that its relaxation uses, even fractionally, which can cost more than the budget. GECOT then logs `warning: The solution costs 5, over the budget 3`, and the `Cost` line shows it. Every other algorithm returns a solution within the budget.
+    `tree_lp` returns the options that its relaxation uses, even fractionally, which can cost more than the budget. GECOT then logs `warning: The solution costs 5, over the budget 3`, the `Cost` line shows it, and the JSON has `"feasible": false`. Such a solution proves nothing: the upper bound is printed without a guaranteed share. Every other algorithm returns a solution within the budget.
 
 ### JSON
 
@@ -100,6 +102,7 @@ $ gecot optimize flow_mip three-woods.json 7 -o solution.json
         "squirrel": 42.44
     },
     "solution_cost":  7,
+    "feasible":       true,
     "solution": {
         "hedgerow":   1,
         "underpass":  1,
@@ -127,7 +130,8 @@ $ gecot optimize flow_mip three-woods.json 7 -o solution.json
 | `computation_time_ms` | the time of the algorithm, in milliseconds |
 | `initial_score`, `solution_score` | the criterion without options and with the solution |
 | `initial_pc_num`, `solution_pc_num` | the score of each case, without options and with the solution |
-| `budget`, `solution_cost` | the budget and the cost of the solution |
+| `budget`, `solution_cost` | the budget and the cost of the solution; with several costs, an object with a number per dimension, as `{"area": 4, "money": 9}` |
+| `feasible` | `true` if the solution fits every budget and buys at most one option of each conflict set, as checked by the warnings below |
 | `solution` | for each option of the instance, 1 if it is bought and 0 otherwise |
 | `algorithm_report` | the status and what the algorithm reports about its run |
 
@@ -169,7 +173,8 @@ Each line of the log starts with the seconds elapsed since `gecot` started. On a
 ```console
 $ gecot optimize multicut_benders instance.json 8 --preprocessing none --time-limit 25
 [   0.0s] GECOT 2.0, algorithm multicut_benders
-[   0.0s] Instance /home/user/instances/Aix/instance_40x40/instance.json: 27 options, 1 species
+[   0.0s] Instance: /home/user/instances/Aix/instance_40x40/instance.json
+[   0.0s] Options count: 27
 [   0.0s] ------------+----------+----------+------------+---------+-----------
 [   0.0s]   species   | vertices | habitats | improvable |  arcs   | improvable
 [   0.0s]             |          |          |  vertices  |         |    arcs
@@ -191,7 +196,7 @@ $ gecot optimize multicut_benders instance.json 8 --preprocessing none --time-li
 [  25.0s] warning: Solver stopped: time limit reached
 ```
 
-The first lines say what was read: the options, the cases, and in a table a row per case with its vertices, those of positive quality (`habitats`), those that some option improves, its arcs and those that some option improves; then the budget as a share of the total cost of the options.
+The first lines say what was read: the options, the cases, and in a table a row per case with its vertices, those of positive quality (`habitats`), those that some option improves, its arcs and those that some option improves; then, with several costs or conflict sets, how many there are, as `Cost dimensions: 2, conflict sets: 2`, and the budget as a share of the total cost of the options, a line per dimension with several costs, as `Budget money=5: 71.43 % of the options' total (7)`.
 
 ### Progress
 
@@ -229,9 +234,9 @@ For `path_lp` and `tree_lp`, each row is a round of the column generation:
 | `-q` | errors only |
 | (default) | the steps of the run, the progress, the warnings |
 | `-v` | also the parameters of the algorithm with their values, the size of the instance after its reformulation, the factor by which the qualities are divided, a table of the preprocessing of each species, the size of the model; the progress table has a row every second or every round, and a `nodes` column |
-| `-vv` | also the details of each step, such as a table of the options that a heuristic buys or removes, and the solver's own log, which goes to the standard output |
+| `-vv` | also the details of each step, such as a table of the options that a heuristic buys or removes (a swap of `greedy` reads `a -> b`), and the solver's own log, which goes to the standard output |
 
-With `-v`, the line `Qualities divided by ...` gives the factor of the [rescaling](../formulations/preprocessing.md#the-instance-given-to-the-algorithms): the solver's own log is in the rescaled unit, everything else in the unit of the instance.
+With `-v`, the line `Qualities scaled by 1/...` gives the factor of the [rescaling](../formulations/preprocessing.md#the-instance-given-to-the-algorithms): the solver's own log is in the rescaled unit, everything else in the unit of the instance.
 
 With `-v` again, the algorithms that [preprocess](../formulations/preprocessing.md) the graphs log a table once every species is preprocessed, here for `flow_benders`:
 
@@ -267,6 +272,7 @@ Ctrl-C stops the algorithm and keeps its best result so far, with the status `in
 |---|---|
 | `Budget doesn't allow purchasing any options` | every option costs more than the budget, or costs 0 |
 | `The solution costs ..., over the budget ...` | `tree_lp` returned its relaxation, see [above](#status) |
+| `The solution costs ... in <dimension>, over the budget ...`, `The solution buys ... options of the conflict set '...'` | should not happen with the algorithms that support several costs and conflict sets; report it |
 | `Solver stopped: time limit reached` | the result is the best so far, not a proved optimum |
 | `Solver stopped without a solution: ..., returning the MIP start` | the solver found nothing in the time given |
 | `This solver has no time limit: --time-limit ignored` and similar | the solver lacks a feature that a parameter asks for |

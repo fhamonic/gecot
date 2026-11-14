@@ -42,7 +42,8 @@ public:
         return solver->json_parameters();
     }
 
-    gecot::bound_report compute(const Instance & instance, const double B,
+    gecot::bound_report compute(const Instance & instance,
+                                const gecot::budget_t & B,
                                 const bound_context &) const override {
         auto [solution, report] = solver->solve(instance, B);
         if(!report.best_bound)

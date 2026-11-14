@@ -66,7 +66,7 @@ struct flow_benders : public mip_solver_base {
     }
 
     template <lazy_constraint_model M, instance_c I>
-    solve_result<I> solve(const I & instance, const double budget) const {
+    solve_result<I> solve(const I & instance, const budget_t & budget) const {
         _check_criterion(instance);
         spdlog::stopwatch sw;
         auto solution = instance.create_option_map(false);
@@ -89,9 +89,7 @@ struct flow_benders : public mip_solver_base {
         const auto X_vars = model.add_binary_variables(
             instance.options().size(), [](const option_t & i) { return i; });
 
-        model.add_constraint(xsum(instance.options(), [&](auto && o) {
-                                 return instance.option_cost(o) * X_vars(o);
-                             }) <= budget);
+        _add_budget_rows(model, instance, budget, X_vars);
 
         auto cases_contracted_data =
             instance.template create_case_map<std::vector<

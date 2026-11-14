@@ -25,24 +25,26 @@
 #include "gecot/bounds/criterion_analysis.hpp"
 #include "gecot/bounds/lp_knapsack.hpp"
 #include "gecot/concepts/instance.hpp"
+#include "gecot/helper.hpp"
 #include "gecot/indices/parallel_pc_num.hpp"
 #include "gecot/indices/pc_num.hpp"
 #include "gecot/utils/log_table.hpp"
 
 namespace gecot {
 
-// The case probabilities with every option bought, of cost at most budget.
+// The case probabilities with every option bought that fits alone in the
+// budget.
 template <case_c C, instance_c I>
 std::vector<double> improved_probability_map(const C & instance_case,
                                              const I & instance,
-                                             double budget) {
+                                             const budget_t & budget) {
     std::vector<double> probabilities(
         instance_case.arc_probability_map().begin(),
         instance_case.arc_probability_map().end());
     const auto & arc_options_map = instance_case.arc_options_map();
     for(auto && a : melon::arcs(instance_case.graph()))
         for(auto && [improved_probability, option] : arc_options_map[a])
-            if(instance.option_cost(option) <= budget)
+            if(fits_alone(instance, option, budget))
                 probabilities[a] =
                     std::max(probabilities[a], improved_probability);
     return probabilities;
@@ -57,7 +59,9 @@ std::vector<double> improved_probability_map(const C & instance_case,
 // Splitting Q_oo' + Q_o'o into θ_oo' + θ_o'o with θ >= 0 bounds row o by
 //   u_o = l_o + Q_oo + max{Σ_o' θ_oo' y_o' : c·y <= B - c_o, y_o = 0}
 // (Caprara, Pisinger and Toth 1999), and the whole by H + max{u·x : c·x <= B},
-// both knapsacks by their LP relaxations.
+// both knapsacks by their LP relaxations. With several cost dimensions, each
+// knapsack is the least of those of the dimensions. Two options of a conflict
+// set are never both bought: their Q_oo' are 0.
 struct qkp_planes {
     enum class theta_start { best, half, target, source };
     theta_start start = theta_start::best;
@@ -74,7 +78,7 @@ struct qkp_planes {
 
     template <instance_c I>
     weighted_result weighted(
-        const I & instance, const double budget,
+        const I & instance, const budget_t & budget,
         std::span<const double> case_weights,
         std::optional<double> weighted_target = std::nullopt) const {
         using graph_t = instance_graph_t<I>;
@@ -93,16 +97,19 @@ struct qkp_planes {
                 for(auto && [source_gain, target_gain, option] :
                     vertex_options_map[v])
                     if((source_gain > 0 || target_gain > 0) &&
-                       instance.option_cost(option) <= budget &&
+                       fits_alone(instance, option, budget) &&
                        item_of[option] == no_item) {
                         item_of[option] = items.size();
                         items.push_back(option);
                     }
         }
         const std::size_t n = items.size();
-        std::vector<double> costs(n);
-        for(std::size_t i = 0; i < n; ++i)
-            costs[i] = instance.option_cost(items[i]);
+        // per dimension
+        std::vector<std::vector<double>> costs(budget.size(),
+                                               std::vector<double>(n));
+        for(std::size_t r = 0; r < budget.size(); ++r)
+            for(std::size_t i = 0; i < n; ++i)
+                costs[r][i] = instance.option_cost(items[i], r);
         spdlog::debug(
             "qkp_planes: {} options with quality gains, {:.0f} MB of dense "
             "matrices",
@@ -192,6 +199,13 @@ struct qkp_planes {
                 });
         }
 
+        for(auto && set : instance.conflict_sets())
+            for(auto && o : set)
+                for(auto && o2 : set)
+                    if(o != o2 && item_of[o] != no_item &&
+                       item_of[o2] != no_item)
+                        Q[item_of[o] * n + item_of[o2]] = 0.0;
+
         weighted_result result{H, std::vector<double>(num_options, 0.0)};
         if(n == 0) {
             spdlog::trace("qkp_planes: no quality gains, the bound is H = {}",
@@ -206,19 +220,21 @@ struct qkp_planes {
             tbb::parallel_for(
                 tbb::blocked_range<std::size_t>(0, n),
                 [&](const tbb::blocked_range<std::size_t> & rows) {
-                    std::vector<double> row(n);
+                    std::vector<double> row(n), capacities(budget.size());
                     for(std::size_t i = rows.begin(); i != rows.end(); ++i) {
                         for(std::size_t j = 0; j < n; ++j)
                             row[j] = (j == i) ? 0.0 : theta(i, j);
+                        for(std::size_t r = 0; r < budget.size(); ++r)
+                            capacities[r] = budget[r] - costs[r][i];
                         u[i] = l[i] + Q[i * n + i] +
                                lp_knapsack(
-                                   row, costs, budget - costs[i],
+                                   row, costs, capacities,
                                    y ? std::span<double>(y->data() + i * n, n)
                                      : std::span<double>{});
                     }
                 });
             return H +
-                   lp_knapsack(u, costs, budget,
+                   lp_knapsack(u, costs, budget.values,
                                x ? std::span<double>(*x) : std::span<double>{});
         };
         auto half = [&](std::size_t i, std::size_t j) {
@@ -315,7 +331,7 @@ struct qkp_planes {
     }
 
     template <instance_c I>
-    bound_report bound(const I & instance, const double budget) const {
+    bound_report bound(const I & instance, const budget_t & budget) const {
         // the target is the criterion's: the weighted part of a linear one
         std::optional<double> weighted_target;
         if(target) {

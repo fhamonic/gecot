@@ -190,6 +190,7 @@ struct tree_formulation_lp : public mip_solver_base {
         namespace colgen = mippp::colgen;
         using namespace mippp;
         using namespace mippp::operators;
+        check_plain_budget(instance, "tree_lp");
         _check_criterion(instance);
         spdlog::stopwatch sw;
         auto time_up = [&] {
@@ -217,7 +218,7 @@ struct tree_formulation_lp : public mip_solver_base {
         for(const auto & instance_case : instance.cases()) {
             const auto [strong_arcs_map, useless_arcs_map] =
                 _compute_strong_and_useless_arcs(instance, instance_case,
-                                                 budget);
+                                                 budget_t{{budget}});
             preprocessing.emplace_back(
                 instance_case.name(),
                 _average_size(instance_case, strong_arcs_map),

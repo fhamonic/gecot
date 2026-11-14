@@ -25,6 +25,7 @@ nav = [
   ] },
   { "Using GECOT" = [
     { "Instance files" = "usage/instance.md" },
+    { "Modeling with costs and conflicts" = "usage/modeling.md" },
     { "Optimizing" = "usage/optimize.md" },
     { "Results and logs" = "usage/results.md" },
     { "Bounding" = "usage/bound.md" },

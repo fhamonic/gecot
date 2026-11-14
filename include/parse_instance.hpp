@@ -6,6 +6,8 @@
 #include <fstream>
 #include <initializer_list>
 #include <iostream>
+#include <optional>
+#include <string>
 
 #include <csv.hpp>
 #include <nlohmann/json-schema.hpp>
@@ -21,6 +23,14 @@ void parse_columns_aliases(
 
 void parse_options(Instance & instance, const nlohmann::json & json_object,
                    const std::filesystem::path & parent_path);
+void parse_conflicts(Instance & instance, const nlohmann::json & json_object,
+                     const std::filesystem::path & parent_path);
+// a finite non-negative number, nullopt otherwise
+std::optional<double> parse_budget_value(const std::string & text);
+// a bare number when the options have one cost, otherwise name=value items,
+// one per cost dimension
+gecot::budget_t parse_budget(const Instance & instance,
+                             const std::string & text);
 void parse_vertices_options(InstanceCase & instance_case,
                             const nlohmann::json & json_object,
                             const std::filesystem::path & parent_path,

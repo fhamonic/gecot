@@ -74,6 +74,8 @@ $$
 
 where $Y_t$ is the set of scenarios at which a cut of $t$ has been added so far. With all the scenarios in $Y_t$ the master would be equivalent to the flow formulation; the search adds only the few that matter.
 
+With [several costs or conflict sets](problem.md#several-costs-and-conflict-sets), the budget row of this master, and of the masters of `multicut_benders` and `multiflow_benders` below, becomes the rows of the [flow formulation](flow.md#cases-and-criterion): one per cost dimension and one per conflict set. The cuts are the same.
+
 ## `multicut_benders`: cuts on groups of targets
 
 `multicut_benders` also removes the variables of the targets. The value of a target in a scenario is

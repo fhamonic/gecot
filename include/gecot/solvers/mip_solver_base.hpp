@@ -158,19 +158,22 @@ struct mip_solver_base {
     template <instance_c I, case_c C>
     auto _compute_strong_and_useless_arcs(const I & instance,
                                           const C & instance_case,
-                                          const double budget) const {
+                                          const budget_t & budget) const {
         using arcs = tbb::concurrent_vector<melon::arc_t<case_graph_t<C>>>;
         auto no_arcs = [&instance_case] {
             return melon::create_vertex_map<arcs>(instance_case.graph());
         };
         if(!contract_strong_arcs && !remove_useless_arcs)
             return std::make_pair(no_arcs(), no_arcs());
-        auto affordable = [&instance, budget](const option_t & o) {
-            return instance.option_cost(o) <= budget;
+        auto affordable = [&instance, &budget](const option_t & o) {
+            for(std::size_t r = 0; r < budget.size(); ++r)
+                if(instance.option_cost(o, r) > budget[r]) return false;
+            return true;
         };
+        // on the cost dimension 0: dropping the others relaxes the problem
         auto labels = num_mus >= 1
                           ? compute_constrained_strong_and_useless_arcs(
-                                instance, instance_case, budget, affordable,
+                                instance, instance_case, budget[0], affordable,
                                 probability_resolution, num_mus, decades_sweep,
                                 all_targets)
                           : compute_strong_and_useless_arcs(
@@ -328,11 +331,33 @@ struct mip_solver_base {
 
     template <instance_c I>
     instance_solution_t<I> _fallback_solution(const I & instance,
-                                              const double budget) const {
+                                              const budget_t & budget) const {
         auto solution = _mip_start_solution(instance);
-        if(compute_solution_cost(instance, solution) > budget + feasibility_tol)
-            throw std::runtime_error("the MIP start exceeds the budget");
+        for(std::size_t r = 0; r < budget.size(); ++r)
+            if(compute_solution_cost(instance, solution, r) >
+               budget[r] + feasibility_tol)
+                throw std::runtime_error("the MIP start exceeds the budget");
+        if(!is_feasible(instance, solution, budget, feasibility_tol))
+            throw std::runtime_error(
+                "the MIP start buys two options of a conflict set");
         return solution;
+    }
+
+    // a row per cost dimension, then a row per conflict set
+    template <typename M, instance_c I>
+    static void _add_budget_rows(M & model, const I & instance,
+                                 const budget_t & budget, const auto & x) {
+        using namespace mippp;
+        using namespace mippp::operators;
+        if(budget.size() != instance.num_cost_dimensions())
+            throw std::invalid_argument(
+                "the budget needs a value per cost dimension");
+        for(std::size_t r = 0; r < budget.size(); ++r)
+            model.add_constraint(xsum(instance.options(), [&](auto && o) {
+                                     return instance.option_cost(o, r) * x(o);
+                                 }) <= budget[r]);
+        for(auto && set : instance.conflict_sets())
+            model.add_constraint(xsum(set, x) <= 1);
     }
 
     // backends without these setters keep their defaults

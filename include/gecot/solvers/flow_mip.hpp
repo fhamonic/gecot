@@ -31,7 +31,7 @@ struct flow_mip : public mip_solver_base {
     bool relax_integrality = false;
 
     template <typename M, instance_c I>
-    solve_result<I> solve(const I & instance, const double budget) const {
+    solve_result<I> solve(const I & instance, const budget_t & budget) const {
         _check_criterion(instance);
         spdlog::stopwatch sw;
         auto solution = instance.create_option_map(false);
@@ -54,9 +54,7 @@ struct flow_mip : public mip_solver_base {
             instance.options().size(), [](const option_t & i) { return i; }
             // ,[](const option_t & i) { return "Y_" + std::to_string(i); }
         );
-        model.add_constraint(xsum(instance.options(), [&](auto && o) {
-                                 return instance.option_cost(o) * X_vars(o);
-                             }) <= budget);
+        _add_budget_rows(model, instance, budget, X_vars);
         if(relax_integrality) {
             if constexpr(requires { model.set_continuous(X_vars(0)); }) {
                 for(auto && o : instance.options())
@@ -153,7 +151,7 @@ struct flow_mip : public mip_solver_base {
                 auto tight_maps =
                     big_Ms == big_M_kind::tight
                         ? std::make_optional(compute_tight_big_M_maps(
-                              instance, budget, feasibility_tol, graph,
+                              instance, budget[0], feasibility_tol, graph,
                               source_quality_map, vertex_options_map,
                               base_probability_map, improvements_map, t,
                               std::views::transform(

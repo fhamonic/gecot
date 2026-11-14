@@ -47,19 +47,29 @@ std::unique_ptr<std::FILE, void (*)(std::FILE *)> open_output_file(
 
 struct prepared_instance {
     Instance raw_instance;
-    // trivial_reformulate_instance's: free options applied, options over the
-    // budget removed, qualities divided by sqrt(score_scale)
+    // trivial_reformulate_instance's: options bought statically applied,
+    // options over the budget removed, qualities divided by sqrt(score_scale)
     Instance instance;
     double score_scale;
-    // of raw_instance, free options not applied
+    // of raw_instance, options bought statically not applied
     melon::static_map<gecot::case_id_t, double> initial_cases_pc_num;
     double initial_score;
-    double base_score;  // with the options of cost 0, not divided
+    double base_score;  // with the options bought statically, not divided
+    gecot::budget_t budget;
+    // the options of raw_instance bought statically
+    gecot::instance_solution_t<Instance> static_options;
 };
-// logs the steps of 'gecot optimize', with "the <noun>'s scores"
+// logs the steps of 'gecot optimize', with "the <noun>'s scores"; the budget
+// is parse_budget's text
 prepared_instance prepare_instance(const std::filesystem::path & instance_file,
-                                   double budget, std::string_view noun,
-                                   bool merge = true);
+                                   const std::string & budget,
+                                   std::string_view noun, bool merge = true);
+// a number per cost dimension: on the line of the property when the options
+// have one cost, as an object keyed by the dimensions otherwise
+void print_json_per_dimension(std::FILE * stream, const std::string & property,
+                              const std::string & line,
+                              const Instance & instance,
+                              const std::vector<double> & values);
 
 // While it lives, the algorithm's progress is logged in raw scores, and Ctrl-C
 // stops it: it returns its best result so far.
@@ -81,8 +91,8 @@ std::shared_ptr<const PathFormulationLPInterface> make_path_reformulation(
     const std::string & parameters);
 gecot::solve_result<Instance> solve_path_reformulated(
     const PathFormulationLPInterface & path_lp,
-    AbstractSolverInterface & solver, const Instance & instance, double budget,
-    bool merge = true);
+    AbstractSolverInterface & solver, const Instance & instance,
+    const gecot::budget_t & budget, bool merge = true);
 
 // the algorithms of 'gecot optimize', in the order -A lists them
 std::vector<std::shared_ptr<AbstractSolverInterface>> make_solver_interfaces();

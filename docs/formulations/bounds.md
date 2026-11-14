@@ -8,7 +8,7 @@ $$
 
 is a share of the best possible gain that the solution is *proved* to reach. This is the percentage that `gecot optimize` prints next to its upper bound, where $s_0$ is the score with only the options [bought statically](preprocessing.md#the-instance-given-to-the-algorithms): those of cost $0$, unless a [conflict set](../usage/instance.md#conflict-sets) makes them a choice, as when a free option [models the harm of another](../usage/modeling.md#actions-that-harm-the-landscape). `gecot bound` computes such bounds on their own, to certify a solution obtained otherwise, a heuristic one for instance. Its methods go from free and loose to costly and exact.
 
-On an instance with [conflict sets](../usage/instance.md#conflict-sets) or [several costs](../usage/instance.md#several-costs), only `all_options` and the bounds of `flow_mip`, `multicut_benders` and `flow_benders` are available for now; the other methods stop with an error.
+On an instance with [conflict sets or several costs](../usage/choosing.md#conflict-sets-and-several-costs), not every method is available yet.
 
 ## `all_options`
 

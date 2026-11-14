@@ -32,6 +32,14 @@ def number(text):
     return float(text) if text not in ("", None) else None
 
 
+# a number, or name=value,... for options of several costs: these sort after
+def budget_key(budget):
+    try:
+        return (0, float(budget), "")
+    except ValueError:
+        return (1, 0.0, budget)
+
+
 def load(path):
     with open(path) as f:
         runs = {(r["instance"], r["budget"]): r for r in csv.DictReader(f)}
@@ -67,7 +75,7 @@ def main():
     for runs, _ in files:
         keys += [k for k in runs if k not in keys]
     instances = list(dict.fromkeys(k[0] for k in keys))
-    keys.sort(key=lambda k: (instances.index(k[0]), float(k[1])))
+    keys.sort(key=lambda k: (instances.index(k[0]), budget_key(k[1])))
 
     best = {}  # key -> [score, bound, initial]
     if os.path.exists(BEST):
@@ -80,6 +88,9 @@ def main():
         for key, r in runs.items():
             entry = best.setdefault(key, [None, None, None])
             score, bound = number(r.get("score")), number(r.get("bound"))
+            # a selection over a budget or a conflict set is no known score
+            if r.get("feasible") == "False":
+                score = None
             if score is not None and (entry[0] is None or score > entry[0]):
                 entry[0] = score
             if bound is not None and (entry[1] is None or bound < entry[1]):
@@ -108,6 +119,11 @@ def main():
             stat["runs"] += 1
             score, bound = number(r.get("score")), number(r.get("bound"))
             wall = float(r["wall_time"])
+            if r.get("feasible") == "False":
+                cells.append(f"infeasible ({r['status']})")
+                stat["log_time"] += math.log((limit or wall) + 1)
+                stat["reached"].append(0.0)
+                continue
             if score is None:
                 cells.append(f"{r['status']} ({r['exit']})")
                 stat["log_time"] += math.log((limit or wall) + 1)
@@ -157,7 +173,7 @@ def main():
         with open(BEST, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["instance", "budget", "score", "bound"])
-            for key in sorted(best, key=lambda k: (k[0], float(k[1]))):
+            for key in sorted(best, key=lambda k: (k[0], budget_key(k[1]))):
                 score, bound, _ = best[key]
                 writer.writerow([key[0], key[1],
                                  "" if score is None else repr(score),

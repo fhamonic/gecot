@@ -28,7 +28,7 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 | `-P`, `--list-params` | lists the parameters of the chosen algorithm |
 | `-o`, `--output-json <file>` | writes the result as JSON |
 | `--output-csv <file>` | writes the selection as CSV |
-| `--reformulation trivial`, `path_lp` [`trivial`] | the instance given to the algorithm. `trivial`: without the options over the budget, in any dimension, and those of cost 0, which are bought unless a [conflict set](../usage/instance.md#conflict-sets) makes them a choice. `path_lp`: also without the options that the path relaxation proves to be in no better solution than its own; not with conflict sets or several costs for now |
+| `--reformulation trivial`, `path_lp` [`trivial`] | the instance given to the algorithm. `trivial`: without the options over the budget, in any dimension, and those of cost 0, which are bought unless a [conflict set](../usage/instance.md#conflict-sets) makes them a choice. `path_lp`: also without the options that the path relaxation proves to be in no better solution than its own; not on [every instance](../usage/choosing.md#conflict-sets-and-several-costs) yet |
 | `--reformulation-params "<name>=<value> ..."` | parameters of the `path_lp` of `--reformulation path_lp`, as `"time-limit=60 pricing=enumerate"`; its MIP start is the solution of `greedy` by default |
 | `--no-merging` | for comparison: keeps apart the vertices that arcs of probability 1 link |
 | `-v`, `--verbose` | logs the details of the algorithm; `-vv` everything, with the solver's own log on the standard output |
@@ -68,7 +68,7 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 | `--solver <name>` | `gurobi` | the solver, used through mippp. `flow_mip` and `path_lp`: `gurobi`, `cplex`, `copt`, `xpress`, `mosek`, `highs`, `scip`, `cbc`, `glpk`. `tree_lp`: the same without `glpk`. Benders decompositions: `gurobi`, `cplex`, `copt` |
 | `-t`, `--feasibility-tolerance <value>` | `1e-07` | the tolerance for rounding errors: the solver's feasibility tolerance, and the relative error accepted on a candidate of a Benders decomposition |
 | `--mip-start <file>` | | a solution file (JSON, as written by `-o`) to start the solver from. Excludes `--mip-start-algorithm` |
-| `--mip-start-algorithm <name>` | `none` | the heuristic whose solution starts the solver, run in its incremental form: `none`, `static`, `greedy`. Its time counts in `--time-limit`. Excludes `--mip-start`. `static` and `greedy` refuse conflict sets and several costs for now |
+| `--mip-start-algorithm <name>` | `none` | the heuristic whose solution starts the solver, run in its incremental form: `none`, `static`, `greedy`. Its time counts in `--time-limit`. Excludes `--mip-start`. Not on [every instance](../usage/choosing.md#conflict-sets-and-several-costs) yet |
 | `--time-limit <seconds>` | | after this time, the best solution found is returned |
 
 See [Optimizing](../usage/optimize.md#parameters-of-the-algorithms).

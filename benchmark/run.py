@@ -31,7 +31,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # suite: file and time limit of a run, in seconds
 SUITES = {"full": ("suites/full.csv", 900), "short": ("suites/short.csv", 120)}
 FIELDS = ["instance", "budget", "status", "wall_time", "time", "initial_score",
-          "score", "bound", "cost", "nodes", "exit"]
+          "score", "bound", "cost", "nodes", "exit", "feasible"]
 
 
 def read_suite(path):
@@ -139,8 +139,12 @@ def main():
           f"{csv_path}", flush=True)
 
     new_file = not os.path.exists(csv_path)
+    fields = FIELDS
+    if not new_file:  # appended rows keep the columns of the file
+        with open(csv_path) as f:
+            fields = next(csv.reader(f), FIELDS)
     with open(csv_path, "a", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDS)
+        writer = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         if new_file:
             writer.writeheader()
         for i, (instance, budget) in enumerate(todo):
@@ -166,7 +170,11 @@ def main():
                     "time": result["computation_time_ms"] / 1000,
                     "initial_score": repr(result["initial_score"]),
                     "score": repr(result["solution_score"]),
-                    "cost": repr(result["solution_cost"]),
+                    # an object per dimension with several costs
+                    "cost": json.dumps(result["solution_cost"])
+                    if isinstance(result["solution_cost"], dict)
+                    else repr(result["solution_cost"]),
+                    "feasible": result.get("feasible", ""),
                     "bound": repr(report["best_bound"])
                     if "best_bound" in report else "",
                     "nodes": report.get("nodes", ""),

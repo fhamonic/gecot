@@ -107,7 +107,7 @@ With a single case and $q = w$ this is the *Budget-Constrained PC Optimization* 
 
 ### Several costs and conflict sets
 
-Two generalizations add constraints of the same kind, rows on $x$ with non-negative coefficients; they are supported for now by `flow_mip`, `multicut_benders` and `flow_benders` only.
+Two generalizations add constraints of the same kind, rows on $x$ with non-negative coefficients; not every algorithm [supports them](../usage/choosing.md#conflict-sets-and-several-costs) yet.
 
 - **Several costs.** Each option has a cost $c_{i,r} \ge 0$ in each dimension $r \in R$, money and area for instance, and each dimension a budget $\beta_r$: the single budget row becomes $\sum_{i \in \Phi} c_{i,r} \cdot x_i \le \beta_r$ for every $r \in R$.
 - **Conflict sets.** Sets $\Omega_l \subseteq \Phi$ of alternative options, of which at most one is bought: $\sum_{i \in \Omega_l} x_i \le 1$ for every set $l$. The sets may overlap.

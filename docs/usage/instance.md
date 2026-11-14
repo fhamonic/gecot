@@ -161,7 +161,7 @@ A set changes the best score where the effects of two options would add up. Opti
 
 !!! warning "Supported algorithms"
 
-    For now, only `flow_mip`, `multicut_benders` and `flow_benders` solve instances with conflict sets or several costs, and only the `all_options` bound and these three algorithms bound them. The other algorithms and bounds, `--mip-start-algorithm` and `--reformulation path_lp`, stop with the error `conflict sets and several cost dimensions are not supported yet`; `--mip-start <file>` works. The check is made once the options over the budget are removed: with a single cost, a budget that leaves no conflict set with two affordable options runs with every algorithm.
+    Not every algorithm solves instances with conflict sets or several costs yet: see [which ones do](choosing.md#conflict-sets-and-several-costs).
 
 ## Criterion
 
@@ -240,4 +240,4 @@ $ gecot optimize greedy aude.json 4
 [   0.0s] Budget 4: 26.67 % of the options' total cost (15)
 ```
 
-and the initial score of the result is the score of the landscape as it is. The heuristics do not run yet on an instance with [conflict sets or several costs](#conflict-sets): `gecot bound all_options` prints the same lines and the initial score. The directory `test/instances` of the repository holds complete instances: a river network with dams (`Aude`), raster landscapes of several sizes (`Aix`) and a patch-based landscape (`Quebec_438_RASY`).
+and the initial score of the result is the score of the landscape as it is. Where the heuristics do not [run yet](choosing.md#conflict-sets-and-several-costs), `gecot bound all_options` prints the same lines and the initial score. The directory `test/instances` of the repository holds complete instances: a river network with dams (`Aude`), raster landscapes of several sizes (`Aix`) and a patch-based landscape (`Quebec_438_RASY`).

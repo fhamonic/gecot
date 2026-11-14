@@ -256,16 +256,6 @@ int optimize_command(const std::vector<std::string> & args) {
                 gecot::compute_solution_cost(instance, solution, r));
         for(const auto & [key, value] : report.score_stats)
             report.stats.emplace_back(key, value * score_scale);
-        std::optional<double> best_bound;
-        if(report.best_bound) {
-            const double bound = report.best_bound.value() * score_scale;
-            report.stats.emplace_back("best_bound", bound);
-            if(solution_score > 0)
-                report.stats.emplace_back(
-                    "gap", (bound - solution_score) / solution_score);
-            // at the optimum, a few ulps below the recomputed score
-            best_bound = std::max(bound, solution_score);
-        }
         auto option_value = [&](const gecot::option_t & option) {
             const auto & option_name = raw_instance.option_name(option);
             return static_cast<int>(
@@ -273,9 +263,11 @@ int optimize_command(const std::vector<std::string> & args) {
                 (instance.contains_option(option_name) &&
                  solution[instance.option_from_name(option_name)]));
         };
+        bool feasible = true;
         for(std::size_t r = 0; r < budget.size(); ++r) {
             if(solution_cost[r] <= budget[r] + 1e-6 * std::max(1.0, budget[r]))
                 continue;
+            feasible = false;
             if(budget.size() == 1)
                 spdlog::warn(
                     "The solution costs {:.10g}, over the budget {:.10g}",
@@ -290,10 +282,23 @@ int optimize_command(const std::vector<std::string> & args) {
         for(std::size_t l = 0; l < raw_instance.conflict_sets().size(); ++l) {
             const auto bought = std::ranges::count_if(
                 raw_instance.conflict_sets()[l], option_value);
-            if(bought > 1)
+            if(bought > 1) {
+                feasible = false;
                 spdlog::warn(
                     "The solution buys {} options of the conflict set '{}'",
                     bought, raw_instance.conflict_set_name(l));
+            }
+        }
+        std::optional<double> best_bound;
+        if(report.best_bound) {
+            const double bound = report.best_bound.value() * score_scale;
+            report.stats.emplace_back("best_bound", bound);
+            if(solution_score > 0)
+                report.stats.emplace_back(
+                    "gap", (bound - solution_score) / solution_score);
+            // at the optimum, a few ulps below the recomputed score; an
+            // infeasible selection is no proof of its own score
+            best_bound = feasible ? std::max(bound, solution_score) : bound;
         }
 
         if(!opt_output_json_file.has_value() &&
@@ -306,8 +311,10 @@ int optimize_command(const std::vector<std::string> & args) {
             if(best_bound)
                 std::println(
                     "Upper bound     {}{}", format_score(best_bound.value()),
-                    guaranteed_gain_share(solution_score, best_bound.value(),
-                                          prepared.base_score)
+                    (feasible ? guaranteed_gain_share(solution_score,
+                                                      best_bound.value(),
+                                                      prepared.base_score)
+                              : std::nullopt)
                         .transform([](double share) {
                             return std::format(
                                 " (at least {:.1f} % of the best possible "
@@ -398,7 +405,7 @@ int optimize_command(const std::vector<std::string> & args) {
             print_json_per_dimension(stream, "solution_cost",
                                      "\"solution_cost\":  ", raw_instance,
                                      solution_cost);
-            std::print(stream, ",");
+            std::print(stream, ",\n    \"feasible\":       {},", feasible);
             print_json_property(
                 stream, "solution",
                 std::views::transform(

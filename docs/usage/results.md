@@ -57,7 +57,7 @@ A solver can also end with `limit reached`, `solver failure` or `unknown status`
 
 !!! warning "Solutions over the budget"
 
-    `tree_lp` returns the options that its relaxation uses, even fractionally, which can cost more than the budget. GECOT then logs `warning: The solution costs 5, over the budget 3`, and the `Cost` line shows it. Every other algorithm returns a solution within the budget.
+    `tree_lp` returns the options that its relaxation uses, even fractionally, which can cost more than the budget. GECOT then logs `warning: The solution costs 5, over the budget 3`, the `Cost` line shows it, and the JSON has `"feasible": false`. Such a solution proves nothing: the upper bound is printed without a guaranteed share. Every other algorithm returns a solution within the budget.
 
 ### JSON
 
@@ -102,6 +102,7 @@ $ gecot optimize flow_mip three-woods.json 7 -o solution.json
         "squirrel": 42.44
     },
     "solution_cost":  7,
+    "feasible":       true,
     "solution": {
         "hedgerow":   1,
         "underpass":  1,
@@ -130,6 +131,7 @@ $ gecot optimize flow_mip three-woods.json 7 -o solution.json
 | `initial_score`, `solution_score` | the criterion without options and with the solution |
 | `initial_pc_num`, `solution_pc_num` | the score of each case, without options and with the solution |
 | `budget`, `solution_cost` | the budget and the cost of the solution; with several costs, an object with a number per dimension, as `{"area": 4, "money": 9}` |
+| `feasible` | `true` if the solution fits every budget and buys at most one option of each conflict set, as checked by the warnings below |
 | `solution` | for each option of the instance, 1 if it is bought and 0 otherwise |
 | `algorithm_report` | the status and what the algorithm reports about its run |
 

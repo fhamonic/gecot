@@ -20,7 +20,7 @@ The algorithms of GECOT differ in what they promise. Start from what you need:
 | `tree_lp` | a relaxation, possibly over the budget | to study the tree relaxation |
 | `greedy --worst` | a deliberately bad solution | as a worst-case reference |
 
-With [conflict sets](instance.md#conflict-sets) or [several costs](instance.md#several-costs), only `multicut_benders`, `flow_benders` and `flow_mip` run for now, and without `--mip-start-algorithm` or `--reformulation path_lp`; the others stop with an error. `multicut_benders` then takes the place of `multiflow_benders` in the guidance below, and a starting solution can still be given with `--mip-start`. [Modeling](modeling.md) shows what these constraints can express.
+With [conflict sets](instance.md#conflict-sets) or [several costs](instance.md#several-costs), not every algorithm runs yet: see [below](#conflict-sets-and-several-costs).
 
 "Exact" always means up to the [tolerances](../formulations/flow.md#what-flow_mip-solves) of the solver and the [resolution](../formulations/preprocessing.md#resolution) of the preprocessing. Under `--time-limit` or after Ctrl-C, the exact algorithms return their best solution with the bound proved so far.
 
@@ -64,6 +64,22 @@ The result is at least as good as the heuristic's and comes with a guaranteed sh
 **Several species with a minimum criterion.** Prefer an exact algorithm. A heuristic ranks the options by the gain of the criterion, and with a minimum only the options that help the worst-off case have any: its choices among the others are arbitrary.
 
 **You compare with a ranking method.** `static` is the ranking of the options by their individual gain, `greedy` its iterated version, and the gap to the optimum measures what the interactions between the options are worth on your landscape.
+
+## Conflict sets and several costs
+
+Instances with [conflict sets](instance.md#conflict-sets) or [several costs](instance.md#several-costs), and what they [can express](modeling.md), are supported by part of GECOT for now:
+
+| | Supported |
+|---|---|
+| `flow_mip`, `multicut_benders`, `flow_benders` | yes |
+| `multiflow_benders`, `static`, `greedy`, `path_lp` | not yet |
+| `tree_lp` | no |
+| bounds `all_options`, `flow_mip`, `multicut_benders`, `flow_benders` | yes |
+| bounds `qkp_planes`, `split_lagrange`, `path_lp`, `multiflow_benders` | not yet |
+| `--mip-start <file>` | yes |
+| `--mip-start-algorithm`, `--reformulation path_lp` | not yet |
+
+The others stop with the error `conflict sets and several cost dimensions are not supported yet`. The check is made once the options over the budget are removed: with a single cost, a budget that leaves no conflict set with two affordable options runs with every algorithm. In the guidance above, `multicut_benders` then takes the place of `multiflow_benders`, and a starting solution can still be given with `--mip-start`.
 
 ## What the solvers support
 

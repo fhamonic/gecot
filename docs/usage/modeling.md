@@ -4,7 +4,7 @@
 
 !!! warning "Supported algorithms"
 
-    For now, only `flow_mip`, `multicut_benders` and `flow_benders` solve instances with several costs or conflict sets, without `--mip-start-algorithm` or `--reformulation path_lp`, and only these and the `all_options` bound bound them.
+    Not every algorithm solves instances with several costs or conflict sets yet: see [which ones do](choosing.md#conflict-sets-and-several-costs).
 
 ## Different kinds of actions
 
@@ -114,7 +114,17 @@ In [`three-woods-works.json`](../examples/three-woods-works.json), the works of 
 
 Up to a budget of 5 the underpass is not worth a third of wood C. At 7, it is: the underpass with the hedgerow and the plantation scores 31.36, against 28.76 for keeping the wood intact. The last column is the original three woods, where the works harm nothing.
 
-**Reading the results.** The *initial score* is the score with nothing bought, so here the landscape after the harm: 12.6. The landscape as it is scores 18.4, the score of `wood_c_intact` alone, and that is the reference for the gains. The printed gains, `+148.89 %` at a budget of 7, are relative to the landscape after the harm, and so is the guaranteed share while the harmful action fits in the budget.
+**Reading the results.** The *initial score* is the score with nothing bought, so here the landscape after the harm: 12.6. This is the convention of [conservation problems](../formulations/problem.md#options), where the landscape is described as it would be if nothing were protected, and the free option is a conservation action among restoration ones. The printed gains, `+148.89 %` at a budget of 7, are relative to the landscape after the harm, and so is the guaranteed share while the harmful action fits in the budget.
+
+The landscape as it is scores 18.4. A run with a budget of 0 gives it: the harmful action is then over the budget, so the free option is bought statically.
+
+```console
+$ gecot optimize flow_mip three-woods-works.json 0 -q
+Status          no option left
+Initial score   12.6
+Solution score  18.4 (+46.03 %)
+...
+```
 
 ```console
 $ gecot optimize flow_mip three-woods-works.json 7 -q

@@ -31,7 +31,7 @@ $ gecot optimize --list-algorithms
 | `tree_lp` | the [tree relaxation](../formulations/relaxations.md#the-tree-formulation), by column generation | none: can exceed the budget |
 | `static`, `greedy` | the [heuristics](../formulations/heuristics.md), incremental or with `--decremental` | none |
 
-[Choosing an algorithm](choosing.md) compares them. With [conflict sets or several costs](instance.md#conflict-sets), only `flow_mip`, `multicut_benders` and `flow_benders` run for now.
+[Choosing an algorithm](choosing.md) compares them. With [conflict sets or several costs](instance.md#conflict-sets), not every algorithm [runs yet](choosing.md#conflict-sets-and-several-costs).
 
 ## Options of the command
 
@@ -81,7 +81,7 @@ Ctrl-C has the same effect as the time limit running out, at any moment: see [Re
 
 A solver searches faster from a good solution. Two parameters, which exclude each other, provide one:
 
-- `--mip-start-algorithm <heuristic>` runs `static` or `greedy` first, in its incremental form, and starts from its solution, which is not available yet with [conflict sets or several costs](instance.md#conflict-sets);
+- `--mip-start-algorithm <heuristic>` runs `static` or `greedy` first, in its incremental form, and starts from its solution (not [on every instance](choosing.md#conflict-sets-and-several-costs) yet);
 - `--mip-start <file>` starts from a solution file written by `-o`, for instance by a previous run with another algorithm or a smaller time limit. Its options that the instance does not have are ignored.
 
 ```console
@@ -102,7 +102,7 @@ The start also seeds the cuts of the Benders decompositions and the columns of t
 
 ## Removing options first
 
-`--reformulation path_lp` runs the path relaxation before the algorithm and removes the options that it proves to be in no solution better than the one it found. The algorithm then works on fewer options, from that solution. It does not run yet on instances with [conflict sets or several costs](instance.md#conflict-sets).
+`--reformulation path_lp` runs the path relaxation before the algorithm and removes the options that it proves to be in no solution better than the one it found. The algorithm then works on fewer options, from that solution. It does not run on [every instance](choosing.md#conflict-sets-and-several-costs) yet.
 
 ```console
 $ gecot optimize flow_mip instance.json 8 --reformulation path_lp

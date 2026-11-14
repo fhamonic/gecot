@@ -5,6 +5,6 @@ gecot::solve_result<Instance> MultiflowBendersInterface::solve(
     const auto started = with_mip_start(solver, instance, B);
     return with_solver(
         [&]<typename LP, gecot::solvers::lazy_constraint_model MILP>() {
-            return started.template solve<MILP>(instance, B.front());
+            return started.template solve<MILP>(instance, B);
         });
 }

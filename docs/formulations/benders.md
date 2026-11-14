@@ -74,7 +74,7 @@ $$
 
 where $Y_t$ is the set of scenarios at which a cut of $t$ has been added so far. With all the scenarios in $Y_t$ the master would be equivalent to the flow formulation; the search adds only the few that matter.
 
-With [several costs or conflict sets](problem.md#several-costs-and-conflict-sets), the budget row of this master, and of the master of `multicut_benders` below, becomes the rows of the [flow formulation](flow.md#cases-and-criterion): one per cost dimension and one per conflict set. The cuts are the same.
+With [several costs or conflict sets](problem.md#several-costs-and-conflict-sets), the budget row of this master, and of the masters of `multicut_benders` and `multiflow_benders` below, becomes the rows of the [flow formulation](flow.md#cases-and-criterion): one per cost dimension and one per conflict set. The cuts are the same.
 
 ## `multicut_benders`: cuts on groups of targets
 
@@ -137,7 +137,7 @@ f_t(x) \;\le\; w^x_t + \sum_{s \neq t} \Big[ \; & \rho^s_s \cdot w^x_s \\
 \end{aligned}
 $$
 
-An option now pays, for each source, only what this source can bring to its arcs. The master is the one of `flow_benders` with these cuts in place of $\operatorname{cut}_{t,y}$, and its linear relaxation is much closer to the optimum. `multiflow_benders` does not accept [several costs or conflict sets](../usage/choosing.md#conflict-sets-and-several-costs) yet.
+An option now pays, for each source, only what this source can bring to its arcs. The master is the one of `flow_benders` with these cuts in place of $\operatorname{cut}_{t,y}$, and its linear relaxation is much closer to the optimum.
 
 **Separation.** The cut of a point $\bar{x}$, which may be fractional, takes for each source the potentials of its largest flow at $\bar{x}$, where an improved copy carries at most $m_{sa} \cdot \bar{x}_i$. This flow is computed by augmenting along the paths of highest gain, and the potentials of the last step are an optimal dual solution. At a scenario, one path takes the whole quality of the source and the potentials are the probabilities of connection.
 

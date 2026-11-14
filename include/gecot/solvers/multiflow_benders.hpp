@@ -33,8 +33,8 @@ namespace solvers {
 
 // Benders decomposition with a flow per source and target.
 //
-// Buying the options X within the budget, c(X) <= B, the quality that
-// reaches a target t is
+// Buying the options X within the budgets and the conflict sets, the quality
+// that reaches a target t is
 //     F_t(X) = q_t(X) + Σ_{s≠t} q_s(X) P_st(X),
 // the source qualities with their gains, each times the probability of its
 // most reliable path to t; t scores (tq_t + Σ_{o∈X} Δtq_to) F_t(X) and the
@@ -63,7 +63,7 @@ namespace solvers {
 //     s.t. z_k <= Σ_{t∈k} (tq_t F_t + Σ_o Δtq_to F'_to)
 //          F'_to <= F_t,  F'_to <= M_t x_o
 //          F_t <= cut_ρ(x)               for each ρ separated
-//          Σ_o c_o x_o <= B,  x binary
+//          Σ_o c_{o,r} x_o <= B_r,  Σ_{o∈S} x_o <= 1,  x binary
 //
 // The cut of a point x̄, fractional or not, takes for each source the ρ of
 // its largest flow at x̄. It is separated first on the linear relaxation,
@@ -342,17 +342,16 @@ struct multiflow_benders : public mip_solver_base {
     };
 
     template <lazy_constraint_model M, instance_c I>
-    solve_result<I> solve(const I & instance, const double budget) const {
+    solve_result<I> solve(const I & instance, const budget_t & budget) const {
         using namespace mippp;
         using namespace mippp::operators;
         using cut = target_block::cut;
-        check_plain_budget(instance, "multiflow_benders");
         _check_criterion(instance);
         spdlog::stopwatch sw;
 
-        // The master: z with the criterion, x with the budget row, and for
-        // each target its block, F_t and its F'_to, in the order of the
-        // block's target quality gains.
+        // The master: z with the criterion, x with the budget and conflict
+        // rows, and for each target its block, F_t and its F'_to, in the
+        // order of the block's target quality gains.
         M model;
         model.set_optimality_tolerance(1e-10);
         model.set_feasibility_tolerance(feasibility_tol);
@@ -363,9 +362,7 @@ struct multiflow_benders : public mip_solver_base {
         model.set_objective(formula.variable(instance.criterion()));
         const auto x = model.add_binary_variables(
             instance.options().size(), [](const option_t & o) { return o; });
-        model.add_constraint(xsum(instance.options(), [&](auto && o) {
-                                 return instance.option_cost(o) * x(o);
-                             }) <= budget);
+        _add_budget_rows(model, instance, budget, x);
 
         std::vector<target_block> blocks;
         std::vector<model_variable_t<M>> F, F_prime;
@@ -373,7 +370,7 @@ struct multiflow_benders : public mip_solver_base {
         for(auto && instance_case : instance.cases()) {
             const auto [strong_arcs_map, useless_arcs_map] =
                 _compute_strong_and_useless_arcs(instance, instance_case,
-                                                 budget_t{{budget}});
+                                                 budget);
             preprocessing.emplace_back(
                 instance_case.name(),
                 _average_size(instance_case, strong_arcs_map),
@@ -387,9 +384,9 @@ struct multiflow_benders : public mip_solver_base {
                 pb.tick();
                 if(!_is_target(instance_case, t)) continue;
                 const auto data = compute_contracted_graph_data(
-                    instance, instance_case, budget_t{{budget}}, t,
-                    strong_arcs_map[t], useless_arcs_map[t],
-                    big_M_kind::knapsack_bnb, feasibility_tol, !no_pruning);
+                    instance, instance_case, budget, t, strong_arcs_map[t],
+                    useless_arcs_map[t], big_M_kind::knapsack_bnb,
+                    feasibility_tol, !no_pruning);
                 const target_block & block = blocks.emplace_back(data);
                 // M_t bounds F_t: without it the relaxation is unbounded
                 // until t receives a cut
@@ -556,8 +553,7 @@ struct multiflow_benders : public mip_solver_base {
             report.score_stats.emplace_back("root_relaxation_value",
                                             *root_value);
         }
-        if(!has_solution)
-            return {_fallback_solution(instance, budget_t{{budget}}), report};
+        if(!has_solution) return {_fallback_solution(instance, budget), report};
         const auto master_solution = model.get_solution();
         auto solution = instance.create_option_map(false);
         for(auto && o : instance.options())

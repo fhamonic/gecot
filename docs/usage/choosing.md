@@ -71,15 +71,15 @@ Instances with [conflict sets](instance.md#conflict-sets) or [several costs](ins
 
 | | Supported |
 |---|---|
-| `flow_mip`, `multicut_benders`, `flow_benders` | yes |
-| `multiflow_benders`, `static`, `greedy`, `path_lp` | not yet |
+| `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` | yes |
+| `static`, `greedy`, `path_lp` | not yet |
 | `tree_lp` | no |
-| bounds `all_options`, `flow_mip`, `multicut_benders`, `flow_benders` | yes |
-| bounds `qkp_planes`, `split_lagrange`, `path_lp`, `multiflow_benders` | not yet |
+| bounds `all_options`, `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` | yes |
+| bounds `qkp_planes`, `split_lagrange`, `path_lp` | not yet |
 | `--mip-start <file>` | yes |
 | `--mip-start-algorithm`, `--reformulation path_lp` | not yet |
 
-The others stop with the error `conflict sets and several cost dimensions are not supported yet`. The check is made once the options over the budget are removed: with a single cost, a budget that leaves no conflict set with two affordable options runs with every algorithm. In the guidance above, `multicut_benders` then takes the place of `multiflow_benders`, and a starting solution can still be given with `--mip-start`.
+The others stop with the error `conflict sets and several cost dimensions are not supported yet`. The check is made once the options over the budget are removed: with a single cost, a budget that leaves no conflict set with two affordable options runs with every algorithm. A starting solution can still be given with `--mip-start`.
 
 ## What the solvers support
 

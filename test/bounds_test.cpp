@@ -540,7 +540,7 @@ GTEST_TEST(bounds, qkp_planes_bounds_the_optimum) {
         for(auto start : {best, half, target, source}) {
             for(std::size_t iterations : {std::size_t{0}, std::size_t{20}}) {
                 const gecot::qkp_planes method{start, iterations, {}};
-                const double bound = method.bound(instance, budget).bound;
+                const double bound = method.bound(instance, {{budget}}).bound;
                 EXPECT_GE(bound, optimum - tolerance)
                     << "round " << round << " start " << static_cast<int>(start)
                     << " iterations " << iterations;
@@ -563,7 +563,7 @@ GTEST_TEST(bounds, qkp_planes_without_quality_gains_is_all_options) {
                                       raw_instance, gecot::budget_t{{budget}})
                                       .instance;
         const double all_options = gecot::all_options_bound(instance).bound;
-        EXPECT_NEAR(gecot::qkp_planes{}.bound(instance, budget).bound,
+        EXPECT_NEAR(gecot::qkp_planes{}.bound(instance, {{budget}}).bound,
                     all_options, 1e-12 * all_options);
     }
 }
@@ -579,12 +579,12 @@ GTEST_TEST(bounds, qkp_planes_joint_bound_is_at_most_the_case_bounds) {
         const gecot::qkp_planes method{
             gecot::qkp_planes::theta_start::half, 0, {}};
         const std::vector<double> w{0.7, 1.3};
-        const double joint = method.weighted(instance, budget, w).bound;
+        const double joint = method.weighted(instance, {{budget}}, w).bound;
         const double separate =
-            0.7 *
-                method.weighted(instance, budget, std::vector{1.0, 0.0}).bound +
-            1.3 *
-                method.weighted(instance, budget, std::vector{0.0, 1.0}).bound;
+            0.7 * method.weighted(instance, {{budget}}, std::vector{1.0, 0.0})
+                      .bound +
+            1.3 * method.weighted(instance, {{budget}}, std::vector{0.0, 1.0})
+                      .bound;
         EXPECT_LE(joint, separate * (1 + 1e-12));
     }
 }
@@ -595,8 +595,8 @@ GTEST_TEST(bounds, qkp_planes_iterations_never_raise_the_bound) {
         auto [instance, budget] = hexagon_like(rng);
         using enum gecot::qkp_planes::theta_start;
         const gecot::qkp_planes iterated{best, 30, {}}, started{best, 0, {}};
-        EXPECT_LE(iterated.bound(instance, budget).bound,
-                  started.bound(instance, budget).bound);
+        EXPECT_LE(iterated.bound(instance, {{budget}}).bound,
+                  started.bound(instance, {{budget}}).bound);
     }
 }
 
@@ -615,15 +615,16 @@ GTEST_TEST(bounds, split_lagrange_bounds_the_optimum) {
                 gecot::split_lagrange method;
                 method.iterations = iterations;
                 if(aim_at_optimum) method.target = optimum;
-                const auto report = method.bound(instance, budget);
+                const auto report = method.bound(instance, {{budget}});
                 EXPECT_GE(report.bound, optimum - tolerance)
                     << "round " << round << " iterations " << iterations
                     << (aim_at_optimum ? " aiming at the optimum" : "");
                 ++runs;
                 stepped += report.stats.front().second > 1;
-                below_qkp += report.bound <
-                             gecot::qkp_planes{}.bound(instance, budget).bound *
-                                 (1 - 1e-9);
+                below_qkp +=
+                    report.bound <
+                    gecot::qkp_planes{}.bound(instance, {{budget}}).bound *
+                        (1 - 1e-9);
             }
         }
     }
@@ -642,9 +643,9 @@ GTEST_TEST(bounds, split_lagrange_starts_from_qkp_planes) {
         method.vertex_side = vertex_side;
         method.iterations = 1;
         const std::vector<double> w{1.0};
-        const double qkp = vertex_side.weighted(instance, budget, w).bound;
+        const double qkp = vertex_side.weighted(instance, {{budget}}, w).bound;
         // the first step's bound itself: the result is at most qkp_planes'
-        const auto result = method.weighted(instance, budget, w);
+        const auto result = method.weighted(instance, {{budget}}, w);
         ASSERT_EQ(result.sweep_bounds.size(), 1u);
         EXPECT_NEAR(result.sweep_bounds[0], qkp, 1e-9 * qkp);
     }
@@ -662,7 +663,8 @@ GTEST_TEST(bounds, split_lagrange_prices_pairs_exactly) {
         const Instance instance = build_instance(
             std::vector<double>(num_options, 1.0),
             {star_options_case(rng, n, num_options)}, criterion_var{0});
-        gecot::split_lagrange::check_structure(instance, num_options);
+        gecot::split_lagrange::check_structure(
+            instance, {{static_cast<double>(num_options)}});
         const InstanceCase & c = instance.cases()[0];
         for(unsigned int s = 0; s < n; ++s)
             for(unsigned int t = 0; t < n; ++t) {
@@ -679,7 +681,8 @@ GTEST_TEST(bounds, split_lagrange_prices_pairs_exactly) {
                 }
                 const double expected = brute_force_pair_value(c, s, t, w, nu);
                 EXPECT_NEAR(gecot::split_lagrange::pair_value(
-                                instance, c, num_options, s, t, nu),
+                                instance, c,
+                                {{static_cast<double>(num_options)}}, s, t, nu),
                             expected, 1e-12 * std::max(1.0, expected))
                     << "pair " << s << "-" << t << " after " << pairs;
                 ++pairs;
@@ -694,9 +697,9 @@ GTEST_TEST(bounds, split_lagrange_checks_the_priced_cases_only) {
         {}, {{{0.9, 0}}, {{0.9, 1}}}};
     const Instance instance =
         build_instance({1, 1}, {fine, two_into_one}, criterion_var{0});
-    EXPECT_THROW(gecot::split_lagrange::check_structure(instance, 2),
+    EXPECT_THROW(gecot::split_lagrange::check_structure(instance, {{2}}),
                  std::invalid_argument);
-    EXPECT_NO_THROW(gecot::split_lagrange{}.bound(instance, 2));
+    EXPECT_NO_THROW(gecot::split_lagrange{}.bound(instance, {{2}}));
 }
 
 GTEST_TEST(bounds, split_lagrange_refuses_unsupported_structures) {
@@ -717,17 +720,64 @@ GTEST_TEST(bounds, split_lagrange_refuses_unsupported_structures) {
         2, {{0, 1}}, {0.5}, {1, 1}, {1, 1}, {}, {{{0.9, 0}, {0.8, 1}}}};
     for(const case_spec & c : {two_into_one, disjoint, shared}) {
         const Instance instance = build_instance({1, 1}, {c}, criterion_var{0});
-        EXPECT_THROW(gecot::split_lagrange::check_structure(instance, 2),
+        EXPECT_THROW(gecot::split_lagrange::check_structure(instance, {{2}}),
                      std::invalid_argument);
-        EXPECT_THROW(gecot::split_lagrange{}.bound(instance, 2),
+        EXPECT_THROW(gecot::split_lagrange{}.bound(instance, {{2}}),
                      std::invalid_argument);
     }
     std::mt19937 rng(19);
     for(int round = 0; round < 20; ++round) {
         auto [instance, budget] = hexagon_like(rng);
         EXPECT_NO_THROW(
-            gecot::split_lagrange::check_structure(instance, budget));
+            gecot::split_lagrange::check_structure(instance, {{budget}}));
     }
+}
+
+GTEST_TEST(bounds, qkp_planes_and_split_lagrange_with_conflicts_and_costs) {
+    std::mt19937 rng(29);
+    int tightened = 0, priced = 0;
+    for(int round = 0; round < 300; ++round) {
+        auto [instance, budget] = random_conflicts_instance(rng);
+        const double optimum = brute_force_optimum(instance, budget);
+        const double tolerance = 1e-9 * std::max(1.0, std::abs(optimum));
+        for(std::size_t iterations : {std::size_t{0}, std::size_t{20}}) {
+            const gecot::qkp_planes method{
+                gecot::qkp_planes::theta_start::best, iterations, {}};
+            const double bound = method.bound(instance, budget).bound;
+            EXPECT_GE(bound, optimum - tolerance) << "round " << round;
+            // the second dimension is read
+            tightened +=
+                bound <
+                method.bound(instance, {{budget[0], 1e9}}).bound * (1 - 1e-12);
+        }
+        try {
+            gecot::split_lagrange::check_structure(instance, budget);
+        } catch(const std::invalid_argument &) {
+            continue;
+        }
+        EXPECT_GE(gecot::split_lagrange{}.bound(instance, budget).bound,
+                  optimum - tolerance)
+            << "round " << round;
+        ++priced;
+    }
+    EXPECT_GT(tightened, 0);
+    EXPECT_GT(priced, 0);
+}
+
+// two options of one vertex, each of a source and a target gain: a set
+// forbids buying both, and so their product
+GTEST_TEST(bounds, qkp_planes_drops_the_products_of_a_conflict_set) {
+    const case_spec site{
+        2, {{0, 1}}, {0.5}, {1, 1}, {1, 1}, {{{1, 1, 0}, {1, 1, 1}}, {}}, {{}}};
+    const Instance both =
+        build_instance({"cost"}, {{1}, {1}}, {}, {site}, criterion_var{0});
+    const Instance one = build_instance({"cost"}, {{1}, {1}}, {{0, 1}}, {site},
+                                        criterion_var{0});
+    auto qkp = [](const Instance & instance) {
+        return gecot::qkp_planes{}.bound(instance, {{2}}).bound;
+    };
+    EXPECT_LT(qkp(one), qkp(both));
+    EXPECT_GE(qkp(one), brute_force_optimum(one, 2) - 1e-9);
 }
 
 GTEST_TEST(trivial_reformulation, keeps_free_options_that_exclude_others) {

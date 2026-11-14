@@ -18,7 +18,7 @@ The arguments are those of [`gecot optimize`](optimize.md), with a method in pla
 | `path_lp` | the Lagrangian bound of the path relaxation | a linear solver |
 | `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` | the bound proved by the exact algorithm | a MILP solver; the optimum when the status is `optimal` |
 
-The [bounds page](../formulations/bounds.md) explains what each one computes. Every method needs a criterion that is non-decreasing in the score of every case and refuses the others; see the [instance files](instance.md#criterion). On an instance with [conflict sets](instance.md#conflict-sets) or [several costs](instance.md#several-costs), not every method [is supported yet](choosing.md#conflict-sets-and-several-costs).
+The [bounds page](../formulations/bounds.md) explains what each one computes. Every method needs a criterion that is non-decreasing in the score of every case and refuses the others; see the [instance files](instance.md#criterion). Every method accepts [conflict sets](instance.md#conflict-sets) and [several costs](instance.md#several-costs).
 
 ## Reading the result
 
@@ -119,6 +119,5 @@ How good is it? Each method answers with a bound $b$. The solution gains 81,627.
 `gecot bound` fails rather than print a bound it cannot stand behind:
 
 - the criterion is not non-decreasing in the score of every case, or the options do not have the shape that `split_lagrange` needs;
-- the instance has [conflict sets](instance.md#conflict-sets) or [several costs](instance.md#several-costs), which the method does not [support yet](choosing.md#conflict-sets-and-several-costs);
 - an exact algorithm stopped before finding any solution, and so before proving a bound: give it more time or a MIP start;
 - the bound computed is below the score of buying nothing, which would be a contradiction.

@@ -42,7 +42,7 @@ public:
                                 const bound_context & context) const override {
         gecot::qkp_planes m = method;
         if(target) m.target = target.value() / context.score_scale;
-        return m.bound(instance, B.front());
+        return m.bound(instance, B);
     }
 
     std::string description() const override {

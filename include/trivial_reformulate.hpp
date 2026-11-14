@@ -117,8 +117,7 @@ reformulation<I> trivial_reformulate_instance(const I & instance,
     // an option over the budget of a dimension is never bought
     auto affordable = instance.create_option_map(true);
     for(auto && o : instance.options())
-        for(std::size_t r = 0; r < budget.size(); ++r)
-            if(instance.option_cost(o, r) > budget[r]) affordable[o] = false;
+        affordable[o] = gecot::fits_alone(instance, o, budget);
     // a set of one affordable option or none constrains nothing
     auto in_conflict = instance.create_option_map(false);
     for(auto && set : instance.conflict_sets())

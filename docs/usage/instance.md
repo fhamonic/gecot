@@ -240,4 +240,4 @@ $ gecot optimize greedy aude.json 4
 [   0.0s] Budget 4: 26.67 % of the options' total cost (15)
 ```
 
-and the initial score of the result is the score of the landscape as it is. Where the heuristics do not [run yet](choosing.md#conflict-sets-and-several-costs), `gecot bound all_options` prints the same lines and the initial score. The directory `test/instances` of the repository holds complete instances: a river network with dams (`Aude`), raster landscapes of several sizes (`Aix`) and a patch-based landscape (`Quebec_438_RASY`).
+and the initial score of the result is the score of the landscape as it is. The directory `test/instances` of the repository holds complete instances: a river network with dams (`Aude`), raster landscapes of several sizes (`Aix`) and a patch-based landscape (`Quebec_438_RASY`).

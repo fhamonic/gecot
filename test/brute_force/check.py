@@ -5,11 +5,13 @@ sets and several cost dimensions, run by hand like test/cli_parity.sh.
 usage: check.py GECOT_BIN [ALGORITHM_CONFIG ...]
 
 Each config is an algorithm and its parameters in one argument, as
-"flow_mip --big-m plain"; by default every supported algorithm with its main
-options. A run passes if its selection is feasible, its reported score is the
-brute-force score of that selection, its bound, if any, is at least the
-brute-force optimum, and, for an exact algorithm, its status is optimal and
-its score the optimum. The instances are variants of the repository's
+"flow_mip --big-m plain", or "bound" and a method of gecot bound, as
+"bound qkp_planes --iterations 20"; by default every supported algorithm and
+method with their main options. A run passes if its selection is feasible, its
+reported score is the brute-force score of that selection, its bound, if any,
+is at least the brute-force optimum, and, for an exact algorithm, its status
+is optimal and its score the optimum. A bound passes if it is at least the
+optimum; split_lagrange refusing the shape of the options is no failure. The instances are variants of the repository's
 three woods, Aude and conflicts instances, written to a temporary directory,
 and include three oracles that bypass the new rows: a second dimension equal
 to the first, an all-zero one, and renamed dimensions, each with the same
@@ -33,13 +35,15 @@ CONFIGS = [
     "path_lp", "path_lp --pricing enumerate", "flow_mip --reformulation path_lp",
     "multicut_benders --reformulation path_lp --reformulation-params pricing=enumerate",
     "static", "greedy", "greedy --worst",
+    "bound all_options", "bound qkp_planes", "bound qkp_planes --iterations 20",
+    "bound split_lagrange", "bound path_lp",
 ]
 
 
 def relaxed(config):
-    """Not exact: the relaxations and the heuristics."""
+    """Not exact: the relaxations, the heuristics and the bounds."""
     words = config.split()
-    return words[0] in ("static", "greedy", "path_lp") or "--lp-relaxation" in words
+    return words[0] in ("static", "greedy", "path_lp", "bound") or "--lp-relaxation" in words
 
 
 def write_instances(out):
@@ -98,11 +102,13 @@ def write_instances(out):
 
 
 def run(binary, path, budget, config, out):
-    algorithm, *params = config.split()
+    words = config.split()
+    bound = words[0] == "bound"
+    command, params = (words[:2], words[2:]) if bound else (["optimize", words[0]], words[1:])
     result = os.path.join(out, "result.json")
     if os.path.exists(result):
         os.remove(result)
-    p = subprocess.run([binary, "optimize", algorithm, path, budget, *params, "-q", "-o", result],
+    p = subprocess.run([binary, *command, path, budget, *params, "-q", "-o", result],
                        capture_output=True, text=True, timeout=600)
     if p.returncode != 0:
         return None, p.stderr.strip()
@@ -126,6 +132,19 @@ def main():
                 for config in configs:
                     runs += 1
                     result, error = run(binary, path, b, config, out)
+                    if config.startswith("bound "):
+                        if result is None and "split_lagrange: " in error:
+                            print(f"  {config:42s} refused: {error[:80]}")
+                            continue
+                        ok = result is not None \
+                            and result["bound"] >= optimum - 1e-6 * max(1, optimum)
+                        print(f"  {config:42s} {result['bound'] if result else error[:80]} "
+                              f"{'ok' if ok else 'FAIL'}")
+                        if not ok:
+                            failures.append(f"{os.path.basename(path)} {b} {config}: "
+                                            f"{result['bound'] if result else error[:200]}, "
+                                            f"optimum {optimum}")
+                        continue
                     if result is None:
                         failures.append(f"{os.path.basename(path)} {b} {config}: {error[:200]}")
                         continue

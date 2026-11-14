@@ -67,21 +67,19 @@ The result is at least as good as the heuristic's and comes with a guaranteed sh
 
 ## Conflict sets and several costs
 
-Instances with [conflict sets](instance.md#conflict-sets) or [several costs](instance.md#several-costs), and what they [can express](modeling.md), are supported by part of GECOT for now:
+Instances with [conflict sets](instance.md#conflict-sets) or [several costs](instance.md#several-costs), and what they [can express](modeling.md), are supported by every algorithm but `tree_lp` and the decremental heuristics:
 
 | | Supported |
 |---|---|
-| `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` | yes |
+| `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders`, `path_lp` | yes |
 | `static`, `greedy`, `greedy --worst` | yes, [with conflict rules](../formulations/heuristics.md#conflict-sets-and-several-costs) |
 | `static --decremental`, `greedy --decremental` | no |
-| `path_lp` | not yet |
 | `tree_lp` | no |
-| bounds `all_options`, `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` | yes |
-| bounds `qkp_planes`, `split_lagrange`, `path_lp` | not yet |
+| every bound of `gecot bound` | yes |
 | `--mip-start <file>`, `--mip-start-algorithm` | yes |
-| `--reformulation path_lp` | not yet |
+| `--reformulation path_lp` | yes |
 
-The others stop with the error `conflict sets and several cost dimensions are not supported yet`, and `--decremental` with its own error. The check is made once the options over the budget are removed: with a single cost, a budget that leaves no conflict set with two affordable options runs with every algorithm.
+`tree_lp` stops with the error `conflict sets and several cost dimensions are not supported yet`, and `--decremental` with its own error. The check is made once the options over the budget are removed: with a single cost, a budget that leaves no conflict set with two affordable options runs with every algorithm.
 
 ## What the solvers support
 

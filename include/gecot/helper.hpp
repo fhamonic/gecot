@@ -163,6 +163,14 @@ bool is_feasible(const I & instance, const S & solution,
     });
 }
 
+// the option alone within the budget of every dimension
+template <instance_c I>
+bool fits_alone(const I & instance, const option_t o, const budget_t & budget) {
+    for(std::size_t r = 0; r < budget.size(); ++r)
+        if(instance.option_cost(o, r) > budget[r]) return false;
+    return true;
+}
+
 // one cost dimension and no conflict set
 template <instance_c I>
 bool has_plain_budget(const I & instance) {

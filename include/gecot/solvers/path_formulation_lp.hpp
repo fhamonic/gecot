@@ -40,7 +40,8 @@ namespace solvers {
 
 // The path formulation relaxation, by column generation.
 //
-// Buying the options X within the budget, c(X) <= B, a case k scores the sum
+// Buying the options X within the budgets and the conflict sets, a case k
+// scores the sum
 // over its pairs of vertices p = (s, t) of
 //     v_p(X) = q_s(X) q_t(X) P_st(X),
 // the source and target qualities with their gains times the probability of
@@ -52,7 +53,8 @@ namespace solvers {
 //     s.t. z_k <= C_k + Σ_{p∈k} Σ_S v_pS y_pS    π_k   contribution
 //          Σ_S y_pS <= 1                        σ_p   uniqueness
 //          Σ_{S∋o} y_pS <= x_o                  λ_po  purchase
-//          Σ_o c_o x_o <= B                     μ     budget
+//          Σ_o c_or x_o <= B_r                  μ_r   budget of dimension r
+//          Σ_{o∈Ω} x_o <= 1                     ν_Ω   conflict set Ω
 //          x, y >= 0
 //
 // with C_k the value of the pairs that no column improves. Buying X, the
@@ -78,7 +80,8 @@ namespace solvers {
 //   at s, each quality option of s is bought if π_k g_o w > λ_po, g_o its
 //   gain. Like the LP above, it ignores the budget: its columns can cost
 //   more than B.
-// - enumerate: per target, once, W = c(S) <= B, which can tighten the
+// - enumerate: per target, once, W = c_0(S) <= B_0, S within the other
+//   budgets and without two options of a conflict set, which can tighten the
 //   relaxation: a label is worth no less than those of no more value that
 //   buy at least its options whatever the duals, so each pair keeps the
 //   non-dominated columns, an argmax for any duals.
@@ -288,12 +291,30 @@ struct path_formulation_lp : public mip_solver_base {
         return reach;
     }
 
+    // S within the budgets beyond the dimension 0, which the weights carry,
+    // and without two options of a conflict set
+    template <instance_c I>
+    static bool _fits_beyond_first(const I & instance, const budget_t & budget,
+                                   const option_set & S) {
+        for(std::size_t r = 1; r < budget.size(); ++r) {
+            double cost = 0;
+            for(const option_t o : S) cost += instance.option_cost(o, r);
+            if(cost > budget[r]) return false;
+        }
+        return std::ranges::none_of(instance.conflict_sets(), [&](auto && set) {
+            return std::ranges::count_if(set, [&](auto && o) {
+                       return std::ranges::binary_search(S, o);
+                   }) > 1;
+        });
+    }
+
     // The non-dominated columns of the pair (s, t) within the budget: each
     // label (S, w) from s to t with each set of the quality options of s.
     template <instance_c I, case_c C>
     static std::vector<valued_set> _pair_columns(
         const I & instance, const C & instance_case, const vertex s,
-        const std::vector<valued_set> & labels, const double budget) {
+        const std::vector<valued_set> & labels, const budget_t & budget) {
+        const bool plain = has_plain_budget(instance);
         const option_set source_options =
             _quality_options(instance_case, s, true, [](auto) { return true; });
         std::vector<valued_set> columns;
@@ -301,8 +322,11 @@ struct path_formulation_lp : public mip_solver_base {
             for(const option_set & A : _subsets(source_options)) {
                 valued_set c{_union(S, A), 0.0};
                 double cost = 0;
-                for(const option_t o : c.first) cost += instance.option_cost(o);
-                if(cost > budget) continue;
+                for(const option_t o : c.first)
+                    cost += instance.option_cost(o, 0);
+                if(cost > budget.front() ||
+                   (!plain && !_fits_beyond_first(instance, budget, c.first)))
+                    continue;
                 c.second = _quality(instance_case, s, true, _in(c.first)) * w;
                 if(c.second <= 0 ||
                    std::ranges::any_of(columns, [&c](const valued_set & e) {
@@ -338,8 +362,9 @@ struct path_formulation_lp : public mip_solver_base {
     // than their column without.
     template <instance_c I>
     std::pair<std::vector<pair_data>, std::vector<double>> _pairs(
-        const I & instance, const double budget,
+        const I & instance, const budget_t & budget,
         const std::optional<instance_solution_t<I>> & start) const {
+        const bool plain = has_plain_budget(instance);
         auto none = [](auto) { return false; };
         auto all = [](auto) { return true; };
         auto in_start = [&start](auto o) { return start && (*start)[o]; };
@@ -389,11 +414,13 @@ struct path_formulation_lp : public mip_solver_base {
                     _labels(
                         instance_case, t, all,
                         [&](const option_t o) {
-                            return instance.option_cost(o);
+                            return instance.option_cost(o, 0);
                         },
                         [](auto, auto) { return true; },
-                        [budget](const label & l, vertex) {
-                            return l.weight <= budget;
+                        [&](const label & l, vertex) {
+                            return l.weight <= budget.front() &&
+                                   (plain || _fits_beyond_first(
+                                                 instance, budget, l.live));
                         },
                         [](const label & a, const label & b, vertex) {
                             return a.value >= b.value &&
@@ -474,18 +501,17 @@ struct path_formulation_lp : public mip_solver_base {
     };
 
     template <typename LP, instance_c I>
-    solve_result<I> solve(const I & instance, const double budget) const {
+    solve_result<I> solve(const I & instance, const budget_t & budget) const {
         auto [solution, report, option_bounds] =
             this->template relax<LP>(instance, budget);
         return {std::move(solution), std::move(report)};
     }
 
     template <typename LP, instance_c I>
-    relaxation<I> relax(const I & instance, const double budget) const {
+    relaxation<I> relax(const I & instance, const budget_t & budget) const {
         namespace colgen = mippp::colgen;
         using namespace mippp;
         using namespace mippp::operators;
-        check_plain_budget(instance, "path_lp");
         _check_criterion(instance);
         spdlog::stopwatch sw;
         auto time_up = [&] {
@@ -494,16 +520,27 @@ struct path_formulation_lp : public mip_solver_base {
 
         std::optional<instance_solution_t<I>> start;
         if(mip_start) {
-            if(compute_solution_cost(instance, _mip_start_solution(instance)) >
-               budget + feasibility_tol)
+            const auto mip_start_solution = _mip_start_solution(instance);
+            bool over = false;
+            for(std::size_t r = 0; r < budget.size(); ++r)
+                over = over ||
+                       compute_solution_cost(instance, mip_start_solution, r) >
+                           budget[r] + feasibility_tol;
+            if(over)
                 spdlog::warn("MIP start exceeds the budget: ignored");
+            else if(!is_feasible(instance, mip_start_solution, budget,
+                                 feasibility_tol))
+                spdlog::warn(
+                    "MIP start buys two options of a conflict set: ignored");
             else
-                start = _mip_start_solution(instance);
+                start = mip_start_solution;
         }
         // enumerate's columns fit in budget + feasibility_tol, as the start
         // and the solution returned do, or L can be below their score
-        const auto [pairs, constants] =
-            _pairs(instance, budget + feasibility_tol, start);
+        budget_t capacity;
+        for(std::size_t r = 0; r < budget.size(); ++r)
+            capacity.values.push_back(budget[r] + feasibility_tol);
+        const auto [pairs, constants] = _pairs(instance, capacity, start);
         std::vector<option_reach> reaches;
         // per case, source s of a pair and vertex u, the probability of the
         // most reliable s-u path with every option: the share of its value
@@ -539,19 +576,24 @@ struct path_formulation_lp : public mip_solver_base {
                     });
             }
 
-        // The master: x, the budget row, and for each case k, z_k with its
-        // contribution row; the rows of a pair come with the first column
-        // that uses them.
+        // The master: x, the budget and conflict rows, and for each case k,
+        // z_k with its contribution row; the rows of a pair come with the first
+        // column that uses them.
         LP model;
         if constexpr(has_feasibility_tolerance<LP>)
             model.set_feasibility_tolerance(feasibility_tol);
         model.set_maximization();
         const auto x = model.add_variables(
             instance.options().size(), [](const option_t & o) { return o; });
-        const auto budget_row =
-            model.add_constraint(xsum(instance.options(), [&](auto && o) {
-                                     return instance.option_cost(o) * x(o);
-                                 }) <= budget);
+        std::vector<constraint_t> budget_rows, conflict_rows;
+        for(std::size_t r = 0; r < budget.size(); ++r)
+            budget_rows.push_back(model.add_constraint(
+                xsum(instance.options(), [&](auto && o) {
+                    return instance.option_cost(o, r) * x(o);
+                }) <= budget[r]));
+        for(auto && set : instance.conflict_sets())
+            conflict_rows.push_back(model.add_constraint(xsum(set, x) <= 1));
+        const auto options_sets = compute_options_conflict_sets(instance);
         std::vector<variable_t> z;
         std::vector<constraint_t> contribution_rows;
         for(const double C_k : constants) {
@@ -833,9 +875,15 @@ struct path_formulation_lp : public mip_solver_base {
                 // the purchase duals as the search counts them, a little
                 // below 0 as 0
                 std::vector<double> reduced_costs(instance.options().size());
-                for(auto && o : instance.options())
-                    reduced_costs[o] =
-                        -instance.option_cost(o) * dual_solution[budget_row];
+                for(auto && o : instance.options()) {
+                    reduced_costs[o] = -instance.option_cost(o, 0) *
+                                       dual_solution[budget_rows.front()];
+                    for(std::size_t r = 1; r < budget.size(); ++r)
+                        reduced_costs[o] -= instance.option_cost(o, r) *
+                                            dual_solution[budget_rows[r]];
+                    for(auto && l : options_sets[o])
+                        reduced_costs[o] -= dual_solution[conflict_rows[l]];
+                }
                 for(const auto & rows : purchase_rows)
                     for(const auto & [o, row] : rows)
                         reduced_costs[o] += std::max(0.0, dual_solution[row]);
@@ -903,20 +951,26 @@ struct path_formulation_lp : public mip_solver_base {
                     num_evicted += columns.evict_columns(model, unattractive);
         }
 
-        // x cast to bool can exceed the budget: the options by decreasing x
-        // that fit in it, or the start if it scores more
+        // x cast to bool can exceed the budgets and buy two options of a
+        // conflict set: the options by decreasing x that fit, or the start if
+        // it scores more
         auto options = std::ranges::to<std::vector>(instance.options());
         std::ranges::stable_sort(options,
                                  [&](const option_t a, const option_t b) {
                                      return x_values[a] > x_values[b];
                                  });
         auto solution = instance.create_option_map(false);
-        double purchased = 0.0;
+        double purchased = 0.0;  // in the dimension 0
         for(const option_t o : options) {
-            const double price = instance.option_cost(o);
-            if(purchased + price > budget + feasibility_tol) continue;
-            purchased += price;
+            const double price = instance.option_cost(o, 0);
+            if(purchased + price > budget.front() + feasibility_tol) continue;
             solution[o] = true;
+            if(!has_plain_budget(instance) &&
+               !is_feasible(instance, solution, budget, feasibility_tol)) {
+                solution[o] = false;
+                continue;
+            }
+            purchased += price;
         }
         auto score = [&](const auto & s) {
             return instance.eval_criterion(

@@ -2,7 +2,7 @@
 
 `path_lp` and `tree_lp` do not solve the problem: they solve a *linear relaxation* of it, in which each pair of vertices, or each target, may choose its own set of options. The relaxation has exponentially many variables and is solved by column generation. It gives what the exact algorithms cannot give on large instances within a short time: an upper bound on the optimum, a good solution, and for each option a bound on what the solutions that buy it can score.
 
-For now, both stop with an error on an instance with [conflict sets or several costs](../usage/choosing.md#conflict-sets-and-several-costs), and so does `gecot optimize --reformulation path_lp`: the programs below have a single budget row and no conflict row.
+The programs below have a single budget row. `path_lp` also solves instances with [conflict sets or several costs](../usage/choosing.md#conflict-sets-and-several-costs), with the rows given [below](#conflict-sets-and-several-costs); `tree_lp` stops with an error on them.
 
 ## The path formulation
 
@@ -68,6 +68,22 @@ is the reduced cost of $x_i$, so a solution that buys $i$ scores at most $L + d_
 ### The solution
 
 The relaxation's $x$ is fractional. `path_lp` turns it into a solution within the budget: it takes the options by decreasing value of $x_i$ and buys each one that still fits. If a MIP start was given (`--mip-start`, `--mip-start-algorithm`) and scores more, the start is returned instead. The result is a solution with a guarantee, the Lagrangian bound: on a 40 × 40 raster landscape of the repository (`test/instances/Aix/instance_40x40`) at budget 8, `path_lp` returns in 4 s, with Gurobi on an 8-core desktop computer, a solution proved to reach 98.5 % of the best possible gain.
+
+## Conflict sets and several costs
+
+With [several costs](problem.md#several-costs-and-conflict-sets), the budget row of the master is one row per dimension $r$, of dual $\eta_r$, and each conflict set $\Omega_l$ adds a row of dual $\nu_l$:
+
+$$
+\sum_{i \in \Phi} c_{i,r} \cdot x_i \le \beta_r \quad r \in R \qquad (\eta_r)\,, \qquad\qquad \sum_{i \in \Omega_l} x_i \le 1 \quad l \qquad (\nu_l)\,.
+$$
+
+A scenario is still a solution of the program, so its optimum is still an upper bound. The pricing `search` still ignores these rows. `enumerate` lists only the sets of options within every budget that hold at most one option of each conflict set, which can tighten the relaxation further. The reduced cost of $x_i$ counts every row of $i$,
+
+$$
+d_i = \sum_{p} \lambda_{pi} - \sum_{r \in R} c_{i,r} \cdot \eta_r - \sum_{l \,:\, i \in \Omega_l} \nu_l\,,
+$$
+
+and the solution takes the options by decreasing $x_i$ that fit in every budget left and share no conflict set with an option already bought. A MIP start over a budget, or that buys two options of a set, is ignored with a warning.
 
 ## The tree formulation
 

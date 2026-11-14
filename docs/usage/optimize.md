@@ -102,7 +102,7 @@ The start also seeds the cuts of the Benders decompositions and the columns of t
 
 ## Removing options first
 
-`--reformulation path_lp` runs the path relaxation before the algorithm and removes the options that it proves to be in no solution better than the one it found. The algorithm then works on fewer options, from that solution. It does not run on [every instance](choosing.md#conflict-sets-and-several-costs) yet.
+`--reformulation path_lp` runs the path relaxation before the algorithm and removes the options that it proves to be in no solution better than the one it found. The algorithm then works on fewer options, from that solution.
 
 ```console
 $ gecot optimize flow_mip instance.json 8 --reformulation path_lp

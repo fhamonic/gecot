@@ -9,11 +9,10 @@ gecot::solve_result<Instance> PathFormulationLPInterface::solve(
 gecot::solvers::path_formulation_lp::relaxation<Instance>
 PathFormulationLPInterface::relax(const Instance & instance,
                                   const gecot::budget_t & B) const {
-    gecot::check_plain_budget(instance, name());
     const auto started = with_mip_start(solver, instance, B);
     std::vector<double> option_bounds;
     auto [solution, report] = with_solver([&]<typename LP, typename MILP>() {
-        auto relaxation = started.template relax<LP>(instance, B.front());
+        auto relaxation = started.template relax<LP>(instance, B);
         option_bounds = std::move(relaxation.option_bounds);
         return gecot::solve_result<Instance>{std::move(relaxation.solution),
                                              std::move(relaxation.report)};

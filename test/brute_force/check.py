@@ -5,10 +5,11 @@ sets and several cost dimensions, run by hand like test/cli_parity.sh.
 usage: check.py GECOT_BIN [ALGORITHM_CONFIG ...]
 
 Each config is an algorithm and its parameters in one argument, as
-"flow_mip --big-m plain"; by default every supported exact algorithm with its
-main options. A run passes if its selection is feasible, its reported score is
-the brute-force score of that selection, and, when its status is optimal, it
-is the brute-force optimum. The instances are variants of the repository's
+"flow_mip --big-m plain"; by default every supported algorithm with its main
+options. A run passes if its selection is feasible, its reported score is the
+brute-force score of that selection, its bound, if any, is at least the
+brute-force optimum, and, for an exact algorithm, its status is optimal and
+its score the optimum. The instances are variants of the repository's
 three woods, Aude and conflicts instances, written to a temporary directory,
 and include three oracles that bypass the new rows: a second dimension equal
 to the first, an all-zero one, and renamed dimensions, each with the same
@@ -28,10 +29,17 @@ CONFIGS = [
     "flow_mip --solver highs", "flow_mip --lp-relaxation",
     "multicut_benders", "multicut_benders --big-m tight", "multicut_benders --groups 0",
     "flow_benders", "flow_benders --big-m knapsack_dantzig", "flow_benders --nb-mus 3",
+    "multiflow_benders", "multiflow_benders --no-root-cuts", "multiflow_benders --no-in-out",
+    "path_lp", "path_lp --pricing enumerate", "flow_mip --reformulation path_lp",
+    "multicut_benders --reformulation path_lp --reformulation-params pricing=enumerate",
+    "static", "greedy", "greedy --worst",
 ]
-# not exact, the relaxations and the heuristics: only feasibility and the
-# score are checked
-RELAXED = ("--lp-relaxation", "static", "greedy")
+
+
+def relaxed(config):
+    """Not exact: the relaxations and the heuristics."""
+    words = config.split()
+    return words[0] in ("static", "greedy", "path_lp") or "--lp-relaxation" in words
 
 
 def write_instances(out):
@@ -124,9 +132,11 @@ def main():
                     X = [int(result["solution"][o]) for o in instance["options"]]
                     score = brute.score(instance, X)
                     status = result["algorithm_report"]["status"]
+                    bound = result["algorithm_report"].get("best_bound", float("inf"))
                     ok = brute.feasible(instance, X, B) and result.get("feasible", True) \
-                        and abs(score - result["solution_score"]) <= 1e-6 * max(1, score)
-                    if not any(r in config for r in RELAXED):
+                        and abs(score - result["solution_score"]) <= 1e-6 * max(1, score) \
+                        and bound >= optimum - 1e-6 * max(1, optimum)
+                    if not relaxed(config):
                         ok = ok and status in ("optimal", "no option left") \
                             and abs(score - optimum) <= 1e-6 * max(1, optimum)
                     print(f"  {config:42s} {status:15s} {score:.10g} {'ok' if ok else 'FAIL'}")
@@ -136,7 +146,7 @@ def main():
         for path, budget_of, twin, twin_budget_of, budgets in oracles:
             for b in budgets:
                 for config in configs:
-                    if any(r in config for r in RELAXED):
+                    if relaxed(config):
                         continue
                     runs += 1
                     first, e1 = run(binary, path, budget_of(b), config, out)

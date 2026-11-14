@@ -3,7 +3,9 @@
 #include <cmath>
 #include <cstdint>
 #include <format>
+#include <optional>
 #include <ranges>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -14,6 +16,7 @@
 #include "gecot/solvers/solve_result.hpp"
 
 #include "instance.hpp"
+#include "io_helper.hpp"
 
 // the long name and the value of each option of app, its default if not
 // given, "none" without one
@@ -52,9 +55,7 @@ inline std::string option_json_value(const CLI::Option & option) {
         return std::format("{}", option.as<std::uint64_t>());
     if(type.starts_with("INT"))
         return std::format("{}", option.as<std::int64_t>());
-    // a path can hold bytes that are not UTF-8, which dump() throws on
-    return nlohmann::json(option.as<std::string>())
-        .dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+    return json_string(option.as<std::string>());
 }
 
 // the long name and the option_json_value of each option of app
@@ -68,15 +69,43 @@ inline std::vector<std::pair<std::string, std::string>> option_json_values(
     return values;
 }
 
+// An option that takes one of the names of choices. The names are its
+// validator, in their order, and its default text is the name of current,
+// the value that the struct holds: the default is written once, there. set
+// receives the value of the name given. Throws if current has no name.
+template <typename V, typename Set>
+CLI::Option * add_choice_option(CLI::App & app, const std::string & name,
+                                const V & current,
+                                std::vector<std::pair<std::string, V>> choices,
+                                Set set, const std::string & help) {
+    const auto current_choice =
+        std::ranges::find(choices, current, &std::pair<std::string, V>::second);
+    if(current_choice == choices.end())
+        throw std::logic_error(name + ": its default has no name");
+    const std::string default_name = current_choice->first;
+    const auto names = std::ranges::to<std::vector>(std::views::keys(choices));
+    return app
+        .add_option_function<std::string>(
+            name,
+            [choices = std::move(choices),
+             set = std::move(set)](const std::string & given) {
+                set(std::ranges::find(choices, given,
+                                      &std::pair<std::string, V>::first)
+                        ->second);
+            },
+            help)
+        ->check(CLI::IsMember(names))
+        ->default_val(default_name);
+}
+
 class AbstractSolverInterface {
 protected:
     CLI::App app;
 
-    void add_feasibility_tol_option(double & feasibility_tol,
-                                    double default_tol = 1e-7) {
+    void add_feasibility_tol_option(double & feasibility_tol) {
         app.add_option("-t,--feasibility-tolerance", feasibility_tol,
                        "Tolerance for rounding errors")
-            ->default_val(default_tol);
+            ->default_val(feasibility_tol);
     }
 
 public:
@@ -101,4 +130,9 @@ public:
     virtual gecot::solve_result<Instance> solve(
         const Instance & instance, const gecot::budget_t & B) const = 0;
     virtual std::string description() const = 0;
+    // what its run proves as an upper bound, for 'gecot bound'; nothing if
+    // it proves none
+    virtual std::optional<std::string> bound_description() const {
+        return std::nullopt;
+    }
 };

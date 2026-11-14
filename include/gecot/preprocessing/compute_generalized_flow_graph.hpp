@@ -22,9 +22,10 @@ auto compute_generalized_flow_graph(const C & instance_case) {
 
     for(auto && [a, uv] : melon::arcs_entries(original_graph)) {
         builder.add_arc(uv, original_probability_map[a], std::nullopt);
-        for(auto && [enhanced_prob, option] :
+        for(auto && [improved_probability, option] :
             instance_case.arc_options_map()[a]) {
-            builder.add_arc(uv, enhanced_prob, std::make_optional(option));
+            builder.add_arc(uv, improved_probability,
+                            std::make_optional(option));
         }
     }
 

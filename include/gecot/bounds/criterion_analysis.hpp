@@ -157,6 +157,48 @@ struct cases_visitor {
     }
 };
 
+struct simplify_visitor {
+    std::size_t num_cases;
+
+    criterion_formula operator()(const criterion_constant & c) const {
+        return c;
+    }
+    criterion_formula operator()(const criterion_var & v) const { return v; }
+    template <typename F>
+    criterion_formula operator()(const F & f) const {
+        if(const auto form = linear_form_visitor{num_cases}(f)) {
+            std::vector<case_id_t> read;
+            cases_visitor{read}(f);
+            const auto num_weights = std::ranges::count_if(
+                form->weights, [](const double w) { return w != 0.0; });
+            if(read.size() == static_cast<std::size_t>(num_weights)) return f;
+            return written(*form);
+        }
+        F simplified;
+        for(auto && e : f.values)
+            simplified.values.push_back(std::visit(*this, e));
+        return simplified;
+    }
+
+    // constant + Σ_k weights[k] z_k without the terms of weight 0, a weight
+    // first in its product as in the criterion of a file
+    static criterion_formula written(const criterion_linear_form & form) {
+        criterion_sum sum;
+        for(std::size_t k = 0; k < form.weights.size(); ++k) {
+            const double w = form.weights[k];
+            const auto z = static_cast<criterion_var>(k);
+            if(w == 1.0)
+                sum.values.emplace_back(z);
+            else if(w != 0.0)
+                sum.values.emplace_back(criterion_product{{w, z}});
+        }
+        if(form.constant != 0.0 || sum.values.empty())
+            sum.values.emplace_back(form.constant);
+        if(sum.values.size() == 1) return std::move(sum.values.front());
+        return sum;
+    }
+};
+
 }  // namespace detail
 
 inline std::optional<criterion_linear_form> linear_form(
@@ -191,6 +233,17 @@ inline std::vector<case_id_t> criterion_cases(
     const auto [first, last] = std::ranges::unique(cases);
     cases.erase(first, last);
     return cases;
+}
+
+// The criterion with each linear part that reads a case score twice, or with
+// weights that add up to 0, written as constant + Σ_k w_k z_k over its cases
+// of non-zero weight: 2 z_1 - z_1 + 0 z_2 becomes z_1. Every other part is
+// returned as it is written. Rewriting those too, to one normal form, would
+// change the order of the operations of a criterion that has nothing to
+// simplify, so the last digits of its scores and the rows of its models.
+inline criterion_formula simplified_criterion(
+    const criterion_formula & criterion, std::size_t num_cases) {
+    return std::visit(detail::simplify_visitor{num_cases}, criterion);
 }
 
 // A bound on the criterion from a bound on its weighted case scores:

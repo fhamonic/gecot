@@ -36,7 +36,9 @@ The score of the whole graph is the optimum of the linear program that puts the 
 
 Let $x_i \in \{0,1\}$ tell whether the option $i \in \Phi$ is bought. Three things change in the program above.
 
-**Improved arcs.** For each arc $a = (u,v)$ and each option $i$ that improves it, add an *improved copy* $a^i = (u,v)$ of probability $\pi_{a^i} = \pi^i_a$, which can carry flow only if $i$ is bought. Let $A'$ be the set of the improved copies and $\Psi = A \cup A'$; from now on $\delta^{\text{out}}_u$, $\delta^{\text{in}}_u$ and the flows are those of $\Psi$. A *big-M constraint* closes the copy when the option is not bought:
+### Improved arcs
+
+For each arc $a = (u,v)$ and each option $i$ that improves it, add an *improved copy* $a^i = (u,v)$ of probability $\pi_{a^i} = \pi^i_a$, which can carry flow only if $i$ is bought. Let $A'$ be the set of the improved copies and $\Psi = A \cup A'$; from now on $\delta^{\text{out}}_u$, $\delta^{\text{in}}_u$ and the flows are those of $\Psi$. A *big-M constraint* closes the copy when the option is not bought:
 
 $$
 \phi^t_{a^i} \le M^t_u \cdot x_i\,,
@@ -44,9 +46,13 @@ $$
 
 where the constant $M^t_u$ is an upper bound on the flow that can reach $u$ on its way to $t$. A flow prefers the copy of largest probability among those that are open, so the arc behaves as if it had the probability $\pi^x_a$.
 
-**Source quality gains.** The quality available at $u$ becomes $w_u + \sum_{i \in \Phi} w^i_u \cdot x_i$, which is linear.
+### Source quality gains
 
-**Target quality gains.** The contribution of a target becomes $\big(q_t + \sum_{i \in \Phi} q^i_t \cdot x_i\big) \cdot f_t$, a product of variables. It is linearized with one variable $f^i_t$ per gain, equal to $f_t$ if $i$ is bought and to $0$ otherwise (a McCormick linearization):
+The quality available at $u$ becomes $w_u + \sum_{i \in \Phi} w^i_u \cdot x_i$, which is linear.
+
+### Target quality gains
+
+The contribution of a target becomes $\big(q_t + \sum_{i \in \Phi} q^i_t \cdot x_i\big) \cdot f_t$, a product of variables. It is linearized with one variable $f^i_t$ per gain, equal to $f_t$ if $i$ is bought and to $0$ otherwise (a McCormick linearization):
 
 $$
 f^i_t \le f_t\,, \qquad f^i_t \le M^t_t \cdot x_i\,,
@@ -78,15 +84,15 @@ With [several costs or conflict sets](problem.md#several-costs-and-conflict-sets
 
 ### Linearizing the criterion
 
-The objective $\mathcal{C}(z)$ is written with one variable $v$ per sub-formula of the criterion:
+The objective $\mathcal{C}(z)$ is written with one variable $\zeta$ per sub-formula of the criterion:
 
 | Sub-formula | Constraint |
 |---|---|
-| a constant $c$ | $v = c$ |
-| the score of the case $k$ | $v = z_k$ |
-| a sum of formulas of variables $v_1, \dots, v_n$ | $v = v_1 + \dots + v_n$ |
-| the product of a constant $c$ by a formula of variable $v_1$ | $v = c \cdot v_1$ |
-| the minimum of formulas of variables $v_1, \dots, v_n$ | $v \le v_j$ for $j = 1, \dots, n$ |
+| a constant $c$ | $\zeta = c$ |
+| the score of the case $k$ | $\zeta = z_k$ |
+| a sum of formulas of variables $\zeta_1, \dots, \zeta_n$ | $\zeta = \zeta_1 + \dots + \zeta_n$ |
+| the product of a constant $c$ by a formula of variable $\zeta_1$ | $\zeta = c \cdot \zeta_1$ |
+| the minimum of formulas of variables $\zeta_1, \dots, \zeta_n$ | $\zeta \le \zeta_j$ for $j = 1, \dots, n$ |
 
 and the objective maximizes the variable of the whole formula. A product of two formulas that both depend on the scores is not linear, and the algorithms built on this program refuse it.
 
@@ -100,11 +106,14 @@ and the objective maximizes the variable of the whole formula. A product of two 
 
 - the instance is first [reformulated](preprocessing.md#the-instance-given-to-the-algorithms): options of cost $0$ are bought unless a conflict set makes them a choice, options over the budget are removed, vertices linked by arcs of probability $1$ are merged, and qualities are rescaled;
 - the flows of a target $t$ live on its own reduced graph $G_t$, without the arcs that are useless for $t$ and with its strong arcs contracted, and vertices that can never be targets ($\overline{q}_t = 0$) have no flow at all;
-- the constants $M^t_u$ are computed on $G_t$ [within the budget](preprocessing.md#big-m-constants).
+- the constants $M^t_u$ are computed on $G_t$ [within the budget](preprocessing.md#big-m-constants);
+- the value of each target has its own variable, $v_t \le q_t \cdot f_t + \sum_{i \in \Phi} q^i_t \cdot f^i_t$, and the score of a case is bounded by their sum, $z_k \le \sum_{t \in V_k} v_t$, with $v_t = 0$ for a vertex that can never be a target.
 
 The solver's relative optimality gap is set to $10^{-10}$, and `-t` sets its feasibility tolerance. The status `optimal` therefore means that the solution is proved optimal up to these tolerances and up to the [resolution](preprocessing.md#resolution) of the preprocessing. When the run stops earlier (`--time-limit`, Ctrl-C), the solution is the best one found and the upper bound is the solver's dual bound: see [Results and logs](../usage/results.md).
 
 `--lp-relaxation` relaxes $x \in \{0,1\}^\Phi$ to $x \in [0,1]^\Phi$ and solves the linear program, whose value bounds the optimum from above. It is an experimental switch, meant to measure how tight the formulation is: the value of the relaxation is the upper bound of the result, and what `gecot bound flow_mip` returns with it. The options printed are only those that the relaxation buys entirely, which always fit in the budget.
+
+`--indicator-constraints` writes the two big-M constraints, of an improved copy and of a target quality gain, as *indicator constraints*: $x_i = 0 \Rightarrow \phi^t_{a^i} \le 0$ and $x_i = 0 \Rightarrow f^i_t \le 0$. The solver then handles the implication itself, and no constant $M$ is computed: `--big-m` has no effect. It is an experimental switch, to compare the two forms, for the solvers that have such constraints (`gurobi`, `cplex`).
 
 ## Parameters
 

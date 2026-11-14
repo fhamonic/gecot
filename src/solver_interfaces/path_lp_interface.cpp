@@ -1,14 +1,13 @@
-#include "solver_interfaces/path_formulation_lp_interface.hpp"
+#include "solver_interfaces/path_lp_interface.hpp"
 
-gecot::solve_result<Instance> PathFormulationLPInterface::solve(
+gecot::solve_result<Instance> PathLpInterface::solve(
     const Instance & instance, const gecot::budget_t & B) const {
     auto [solution, report, option_bounds] = relax(instance, B);
     return {std::move(solution), std::move(report)};
 }
 
-gecot::solvers::path_formulation_lp::relaxation<Instance>
-PathFormulationLPInterface::relax(const Instance & instance,
-                                  const gecot::budget_t & B) const {
+gecot::solvers::path_lp::relaxation<Instance> PathLpInterface::relax(
+    const Instance & instance, const gecot::budget_t & B) const {
     const auto started = with_mip_start(solver, instance, B);
     std::vector<double> option_bounds;
     auto [solution, report] = with_solver([&]<typename LP, typename MILP>() {

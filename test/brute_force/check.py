@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Checks gecot's algorithms against brute force on small instances with conflict
-sets and several cost dimensions, run by hand like test/cli_parity.sh.
+sets and several cost dimensions, run by hand like test/parity/capture.py.
 
 usage: check.py GECOT_BIN [ALGORITHM_CONFIG ...]
 
@@ -12,10 +12,11 @@ reported score is the brute-force score of that selection, its bound, if any,
 is at least the brute-force optimum, and, for an exact algorithm, its status
 is optimal and its score the optimum. A bound passes if it is at least the
 optimum; split_lagrange refusing the shape of the options is no failure. The instances are variants of the repository's
-three woods, Aude and conflicts instances, written to a temporary directory,
-and include three oracles that bypass the new rows: a second dimension equal
-to the first, an all-zero one, and renamed dimensions, each with the same
-optimum as its plain twin. Needs numpy.
+three woods, Aude, conflicts and two species instances, written to a temporary
+directory. The two species come with criteria that gecot simplifies, leaving a
+case out. Three oracles bypass the new rows: a second dimension equal to the
+first, an all-zero one, and renamed dimensions, each with the same optimum as
+its plain twin. Needs numpy.
 """
 import copy, csv, json, os, random, subprocess, sys, tempfile
 
@@ -29,8 +30,10 @@ CONFIGS = [
     "flow_mip", "flow_mip --big-m knapsack_dantzig", "flow_mip --big-m plain",
     "flow_mip --big-m tight", "flow_mip --nb-mus 3", "flow_mip --preprocessing none",
     "flow_mip --solver highs", "flow_mip --lp-relaxation",
+    "flow_mip --indicator-constraints",
     "multicut_benders", "multicut_benders --big-m tight", "multicut_benders --groups 0",
     "flow_benders", "flow_benders --big-m knapsack_dantzig", "flow_benders --nb-mus 3",
+    "flow_benders --indicator-constraints",
     "multiflow_benders", "multiflow_benders --no-root-cuts", "multiflow_benders --no-in-out",
     "path_lp", "path_lp --pricing enumerate", "flow_mip --reformulation path_lp",
     "multicut_benders --reformulation path_lp --reformulation-params pricing=enumerate",
@@ -90,6 +93,18 @@ def write_instances(out):
                   ["money=2,area=2", "money=5,area=4", "money=8,area=6"]))
     cases.append((aude_variant("aude_c1", money), ["2", "3", "5"]))
     cases.append((star(out), ["money=3,area=2", "money=5,area=3", "money=8,area=1"]))
+    # criteria that gecot simplifies to one that does not read the hedgehog, its first case:
+    # the terms of a sum that add up to the squirrel, then such a sum inside a minimum
+    species = json.load(open(f"{REPO}/docs/examples/two-species.json"))
+    term = lambda *values: {"operation": "sum", "values": list(values)}
+    for name, criterion in (
+            ("species_sum", term([2, "squirrel"], [-1, "squirrel"], [0, "hedgehog"])),
+            ("species_min", {"operation": "min", "values": [
+                term("squirrel", "hedgehog", [-1, "hedgehog"]), [3, "squirrel"]]})):
+        j = copy.deepcopy(species)
+        j["criterion"] = criterion
+        json.dump(j, open(f"{out}/{name}.json", "w"))
+        cases.append((f"{out}/{name}.json", ["3", "5", "7"]))
     # (instance, its budget, twin, the twin's budget, budget values)
     same = lambda b: b
     oracles = [(aude_variant("aude_dup", lambda i: {"money": money(i), "copy": money(i)}),

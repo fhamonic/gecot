@@ -1,5 +1,7 @@
 # Conflict sets and cost vectors: design note
 
+> **Status, 2026-11-14.** A record of the study. Both extensions have been implemented since (main, fd12a84), for every algorithm and bound but `tree_lp` and `--decremental`: "nothing is implemented" below is true of the time of writing. The files and lines cited are those of that time; `path_formulation_lp.hpp` and `tree_formulation_lp.hpp` are now `path_lp.hpp` and `tree_lp.hpp`.
+
 This note studies two extensions of gecot: **conflict sets** of options, at most one option of each set bought (SOS1 on binaries), and **cost vectors**, one budget per cost dimension. It is written for the owner and for whoever implements them. It is a study only: nothing is implemented, and main is at e2585fc (2026-11-13).
 
 - **Sources.**

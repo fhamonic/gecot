@@ -1,90 +1,120 @@
 #pragma once
 
-#include <limits>
+#include <cstddef>
+#include <optional>
 #include <stdexcept>
-#include <type_traits>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 
-#include "mippp/solvers/gurobi/all.hpp"
+#include "mippp/model_concepts.hpp"
 
 #include "melon/graph.hpp"
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
 #include "gecot/preprocessing/compute_big_M_map.hpp"
-#include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
-#include "gecot/preprocessing/compute_contracted_generalized_flow_graph.hpp"
-#include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
-#include "gecot/preprocessing/compute_tight_big_M_maps.hpp"
+#include "gecot/preprocessing/compute_contracted_graph.hpp"
 
 #include "gecot/solvers/mip_solver_base.hpp"
 
 namespace gecot {
 namespace solvers {
 
+// The flow formulation of docs/formulations/flow.md. Each block of solve()
+// builds the variables and the constraints of the section it names.
 struct flow_mip : public mip_solver_base {
     // plain for comparison, tight experimental
     big_M_kind big_Ms = big_M_kind::knapsack_bnb;
     // experimental: the options continuous, for the root relaxation's bound
     bool relax_integrality = false;
+    // experimental: no big-M is then computed, and big_Ms is not read
+    bool indicator_constraints = false;
+
+    // by how much the tight big-Ms lower the knapsack ones
+    struct tight_big_M_statistics {
+        double arc_sum = 0, arc_knapsack_sum = 0, target_sum = 0,
+               target_knapsack_sum = 0;
+        std::size_t num_arcs = 0, num_arcs_halved = 0;
+
+        void add(const contracted_flow_graph & G_t, const auto & target_gains) {
+            if(!G_t.tight_big_Ms) return;
+            const auto & knapsack_big_M_map = G_t.big_M_map.value();
+            for(const auto & [source_gain, target_gain, i] : target_gains) {
+                target_sum += G_t.target_big_M(i);
+                target_knapsack_sum += knapsack_big_M_map[G_t.t];
+            }
+            for(auto && a : melon::arcs(G_t.graph)) {
+                if(!G_t.improvement_option_map[a].has_value()) continue;
+                const double knapsack_M =
+                    knapsack_big_M_map[melon::arc_source(G_t.graph, a)];
+                arc_sum += G_t.improvement_big_M(a);
+                arc_knapsack_sum += knapsack_M;
+                ++num_arcs;
+                num_arcs_halved += G_t.improvement_big_M(a) <= knapsack_M / 2;
+            }
+        }
+        void log() const {
+            spdlog::debug(
+                "flow_mip tight big-Ms: arcs {:.4g} of the knapsack ones ({} "
+                "of {} halved at least), target gains {:.4g}",
+                arc_knapsack_sum > 0 ? arc_sum / arc_knapsack_sum : 1.0,
+                num_arcs_halved, num_arcs,
+                target_knapsack_sum > 0 ? target_sum / target_knapsack_sum
+                                        : 1.0);
+        }
+    };
 
     template <typename M, instance_c I>
     solve_result<I> solve(const I & instance, const budget_t & budget) const {
-        _check_criterion(instance);
-        spdlog::stopwatch sw;
-        auto solution = instance.create_option_map(false);
-
         using namespace mippp;
         using namespace mippp::operators;
+        using vertex = melon::vertex_t<instance_graph_t<I>>;
+        _check_criterion(instance);
+        if(indicator_constraints && !has_indicator_constraints<M>)
+            throw std::invalid_argument(
+                "this solver has no indicator constraints");
+        if(indicator_constraints && relax_integrality)
+            throw std::invalid_argument(
+                "an indicator constraint needs a binary option: not with "
+                "the relaxed ones");
+        spdlog::stopwatch sw;
         M model;
-        _set_tolerances(model, 1e-10, feasibility_tol);
+        _set_tolerances(model, mip_gap, feasibility_tol);
 
-        const auto C_vars = model.add_variables(
-            instance.cases().size(), [](const case_id_t & id) { return id; }
-            // ,[](const case_id_t & id) { return "C_" + std::to_string(id); }
-        );
-
+        // Cases and criterion: the scores z_k under their criterion
+        // (Linearizing the criterion), the options x_i within the budgets
+        // and the conflict sets
+        const auto z = model.add_variables(
+            instance.cases().size(), [](const case_id_t & k) { return k; });
         model.set_maximization();
-        model.set_objective(std::visit(formula_variable_visitor{model, C_vars},
-                                       instance.criterion()));
-
-        const auto X_vars = model.add_binary_variables(
-            instance.options().size(), [](const option_t & i) { return i; }
-            // ,[](const option_t & i) { return "Y_" + std::to_string(i); }
-        );
-        _add_budget_rows(model, instance, budget, X_vars);
+        formula_variable_visitor formula{model, z};
+        model.set_objective(formula.variable(instance.criterion()));
+        const auto x = model.add_binary_variables(
+            instance.options().size(), [](const option_t & i) { return i; });
+        _add_budget_rows(model, instance, budget, x);
         if(relax_integrality) {
-            if constexpr(requires { model.set_continuous(X_vars(0)); }) {
-                for(auto && o : instance.options())
-                    model.set_continuous(X_vars(o));
+            if constexpr(requires { model.set_continuous(x(0)); }) {
+                for(auto && i : instance.options()) model.set_continuous(x(i));
             } else
                 throw std::invalid_argument(
                     "this solver cannot relax the options");
         }
-        // Σ of the big-Ms used and of the knapsack ones, arcs then targets
-        double arc_M_sum = 0, arc_M_old_sum = 0, target_M_sum = 0,
-               target_M_old_sum = 0;
-        std::size_t arc_M_count = 0, arc_M_halved = 0;
 
+        const std::optional<big_M_kind> computed_big_Ms =
+            indicator_constraints ? std::nullopt : std::optional(big_Ms);
+        tight_big_M_statistics tight_statistics;
         std::vector<preprocessing_row<>> preprocessing;
         for(auto && instance_case : instance.cases()) {
-            const auto case_id = instance_case.id();
+            const case_id_t k = instance_case.id();
             const auto & original_graph = instance_case.graph();
-            const auto & original_target_quality_map =
+            const auto & target_quality_map =
                 instance_case.target_quality_map();
-            const auto & original_vertex_options_map =
+            const auto & vertex_options_map =
                 instance_case.vertex_options_map();
-
-            const auto Xi_vars = model.add_variables(
-                original_graph.num_vertices(),
-                [](const melon::vertex_t<instance_graph_t<I>> & v) { return v; }
-                // ,[case_id](const melon::vertex_t<instance_graph_t<I>> & v) {
-                //     return "Xi_" + std::to_string(v) + "(" +
-                //            std::to_string(case_id) + ")";
-                // }
-            );
 
             const auto [strong_arcs_map, useless_arcs_map] =
                 _compute_strong_and_useless_arcs(instance, instance_case,
@@ -93,206 +123,131 @@ struct flow_mip : public mip_solver_base {
                 instance_case.name(),
                 _average_size(instance_case, strong_arcs_map),
                 _average_size(instance_case, useless_arcs_map));
-            spdlog::debug("Computing contractions and big-Ms of the '{}' graph",
+            spdlog::debug("Computing contractions{} of the '{}' graph",
+                          computed_big_Ms ? " and big-Ms" : "",
                           instance_case.name());
 
+            // What flow_mip solves: the value v_t of each vertex, 0 for one
+            // that can never be a target
+            const auto v =
+                model.add_variables(original_graph.num_vertices(),
+                                    [](const vertex & t) { return t; });
             for(const auto & original_t : melon::vertices(original_graph)) {
                 if(!_is_target(instance_case, original_t)) {
-                    model.set_variable_upper_bound(Xi_vars(original_t), 0);
+                    model.set_variable_upper_bound(v(original_t), 0);
                     continue;
                 }
+                const contracted_flow_graph G_t = compute_contracted_flow_graph(
+                    instance, instance_case, budget, original_t,
+                    strong_arcs_map[original_t], useless_arcs_map[original_t],
+                    computed_big_Ms, feasibility_tol, !no_pruning);
+                const auto & graph = G_t.graph;
+                const auto & t = G_t.t;
+                tight_statistics.add(G_t, vertex_options_map[original_t]);
 
-                const auto F_var =
-                    model.add_variable(/*"F_" + std::to_string(original_t) + "(" +
-                                       std::to_string(case_id) + ")"*/);
-
-                std::vector<std::pair<model_variable<int, double>, double>>
-                    F_prime_additional_terms;
-
-                const auto [graph, source_quality_map, vertex_options_map,
-                            arc_no_map, probability_map, arc_option_map, t] =
-                    compute_contracted_generalized_flow_graph(
-                        instance_case, strong_arcs_map[original_t],
-                        useless_arcs_map[original_t], original_t, !no_pruning);
-                using Graph = std::decay_t<decltype(graph)>;
-                auto big_M_vertices = std::views::filter(
-                    melon::vertices(graph),
-                    [&graph, &arc_option_map, t](auto && u) {
-                        return u == t ||
-                               std::ranges::any_of(
-                                   melon::out_arcs(graph, u),
-                                   [&arc_option_map](auto && a) {
-                                       return arc_option_map[a].has_value();
-                                   });
-                    });
-                const auto big_M_map =
-                    big_Ms == big_M_kind::plain
-                        ? compute_big_M_map(graph, source_quality_map,
-                                            vertex_options_map, probability_map,
-                                            big_M_vertices)
-                        : compute_knapsack_big_M_map(
-                              instance, budget,
-                              big_Ms == big_M_kind::knapsack_dantzig, graph,
-                              source_quality_map, vertex_options_map,
-                              probability_map, big_M_vertices);
-
-                // an arc per improvement, of base probability 0
-                auto base_probability_map =
-                    melon::create_arc_map<double>(graph, 0.0);
-                auto improvements_map = melon::create_arc_map<
-                    std::vector<std::pair<double, option_t>>>(graph, {});
-                for(auto && a : melon::arcs(graph)) {
-                    if(arc_option_map[a].has_value())
-                        improvements_map[a].emplace_back(
-                            probability_map[a], arc_option_map[a].value());
-                    else
-                        base_probability_map[a] = probability_map[a];
+                // A linear program for the score: the flow f_t that reaches
+                // t. Target quality gains: for each gain f^i_t, equal to f_t
+                // if i is bought and to 0 otherwise
+                const auto f_t = model.add_variable();
+                std::vector<std::pair<model_variable_t<M>, double>>
+                    target_gains;
+                for(const auto & [source_gain, target_gain, i] :
+                    vertex_options_map[original_t]) {
+                    const auto f_ti = model.add_variable();
+                    model.add_constraint(f_ti <= f_t);
+                    if(indicator_constraints) {
+                        if constexpr(has_indicator_constraints<M>)
+                            model.add_indicator_constraint(x(i), false,
+                                                           f_ti <= 0);
+                    } else
+                        model.add_constraint(f_ti <=
+                                             G_t.target_big_M(i) * x(i));
+                    target_gains.emplace_back(f_ti, target_gain);
                 }
-                auto tight_maps =
-                    big_Ms == big_M_kind::tight
-                        ? std::make_optional(compute_tight_big_M_maps(
-                              instance, budget[0], feasibility_tol, graph,
-                              source_quality_map, vertex_options_map,
-                              base_probability_map, improvements_map, t,
-                              std::views::transform(
-                                  original_vertex_options_map[original_t],
-                                  [](auto && e) { return std::get<2>(e); })))
-                        : std::nullopt;
 
-                for(const auto & [sqg, target_quality_gain, option] :
-                    original_vertex_options_map[original_t]) {
-                    const auto F_prime_t_var =
-                        model.add_variable(/*"F'_" + std::to_string(original_t) +
-                                           "_" + std::to_string(option) + "(" +
-                                           std::to_string(case_id) + ")"*/);
-                    model.add_constraint(F_prime_t_var <= F_var);
-
-                    //*
-                    const double target_M =
-                        tight_maps
-                            ? std::min(big_M_map[t], tight_maps->second[option])
-                            : big_M_map[t];
-                    target_M_sum += target_M;
-                    target_M_old_sum += big_M_map[t];
-                    model.add_constraint(F_prime_t_var <=
-                                         target_M * X_vars(option));
-                    /*/
-                    model.add_indicator_constraint(X_vars(option), false,
-                                                   F_prime_t_var <= 0);
-                    //*/
-                    F_prime_additional_terms.emplace_back(F_prime_t_var,
-                                                          target_quality_gain);
-                }
-                const auto Phi_t_vars = model.add_variables(
+                // A linear program for the score, Source quality gains: the
+                // flow phi_a that enters each arc on its way to t, and its
+                // conservation at each vertex
+                const auto phi = model.add_variables(
                     graph.num_arcs(),
-                    [&arc_no_map](const melon::arc_t<Graph> & a) {
-                        return arc_no_map[a];
-                    }
-                    // ,[original_t, case_id](const melon::arc_t<Graph> & a) {
-                    //     return "P_" + std::to_string(original_t) + "_" +
-                    //            std::to_string(a) + "(" +
-                    //            std::to_string(case_id) + ")";
-                    // }
-                );
-                // flow conservation constraints
+                    [&G_t](const contracted_flow_graph::arc & a) {
+                        return G_t.arc_no_map[a];
+                    });
                 model.add_constraints(
                     melon::vertices(graph),
                     [&](auto && u) {
-                        return OPT(
-                            (u == t),
-                            F_var + xsum(graph.out_arcs(t), Phi_t_vars) <=
-                                xsum(graph.in_arcs(t),
-                                     [&](auto && a) {
-                                         return probability_map[a] *
-                                                Phi_t_vars(a);
-                                     }) +
-                                    source_quality_map[t] +
-                                    xsum(vertex_options_map[t],
-                                         [&X_vars](auto && p) {
-                                             return p.first * X_vars(p.second);
-                                         }));
+                        return (u == t)
+                                   ? std::make_optional(
+                                         f_t + xsum(graph.out_arcs(t), phi) <=
+                                         xsum(
+                                             graph.in_arcs(t),
+                                             [&](auto && a) {
+                                                 return G_t.probability_map[a] *
+                                                        phi(a);
+                                             }) +
+                                             G_t.source_quality_map[t] +
+                                             xsum(G_t.source_options_map[t],
+                                                  [&x](auto && gain) {
+                                                      return gain.first *
+                                                             x(gain.second);
+                                                  }))
+                                   : std::nullopt;
                     },
                     [&](auto && u) {
-                        return xsum(graph.out_arcs(u), Phi_t_vars) <=
+                        return xsum(graph.out_arcs(u), phi) <=
                                xsum(graph.in_arcs(u),
                                     [&](auto && a) {
-                                        return probability_map[a] *
-                                               Phi_t_vars(a);
+                                        return G_t.probability_map[a] * phi(a);
                                     }) +
-                                   source_quality_map[u] +
-                                   xsum(vertex_options_map[u],
-                                        [&X_vars](auto && p) {
-                                            return p.first * X_vars(p.second);
+                                   G_t.source_quality_map[u] +
+                                   xsum(G_t.source_options_map[u],
+                                        [&x](auto && gain) {
+                                            return gain.first * x(gain.second);
                                         });
                     });
-                // model.add_constraints(
-                //     std::views::filter(melon::arcs(graph),
-                //                        [&](auto && a) {
-                //                            return
-                //                            arc_option_map[a].has_value();
-                //                        }),
-                //     [&](auto && a) {
-                //         return Phi_t_vars(a) <=
-                //                X_vars(arc_option_map[a].value()) *
-                //                    big_M_map[melon::arc_source(graph, a)];
-                //     });
 
-                //*
+                // Improved arcs: an improved copy carries flow only if its
+                // option is bought
                 for(auto && a : melon::arcs(graph)) {
-                    if(!arc_option_map[a].has_value()) continue;
-                    const double old_M = big_M_map[melon::arc_source(graph, a)];
-                    const double arc_M =
-                        tight_maps ? std::min(old_M, tight_maps->first[a][0])
-                                   : old_M;
-                    arc_M_sum += arc_M;
-                    arc_M_old_sum += old_M;
-                    ++arc_M_count;
-                    arc_M_halved += arc_M <= old_M / 2;
-                    model.add_constraint(Phi_t_vars(a) <=
-                                         X_vars(arc_option_map[a].value()) *
-                                             arc_M);
+                    if(!G_t.improvement_option_map[a].has_value()) continue;
+                    const option_t i = G_t.improvement_option_map[a].value();
+                    if(indicator_constraints) {
+                        if constexpr(has_indicator_constraints<M>)
+                            model.add_indicator_constraint(x(i), false,
+                                                           phi(a) <= 0);
+                    } else
+                        model.add_constraint(phi(a) <=
+                                             x(i) * G_t.improvement_big_M(a));
                 }
-                /*/
-                for(auto && a : melon::arcs(graph)) {
-                    if(!arc_option_map[a].has_value()) continue;
-                    model.add_indicator_constraint(
-                        X_vars(arc_option_map[a].value()), false,
-                        Phi_t_vars(a) <= 0);
-                }
-                //*/
+
+                // What flow_mip solves: the value of t
                 model.add_constraint(
-                    Xi_vars(original_t) <=
-                    original_target_quality_map[original_t] * F_var +
-                        xsum(F_prime_additional_terms, [](const auto & p) {
-                            return p.first * p.second;
+                    v(original_t) <=
+                    target_quality_map[original_t] * f_t +
+                        xsum(target_gains, [](const auto & gain) {
+                            return gain.first * gain.second;
                         }));
             }
-            model.add_constraint(C_vars(instance_case.id()) <= Xi_vars);
+            // What flow_mip solves: the score of the case, at most the sum
+            // of the v_t
+            model.add_constraint(z(k) <= v);
         }
         _log_preprocessing(preprocessing);
-
-        if(big_Ms == big_M_kind::tight)
-            spdlog::debug(
-                "flow_mip tight big-Ms: arcs {:.4g} of the knapsack ones ({} "
-                "of {} halved at least), target gains {:.4g}",
-                arc_M_old_sum > 0 ? arc_M_sum / arc_M_old_sum : 1.0,
-                arc_M_halved, arc_M_count,
-                target_M_old_sum > 0 ? target_M_sum / target_M_old_sum : 1.0);
-        _add_mip_start(model, instance, X_vars);
+        if(computed_big_Ms == big_M_kind::tight) tight_statistics.log();
+        _add_mip_start(model, instance, x);
 
         const auto [has_solution, report] = _solve(model, sw);
         if(!has_solution) return {_fallback_solution(instance, budget), report};
-        const auto model_solution = model.get_solution();
+        if(!relax_integrality)
+            return {_bought_options(instance, model.get_solution(), x), report};
 
         // Of the relaxation, only the options bought entirely: those bought
         // by half can cost more than the budget, and their score is then
         // reported above the bound of the relaxation.
-        for(const auto & i : instance.options()) {
-            solution[i] = relax_integrality
-                              ? model_solution[X_vars(i)] >= 1 - feasibility_tol
-                              : model_solution[X_vars(i)] > 0.5;
-        }
-
+        const auto relaxation = model.get_solution();
+        auto solution = instance.create_option_map(false);
+        for(const auto & i : instance.options())
+            solution[i] = relaxation[x(i)] >= 1 - feasibility_tol;
         return {solution, report};
     }
 };

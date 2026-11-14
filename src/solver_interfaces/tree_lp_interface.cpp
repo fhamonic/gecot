@@ -1,6 +1,6 @@
-#include "solver_interfaces/tree_formulation_lp_interface.hpp"
+#include "solver_interfaces/tree_lp_interface.hpp"
 
-gecot::solve_result<Instance> TreeFormulationLPInterface::solve(
+gecot::solve_result<Instance> TreeLpInterface::solve(
     const Instance & instance, const gecot::budget_t & B) const {
     gecot::check_plain_budget(instance, name());
     const auto started = with_mip_start(solver, instance, B);

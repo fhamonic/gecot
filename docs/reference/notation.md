@@ -45,7 +45,9 @@ The symbols of the [formulation pages](../formulations/problem.md), next to the 
 | $\phi^t_a$ | flow that enters the arc $a$ on its way to $t$ | |
 | $f^i_t$ | the variable equal to $f_t$ if $i$ is bought and to 0 otherwise | |
 | $z_k$ ★ | score of the case $k$ | |
+| $\zeta$ ★ | variable of a sub-formula of the criterion, in its [linearization](../formulations/flow.md#linearizing-the-criterion) | |
 | $M^t_u$ | big-M constant: a bound on the flow that reaches $u$ on its way to $t$ | parameter `--big-m` |
+| $(\cdot)^+$ | positive part, $\max\{\cdot\,, 0\}$ | |
 
 ## Preprocessing
 
@@ -58,7 +60,8 @@ The symbols of the [formulation pages](../formulations/problem.md), next to the 
 | $F^x(u,v)$, $F(u,v)$ | fiber of the arc $(u,v)$ in the scenario $x$, and in every scenario | |
 | $\varepsilon$ | resolution of the integer lengths | parameter `--resolution` |
 | $G_t$ | reduced graph of the target $t$ | |
-| $\mu$, $\lambda^\mu_a$ | Lagrange multiplier of the budget-aware labelling, and the lengths it penalizes | parameters `--nb-mus`, `--mus-sweep` |
+| $\mu$, $\lambda^\mu_a$ | Lagrange multiplier of the budget-aware labelling and of the tight constants, and the lengths it penalizes | parameters `--nb-mus`, `--mus-sweep` |
+| $k_j$, $\Pi^\mu(s,u)$ | bound on the arcs of the option $j$ on a simple path, and probability of connection under the tolls of the [tight constants](../formulations/preprocessing.md#the-tight-constants) | `--big-m tight` |
 | $A_i$ | the arcs that the option $i$ improves | |
 
 ## Decompositions and relaxations
@@ -67,15 +70,19 @@ The symbols of the [formulation pages](../formulations/problem.md), next to the 
 |---|---|---|
 | $\rho_u$ | potential of the vertex $u$: dual variable of its flow conservation | |
 | $\sigma_{a^i}$ | dual variable of the big-M constraint of an improved copy | |
-| $y$ | reference scenario of a cut | |
+| $y$, $Y_t$, $Y_g$ | reference scenario of a cut, and the scenarios at which the target $t$, the group $g$, received one so far | |
 | $\operatorname{cut}_{t,y}(x)$ | cut of the target $t$ at $y$, a linear function of $x$ | field `lazy_constraints` |
-| $v_t(x)$ | value of the target $t$, $q^x_t \cdot f_t(x)$ | |
+| $v_t(x)$ | value of the target $t$, $q^x_t \cdot f_t(x)$; also the variable that `flow_mip` gives it | |
 | $\theta_g$, $\mathcal{G}_k$ | value of the group of targets $g$, and the groups of the case $k$ | parameter `--groups` |
 | $A_s$, $m_{sa}$, $\rho^s$ | arcs, big-M constants and potentials of the source $s$ in `multiflow_benders` | field `sources` |
+| $\hat{x}$ | the point at which `multiflow_benders` separates a cut, fractional or not | |
 | $p = (s,t)$ | a pair of vertices | field `pairs` |
 | $v_p(S)$, $v_t(S)$ | value of a pair, of a target, when the set $S$ is bought | |
 | $y_{pS}$, $y_{tS}$ | columns of the path and tree formulations | |
+| $C_k$ | value of the pairs of the case $k$ that no option changes | |
 | $\gamma_k$, $\sigma_p$, $\lambda_{pi}$, $\eta$ | dual variables of the contribution, uniqueness, purchase and budget constraints | |
+| $(S, \omega, W)$ | a label of the pricing of `path_lp`: the options bought, the value of the path without the source quality, the weight of $S$ | |
+| $\eta_r$, $\nu_l$ ★ | dual variables of the budget of the dimension $r$ and of the conflict set $\Omega_l$ | |
 | $r_{pS}$, $r_p$ | reduced cost of a column, best reduced cost of a pair | |
 | $L$ | Lagrangian bound | field `best_bound` of `path_lp` |
 | $d_i$ | reduced cost of the option $i$ in the relaxation | option `--reformulation path_lp` |
@@ -87,8 +94,24 @@ The symbols of the [formulation pages](../formulations/problem.md), next to the 
 | $e_i$ | the scenario that buys the option $i$ alone | |
 | $\Delta^+_i(x)$, $\Delta^-_i(x)$ | gain and loss of the option $i$ per unit of cost, in the scenario $x$ (of $D_i$ with several costs) | |
 | $D_i$ ★ | the cost that the heuristics divide a gain by: $c_i$ with a single cost | |
+| $r_0$ ★ | the dimension whose unit $D_i$ is in: the first one of positive budget | |
 | $b$ | an upper bound on the score of the scenarios within the budget | field `bound`, line `Upper bound` |
 | $s_0$ | score with only the options bought statically: of cost 0 in every dimension, and in no conflict set with another affordable option | |
 | $H$, $l_i$, $Q_{ij}$ | constant, linear and quadratic terms of the bound of `qkp_planes` | |
 | $\theta_{ij}$, $u_i$ | split of the quadratic terms, and the resulting bound on what the option $i$ brings | parameter `--theta` |
 | $\nu_{pi}$, $R_p(\nu)$ | prices of `split_lagrange`, and the best priced value of a pair | |
+
+## In the code
+
+Convention of the code: a variable is named after the symbol it implements, so that the lines that build a model read as its formulation. `flow_mip` is the reference for it, and these are its names:
+
+| Symbol | Identifier |
+|---|---|
+| $i \in \Phi$, $k \in K$ | `i`, `k` |
+| $x_i$, $z_k$ | `x(i)`, `z(k)` |
+| $G_t$ and its target | `G_t`, `t`; the same vertex in the graph of the instance is `original_t` |
+| $v_t$, $f_t$, $f^i_t$, $\phi^t_a$ | `v(original_t)`, `f_t`, `f_ti`, `phi(a)` |
+| $M^t_u$ for the improved copy `a` that leaves $u$, $M^t_t$ for the gain of $i$ | `G_t.improvement_big_M(a)`, `G_t.target_big_M(i)` |
+| $w_u$, $w^i_u$ | `G_t.source_quality_map[u]`, `G_t.source_options_map[u]` |
+| $q_t$, $q^i_t$ | `target_quality_map[original_t]`, `target_gain` |
+| $\pi_a$, and $\pi^i_a$ for an improved copy | `G_t.probability_map[a]` |

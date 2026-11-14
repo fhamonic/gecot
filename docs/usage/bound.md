@@ -46,6 +46,8 @@ The solutions that the bound covers are those of `gecot optimize`: the options o
 
 ```json
 {
+    "gecot_version":  "2.0",
+    "format_version": 1,
     "instance_path":  "/home/user/instances/Aix/instance_40x40/instance.json",
     "method":  "path_lp",
     "method_parameters": {
@@ -60,9 +62,10 @@ The solutions that the bound covers are those of `gecot optimize`: the options o
         "relative-gap":          0
     },
     "computation_time_ms":  3423,
-    "initial_score":  356238.4908355161,
+    "initial_score":  356238.49083551613,
+    "base_score":     356238.49083551567,
     "initial_pc_num": {
-        "squirrel": 356238.4908355161
+        "squirrel": 356238.49083551613
     },
     "budget":         8,
     "bound":          439093.3253832197,
@@ -82,7 +85,7 @@ The solutions that the bound covers are those of `gecot optimize`: the options o
 }
 ```
 
-`method_parameters` holds the parameters of the method with the values used, as [`algorithm_parameters`](results.md#json) does for an algorithm. The `method_report` of a method that is an algorithm is the [report of this algorithm](results.md#json), plus `solution_score`, the score of the solution that the algorithm found on the way. With [several costs](instance.md#several-costs), `budget` is an object with a number per dimension, as `{"area": 4, "money": 5}`.
+`gecot_version`, `format_version`, `initial_score` and `base_score` are those of a [solution file](results.md#json). `method_parameters` holds the parameters of the method with the values used, as [`algorithm_parameters`](results.md#json) does for an algorithm. The `method_report` of a method that is an algorithm is the [report of this algorithm](results.md#json), plus `solution_score`, the score of the solution that the algorithm found on the way. With [several costs](instance.md#several-costs), `budget` is an object with a number per dimension, as `{"area": 4, "money": 5}`.
 
 ## Certifying a solution
 

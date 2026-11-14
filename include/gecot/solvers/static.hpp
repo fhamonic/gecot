@@ -11,13 +11,14 @@
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
+#include "gecot/solvers/heuristics_common.hpp"
 #include "gecot/utils/log_table.hpp"
 
 namespace gecot {
 namespace solvers {
 
 struct Static {
-    double feasibility_tol = 0.0;
+    double feasibility_tol = default_feasibility_tol;
     // every option within the budget is bought first, then the worst ones
     // are removed until the budget is met; with a single cost and no
     // conflict set
@@ -27,202 +28,119 @@ struct Static {
     template <instance_c I>
     instance_solution_t<I> solve(const I & instance,
                                  const budget_t & budget) const {
-        if(decremental && !has_plain_budget(instance))
-            throw std::invalid_argument(
-                "static --decremental: conflict sets and several cost "
-                "dimensions are not supported, run static without "
-                "--decremental");
+        if(decremental) check_decremental(instance, "static");
         auto solution = instance.create_option_map(false);
 
-        const auto & cases = instance.cases();
+        // the options that fit alone: bought with --decremental, to buy
+        // otherwise
         std::vector<option_t> options, free_options;
+        for(const option_t & i : instance.options())
+            if(fits_alone(instance, i, budget, feasibility_tol))
+                (decremental ? options : free_options).emplace_back(i);
         double purchased = 0.0;
-        const auto fits_alone = [&](const option_t & option) {
-            for(std::size_t r = 0; r < budget.size(); ++r)
-                if(instance.option_cost(option, r) >
-                   budget[r] + feasibility_tol)
-                    return false;
-            return true;
-        };
-        for(const option_t & option : instance.options()) {
-            if(!fits_alone(option)) continue;
-            if(!decremental) {
-                free_options.emplace_back(option);
-                continue;
-            }
-            options.emplace_back(option);
-            solution[option] = true;
-            purchased += instance.option_cost(option);
+        for(const option_t & i : options) {
+            solution[i] = true;
+            purchased += instance.option_cost(i);
         }
 
+        heuristic_landscape landscape(instance);
         auto options_cases_pc_num = instance.create_option_map(
             instance.template create_case_map<double>());
-        auto cases_current_sqm =
-            instance
-                .template create_case_map<instance_source_quality_map_t<I>>();
-        auto cases_current_tqm =
-            instance
-                .template create_case_map<instance_target_quality_map_t<I>>();
-        auto cases_current_pm =
-            instance.template create_case_map<instance_probability_map_t<I>>();
-        const auto cases_vertex_options =
-            compute_cases_vertex_options(instance);
-        const auto cases_arc_options = compute_cases_arc_options(instance);
         auto options_ratios = instance.create_option_map(0.0);
 
+        // --decremental: the options by increasing loss per unit of cost in
+        // the scenario that buys them all, removed until the cost fits the
+        // budget
         if(decremental) {
-            for(const auto & instance_case : cases) {
-                auto & current_sqm = (cases_current_sqm[instance_case.id()] =
-                                          instance_case.source_quality_map());
-                auto & current_tqm = (cases_current_tqm[instance_case.id()] =
-                                          instance_case.target_quality_map());
-                auto & current_pm = (cases_current_pm[instance_case.id()] =
-                                         instance_case.arc_probability_map());
-                const auto & vertex_options =
-                    cases_vertex_options[instance_case.id()];
-                const auto & arc_options =
-                    cases_arc_options[instance_case.id()];
-                for(auto && option : options) {
-                    for(auto && [u, source_quality_gain, target_quality_gain] :
-                        vertex_options[option]) {
-                        current_sqm[u] += source_quality_gain;
-                        current_tqm[u] += target_quality_gain;
-                    }
-                    for(auto && [a, enhanced_prob] : arc_options[option])
-                        current_pm[a] = std::max(current_pm[a], enhanced_prob);
-                }
-            }
-
+            landscape.set(options);
             log_table<spdlog::level::trace, 50, 40, 12, 11> removed(
                 {"removed option id"},
                 {"loss/cost ratio", log_format::scientific(5)},
                 {"solution cost", log_format::scientific(5)});
-
-            const double max_score =
-                compute_score(instance, cases_current_sqm, cases_current_tqm,
-                              cases_current_pm);
-            compute_options_cases_decr_pc_num(
-                instance, solution, options, cases_current_sqm,
-                cases_current_tqm, cases_current_pm, cases_vertex_options,
-                cases_arc_options, options_cases_pc_num);
-
-            for(auto && option : options) {
-                options_ratios[option] =
-                    (max_score -
-                     instance.eval_criterion(options_cases_pc_num[option])) /
-                    instance.option_cost(option);
+            const double max_score = landscape.score();
+            landscape.scores_without(solution, options, options_cases_pc_num);
+            for(const option_t & i : options) {
+                options_ratios[i] = (max_score - instance.eval_criterion(
+                                                     options_cases_pc_num[i])) /
+                                    instance.option_cost(i);
             }
-
             std::ranges::sort(
-                options, [&options_ratios](auto && o1, auto && o2) {
-                    return options_ratios[o1] < options_ratios[o2];
+                options, [&options_ratios](auto && i1, auto && i2) {
+                    return options_ratios[i1] < options_ratios[i2];
                 });
 
-            for(auto && option : options) {
+            for(const option_t & i : options) {
                 if(purchased <= budget.front() + feasibility_tol) break;
-                const double price = instance.option_cost(option);
-                purchased -= price;
-                solution[option] = false;
-                free_options.emplace_back(option);
-                removed.row(instance.option_name(option),
-                            options_ratios[option], purchased);
+                purchased -= instance.option_cost(i);
+                solution[i] = false;
+                free_options.emplace_back(i);
+                removed.row(instance.option_name(i), options_ratios[i],
+                            purchased);
             }
             if(only_dec) return solution;
         }
 
-        // the cost spent in each dimension
+        // The cost spent in each dimension. The removals leave it in the
+        // first one alone, which is the only one: --decremental refuses
+        // several.
         std::vector<double> spent;
         for(std::size_t r = 0; r < budget.size(); ++r)
             spent.push_back(r == 0 ? purchased : 0.0);
-        const auto fits = [&](const option_t & o) {
+        const auto fits = [&](const option_t & i) {
             for(std::size_t r = 0; r < budget.size(); ++r)
-                if(!(instance.option_cost(o, r) <=
+                if(!(instance.option_cost(i, r) <=
                      budget[r] - spent[r] + feasibility_tol))
                     return false;
             return true;
         };
+        // the options by decreasing gain per unit of cost in the scenario
+        // reached, each bought if it fits in what is left of the budget
         if(std::ranges::any_of(free_options, fits)) {
             log_table<spdlog::level::trace, 50, 40, 12, 11> added(
                 {"added option id"},
                 {"gain/cost ratio", log_format::scientific(5)},
                 {"budget left", log_format::scientific(5)});
 
-            for(const auto & instance_case : cases) {
-                auto & current_sqm = (cases_current_sqm[instance_case.id()] =
-                                          instance_case.source_quality_map());
-                auto & current_tqm = (cases_current_tqm[instance_case.id()] =
-                                          instance_case.target_quality_map());
-                auto & current_pm = (cases_current_pm[instance_case.id()] =
-                                         instance_case.arc_probability_map());
-                auto && vertex_options =
-                    cases_vertex_options[instance_case.id()];
-                auto && arc_options = cases_arc_options[instance_case.id()];
-                for(auto && option : options) {
-                    if(!solution[option]) continue;
-                    for(auto && [u, source_quality_gain, target_quality_gain] :
-                        vertex_options[option]) {
-                        current_sqm[u] += source_quality_gain;
-                        current_tqm[u] += target_quality_gain;
-                    }
-                    for(auto && [a, enhanced_prob] : arc_options[option])
-                        current_pm[a] = std::max(current_pm[a], enhanced_prob);
-                }
-            }
-            const double decremental_score =
-                compute_score(instance, cases_current_sqm, cases_current_tqm,
-                              cases_current_pm);
-            compute_options_cases_incr_pc_num(
-                instance, free_options, cases_current_sqm, cases_current_tqm,
-                cases_current_pm, cases_vertex_options, cases_arc_options,
-                options_cases_pc_num);
+            landscape.set(std::views::filter(options, [&](auto && i) {
+                return static_cast<bool>(solution[i]);
+            }));
+            const double decremental_score = landscape.score();
+            landscape.scores_with(free_options, options_cases_pc_num);
 
             // divides the gains: the cost with a single dimension
             const auto costs = compute_heuristic_costs(instance, budget);
             const std::size_t r0 = reference_dimension(budget);
-            for(const option_t & option : free_options) {
+            for(const option_t & i : free_options) {
                 const double gain =
-                    instance.eval_criterion(options_cases_pc_num[option]) -
+                    instance.eval_criterion(options_cases_pc_num[i]) -
                     decremental_score;
-                options_ratios[option] =
-                    costs[option] == 0 ? gain : gain / costs[option];
+                options_ratios[i] = costs[i] == 0 ? gain : gain / costs[i];
             }
-            // a free option, whose ratio would be infinite or undefined,
-            // comes first if it gains, last if it loses, and otherwise
-            // counts as a gain of 0
-            const auto tier = [&](const option_t & o) {
-                if(costs[o] != 0) return 0;
-                const double eps = 1e-12 * std::abs(decremental_score);
-                return (options_ratios[o] > eps) - (options_ratios[o] < -eps);
+            const auto tier = [&](const option_t & i) {
+                return free_option_tier(costs[i], options_ratios[i],
+                                        decremental_score);
             };
-            const auto key = [&](const option_t & o) {
-                return costs[o] == 0 && tier(o) == 0 ? 0.0 : options_ratios[o];
+            const auto key = [&](const option_t & i) {
+                return ratio_key(costs[i], options_ratios[i],
+                                 decremental_score);
             };
-            std::ranges::sort(free_options, [&](auto && o1, auto && o2) {
-                const int t1 = tier(o1), t2 = tier(o2);
-                return t1 != t2 ? t1 > t2 : key(o1) > key(o2);
+            std::ranges::sort(free_options, [&](auto && i1, auto && i2) {
+                const int t1 = tier(i1), t2 = tier(i2);
+                return t1 != t2 ? t1 > t2 : key(i1) > key(i2);
             });
 
             const auto options_sets = compute_options_conflict_sets(instance);
-            // a conflict set of the option holds a bought option
-            const auto blocked = [&](const option_t & option) {
-                return std::ranges::any_of(
-                    options_sets[option], [&](auto && l) {
-                        return std::ranges::any_of(
-                            instance.conflict_sets()[l], [&](auto && other) {
-                                return other != option && solution[other];
-                            });
-                    });
-            };
-            for(const option_t & option : free_options) {
+            for(const option_t & i : free_options) {
                 bool over = false;
                 for(std::size_t r = 0; r < budget.size(); ++r)
-                    over = over || spent[r] + instance.option_cost(option, r) >
+                    over = over || spent[r] + instance.option_cost(i, r) >
                                        budget[r] + feasibility_tol;
-                if(over || blocked(option)) continue;
+                if(over || is_blocked(instance, options_sets, solution, i))
+                    continue;
                 for(std::size_t r = 0; r < budget.size(); ++r)
-                    spent[r] += instance.option_cost(option, r);
-                solution[option] = true;
-                added.row(instance.option_name(option), options_ratios[option],
+                    spent[r] += instance.option_cost(i, r);
+                solution[i] = true;
+                added.row(instance.option_name(i), options_ratios[i],
                           budget[r0] - spent[r0]);
             }
         }

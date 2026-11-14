@@ -10,7 +10,7 @@ private:
 
 public:
     MultiflowBendersInterface() : AbstractMipInterface("multiflow_benders") {
-        add_mip_options(solver, 1e-7, lazy_constraint_solvers);
+        add_mip_options(solver, lazy_constraint_solvers);
         add_preprocessing_options(solver);
         app.add_flag("--no-root-cuts", solver.no_root_cuts,
                      "For comparison: no cut on the linear relaxation before "
@@ -28,5 +28,9 @@ public:
         return "Benders decomposition of the multicommodity flows, one per "
                "source and target, its cuts separated on the linear "
                "relaxation first";
+    }
+    std::optional<std::string> bound_description() const override {
+        return "Dual bound of the multiflow Benders master; needs an "
+               "incumbent.";
     }
 };

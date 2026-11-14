@@ -1,5 +1,7 @@
 # Constrained (Lagrangian) preprocessing: design note
 
+> **Status, 2026-11-14.** A record of the studies of 2026-11-05 to 2026-11-13. The code has moved since: the lines cited are those of that time. What the constrained preprocessing does today is stated in `docs/formulations/preprocessing.md`, "Taking the budget into account".
+
 Design note on gecot's constrained preprocessing, `compute_constrained_strong_and_useless_arcs`, which `--nb-mus` turns on in `flow_mip`, `tree_lp` and, since branch `benders-preprocessing`, the Benders decompositions (today `multicut_benders`, `flow_benders` and `multiflow_benders`). It is written for the owner and future maintainers; §2 is the part gecot's user documentation can draw on, and it ends with proposed text. Dated 2026-11-06, it records everything that was tested about this preprocessing on 2026-11-05 and 2026-11-06: a review against the thesis, three validity fixes, budget and grid sweeps, a study of the multiplier order, end-to-end timings, and the implementation that landed. The code described is commit 4d4c14c on branch `prep-mip-tight-big-m`, squashed into main as 68e7391; the header is the same file in both (md5 d7af8040).
 
 - **Sources.**

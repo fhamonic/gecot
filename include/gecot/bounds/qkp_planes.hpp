@@ -50,29 +50,21 @@ std::vector<double> improved_probability_map(const C & instance_case,
     return probabilities;
 }
 
-// Upper planes of the quadratic knapsack that bounds the weighted case
-// scores. Every probability P(X) is at most P̄, its value with every option
-// bought, and the qualities are the base ones q plus the gains G x, so
-//   Σ_k w_k pc_k(X) <= H + l·x + xᵀQx,
-//   H = Σ_k w_k q^s P̄ q^t,  l_o = Σ_k w_k (g^s_o P̄ q^t + q^s P̄ g^t_o),
-//   Q_oo' = Σ_k w_k g^s_o P̄ g^t_o'.
-// Splitting Q_oo' + Q_o'o into θ_oo' + θ_o'o with θ >= 0 bounds row o by
-//   u_o = l_o + Q_oo + max{Σ_o' θ_oo' y_o' : c·y <= B - c_o, y_o = 0}
-// (Caprara, Pisinger and Toth 1999), and the whole by H + max{u·x : c·x <= B},
-// both knapsacks by their LP relaxations. With several cost dimensions, each
-// knapsack is the least of those of the dimensions. Two options of a conflict
-// set are never both bought: their Q_oo' are 0.
+// The upper planes of docs/formulations/bounds.md ("qkp_planes") on the
+// weighted case scores: H, l and Q are the sums of those of the cases, each
+// times the weight of its case.
 struct qkp_planes {
     enum class theta_start { best, half, target, source };
     theta_start start = theta_start::best;
     // projected subgradient steps on θ after the start
     std::size_t iterations = 0;
-    // the weighted score the steps aim at, 0.9 times the bound if not given
+    // the score of the criterion that the steps aim at, for a linear
+    // criterion; 0.9 times the bound if not given
     std::optional<double> target;
 
     struct weighted_result {
         double bound;
-        // per option: the bound u_o on the gains of buying it, 0 without gains
+        // per option: the bound u_i on the gains of buying it, 0 without gains
         std::vector<double> option_bounds;
     };
 
@@ -200,11 +192,11 @@ struct qkp_planes {
         }
 
         for(auto && set : instance.conflict_sets())
-            for(auto && o : set)
-                for(auto && o2 : set)
-                    if(o != o2 && item_of[o] != no_item &&
-                       item_of[o2] != no_item)
-                        Q[item_of[o] * n + item_of[o2]] = 0.0;
+            for(auto && option : set)
+                for(auto && other : set)
+                    if(option != other && item_of[option] != no_item &&
+                       item_of[other] != no_item)
+                        Q[item_of[option] * n + item_of[other]] = 0.0;
 
         weighted_result result{H, std::vector<double>(num_options, 0.0)};
         if(n == 0) {

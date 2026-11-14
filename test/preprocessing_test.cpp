@@ -201,10 +201,11 @@ GTEST_TEST(preprocessing, fuzzy_test) {
                 // auto lower_length_map = original_probability_map;
                 // const auto & arc_options_map = instance.arc_options_map();
                 // for(const auto & a : melon::arcs(original_graph)) {
-                //     for(const auto & [improved_prob, option] :
+                //     for(const auto & [improved_probability, option] :
                 //     arc_options_map[a]) {
                 //         lower_length_map[a] =
-                //             std::max(lower_length_map[a], improved_prob);
+                //             std::max(lower_length_map[a],
+                //             improved_probability);
                 //     }
                 // }
                 // printer

@@ -14,23 +14,20 @@ private:
 
 public:
     QkpPlanesInterface() : AbstractBoundInterface("qkp_planes") {
-        app.add_option_function<std::string>(
-               "--theta",
-               [this](const std::string & s) {
-                   using enum gecot::qkp_planes::theta_start;
-                   method.start = s == "half"     ? half
-                                  : s == "target" ? target
-                                  : s == "source" ? source
-                                                  : best;
-               },
-               "Split of the quadratic terms between the two options of a "
-               "pair: half each, all to the one with the target gain, all to "
-               "the one with the source gain, or the best of the three")
-            ->check(CLI::IsMember({"best", "half", "target", "source"}))
-            ->default_val("best");
+        using theta_start = gecot::qkp_planes::theta_start;
+        add_choice_option<theta_start>(
+            app, "--theta", method.start,
+            {{"best", theta_start::best},
+             {"half", theta_start::half},
+             {"target", theta_start::target},
+             {"source", theta_start::source}},
+            [this](const theta_start start) { method.start = start; },
+            "Split of the quadratic terms between the two options of a "
+            "pair: half each, all to the one with the target gain, all to "
+            "the one with the source gain, or the best of the three");
         app.add_option("--iterations", method.iterations,
                        "Subgradient steps on the split after it")
-            ->default_val(0);
+            ->default_val(method.iterations);
         add_target_option(target,
                           "Score the subgradient steps aim at, a known "
                           "solution's for instance (default: 0.9 times the "

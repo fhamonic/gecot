@@ -32,7 +32,7 @@ $$
 \end{aligned}
 $$
 
-The scenario appears only in its objective. A dual solution $(\rho, \sigma)$ is therefore feasible whatever the scenario, and by weak duality it bounds the flow of *every* scenario:
+The scenario appears only in its objective. A dual solution $(\rho, \sigma)$ is therefore feasible whatever the scenario, and by weak duality it bounds the flow of *every* scenario for which the constants $M^t_u$ are valid, that is, with the [default constants](preprocessing.md#big-m-constants), every scenario within the budget:
 
 $$
 f_t(x) \;\le\; \sum_{u} \Big( w_u + \sum_{i \in \Phi} w^i_u \cdot x_i \Big) \cdot \rho_u \;+\; \sum_{a^i \in A'} M^t_u \cdot \sigma_{a^i} \cdot x_i\,,
@@ -73,6 +73,8 @@ $$
 $$
 
 where $Y_t$ is the set of scenarios at which a cut of $t$ has been added so far. With all the scenarios in $Y_t$ the master would be equivalent to the flow formulation; the search adds only the few that matter.
+
+`--indicator-constraints` writes the big-M constraint of each target quality gain as an *indicator constraint*, $x_i = 0 \Rightarrow f^i_t \le 0$, as [in `flow_mip`](flow.md#what-flow_mip-solves). The cuts keep their constants $M^t_u$, which are coefficients and not constraints. It is an experimental switch, for the solvers that have such constraints (`gurobi`, `cplex`).
 
 With [several costs or conflict sets](problem.md#several-costs-and-conflict-sets), the budget row of this master, and of the masters of `multicut_benders` and `multiflow_benders` below, becomes the rows of the [flow formulation](flow.md#cases-and-criterion): one per cost dimension and one per conflict set. The cuts are the same.
 
@@ -122,13 +124,26 @@ $$
 f_t(x) = w^x_t + \sum_{s \neq t} w^x_s \cdot \Pi^x(s,t)\,.
 $$
 
-The part of a source $s$ is the optimum of the program above with the quality of $s$ alone, restricted to the set $A_s$ of the arcs that a most reliable path from $s$ to $t$ can use in some scenario, and with its own constants:
+The part of a source $s \neq t$ is the optimum of the program of [the cut of a target](#the-cut-of-a-target) with the quality of $s$ alone, restricted to the set $A_s$ of the arcs that a most reliable path from $s$ to $t$ can use in some scenario, and with its own constants $m_{sa}$:
+
+$$
+\begin{aligned}
+\max \;\; & f \\
+\text{s.t.} \;\;
+& \sum_{a \in \delta^{\text{out}}_u \cap A_s} \phi_a - \sum_{b \in \delta^{\text{in}}_u \cap A_s} \pi_b \cdot \phi_b \le [u = s] \cdot w^x_s && u \neq t && (\rho^s_u) \\
+& f + \sum_{a \in \delta^{\text{out}}_t \cap A_s} \phi_a - \sum_{b \in \delta^{\text{in}}_t \cap A_s} \pi_b \cdot \phi_b \le 0 && && (\rho^s_t) \\
+& \phi_{a^i} \le m_{sa} \cdot x_i && a^i \in A_s \cap A' && (\sigma^s_{a^i}) \\
+& \phi \ge 0\,, \; f \ge 0\,,
+\end{aligned}
+$$
+
+where $[u = s]$ is $1$ at $s$ and $0$ elsewhere, and
 
 $$
 m_{sa} = \overline{w}_s \cdot \overline{\Pi}(s,u) \qquad \text{for an improved copy } a \text{ leaving } u\,,
 $$
 
-what $s$ alone can bring to $u$ with every option. An arc $(u,v)$ is in $A_s$ when the best path of $s$ through it with every option, of probability $\overline{\Pi}(s,u) \cdot \overline{\pi}_{uv} \cdot \overline{\Pi}(v,t)$, is at least as reliable as the best path of $s$ without any option. Any potentials $\rho^s$ with $\rho^s_t = 1$ and $\rho^s_u \ge \pi_a \cdot \rho^s_v$ on the arcs $a = (u,v)$ of $A_s \cap A$ then give
+what $s$ alone can bring to $u$ with every option. An arc or an improved copy $a = (u,v)$ is in $A_s$ when the best path of $s$ through it with every option, of probability $\overline{\Pi}(s,u) \cdot \pi_a \cdot \overline{\Pi}(v,t)$ with the probability of $a$ itself, is at least as reliable as the best path of $s$ without any option, up to a relative $10^{-9}$: in every scenario a most reliable path of $s$ is at least that reliable, so it uses no other arc. Only the sources that can bring something to $t$ get a flow, those with $\overline{w}_s > 0$ and $\overline{\Pi}(s,t) > 0$. Any potentials $\rho^s$ with $\rho^s_t = 1$ and $\rho^s_u \ge \pi_a \cdot \rho^s_v$ on the arcs $a = (u,v)$ of $A_s \cap A$ then give
 
 $$
 \begin{aligned}
@@ -137,18 +152,22 @@ f_t(x) \;\le\; w^x_t + \sum_{s \neq t} \Big[ \; & \rho^s_s \cdot w^x_s \\
 \end{aligned}
 $$
 
-An option now pays, for each source, only what this source can bring to its arcs. The master is the one of `flow_benders` with these cuts in place of $\operatorname{cut}_{t,y}$, and its linear relaxation is much closer to the optimum.
+An option now pays, for each source, only what this source can bring to its arcs. The master is the one of `flow_benders` with these cuts in place of $\operatorname{cut}_{t,y}$, and with each $f_t$ bounded by $M^t_t$: without this bound its relaxation is unbounded until $t$ receives a cut. The constant $M^t_t$ is the `knapsack_bnb` one, as `multiflow_benders` has no `--big-m`, and only the gains $q^i_t > 0$ get a variable $f^i_t$. Its linear relaxation is much closer to the optimum.
 
-**Separation.** The cut of a point $\bar{x}$, which may be fractional, takes for each source the potentials of its largest flow at $\bar{x}$, where an improved copy carries at most $m_{sa} \cdot \bar{x}_i$. This flow is computed by augmenting along the paths of highest gain, and the potentials of the last step are an optimal dual solution. At a scenario, one path takes the whole quality of the source and the potentials are the probabilities of connection.
+### Separation
 
-**Cuts on the relaxation.** Before the search, `multiflow_benders` solves the linear relaxation of its master, with $x \in [0,1]^\Phi$, and separates cuts until the optimum of the relaxation violates none. It does so *in-out*: the point that is separated is a center that moves halfway toward each new optimum of the relaxation, whose cuts are deeper than those of the optimum itself, and when the center yields no violated cut the optimum takes over. With a time limit, this phase takes at most half of it. The value of the relaxation with its cuts is an upper bound on the optimum, reported as `root_relaxation_value`, and the bound of the run is the lower of this value and the solver's bound. `--no-root-cuts` skips the phase and `--no-in-out` separates the optimum from the start, both for comparison.
+The cut of a point $\hat{x}$, which may be fractional, takes for each source the potentials of its largest flow at $\hat{x}$, where an improved copy carries at most $m_{sa} \cdot \hat{x}_i$. This flow is computed by augmenting along the paths of highest gain, and the potentials of the last step are an optimal dual solution. At a scenario, one path takes the whole quality of the source and the potentials are the probabilities of connection. If this computation does not settle, the source takes the potentials of the arcs of $A_s$ that are open at $\hat{x}$, without any flow. They are feasible too, so the cut stays valid, and at a scenario they are the probabilities of connection, so the flow of a candidate stays exact.
+
+### Cuts on the relaxation
+
+Before the search, `multiflow_benders` solves the linear relaxation of its master, with $x \in [0,1]^\Phi$, and separates cuts until the optimum of the relaxation violates none. It does so *in-out*: the point that is separated is a center, which starts at the first optimum of the relaxation and moves halfway toward each new one, and whose cuts are deeper than those of the optimum itself; when the center yields no violated cut, the optimum takes over. A cut is added when the value of $f_t$ at the optimum exceeds the cut by more than $10^{-7}$, relative and absolute; this tolerance is fixed and does not follow `-t`. With a time limit, this phase takes at most half of it. The value of the relaxation with its cuts is an upper bound on the optimum, reported as `root_relaxation_value`, and the bound of the run is the lower of this value and the solver's bound. `--no-root-cuts` skips the phase and `--no-in-out` separates the optimum from the start, both for comparison.
 
 ## The search
 
 The three masters are solved by the branch and bound of a MILP solver, with the cuts added *lazily*:
 
 1. Before the search, `flow_benders` and `multicut_benders` add the cuts of the scenario that buys nothing, all three add the cuts of the MIP start if there is one, and `multiflow_benders` adds its cuts on the relaxation.
-2. Each time the solver finds a candidate scenario $y$, GECOT computes the true flows $f_t(y)$, by one shortest path computation per target.
+2. Each time the solver finds a candidate scenario $y$, GECOT computes the true flows $f_t(y)$: by one shortest path computation per target, or for `multiflow_benders` by its [separation](#separation) at $y$.
 3. For each target, or each group, that the master overestimates by more than the tolerance `-t` (relative to its true value), the cut at $y$ is added as a lazy constraint.
 4. A candidate that receives a cut is rejected by the solver, although $y$ is a perfectly valid solution whose score is now known. GECOT hands it back with its true values, so that no solution found is lost.
 
@@ -161,7 +180,7 @@ The three decompositions need a solver that accepts lazy constraints in a callba
 | Algorithm | Parameters |
 |---|---|
 | `multicut_benders` | `--groups`, `--grouping`, `--grouping-seed`, `--big-m` |
-| `flow_benders` | `--big-m` |
+| `flow_benders` | `--big-m`, `--indicator-constraints` |
 | `multiflow_benders` | `--no-root-cuts`, `--no-in-out` |
 
 Their report adds `lazy_constraints`, the number of cuts added during the search, and for `multiflow_benders` `sources`, `root_rounds`, `root_cuts` and `root_relaxation_value`.

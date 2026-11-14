@@ -10,9 +10,14 @@ private:
 
 public:
     FlowBendersInterface() : AbstractMipInterface("flow_benders") {
-        add_mip_options(solver, 1e-7, lazy_constraint_solvers);
+        add_mip_options(solver, lazy_constraint_solvers);
         add_preprocessing_options(solver);
         add_big_M_option(solver.big_Ms);
+        app.add_flag("--indicator-constraints", solver.indicator_constraints,
+                     "Experimental: a target quality gain is closed by an "
+                     "indicator constraint on its option, in place of its "
+                     "big-M constraint; the cuts keep their big-Ms (gurobi "
+                     "and cplex)");
     }
 
     gecot::solve_result<Instance> solve(
@@ -22,5 +27,8 @@ public:
         return "Benders decomposition across each generalized flow with non "
                "linearity of vertex improvements handled by the master "
                "problem";
+    }
+    std::optional<std::string> bound_description() const override {
+        return "Dual bound of the flow Benders master; needs an incumbent.";
     }
 };

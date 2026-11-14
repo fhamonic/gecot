@@ -12,19 +12,26 @@
 
 #include "commands/common.hpp"
 
-#include "solver_interfaces/path_formulation_lp_interface.hpp"
+#include "solver_interfaces/path_lp_interface.hpp"
 #include "trivial_reformulate.hpp"
 
 namespace {
 // the options are ruled out against the MIP start
-struct PathReformulationInterface : PathFormulationLPInterface {
+struct PathReformulationInterface : PathLpInterface {
     PathReformulationInterface() {
         app.get_option("--mip-start-algorithm")->default_val("greedy");
+    }
+    // A start file replaces greedy's solution: left at its default, greedy
+    // would run and overwrite the start that the file gave.
+    void parse(std::vector<std::string> args) {
+        PathLpInterface::parse(std::move(args));
+        if(app.get_option("--mip-start")->count())
+            app.get_option("--mip-start-algorithm")->default_val("none");
     }
 };
 }  // namespace
 
-std::shared_ptr<const PathFormulationLPInterface> make_path_reformulation(
+std::shared_ptr<const PathLpInterface> make_path_reformulation(
     const std::string & parameters) {
     auto path_lp = std::make_shared<PathReformulationInterface>();
     std::vector<std::string> args;
@@ -36,9 +43,9 @@ std::shared_ptr<const PathFormulationLPInterface> make_path_reformulation(
 }
 
 gecot::solve_result<Instance> solve_path_reformulated(
-    const PathFormulationLPInterface & path_lp,
-    AbstractSolverInterface & solver, const Instance & instance,
-    const gecot::budget_t & budget, const bool merge) {
+    const PathLpInterface & path_lp, AbstractSolverInterface & solver,
+    const Instance & instance, const gecot::budget_t & budget,
+    const bool merge) {
     auto score = [&](const auto & X) {
         return instance.eval_criterion(
             gecot::compute_solution_cases_pc_num(instance, X));

@@ -13,6 +13,8 @@ Before any algorithm runs, `gecot optimize` and `gecot bound` rewrite the instan
 
 **Options that cost 0 in every [cost dimension](../usage/instance.md#several-costs) are bought.** They are applied to the graphs, and the solution lists them as bought. The *initial score* is still the score of the landscape without them. An option of cost 0 in a [conflict set](../usage/instance.md#conflict-sets) with another affordable option is not: buying it would exclude that option, so it stays a decision of cost 0. The [modeling page](../usage/modeling.md) uses this rule to express the negative effects of an option.
 
+**The criterion is simplified, and the cases that it does not read are removed.** In a part of the criterion made of sums and products by constants, the terms of a case are added up: $2 z_k - z_k$ becomes $z_k$, and $z_k + 0\, z_l$ becomes $z_k$. This is done only where a case is read twice or is left with a weight of 0: a criterion with nothing to add up is kept as it is written, with the order of its terms. A case that the criterion then does not read is not given to the algorithm. Its score is still reported, with the options bought, which can improve it too. A criterion that reads no case is refused, since every selection would have the same score.
+
 **Options that cost more than the budget are removed**, in any of their [cost dimensions](../usage/instance.md#several-costs). A conflict set left with one option or none is dropped, as it constrains nothing.
 
 **Vertices linked by arcs of probability 1 are merged.** If two vertices $u$ and $v$ are connected with probability $\Pi(u,v) = \Pi(v,u) = 1$, the flow passes from one to the other without loss, so $f_u = f_v$ in every scenario. The same holds for a set $T$ of vertices that are pairwise connected with probability $1$: it is contracted into a single vertex $m$ with
@@ -32,7 +34,7 @@ If no option is left, there is nothing to decide: the run ends with the status `
 
 ### Removing options with the path relaxation
 
-`gecot optimize --reformulation path_lp` goes one step further. It first runs the [path relaxation](relaxations.md), which returns a solution of score $s$ and, for each option $i$, an upper bound $b_i$ on the score of every solution that buys $i$. An option with $b_i \le s$ is in no solution better than the one in hand, so it is removed. The algorithm then runs on the options left, starting from the solution of the relaxation, and the result is the better of the two solutions. When no option is left, or when the bound of the relaxation already equals $s$, the solution is optimal and the algorithm is not run. `--reformulation-params` passes parameters to this `path_lp`, as in `--reformulation-params "time-limit=60 pricing=enumerate"`; its MIP start is the solution of `greedy` unless told otherwise.
+`gecot optimize --reformulation path_lp` goes one step further. It first runs the [path relaxation](relaxations.md), which returns a solution of score $s$ and, for each option $i$, an upper bound $b_i$ on the score of every solution that buys $i$. An option with $b_i \le s$ is in no solution better than the one in hand, so it is removed. The algorithm then runs on the options left, starting from the solution of the relaxation, and the result is the better of the two solutions. When no option is left, or when the bound of the relaxation already equals $s$, the solution is optimal and the algorithm is not run. `--reformulation-params` passes parameters to this `path_lp`, as in `--reformulation-params "time-limit=60 pricing=enumerate"`; its MIP start is the solution of `greedy` unless told otherwise, by `mip-start-algorithm` or by a file given as `mip-start`.
 
 ## The graph of a target
 
@@ -204,7 +206,7 @@ $$
 \lambda^\mu_a = \min\Big\{ l^+_a\,,\; \min_{i \,:\, a \in A_i} \Big( l^i_a + \mu \cdot \frac{c_i}{|A_i|} \Big) \Big\}\,.
 $$
 
-For a scenario $x$ of cost at most $\beta$ and a simple path $Q$, the options that $x$ buys pay at most $\mu \cdot \beta$ along $Q$, so $l^x(Q) \ge \lambda^\mu(Q) - \mu \cdot \beta$. The colouring algorithm run with the lower lengths $\lambda^\mu$, the paths through $(u,v)$ being handicapped by $\mu \cdot \beta$, therefore yields labels that are valid within the budget. Each multiplier gives its own labels, and they accumulate: $\mu = 0$ gives the labels of the previous sections, and larger multipliers add to them. With [several costs](problem.md#several-costs-and-conflict-sets), $c_i$ and $\beta$ are the costs and the budget of the first cost dimension in alphabetical order; ignoring the other dimensions and the conflict sets only weakens the labels.
+For a scenario $x$ of cost at most $\beta$ and a simple path $Q$, the options that $x$ buys pay at most $\mu \cdot \beta$ along $Q$, so $l^x(Q) \ge \lambda^\mu(Q) - \mu \cdot \beta$. The colouring algorithm run with the lower lengths $\lambda^\mu$, the paths through $(u,v)$ being handicapped by $\mu \cdot \beta$, therefore yields labels that are valid within the budget. Each multiplier gives its own labels, and they accumulate: $\mu = 0$ gives the labels of the previous sections, and larger multipliers add to them. With [several costs](problem.md#several-costs-and-conflict-sets), $c_i$ and $\beta$ are the costs and the budget of the first cost dimension, in the [order of their names](../usage/instance.md#several-costs); ignoring the other dimensions and the conflict sets only weakens the labels.
 
 `--nb-mus N` turns this on, with $N + 1$ positive multipliers in geometric progression up to the largest useful one, after $\mu = 0$. It is experimental, and off by default ($N = 0$):
 
@@ -237,9 +239,31 @@ a knapsack problem solved exactly by branch and bound for each vertex that needs
 
 **`knapsack_dantzig`** replaces this knapsack by its linear relaxation, $x \in [0,1]^\Phi$, solved by taking the options by decreasing $g_i / c_i$ and a fraction of the first one that does not fit. The constant is larger, but it takes a sort of the options per vertex, whereas the branch and bound can take seconds per vertex when many options have nearly the same ratio $g_i / c_i$, for instance when each option brings as much quality as it costs.
 
-**`tight`** (experimental) lowers the `knapsack_bnb` constant of each improved copy $a^i$ of an arc $(u,v)$, by keeping only the sources that can use it, those whose best path through $a^i$ with every option is at least as reliable as their best path without any option, and by bounding the probabilities within the budget left by $i$ with a Lagrangian relaxation, in the first cost dimension when there are several.
+**`tight`** (experimental) lowers the `knapsack_bnb` constant of each improved copy $a^i$ of an arc $(u,v)$, by keeping only the sources that can use it, those whose best path through $a^i$ with every option is at least as reliable as their best path without any option, and by bounding the probabilities within the budget left by $i$ with a Lagrangian relaxation, in the first cost dimension when there are several. [The tight constants](#the-tight-constants) gives the two bounds.
 
 `--big-m` is a parameter of `flow_mip`, `multicut_benders` and `flow_benders`. `multiflow_benders` has its own constants, one per source and arc, and `tree_lp` uses the plain ones.
+
+### The tight constants
+
+A constant is valid if, for every scenario $x$ within the budget that buys $i$, some flow that reaches $f_t(x)$ satisfies its constraint. One flow is enough: the one in which each source $s$ sends its quality $w^x_s$ along a single most reliable path from $s$ to $t$ in $G_t$ improved by $x$, and among these paths along one with the fewest improved copies.
+
+**The sources kept.** With $\Pi_{G_t}$ the probabilities of connection in $G_t$ without any option, the source $s$ sends nothing through the copy $a^i$ of $(u,v)$ when
+
+$$
+\overline{\Pi}_{G_t}(s,u) \cdot \pi^i_a \cdot \overline{\Pi}_{G_t}(v,t) < \Pi_{G_t}(s,t)\,:
+$$
+
+every path through the copy is then less reliable than the best path of $s$ without options, which every scenario leaves open, and on a tie that path has fewer improved copies. The test keeps a source within a relative $10^{-9}$ of a tie. The flow that leaves $u$ on $a^i$ is therefore at most $\sum_s w^x_s \cdot \Pi^x_{G_t}(s,u)$ over the sources kept, where the qualities are bounded as in `knapsack_bnb`: the gains of $i$ are counted, and those of the other options go through a knapsack of budget $\beta - c_i$, what $i$ leaves. This budget left is counted with the slack `-t`, here and below, so that the constants hold for a MIP start accepted within this slack.
+
+**The probabilities within the budget.** Let $k_j$ bound the number of arcs of the option $j$ that a simple path can take. A simple path enters a vertex once and leaves it once, so $k_j$ is the smaller of the numbers of heads and of tails of the arcs of $j$. For a multiplier $\mu \ge 0$, charge each improved copy $a^j$ the toll $\mu \cdot c_j / k_j$, the copies of $i$ being free: a path from $s$ to $u$ whose options cost at most $\beta - c_i$ pays at most $\mu \cdot (\beta - c_i)$. Hence
+
+$$
+\Pi^x_{G_t}(s,u) \;\le\; e^{\mu \cdot (\beta - c_i)} \cdot \Pi^\mu(s,u)\,,
+$$
+
+where $\Pi^\mu(s,u)$ is the probability of the most reliable path when the probability of each copy $a^j$ is multiplied by $e^{-\mu \cdot c_j / k_j}$. The multiplier $\mu = 0$ gives $\overline{\Pi}_{G_t}(s,u)$, and each source takes the least of its bounds over six multipliers, $0$ then $0.5$ to $8$ times $1 / \beta$.
+
+The constant $M^t_t$ of the target quality gain of $i$ is bounded in the same way at $t$, with every source kept. With [several costs](problem.md#several-costs-and-conflict-sets), the costs and the budget are those of the first cost dimension, and the conflict sets are ignored: this only weakens the constants.
 
 ## What each step brings
 

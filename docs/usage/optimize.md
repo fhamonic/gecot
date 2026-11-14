@@ -112,7 +112,7 @@ $ gecot optimize flow_mip instance.json 8 --reformulation path_lp
 [   2.8s] Running algorithm 'flow_mip' on the options left
 ```
 
-It pays when the relaxation is tight and the algorithm slow on the whole instance; otherwise it only adds the time of the relaxation. When the relaxation proves its own solution optimal, the algorithm is not run at all. `--reformulation-params "time-limit=60 pricing=enumerate"` passes parameters to this `path_lp`, without their dashes; its MIP start is the solution of `greedy` unless `mip-start-algorithm` says otherwise. The report of the run prefixes the fields of the relaxation with `reformulation_` and adds `remaining_options`.
+It pays when the relaxation is tight and the algorithm slow on the whole instance; otherwise it only adds the time of the relaxation. When the relaxation proves its own solution optimal, the algorithm is not run at all. `--reformulation-params "time-limit=60 pricing=enumerate"` passes parameters to this `path_lp`, without their dashes and separated by spaces, so that a value cannot hold one; its MIP start is the solution of `greedy`, unless `mip-start-algorithm` names another algorithm or `mip-start=<file>` gives a solution, which replaces it. The report of the run prefixes the fields of the relaxation with `reformulation_` and adds `remaining_options`.
 
 ## Several budgets
 

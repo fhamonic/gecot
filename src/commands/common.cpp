@@ -258,6 +258,42 @@ void print_json_per_dimension(std::FILE * stream, const std::string & property,
                             }));
 }
 
+void print_json_head(
+    std::FILE * stream, const std::filesystem::path & instance_file,
+    const std::string & kind, const std::string & name,
+    const std::vector<std::pair<std::string, std::string>> & parameters) {
+    std::print(
+        stream,
+        "{{\n    \"gecot_version\":  \"{}\",\n    \"format_version\": {},\n    "
+        "\"instance_path\":  {},\n    \"{}\":  \"{}\",",
+        PROJECT_VERSION, result_format_version,
+        json_string(std::filesystem::absolute(instance_file).generic_string()),
+        kind, name);
+    print_json_property(stream, kind + "_parameters", parameters);
+}
+
+void print_json_instance(std::FILE * stream, const prepared_instance & prepared,
+                         const long long computation_time_ms) {
+    std::print(stream,
+               ",\n    \"computation_time_ms\":  {},\n    "
+               "\"initial_score\":  {},\n    \"base_score\":     {},",
+               computation_time_ms, prepared.initial_score,
+               prepared.base_score);
+    print_json_property(
+        stream, "initial_pc_num",
+        std::views::transform(
+            prepared.raw_instance.cases(),
+            [&prepared](const auto & instance_case) {
+                return std::make_pair(
+                    instance_case.name(),
+                    prepared.initial_cases_pc_num[instance_case.id()]);
+            }));
+    std::print(stream, ",");
+    print_json_per_dimension(stream, "budget",
+                             "\"budget\":         ", prepared.raw_instance,
+                             prepared.budget.values);
+}
+
 progress_watch::progress_watch(const prepared_instance & prepared) {
     const auto gain = [scale = prepared.score_scale,
                        initial = prepared.initial_score](const double score) {
@@ -334,10 +370,11 @@ progress_watch::progress_watch(const prepared_instance & prepared) {
         }
     };
     gecot::stop_requested = false;
-    std::signal(SIGINT, request_stop);
+    _previous_handler = std::signal(SIGINT, request_stop);
 }
 
 progress_watch::~progress_watch() {
-    std::signal(SIGINT, SIG_DFL);
+    std::signal(SIGINT, _previous_handler);
+    gecot::stop_requested = false;
     gecot::report_progress = [](const gecot::progress &) {};
 }

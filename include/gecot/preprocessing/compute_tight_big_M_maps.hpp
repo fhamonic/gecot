@@ -20,40 +20,14 @@
 
 namespace gecot {
 
-// The big-Ms of a flow of quality toward t: one per arc a = (u, v) and option
-// o improving it, bounding the flow that leaves u on a improved by o, and one
-// per option with a target quality gain at t, bounding the flow F_t reaching t
-// when the option is bought. The graph gives each arc a base probability and
-// the (improved probability, option) pairs of its improvements; flow_mip's
-// graph has an arc of base probability 0 per improvement.
-//
-// A big-M is valid if, for every x within the budget that buys o, some flow
-// reaching the true F_t(x) satisfies it. The canonical flow does: each source
-// w sends q_w(x) along one most reliable w-t path of the graph improved by x,
-// among them one with the fewest improved arcs. So w sends nothing through a
-// improved by o when
-//   P̄_wu p_ao P̄_vt < P0_wt
-// (P̄ with every improvement, P0 with none): every path through it is less
-// reliable than w's best path without improvements, which x always leaves; on
-// a tie, that path has fewer improved arcs. Hence, over the kept sources W,
-//   flow <= Σ_{w ∈ W} q_w(x) P_wu(x),
-// q_w(x) being the base quality, plus o's gains, plus the other options' gains
-// within the budget B' = B - c_o left by o: a 0/1 knapsack.
-//
-// For P_wu(x): for any λ >= 0 and any w-u path π improved by the options S,
-// all within B',
-//   ln P_π <= ln P_π + λ (B' - c(S)) <= λ B' - Σ_{e ∈ π} (ℓ_e + λ c_o(e)
-//   s_o(e))
-// as c(S) >= Σ_{e ∈ π} c_o(e) s_o(e) when each option o' shares its cost over
-// its arcs with s = 1 / k_o', k_o' bounding the arcs of o' a simple path can
-// take: a simple path enters a vertex once, so k_o' is the smaller of the
-// numbers of heads and of tails of the arcs of o'. o's own improvements are
-// free. So P_wu(x) <= e^{λ B'} P_λ(w, u), the most reliable path where each
-// improvement's probability is tolled by e^{-λ c_o' s_o'}; λ = 0 gives P̄_wu,
-// and the bound takes the least over a few λ.
-//
-// The costs and the budget are those of the cost dimension 0: dropping the
-// other dimensions and the conflict sets relaxes the problem.
+// The tight big-Ms of a flow toward t, of docs/formulations/preprocessing.md
+// ("The tight constants"): one per arc a and option i improving it, bounding
+// the flow that leaves the tail of a on a improved by i, and one per option
+// of target_options, bounding the flow that reaches t when it is bought.
+// The graph gives each arc a base probability and the (improved probability,
+// option) pairs of its improvements; flow_mip's graph has an arc of base
+// probability 0 per improvement. The costs and the budget are those of the
+// cost dimension 0.
 template <instance_c I, typename GR, typename QM, typename SOM, typename BPM,
           typename IM>
 auto compute_tight_big_M_maps(const I & instance, const double budget,
@@ -72,23 +46,24 @@ auto compute_tight_big_M_maps(const I & instance, const double budget,
                                        double>;
     const std::size_t num_options = std::ranges::size(instance.options());
 
-    // per option its improved arcs, and the share s of its cost each pays
+    // per option its improved arcs, and the share 1 / k_i of its cost that
+    // each pays
     std::vector<std::vector<arc_t>> option_arcs_of(num_options);
     auto improved_probability_map = melon::create_arc_map<double>(graph, 0.0);
     for(auto && a : melon::arcs(graph)) {
         improved_probability_map[a] = base_probability_map[a];
-        for(auto && [p, o] : improvements_map[a]) {
-            if(instance.option_cost(o, 0) > budget) continue;
-            option_arcs_of[o].push_back(a);
+        for(auto && [p, i] : improvements_map[a]) {
+            if(instance.option_cost(i, 0) > budget) continue;
+            option_arcs_of[i].push_back(a);
             improved_probability_map[a] =
                 std::max(improved_probability_map[a], p);
         }
     }
     std::vector<double> share(num_options, 0.0);
-    for(std::size_t o = 0; o < num_options; ++o) {
-        if(option_arcs_of[o].empty()) continue;
+    for(std::size_t i = 0; i < num_options; ++i) {
+        if(option_arcs_of[i].empty()) continue;
         std::vector<vertex_t> heads, tails;
-        for(auto && a : option_arcs_of[o]) {
+        for(auto && a : option_arcs_of[i]) {
             heads.push_back(melon::arc_target(graph, a));
             tails.push_back(melon::arc_source(graph, a));
         }
@@ -96,11 +71,12 @@ auto compute_tight_big_M_maps(const I & instance, const double budget,
             std::ranges::sort(*v);
             v->erase(std::ranges::unique(*v).begin(), v->end());
         }
-        share[o] =
+        share[i] =
             1.0 / static_cast<double>(std::min(heads.size(), tails.size()));
     }
 
-    // P̄_vt and P0_wt for every vertex
+    // the probabilities of connection to t, with every improvement and with
+    // none
     auto improved_to_t = melon::create_vertex_map<double>(graph, 0.0);
     for(const auto & [v, p] : melon::dijkstra(reversed_traits{}, reversed_graph,
                                               improved_probability_map, t))
@@ -110,25 +86,29 @@ auto compute_tight_big_M_maps(const I & instance, const double budget,
                                               base_probability_map, t))
         base_to_t[v] = p;
 
-    // λ = μ / B; any λ >= 0 is valid
-    static constexpr std::array<double, 6> mus = {0.0, 0.5, 1.0, 2.0, 4.0, 8.0};
+    // The multipliers μ, times the budget; any μ >= 0 is valid. 0 first: its
+    // pass chooses the sources kept, which the others only lower.
+    static constexpr std::array<double, 6> multiples = {0.0, 0.5, 1.0,
+                                                        2.0, 4.0, 8.0};
+    static_assert(multiples.front() == 0.0);
     struct reach_scratch {
         option_t free_option = 0;
-        double lambda = 0.0;
+        double mu = 0.0;
         std::vector<double> best;
         std::vector<vertex_t> touched;
     };
     auto make_reach = [&](reach_scratch & sc) {
         auto tolled = melon::maps::function([&](const arc_t & e) {
-            if(sc.lambda == 0.0) return improved_probability_map[e];
+            if(sc.mu == 0.0) return improved_probability_map[e];
             double p = base_probability_map[e];
-            for(auto && [ip, o] : improvements_map[e]) {
-                if(instance.option_cost(o, 0) > budget) continue;
-                p = std::max(p, o == sc.free_option
-                                    ? ip
-                                    : ip * std::exp(-sc.lambda *
-                                                    instance.option_cost(o, 0) *
-                                                    share[o]));
+            for(auto && [improved_probability, i] : improvements_map[e]) {
+                if(instance.option_cost(i, 0) > budget) continue;
+                p = std::max(
+                    p, i == sc.free_option
+                           ? improved_probability
+                           : improved_probability *
+                                 std::exp(-sc.mu * instance.option_cost(i, 0) *
+                                          share[i]));
             }
             return p;
         });
@@ -138,48 +118,48 @@ auto compute_tight_big_M_maps(const I & instance, const double budget,
     std::size_t vertex_id_bound = 0;
     for(auto && v : melon::vertices(graph))
         vertex_id_bound = std::max(vertex_id_bound, std::size_t{v} + 1);
-    // for every w reaching from and kept: the least over λ of
-    // e^{λ B'} P_λ(w, from), o's improvements free; λ = 0 first, giving P̄
+    // for every source s that reaches from and is kept: the least over μ of
+    // e^{μ (β - c_i)} Π^μ(s, from), the improvements of i free
     auto budget_reach = [&](auto & algo, reach_scratch & sc,
-                            const vertex_t from, const option_t o, auto && keep,
+                            const vertex_t from, const option_t i, auto && keep,
                             std::vector<std::pair<vertex_t, double>> & reach) {
         const double left =
-            std::max(0.0, budget - instance.option_cost(o, 0) + tolerance);
-        sc.free_option = o;
+            std::max(0.0, budget - instance.option_cost(i, 0) + tolerance);
+        sc.free_option = i;
         if(sc.best.size() < vertex_id_bound)
             sc.best.assign(vertex_id_bound, 0.0);
         reach.clear();
-        for(const double mu : mus) {
-            if(mu > 0 && budget <= 0) break;
-            sc.lambda = mu > 0 ? mu / budget : 0.0;
-            const double factor = std::exp(sc.lambda * left);
+        for(const double multiple : multiples) {
+            if(multiple > 0 && budget <= 0) break;
+            sc.mu = multiple > 0 ? multiple / budget : 0.0;
+            const double factor = std::exp(sc.mu * left);
             algo.reset().add_source(from);
-            for(const auto & [w, p] : algo) {
-                if(mu == 0.0) {
-                    if(!keep(w, p)) continue;
-                    sc.touched.push_back(w);
-                    sc.best[w] = p;
-                } else if(sc.best[w] > 0)
-                    sc.best[w] = std::min(sc.best[w], factor * p);
+            for(const auto & [s, p] : algo) {
+                if(multiple == 0.0) {
+                    if(!keep(s, p)) continue;
+                    sc.touched.push_back(s);
+                    sc.best[s] = p;
+                } else if(sc.best[s] > 0)
+                    sc.best[s] = std::min(sc.best[s], factor * p);
             }
         }
-        for(const vertex_t w : sc.touched) {
-            reach.emplace_back(w, sc.best[w]);
-            sc.best[w] = 0.0;
+        for(const vertex_t s : sc.touched) {
+            reach.emplace_back(s, sc.best[s]);
+            sc.best[s] = 0.0;
         }
         sc.touched.clear();
     };
 
-    // the knapsack of the other options' gains, o's own outside it
+    // the knapsack of the gains of the other options, those of i outside it
     auto bound = [&](const std::vector<std::pair<vertex_t, double>> & reach,
-                     const option_t o) {
+                     const option_t i) {
         auto option_gains = instance.template create_option_map<double>();
         option_gains.fill(0.0);
         double M = 0.0;
-        for(const auto & [w, p] : reach) {
-            M += p * source_quality_map[w];
-            for(const auto & [gain, option] : source_options_map[w]) {
-                if(option == o)
+        for(const auto & [s, p] : reach) {
+            M += p * source_quality_map[s];
+            for(const auto & [gain, option] : source_options_map[s]) {
+                if(option == i)
                     M += p * gain;
                 else
                     option_gains[option] += p * gain;
@@ -200,7 +180,7 @@ auto compute_tight_big_M_maps(const I & instance, const double budget,
                 [&instance](auto && option) {
                     return instance.option_cost(option, 0);
                 },
-                budget - instance.option_cost(o, 0) + tolerance);
+                budget - instance.option_cost(i, 0) + tolerance);
             M += knapsack.run().solution_value();
         }
         return M;
@@ -220,36 +200,37 @@ auto compute_tight_big_M_maps(const I & instance, const double budget,
             reach_scratch sc;
             auto algo = make_reach(sc);
             std::vector<std::pair<vertex_t, double>> reach;
-            for(std::size_t i = r.begin(); i != r.end(); ++i) {
-                const arc_t a = improved_arcs[i];
-                std::size_t k = 0;
-                for(auto && [ip, o] : improvements_map[a]) {
+            for(std::size_t n = r.begin(); n != r.end(); ++n) {
+                const arc_t a = improved_arcs[n];
+                std::size_t rank = 0;
+                for(auto && [improved_probability, i] : improvements_map[a]) {
                     const double through =
-                        ip * improved_to_t[melon::arc_target(graph, a)];
-                    // keeps w within a relative 1e-9 of a tie
+                        improved_probability *
+                        improved_to_t[melon::arc_target(graph, a)];
+                    // keeps s within a relative 1e-9 of a tie
                     budget_reach(
-                        algo, sc, melon::arc_source(graph, a), o,
-                        [&](const vertex_t & w, const double p) {
-                            return p * through >= base_to_t[w] * (1 - 1e-9);
+                        algo, sc, melon::arc_source(graph, a), i,
+                        [&](const vertex_t & s, const double p) {
+                            return p * through >= base_to_t[s] * (1 - 1e-9);
                         },
                         reach);
-                    arc_big_M_map[a][k++] = bound(reach, o);
+                    arc_big_M_map[a][rank++] = bound(reach, i);
                 }
             }
         });
 
-    // F_t with o bought, for the options of target_options: every source,
-    // o's gains outside the knapsack
+    // f_t with i bought, for the options of target_options: every source,
+    // the gains of i outside the knapsack
     std::vector<double> target_big_M(num_options, 0.0);
     {
         reach_scratch sc;
         auto algo = make_reach(sc);
         std::vector<std::pair<vertex_t, double>> reach;
-        for(const option_t o : target_options) {
+        for(const option_t i : target_options) {
             budget_reach(
-                algo, sc, t, o,
+                algo, sc, t, i,
                 [](const vertex_t &, const double) { return true; }, reach);
-            target_big_M[o] = bound(reach, o);
+            target_big_M[i] = bound(reach, i);
         }
     }
 

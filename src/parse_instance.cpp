@@ -488,7 +488,7 @@ void parse_options(Instance & instance, const nlohmann::json & json_object,
             throw std::invalid_argument("option id '" + option_id +
                                         "' appears multiple times");
         for(const double option_cost : option_costs)
-            if(!(option_cost >= 0))
+            if(!(option_cost >= 0) || std::isinf(option_cost))
                 throw std::invalid_argument('\'' + std::to_string(option_cost) +
                                             "' is not a valid cost");
         instance.add_option(option_id, option_costs);
@@ -699,6 +699,9 @@ void parse_vertices_options(InstanceCase & instance_case,
                                  const std::string & vertex_id,
                                  const double source_quality_gain,
                                  const double target_quality_gain) {
+        if(!std::isfinite(source_quality_gain) ||
+           !std::isfinite(target_quality_gain))
+            throw std::invalid_argument("quality gains must be finite numbers");
         if(source_quality_gain < 0 || target_quality_gain < 0)
             throw std::invalid_argument("quality gains must be non-negative");
         vertex_options[instance_case.vertex_from_name(vertex_id)].emplace_back(
@@ -762,7 +765,7 @@ void parse_arcs_options(InstanceCase & instance_case,
     auto add_arc_option = [&](const std::string & option_id,
                               const std::string & arc_id,
                               const double improved_probability) {
-        if(improved_probability < 0 || improved_probability > 1)
+        if(!(improved_probability >= 0 && improved_probability <= 1))
             throw std::invalid_argument('\'' +
                                         std::to_string(improved_probability) +
                                         "' is not a valid probability");
@@ -828,6 +831,8 @@ InstanceCase & parse_instance_case(const nlohmann::json & json_object,
         if(vertex_name_to_id_map.contains(id))
             throw std::invalid_argument("vertex id '" + id +
                                         "' appears multiple times");
+        if(!std::isfinite(source_quality) || !std::isfinite(target_quality))
+            throw std::invalid_argument("qualities must be finite numbers");
         if(source_quality < 0 || target_quality < 0)
             throw std::invalid_argument("qualities must be non-negative");
         source_quality_map.emplace_back(source_quality);
@@ -874,7 +879,7 @@ InstanceCase & parse_instance_case(const nlohmann::json & json_object,
 
     auto add_arc = [&](const std::string & id, const std::string & from,
                        const std::string & to, double probability) {
-        if(probability < 0 || probability > 1)
+        if(!(probability >= 0 && probability <= 1))
             throw std::invalid_argument('\'' + std::to_string(probability) +
                                         "' is not a valid probability");
         if(!vertex_name_to_id_map.contains(from))

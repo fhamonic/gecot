@@ -7,8 +7,28 @@
 #include <string>
 
 #include <spdlog/spdlog.h>
+#include <nlohmann/json.hpp>
 
 #include "gecot/utils/log_table.hpp"
+
+// text as a JSON string, quoted and escaped: a path, a status, the text of
+// a parameter. A byte that is not UTF-8, which a path can hold and dump()
+// throws on by default, is replaced: not to be used for a name of the
+// instance, which a reader matches against it.
+inline std::string json_string(const std::string & text) {
+    return nlohmann::json(text).dump(-1, ' ', false,
+                                     nlohmann::json::error_handler_t::replace);
+}
+
+// text as a CSV field, quoted, its quotes doubled
+inline std::string csv_field(const std::string & text) {
+    std::string field = "\"";
+    for(const char c : text) {
+        if(c == '"') field += '"';
+        field += c;
+    }
+    return field + '"';
+}
 
 template <spdlog::level::level_enum LVL>
 void print_instance_size(auto && instance) {

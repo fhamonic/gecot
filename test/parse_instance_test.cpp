@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
+#include <filesystem>
+#include <format>
+#include <fstream>
 #include <string>
+#include <utility>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
@@ -234,6 +238,90 @@ GTEST_TEST(parse_instance, cost_dimensions_and_conflicts_errors) {
         { "set_id": "site", "option_id": "bridge" }
     ])"),
                  std::invalid_argument);
+}
+
+namespace {
+
+// three woods in a new directory, with one of its tables in a CSV file
+Instance three_woods_with_csv(const std::string & table,
+                              const std::string & csv) {
+    static int count = 0;
+    const std::filesystem::path directory =
+        std::filesystem::path(testing::TempDir()) /
+        ("gecot_three_woods_" + std::to_string(count++));
+    std::filesystem::create_directories(directory);
+    std::ofstream(directory / "table.csv") << csv;
+    nlohmann::json instance_json;
+    instance_json["options"] = nlohmann::json::parse(R"([
+        { "id": "hedgerow", "cost": 2 },
+        { "id": "underpass", "cost": 3 },
+        { "id": "plantation", "cost": 2 }
+    ])");
+    instance_json["cases"] = nlohmann::json::parse(three_woods_cases);
+    nlohmann::json & tables =
+        table == "options" ? instance_json : instance_json["cases"]["squirrel"];
+    tables[table] = {{"csv_file", "table.csv"}};
+    std::ofstream(directory / "instance.json") << instance_json;
+    return parse_instance(directory / "instance.json");
+}
+
+}  // namespace
+
+// JSON has no infinity: a CSV file is the only way in for one, where 1e400
+// is read as infinity without a word. The texts nan and inf are refused
+// too, by the reader of the CSV file.
+GTEST_TEST(parse_instance, refuses_non_finite_csv_values) {
+    const std::pair<const char *, const char *> tables[] = {
+        {"options", "id,cost\nhedgerow,2\nunderpass,{}\nplantation,2\n"},
+        {"vertices",
+         "id,source_quality,target_quality\nwood_a,2,2\nwood_b,{},1\n"
+         "wood_c,3,3\n"},
+        {"vertices",
+         "id,source_quality,target_quality\nwood_a,2,2\nwood_b,1,{}\n"
+         "wood_c,3,3\n"},
+        {"vertices_improvements",
+         "vertex_id,option_id,source_quality_gain,target_quality_gain\n"
+         "wood_b,plantation,{},1\n"},
+        {"vertices_improvements",
+         "vertex_id,option_id,source_quality_gain,target_quality_gain\n"
+         "wood_b,plantation,1,{}\n"},
+        {"arcs",
+         "id,from,to,probability\na_b,wood_a,wood_b,{}\n"
+         "b_a,wood_b,wood_a,0.5\nb_c,wood_b,wood_c,0.2\n"
+         "c_b,wood_c,wood_b,0.2\n"},
+        {"arcs_improvements",
+         "arc_id,option_id,improved_probability\na_b,hedgerow,{}\n"},
+    };
+    for(const auto & [table, csv] : tables) {
+        auto with = [&](const char * value) {
+            return three_woods_with_csv(
+                table, std::vformat(csv, std::make_format_args(value)));
+        };
+        // the table is read: the refusals below are those of the value
+        EXPECT_NO_THROW(with("1")) << table;
+        for(const char * value : {"1e400", "-1e400", "nan", "inf"})
+            EXPECT_THROW(with(value), std::invalid_argument)
+                << table << ' ' << value;
+    }
+}
+
+GTEST_TEST(instance, refuses_inconsistent_options_and_conflict_sets) {
+    Instance instance;
+    EXPECT_THROW(instance.set_cost_dimensions({}), std::invalid_argument);
+    instance.set_cost_dimensions({"area", "money"});
+    const auto hedgerow = instance.add_option("hedgerow", {1.0, 2.0});
+    EXPECT_THROW(instance.add_option("hedgerow", {1.0, 2.0}),
+                 std::invalid_argument);
+    EXPECT_THROW(instance.add_option("underpass", {3.0}),
+                 std::invalid_argument);
+    // the costs of hedgerow would be read as those of one dimension
+    EXPECT_THROW(instance.set_cost_dimensions({"cost"}), std::logic_error);
+    EXPECT_THROW(instance.add_conflict_set("site", {hedgerow, hedgerow}),
+                 std::invalid_argument);
+    EXPECT_THROW(instance.add_conflict_set("site", {hedgerow, hedgerow + 1}),
+                 std::invalid_argument);
+    EXPECT_EQ(instance.num_options(), 1u);
+    EXPECT_TRUE(instance.conflict_sets().empty());
 }
 
 GTEST_TEST(parse_instance, budget) {

@@ -27,6 +27,7 @@ struct budget_t {
     [[nodiscard]] std::size_t size() const noexcept { return values.size(); }
     [[nodiscard]] double front() const { return values.front(); }
 };
+static_assert(!std::ranges::range<budget_t>);
 
 template <typename _Tp>
 using case_graph_t = std::decay_t<decltype(std::declval<_Tp &>().graph())>;

@@ -3,6 +3,7 @@
 
 #include <cstdio>
 #include <filesystem>
+#include <format>
 #include <initializer_list>
 #include <memory>
 #include <optional>
@@ -16,6 +17,7 @@
 
 #include "bound_interfaces/abstract_bound_interface.hpp"
 #include "instance.hpp"
+#include "io_helper.hpp"
 #include "solver_interfaces/abstract_solver_interface.hpp"
 
 void print_soft_name();
@@ -71,6 +73,21 @@ void print_json_per_dimension(std::FILE * stream, const std::string & property,
                               const Instance & instance,
                               const std::vector<double> & values);
 
+// The format of the result files, raised when a field changes its meaning
+// or goes: a field added leaves it.
+inline constexpr int result_format_version = 1;
+
+// The head of a result file: the versions, the instance, then the algorithm
+// or the method, which kind names, with its parameters.
+void print_json_head(
+    std::FILE * stream, const std::filesystem::path & instance_file,
+    const std::string & kind, const std::string & name,
+    const std::vector<std::pair<std::string, std::string>> & parameters);
+// what follows the parameters in a result file: the time, the initial and
+// base scores and the budget
+void print_json_instance(std::FILE * stream, const prepared_instance & prepared,
+                         long long computation_time_ms);
+
 // While it lives, the algorithm's progress is logged in raw scores, and Ctrl-C
 // stops it: it returns its best result so far.
 struct progress_watch {
@@ -78,6 +95,9 @@ struct progress_watch {
     ~progress_watch();
     progress_watch(const progress_watch &) = delete;
     progress_watch & operator=(const progress_watch &) = delete;
+
+private:
+    void (*_previous_handler)(int);
 };
 
 // 'gecot optimize --reformulation path_lp': path_lp, with the given
@@ -86,34 +106,53 @@ struct progress_watch {
 // options whose bound is no more than the score of path_lp's solution are in
 // no better solution: solver runs on the instance without them, from
 // path_lp's solution, and the result is the better of the two solutions.
-class PathFormulationLPInterface;
-std::shared_ptr<const PathFormulationLPInterface> make_path_reformulation(
+class PathLpInterface;
+std::shared_ptr<const PathLpInterface> make_path_reformulation(
     const std::string & parameters);
 gecot::solve_result<Instance> solve_path_reformulated(
-    const PathFormulationLPInterface & path_lp,
-    AbstractSolverInterface & solver, const Instance & instance,
-    const gecot::budget_t & budget, bool merge = true);
+    const PathLpInterface & path_lp, AbstractSolverInterface & solver,
+    const Instance & instance, const gecot::budget_t & budget,
+    bool merge = true);
 
 // the algorithms of 'gecot optimize', in the order -A lists them
 std::vector<std::shared_ptr<AbstractSolverInterface>> make_solver_interfaces();
 // the methods of 'gecot bound', in the order -M lists them
 std::vector<std::shared_ptr<AbstractBoundInterface>> make_bound_interfaces();
 
+// A name of the instance as a JSON string: its quotes, backslashes and
+// control characters escaped, its other bytes kept. A name read from a CSV
+// file in another encoding is not UTF-8: with the replacement character of
+// json_string, two names could become one key, and none would match the
+// instance when the result is given back as a MIP start.
+inline std::string json_name(const std::string & name) {
+    std::string quoted = "\"";
+    for(const char c : name) {
+        if(c == '"' || c == '\\')
+            (quoted += '\\') += c;
+        else if(static_cast<unsigned char>(c) < 0x20)
+            quoted += std::format("\\u{:04x}", static_cast<unsigned char>(c));
+        else
+            quoted += c;
+    }
+    return quoted + '"';
+}
+
+// the keys are names, aligned on their escaped length
 template <typename R>
 void print_json_property(std::FILE * stream, const std::string & property_name,
                          R && pairs_range) {
     std::print(stream, "\n    \"{}\": {{", property_name);
     const std::size_t key_max_length =
         (std::ranges::empty(pairs_range)
-             ? 0
+             ? 2
              : std::ranges::max(std::ranges::views::transform(
                    std::views::keys(pairs_range),
-                   [&](auto && s) { return s.size(); }))) +
-        3;
+                   [&](auto && s) { return json_name(s).size(); }))) +
+        1;
     bool first_line = true;
     for(const auto & [key, value] : pairs_range) {
         std::print(stream, "{}\n        {:<{}} {}", first_line ? "" : ",",
-                   std::string("\"") + key + "\":", key_max_length, value);
+                   json_name(key) + ":", key_max_length, value);
         first_line = false;
     }
     std::print(stream, "\n    }}");

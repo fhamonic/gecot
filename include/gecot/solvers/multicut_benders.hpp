@@ -26,31 +26,8 @@
 namespace gecot {
 namespace solvers {
 
-// Benders decomposition with a cut per group of targets.
-//
-// Buying the options X within the budget, c(X) <= B, a case k scores the sum
-// over its targets t of
-//     v_t(X) = q_t(X) Σ_s q_s(X) P_st(X),
-// the target quality with its gains times the source qualities with their
-// gains, each times the probability of its most reliable path to t, and the
-// criterion φ combines the cases' scores. For any options Y, with
-// ρ_u = q_t(Y) P_ut(Y) on the graph contracted for t,
-//     v_t(X) <= cut_tY(x) = Σ_u (q_u + Σ_o Δq_uo x_o) ρ_u
-//                         + Σ_{o∉Y} Σ_{a=(u,w)∈o} M_ao (p'_ao ρ_w - ρ_u)⁺ x_o
-//                         + Σ_{o∉Y} M_to Δq_to x_o
-// for every X within the budget, x its indicator, with equality at X = Y:
-// M_ao bounds the flow of quality through a improved by o, M_to the flow that
-// reaches t. The targets of each case are split into groups, and the master
-//
-//     max  φ(z)
-//     s.t. z_k <= Σ_{g∈k} θ_g
-//          θ_g <= Σ_{t∈g} cut_tY(x)    for each Y cut so far
-//          Σ_o c_o x_o <= B,  x binary
-//
-// receives the cuts of a candidate Y for the groups whose θ_g exceeds
-// Σ_{t∈g} v_t(Y). One group per case is the single-cut decomposition, one
-// group per target the one with a cut per target: fewer groups mean fewer,
-// weaker cuts.
+// The decomposition of docs/formulations/benders.md with a cut per group of
+// targets. Each block of solve() builds what the section it names states.
 struct multicut_benders : public mip_solver_base {
     // groups per case; 0: a group per target
     std::size_t num_groups = 2;
@@ -96,8 +73,9 @@ struct multicut_benders : public mip_solver_base {
         auto value_map = melon::create_vertex_map<double>(graph, 0.0);
         for(const vertex t : targets) {
             double quality = instance_case.target_quality_map()[t];
-            for(auto && [sqg, tqg, o] : instance_case.vertex_options_map()[t])
-                quality += tqg;
+            for(auto && [source_gain, target_gain, i] :
+                instance_case.vertex_options_map()[t])
+                quality += target_gain;
             value_map[t] =
                 quality *
                 pc_num_vertex_in_flow(graph, instance_case.source_quality_map(),
@@ -138,209 +116,194 @@ struct multicut_benders : public mip_solver_base {
         }
         std::ranges::stable_sort(targets, {},
                                  [&](const vertex t) { return group_map[t]; });
-        for(std::size_t i = 0; i < n; ++i)
-            if(i == 0 || group_map[targets[i]] != group_map[targets[i - 1]])
-                firsts.push_back(i);
+        for(std::size_t j = 0; j < n; ++j)
+            if(j == 0 || group_map[targets[j]] != group_map[targets[j - 1]])
+                firsts.push_back(j);
         firsts.push_back(n);
         return std::make_pair(std::move(targets), std::move(firsts));
     }
 
-    // v_t(Y) and the ρ of cut_tY
+    // v_t(y) and the potentials of cut^v_{t,y}: those of the cut of a target
+    // times the target quality q^y_t
     template <case_c C>
-    auto _dual_flow(const contracted_graph_data<C> & data,
-                    const auto & Y) const {
-        const auto & instance_case = data.instance_case.get();
-        double t_quality = instance_case.target_quality_map()[data.original_t];
-        for(auto && [sqg, tqg, o] :
-            instance_case.vertex_options_map()[data.original_t])
-            if(Y[o]) t_quality += tqg;
-
-        double flow = 0.0;
-        auto rho = melon::create_vertex_map<double>(data.graph, 0.0);
-        const auto & reversed_graph = melon::views::reverse(data.graph);
-        for(const auto & [u, prob] : melon::dijkstra(
-                detail::pc_num_dijkstra_traits<decltype(reversed_graph),
-                                               double>{},
-                reversed_graph,
-                [&](auto && a) {
-                    double p = data.probability_map[a];
-                    for(auto && [improved_prob, o] : data.arc_options_map[a])
-                        if(Y[o]) p = std::max(p, improved_prob);
-                    return p;
-                },
-                data.t)) {
-            double quality = data.source_quality_map[u];
-            for(auto && [sqg, o] : data.source_options_map[u])
-                if(Y[o]) quality += sqg;
-            flow += quality * prob;
-            rho[u] = t_quality * prob;
-        }
-        return std::make_pair(t_quality * flow, std::move(rho));
+    static auto _value_and_potentials(const contracted_graph_data<C> & G_t,
+                                      const auto & y) {
+        const auto & instance_case = G_t.instance_case.get();
+        double quality = instance_case.target_quality_map()[G_t.original_t];
+        for(auto && [source_gain, target_gain, i] :
+            instance_case.vertex_options_map()[G_t.original_t])
+            if(y[i]) quality += target_gain;
+        auto [flow, rho] = G_t.flow_and_potentials(y);
+        for(auto && u : melon::vertices(G_t.graph)) rho[u] *= quality;
+        return std::make_pair(quality * flow, std::move(rho));
     }
 
     template <lazy_constraint_model M, instance_c I>
     solve_result<I> solve(const I & instance, const budget_t & budget) const {
         using namespace mippp;
         using namespace mippp::operators;
-        using target_data = contracted_graph_data<instance_case_t<I>>;
+        using target_graph = contracted_graph_data<instance_case_t<I>>;
         _check_criterion(instance);
         spdlog::stopwatch sw;
-
-        // The master: z with the criterion, x with the budget row, and for
-        // each case its targets and the θ of its groups.
         M model;
-        model.set_optimality_tolerance(1e-10);
-        model.set_feasibility_tolerance(feasibility_tol);
-        model.set_maximization();
+        _set_tolerances(model, mip_gap, feasibility_tol);
+
+        // Cases and criterion, in flow.md: the scores z_k under their
+        // criterion (Linearizing the criterion), the options x_i within the
+        // budgets and the conflict sets
         const auto z = model.add_variables(
             instance.cases().size(), [](const case_id_t & k) { return k; });
+        model.set_maximization();
         formula_variable_visitor formula{model, z};
         model.set_objective(formula.variable(instance.criterion()));
         const auto x = model.add_binary_variables(
-            instance.options().size(), [](const option_t & o) { return o; });
+            instance.options().size(), [](const option_t & i) { return i; });
         _add_budget_rows(model, instance, budget, x);
 
-        // θ_g and the targets [first, last) of its case that g holds
+        // theta_g and the targets [first, last) of its case that g holds
         struct group {
             model_variable_t<M> theta;
             std::size_t first, last;
         };
+        // the graphs G_t of the targets of each case, in the order of their
+        // groups
         auto targets =
-            instance.template create_case_map<std::vector<target_data>>();
+            instance.template create_case_map<std::vector<target_graph>>();
         auto cases_groups =
             instance.template create_case_map<std::vector<group>>();
         // with the number of targets of each group
         std::vector<preprocessing_row<std::string>> preprocessing;
         for(auto && instance_case : instance.cases()) {
+            const case_id_t k = instance_case.id();
             const auto [strong_arcs_map, useless_arcs_map] =
                 _compute_strong_and_useless_arcs(instance, instance_case,
                                                  budget);
             spdlog::debug("Computing contractions and big-Ms of the '{}' graph",
                           instance_case.name());
-            auto & case_targets = targets[instance_case.id()];
             const auto [target_vertices, firsts] =
                 _grouped_targets(instance_case);
             {
                 progress_bar<spdlog::level::info, 64> pb(
                     target_vertices.size());
                 for(const auto & t : target_vertices) {
-                    case_targets.push_back(compute_contracted_graph_data(
+                    targets[k].push_back(compute_contracted_graph_data(
                         instance, instance_case, budget, t, strong_arcs_map[t],
                         useless_arcs_map[t], big_Ms, feasibility_tol,
                         !no_pruning));
                     pb.tick();
                 }
             }
-            auto & case_groups = cases_groups[instance_case.id()];
+
+            // multicut_benders, the master: theta_g for each group of the
+            // case, and its score z_k at most their sum
             for(std::size_t g = 0; g + 1 < firsts.size(); ++g)
-                case_groups.push_back(
+                cases_groups[k].push_back(
                     {model.add_variable(), firsts[g], firsts[g + 1]});
+            model.add_constraint(z(k) <= xsum(std::views::transform(
+                                             cases_groups[k], &group::theta)));
+
             preprocessing.emplace_back(
                 instance_case.name(),
                 _average_size(instance_case, strong_arcs_map),
                 _average_size(instance_case, useless_arcs_map),
                 std::format("{:n}", std::views::transform(
-                                        case_groups, [](const group & g) {
+                                        cases_groups[k], [](const group & g) {
                                             return g.last - g.first;
                                         })));
-            model.add_constraint(
-                z(instance_case.id()) <=
-                xsum(std::views::transform(case_groups, &group::theta)));
         }
         _log_preprocessing(preprocessing, log_column<22>{"targets per group"});
 
-        auto cut = [&](const target_data & data, const auto & Y,
+        // multicut_benders: cut^v_{t,y}(x), with the potentials rho of y that
+        // count the target quality
+        auto cut = [&](const target_graph & G_t, const auto & y,
                        const auto & rho) {
-            return xsum(data.graph.vertices(),
+            return xsum(G_t.graph.vertices(),
                         [&](auto && u) {
-                            return (data.source_quality_map[u] +
-                                    xsum(data.source_options_map[u],
-                                         [&](auto && e) {
-                                             auto && [sqg, o] = e;
-                                             return sqg * x(o);
+                            return (G_t.source_quality_map[u] +
+                                    xsum(G_t.source_options_map[u],
+                                         [&](auto && gain) {
+                                             auto && [source_gain, i] = gain;
+                                             return source_gain * x(i);
                                          })) *
                                    rho[u];
                         }) +
-                   xsum(
-                       data.graph.arcs(),
-                       [&](auto && a) {
-                           return xsum(
-                               std::views::iota(std::size_t{0},
-                                                data.arc_options_map[a].size()),
-                               [&, a](const std::size_t i) {
-                                   auto && [improved_prob, o] =
-                                       data.arc_options_map[a][i];
-                                   const auto u = data.graph.arc_source(a);
-                                   const auto w = data.graph.arc_target(a);
-                                   const double gain =
-                                       Y[o] ? 0.0
-                                            : std::max(0.0,
-                                                       improved_prob * rho[w] -
-                                                           rho[u]);
-                                   return data.improvement_big_M(a, i) * gain *
-                                          x(o);
-                               });
-                       }) +
-                   xsum(data.instance_case.get()
-                            .vertex_options_map()[data.original_t],
-                        [&](auto && e) {
-                            auto && [sqg, tqg, o] = e;
-                            return data.target_big_M(o) * (Y[o] ? 0.0 : tqg) *
-                                   x(o);
+                   xsum(G_t.graph.arcs(),
+                        [&](auto && a) {
+                            return xsum(
+                                std::views::iota(std::size_t{0},
+                                                 G_t.arc_options_map[a].size()),
+                                [&, a](const std::size_t n) {
+                                    auto && [improved_probability, i] =
+                                        G_t.arc_options_map[a][n];
+                                    const auto u = G_t.graph.arc_source(a);
+                                    const auto v = G_t.graph.arc_target(a);
+                                    const double sigma =
+                                        y[i] ? 0.0
+                                             : std::max(0.0,
+                                                        improved_probability *
+                                                                rho[v] -
+                                                            rho[u]);
+                                    return G_t.improvement_big_M(a, n) * sigma *
+                                           x(i);
+                                });
+                        }) +
+                   xsum(G_t.instance_case.get()
+                            .vertex_options_map()[G_t.original_t],
+                        [&](auto && gain) {
+                            auto && [source_gain, target_gain, i] = gain;
+                            return G_t.target_big_M(i) *
+                                   (y[i] ? 0.0 : target_gain) * x(i);
                         });
         };
         // visit(k, g, v_g, cut) for each group g of each case k, with
-        // v_g = Σ_{t∈g} v_t(Y) and its cut at Y. The cut is a lazy sum that
-        // reads flows: it is only valid inside visit.
-        auto for_each_group = [&](const auto & Y, auto && visit) {
+        // v_g the sum of the v_t(y) of its targets and its cut at y. The cut
+        // is a lazy sum that reads values: it is only valid inside visit.
+        auto for_each_group = [&](const auto & y, auto && visit) {
             for(auto && instance_case : instance.cases()) {
                 const case_id_t k = instance_case.id();
-                const auto flows =
+                const auto values =
                     std::ranges::to<std::vector>(std::views::transform(
-                        targets[k], [&](const target_data & data) {
-                            return _dual_flow(data, Y);
+                        targets[k], [&](const target_graph & G_t) {
+                            return _value_and_potentials(G_t, y);
                         }));
                 for(const group & g : cases_groups[k]) {
                     double value = 0;
-                    for(std::size_t i = g.first; i < g.last; ++i)
-                        value += flows[i].first;
+                    for(std::size_t n = g.first; n < g.last; ++n)
+                        value += values[n].first;
                     visit(k, g, value,
                           g.theta <= xsum(std::views::iota(g.first, g.last),
-                                          [&](const std::size_t i) {
-                                              return cut(targets[k][i], Y,
-                                                         flows[i].second);
+                                          [&](const std::size_t n) {
+                                              return cut(targets[k][n], y,
+                                                         values[n].second);
                                           }));
                 }
             }
         };
-        auto seed_cuts = [&](const auto & Y) {
+        auto seed_cuts = [&](const auto & y) {
             for_each_group(
-                Y, [&](case_id_t, const group &, double, auto && group_cut) {
+                y, [&](case_id_t, const group &, double, auto && group_cut) {
                     model.add_constraint(
                         std::forward<decltype(group_cut)>(group_cut));
                 });
         };
+        // The search, step 1: the cuts of the scenario that buys nothing,
+        // then those of the MIP start
         seed_cuts(instance.create_option_map(false));
-        if(mip_start) {
-            const auto start = _mip_start_solution(instance);
-            model.add_mip_start(std::views::transform(
-                instance.options(),
-                [&](auto o) { return std::make_pair(x(o), start[o]); }));
-            seed_cuts(start);
-        }
+        if(const auto start = _add_mip_start(model, instance, x))
+            seed_cuts(*start);
 
-        // The solver drops a candidate that receives cuts and may never
-        // propose its options again, although they are a solution of score
-        // φ(v(Y)): it gets them back with their scores.
+        // The search, steps 2 to 4: the values of a candidate y, the cut at
+        // y of each group whose theta_g exceeds its value, and y handed back
         std::size_t num_cuts = 0;
         model.set_candidate_solution_callback(
             [&](typename M::candidate_solution_callback_handle & handle) {
                 auto candidate = handle.get_solution();
-                auto Y = melon::maps::function(
-                    [&](const option_t o) { return candidate[x(o)] > 0.5; });
+                auto y = melon::maps::function([&](const option_t i) {
+                    return _is_bought(candidate[x(i)]);
+                });
                 auto case_scores = instance.create_case_map(0.0);
                 const std::size_t num_cuts_before = num_cuts;
-                for_each_group(Y, [&](const case_id_t k, const group & g,
+                for_each_group(y, [&](const case_id_t k, const group & g,
                                       const double value, auto && group_cut) {
                     case_scores[k] += value;
                     if(std::exchange(candidate[g.theta], value) - value <=
@@ -350,23 +313,15 @@ struct multicut_benders : public mip_solver_base {
                     handle.add_lazy_constraint(
                         std::forward<decltype(group_cut)>(group_cut));
                 });
-                if(num_cuts == num_cuts_before) return;
-                for(auto && o : instance.options()) candidate[x(o)] = Y[o];
-                for(auto && instance_case : instance.cases())
-                    candidate[z(instance_case.id())] =
-                        case_scores[instance_case.id()];
-                formula.set_values(candidate, case_scores);
-                handle.add_solution(candidate);
+                if(num_cuts > num_cuts_before)
+                    _hand_back(handle, candidate, instance, x, y, z,
+                               case_scores, formula);
             });
 
         auto [has_solution, report] = _solve(model, sw);
         report.stats.emplace_back("lazy_constraints", num_cuts);
         if(!has_solution) return {_fallback_solution(instance, budget), report};
-        const auto master_solution = model.get_solution();
-        auto solution = instance.create_option_map(false);
-        for(auto && o : instance.options())
-            solution[o] = master_solution[x(o)] > 0.5;
-        return {solution, report};
+        return {_bought_options(instance, model.get_solution(), x), report};
     }
 };
 

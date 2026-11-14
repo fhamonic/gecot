@@ -20,7 +20,7 @@
 namespace gecot {
 namespace detail {
 template <melon::outward_incidence_graph _Graph, typename _ValueType>
-struct strong_arc_default_traits {
+struct blue_wins_ties_traits {
     using semiring = melon::shortest_path_semiring<_ValueType>;
     using entry = std::pair<_ValueType, bool>;
     static bool compare_entries(const entry & e1, const entry & e2) {
@@ -44,7 +44,7 @@ struct strong_arc_default_traits {
     static constexpr bool store_paths = false;
 };
 template <melon::outward_incidence_graph _Graph, typename _ValueType>
-struct useless_arc_default_traits {
+struct red_wins_ties_traits {
     using semiring = melon::shortest_path_semiring<_ValueType>;
     using entry = std::pair<_ValueType, bool>;
     static bool compare_entries(const entry & e1, const entry & e2) {
@@ -68,17 +68,22 @@ struct useless_arc_default_traits {
     static constexpr bool store_paths = false;
 };
 
+// what the length of a path stays under, in the uint64 lengths: the rest is
+// for the penalties of the constrained labelling
+inline constexpr double path_length_bound = 0x1p62;
+
 // The lengths are the integers -log(max(p, resolution)) / log1p(resolution).
 // Throws unless the longest is positive and a path through every vertex at
-// this length fits in 62 bits, the rest being for the penalties of the
-// constrained labelling: lengths that are all 0, or that wrap around, label
-// strong arcs that are not, and the optimum is lost without a warning.
+// this length stays under path_length_bound: lengths that are all 0, or that
+// wrap around, label strong arcs that are not, and the optimum is lost
+// without a warning.
 template <typename G>
 void check_resolution(const G & graph, const double resolution) {
     const double max_length = -std::log(resolution) / std::log1p(resolution);
     // false for the NaN of a negative resolution too
     if(!(max_length > 0 &&
-         max_length * static_cast<double>(graph.num_vertices()) < 0x1p62))
+         max_length * static_cast<double>(graph.num_vertices()) <
+             path_length_bound))
         throw std::invalid_argument(std::format(
             "resolution {}: must be in ]0, 1[, and not so small that the "
             "lengths of a path of {} vertices overflow",
@@ -119,12 +124,30 @@ struct path_dijkstra_traits {
     static constexpr bool store_paths = true;
     static constexpr bool store_distances = false;
 };
+// the length of an arc of probability p, an integer number of steps of
+// log(1 + resolution), a probability under the resolution counting as it
+inline uint64_t probability_to_length(const double p, const double resolution) {
+    return static_cast<uint64_t>(-std::log(std::max(p, resolution)) /
+                                 std::log1p(resolution));
+}
+
+// The parallel loops of a labelling push in thread order: sorted, the
+// contracted graphs and the models built on them are the same from run to
+// run.
+void sort_labels(const auto & graph, auto & strong_arcs_map,
+                 auto & useless_arcs_map) {
+    for(auto && v : melon::vertices(graph)) {
+        std::sort(strong_arcs_map[v].begin(), strong_arcs_map[v].end());
+        std::sort(useless_arcs_map[v].begin(), useless_arcs_map[v].end());
+    }
+}
+
 }  // namespace detail
 
 template <case_c C>
 auto compute_strong_and_useless_arcs(
     const C & instance_case,
-    const auto & option_predicate = [](const option_t & o) { return true; },
+    const auto & option_predicate = [](const option_t & i) { return true; },
     double probability_resolution = 0.00000001,
     const bool all_targets = false) {
     using graph_t = case_graph_t<C>;
@@ -134,23 +157,20 @@ auto compute_strong_and_useless_arcs(
     detail::check_resolution(instance_case.graph(), probability_resolution);
     spdlog::info("Preprocessing the '{}' graph", instance_case.name());
 
-    auto prob_to_length =
-        [probability_resolution](const double p) -> log_probability_t {
-        return static_cast<log_probability_t>(
-            -std::log(std::max(p, probability_resolution)) /
-            std::log1p(probability_resolution));
+    auto prob_to_length = [probability_resolution](const double p) {
+        return detail::probability_to_length(p, probability_resolution);
     };
     const auto & graph = instance_case.graph();
     const auto & target_quality_map = instance_case.target_quality_map();
 
-    auto useless_vertices_map = melon::create_vertex_map<bool>(graph);
+    auto never_target_map = melon::create_vertex_map<bool>(graph);
     for(const auto & v : melon::vertices(graph)) {
-        useless_vertices_map[v] =
+        never_target_map[v] =
             !all_targets &&
             (target_quality_map[v] == 0 &&
              std::ranges::none_of(instance_case.vertex_options_map()[v],
                                   [](auto && e) {
-                                      auto && [sqg, tqg, o] = e;
+                                      auto && [sqg, tqg, i] = e;
                                       return tqg > 0;
                                   }));
     }
@@ -170,10 +190,10 @@ auto compute_strong_and_useless_arcs(
     for(const arc_t & a : arcs_range) {
         improved_length_map[a] = base_length_map[a] =
             prob_to_length(base_probability_map[a]);
-        for(const auto & [improved_prob, option] : arc_options_map[a]) {
+        for(const auto & [improved_probability, option] : arc_options_map[a]) {
             if(!option_predicate(option)) continue;
-            improved_length_map[a] =
-                std::min(improved_length_map[a], prob_to_length(improved_prob));
+            improved_length_map[a] = std::min(
+                improved_length_map[a], prob_to_length(improved_probability));
         }
     }
     const auto zero_cycle_arcs_map =
@@ -191,8 +211,7 @@ auto compute_strong_and_useless_arcs(
                     graph, {},
                     [&uv](const arc_t & a) -> bool { return a != uv; });
                 auto algo = melon::competing_dijkstras(
-                    detail::strong_arc_default_traits<graph_t,
-                                                      log_probability_t>{},
+                    detail::blue_wins_ties_traits<graph_t, log_probability_t>{},
                     sgraph, base_length_map, improved_length_map);
                 for(const auto & a : arcs_block) {
                     uv = a;
@@ -206,7 +225,7 @@ auto compute_strong_and_useless_arcs(
                     algo.add_blue_source(
                         v, base_length_map[uv] + zero_cycle_arcs_map[uv]);
                     for(const auto & [w, w_dist] : algo) {
-                        if(useless_vertices_map[w]) continue;
+                        if(never_target_map[w]) continue;
                         strong_arcs_map[w].push_back(uv);
                     }
                     pb.tick();
@@ -224,8 +243,7 @@ auto compute_strong_and_useless_arcs(
                 // red wins ties: two arcs tied for a target would both be
                 // useless, and removed together
                 auto algo = melon::competing_dijkstras(
-                    detail::useless_arc_default_traits<graph_t,
-                                                       log_probability_t>{},
+                    detail::red_wins_ties_traits<graph_t, log_probability_t>{},
                     sgraph, base_length_map, improved_length_map);
                 for(const auto & a : arcs_block) {
                     uv = a;
@@ -235,19 +253,14 @@ auto compute_strong_and_useless_arcs(
                     algo.add_blue_source(u);
                     algo.add_red_source(v, improved_length_map[uv]);
                     for(const auto & [w, w_dist] : algo) {
-                        if(useless_vertices_map[w]) continue;
+                        if(never_target_map[w]) continue;
                         useless_arcs_map[w].push_back(uv);
                     }
                     pb.tick();
                 }
             });
     }
-    // the parallel loops push in thread order: sorted, the contracted graphs
-    // and the models built on them are the same from run to run
-    for(auto && v : melon::vertices(graph)) {
-        std::sort(strong_arcs_map[v].begin(), strong_arcs_map[v].end());
-        std::sort(useless_arcs_map[v].begin(), useless_arcs_map[v].end());
-    }
+    detail::sort_labels(graph, strong_arcs_map, useless_arcs_map);
 
     return std::make_pair(strong_arcs_map, useless_arcs_map);
 }

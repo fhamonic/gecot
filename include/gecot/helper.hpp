@@ -22,8 +22,6 @@
 #include "melon/graph.hpp"
 #include "melon/mapping.hpp"
 
-#define OPT(cond, ...) ((cond) ? std::make_optional(__VA_ARGS__) : std::nullopt)
-
 #include "gecot/concepts/instance.hpp"
 #include "gecot/indices/parallel_pc_num.hpp"
 #include "gecot/indices/pc_num.hpp"
@@ -31,6 +29,10 @@
 #include "gecot/utils/progress_bar.hpp"
 
 namespace gecot {
+
+// the default of -t, for the structs of the algorithms and their options on
+// the command line
+inline constexpr double default_feasibility_tol = 1e-7;
 
 template <instance_c I>
 auto compute_cases_vertex_options(const I & instance) noexcept {
@@ -58,8 +60,8 @@ void compute_case_arc_options(const C & instance_case,
                               auto & arc_options) noexcept {
     const auto & arc_options_map = instance_case.arc_options_map();
     for(auto && a : melon::arcs(instance_case.graph())) {
-        for(auto && [enhanced_prob, option] : arc_options_map[a])
-            arc_options[option].emplace_back(a, enhanced_prob);
+        for(auto && [improved_probability, option] : arc_options_map[a])
+            arc_options[option].emplace_back(a, improved_probability);
     }
 }
 
@@ -124,7 +126,7 @@ double compute_base_score(const I & instance) noexcept {
     return instance.eval_criterion(compute_base_cases_pc_num(instance));
 }
 
-// not noexcept: option_cost(o) throws if the options have several costs
+// not noexcept: option_cost(i) throws if the options have several costs
 template <instance_c I, melon::mapping<option_t> S>
     requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
 double compute_solution_cost(const I & instance, const S & solution) {
@@ -157,17 +159,18 @@ bool is_feasible(const I & instance, const S & solution,
         if(compute_solution_cost(instance, solution, r) > budget[r] + tolerance)
             return false;
     return std::ranges::all_of(instance.conflict_sets(), [&](auto && set) {
-        return std::ranges::count_if(set, [&](auto && o) {
-                   return static_cast<bool>(solution[o]);
+        return std::ranges::count_if(set, [&](auto && i) {
+                   return static_cast<bool>(solution[i]);
                }) <= 1;
     });
 }
 
-// the option alone within the budget of every dimension
+// the option alone within the budget of every dimension, up to the tolerance
 template <instance_c I>
-bool fits_alone(const I & instance, const option_t o, const budget_t & budget) {
+bool fits_alone(const I & instance, const option_t i, const budget_t & budget,
+                const double tolerance = 0.0) {
     for(std::size_t r = 0; r < budget.size(); ++r)
-        if(instance.option_cost(o, r) > budget[r]) return false;
+        if(instance.option_cost(i, r) > budget[r] + tolerance) return false;
     return true;
 }
 
@@ -203,15 +206,15 @@ template <instance_c I>
 auto compute_heuristic_costs(const I & instance, const budget_t & budget) {
     const std::size_t r0 = reference_dimension(budget);
     auto costs = instance.create_option_map(0.0);
-    for(auto && o : instance.options()) {
-        costs[o] = instance.option_cost(o, r0);
+    for(auto && i : instance.options()) {
+        costs[i] = instance.option_cost(i, r0);
         for(std::size_t r = 0; r < budget.size(); ++r)
-            if(r != r0 && budget[r] > 0 && instance.option_cost(o, r) > 0)
-                costs[o] += instance.option_cost(o, r) / budget[r] * budget[r0];
-        if(!std::isfinite(costs[o]) ||
-           (costs[o] != 0 && !std::isnormal(costs[o])))
+            if(r != r0 && budget[r] > 0 && instance.option_cost(i, r) > 0)
+                costs[i] += instance.option_cost(i, r) / budget[r] * budget[r0];
+        if(!std::isfinite(costs[i]) ||
+           (costs[i] != 0 && !std::isnormal(costs[i])))
             throw std::logic_error("the costs of option '" +
-                                   instance.option_name(o) +
+                                   instance.option_name(i) +
                                    "' are out of the range of the heuristics");
     }
     return costs;
@@ -224,7 +227,7 @@ auto compute_options_conflict_sets(const I & instance) {
         instance.template create_option_map<std::vector<std::size_t>>();
     std::size_t l = 0;
     for(auto && set : instance.conflict_sets()) {
-        for(auto && o : set) options_sets[o].push_back(l);
+        for(auto && i : set) options_sets[i].push_back(l);
         ++l;
     }
     return options_sets;
@@ -263,8 +266,9 @@ auto compute_solution_cases_pc_num(const I & instance, const S & solution,
             auto && arc_options = cases_arc_options[case_id];
             for(auto && option : instance.options()) {
                 if(!solution[option]) continue;
-                for(auto && [a, enhanced_prob] : arc_options[option]) {
-                    enhanced_pm[a] = std::max(enhanced_pm[a], enhanced_prob);
+                for(auto && [a, improved_probability] : arc_options[option]) {
+                    enhanced_pm[a] =
+                        std::max(enhanced_pm[a], improved_probability);
                 }
             }
             return enhanced_pm;
@@ -279,143 +283,6 @@ auto compute_solution_cases_pc_num(const I & instance,
     const auto cases_arc_options = compute_cases_arc_options(instance);
     return compute_solution_cases_pc_num(
         instance, solution, cases_vertex_options, cases_arc_options);
-}
-
-template <instance_c I, detail::range_of<option_t> O>
-void compute_options_cases_incr_pc_num(
-    const I & instance, const O & free_options, auto && cases_current_sqm,
-    auto && cases_current_tqm, auto && cases_current_pm,
-    auto && cases_vertex_options, auto && cases_arc_options,
-    auto & options_cases_pc_num) {
-    const auto & cases = instance.cases();
-    progress_bar<spdlog::level::debug, 64> pb(free_options.size() *
-                                              cases.size());
-    tbb::parallel_for(
-        tbb::blocked_range2d(cases.begin(), cases.end(), free_options.begin(),
-                             free_options.end()),
-        [&](const tbb::blocked_range2d<decltype(cases.begin()),
-                                       decltype(free_options.begin())> &
-                cases_options_block) {
-            for(const auto & instance_case : cases_options_block.rows()) {
-                const auto & options_block = cases_options_block.cols();
-                if(options_block.begin() == options_block.end()) continue;
-
-                const auto & graph = instance_case.graph();
-                const auto & current_sqm =
-                    cases_current_sqm[instance_case.id()];
-                const auto & current_tqm =
-                    cases_current_tqm[instance_case.id()];
-                const auto & current_pm = cases_current_pm[instance_case.id()];
-                const auto & vertex_options =
-                    cases_vertex_options[instance_case.id()];
-                const auto & arc_options =
-                    cases_arc_options[instance_case.id()];
-
-                auto enhanced_sqm = current_sqm;
-                auto enhanced_tqm = current_tqm;
-                auto enhanced_pm = current_pm;
-
-                for(auto it = options_block.begin();;) {
-                    option_t option = *it;
-                    for(auto && [u, source_quality_gain, target_quality_gain] :
-                        vertex_options[option]) {
-                        enhanced_sqm[u] += source_quality_gain;
-                        enhanced_tqm[u] += target_quality_gain;
-                    }
-                    for(auto && [a, enhanced_prob] : arc_options[option])
-                        enhanced_pm[a] =
-                            std::max(enhanced_pm[a], enhanced_prob);
-
-                    options_cases_pc_num[option][instance_case.id()] =
-                        parallel_pc_num(graph, enhanced_sqm, enhanced_tqm,
-                                        enhanced_pm);
-
-                    pb.tick();
-                    if(++it == options_block.end()) break;
-
-                    for(auto && [u, source_quality_gain, target_quality_gain] :
-                        vertex_options[option]) {
-                        enhanced_sqm[u] -= source_quality_gain;
-                        enhanced_tqm[u] -= target_quality_gain;
-                    }
-                    for(auto && [a, enhanced_prob] : arc_options[option])
-                        enhanced_pm[a] = current_pm[a];
-                }
-            }
-        });
-}
-
-template <instance_c I, melon::mapping<option_t> S,
-          detail::range_of<option_t> O>
-    requires std::convertible_to<melon::mapped_value_t<S, option_t>, bool>
-void compute_options_cases_decr_pc_num(
-    const I & instance, const S & current_solution, const O & taken_options,
-    auto && cases_current_sqm, auto && cases_current_tqm,
-    auto && cases_current_pm, auto && cases_vertex_options,
-    auto && cases_arc_options, auto & options_cases_pc_num) {
-    const auto & cases = instance.cases();
-    progress_bar<spdlog::level::debug, 64> pb(taken_options.size() *
-                                              cases.size());
-    tbb::parallel_for(
-        tbb::blocked_range2d(cases.begin(), cases.end(), taken_options.begin(),
-                             taken_options.end()),
-        [&](const tbb::blocked_range2d<decltype(cases.begin()),
-                                       decltype(taken_options.begin())> &
-                cases_options_block) {
-            for(const auto & instance_case : cases_options_block.rows()) {
-                const auto & options_block = cases_options_block.cols();
-                if(options_block.begin() == options_block.end()) continue;
-
-                const auto & current_sqm =
-                    cases_current_sqm[instance_case.id()];
-                const auto & current_tqm =
-                    cases_current_tqm[instance_case.id()];
-                const auto & current_pm = cases_current_pm[instance_case.id()];
-                const auto & original_pm = instance_case.arc_probability_map();
-                const auto & vertex_options =
-                    cases_vertex_options[instance_case.id()];
-                const auto & arc_options =
-                    cases_arc_options[instance_case.id()];
-
-                auto enhanced_sqm = current_sqm;
-                auto enhanced_tqm = current_tqm;
-                auto enhanced_pm = current_pm;
-
-                for(auto it = options_block.begin();;) {
-                    option_t option = *it;
-                    for(auto && [u, source_quality_gain, target_quality_gain] :
-                        vertex_options[option]) {
-                        enhanced_sqm[u] -= source_quality_gain;
-                        enhanced_tqm[u] -= target_quality_gain;
-                    }
-                    for(auto && [a, _] : arc_options[option]) {
-                        enhanced_pm[a] = original_pm[a];
-                        for(auto && [current_prob, i] :
-                            instance_case.arc_options_map()[a]) {
-                            if(current_solution[i] == 0.0 || option == i)
-                                continue;
-                            enhanced_pm[a] =
-                                std::max(enhanced_pm[a], current_prob);
-                        }
-                    }
-
-                    options_cases_pc_num[option][instance_case.id()] =
-                        parallel_pc_num(instance_case.graph(), enhanced_sqm,
-                                        enhanced_tqm, enhanced_pm);
-
-                    pb.tick();
-                    if(++it == options_block.end()) break;
-
-                    for(auto && [u, source_quality_gain, target_quality_gain] :
-                        vertex_options[option]) {
-                        enhanced_sqm[u] += source_quality_gain;
-                        enhanced_tqm[u] += target_quality_gain;
-                    }
-                    for(auto && [a, _] : arc_options[option])
-                        enhanced_pm[a] = current_pm[a];
-                }
-            }
-        });
 }
 
 }  // namespace gecot

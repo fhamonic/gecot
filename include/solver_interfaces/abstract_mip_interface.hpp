@@ -29,6 +29,16 @@
 
 #include "solver_interfaces/abstract_solver_interface.hpp"
 
+// lazy_constraint_solvers is written by hand: without these, a backend of
+// the list that no longer satisfied the concept would be refused only at run
+// time, when chosen
+static_assert(gecot::solvers::lazy_constraint_model<mippp::gurobi_milp>);
+static_assert(gecot::solvers::lazy_constraint_model<mippp::cplex_milp>);
+static_assert(gecot::solvers::lazy_constraint_model<mippp::copt_milp>);
+// the same for the two backends that the help of --indicator-constraints names
+static_assert(mippp::has_indicator_constraints<mippp::gurobi_milp>);
+static_assert(mippp::has_indicator_constraints<mippp::cplex_milp>);
+
 class AbstractMipInterface : public AbstractSolverInterface {
 public:
     using AbstractSolverInterface::AbstractSolverInterface;
@@ -46,8 +56,15 @@ public:
         nlohmann::json solution_json;
         instance_stream >> solution_json;
 
+        // not solution_json["solution"]: on a file without one it inserts
+        // a null, and the start is empty without a word
+        if(!solution_json.is_object() || !solution_json.contains("solution") ||
+           !solution_json.at("solution").is_object())
+            throw std::invalid_argument("File '" + solution_path.string() +
+                                        "' has no \"solution\" object");
         std::vector<std::string> taken_option_names;
-        for(auto && [option_name, value] : solution_json["solution"].items()) {
+        for(auto && [option_name, value] :
+            solution_json.at("solution").items()) {
             if(!value.template get<int>()) continue;
             taken_option_names.emplace_back(option_name);
         }
@@ -61,8 +78,8 @@ public:
     }
 
 protected:
-    std::string solver_name;
-    std::string mip_start_algorithm;
+    std::string solver_name = "gurobi";
+    std::string mip_start_algorithm = "none";
     gecot::solvers::mip_solver_base * mip_solver = nullptr;
 
     static inline const std::vector<std::string> all_solvers{
@@ -75,13 +92,13 @@ protected:
         "gurobi", "cplex", "copt", "xpress", "mosek", "highs", "scip", "cbc"};
 
     void add_mip_options(
-        gecot::solvers::mip_solver_base & solver, double default_tol = 1e-7,
+        gecot::solvers::mip_solver_base & solver,
         const std::vector<std::string> & solvers = all_solvers) {
         mip_solver = &solver;
         app.add_option("--solver", solver_name, "Solver used through mippp")
             ->check(CLI::IsMember(solvers))
-            ->default_val("gurobi");
-        add_feasibility_tol_option(solver.feasibility_tol, default_tol);
+            ->default_val(solver_name);
+        add_feasibility_tol_option(solver.feasibility_tol);
         auto * mip_start_option =
             app.add_option_function<std::filesystem::path>(
                 "--mip-start",
@@ -94,7 +111,7 @@ protected:
                        "Algorithm whose solution is proposed as a MIP start "
                        "to the solver, its time counted in --time-limit")
             ->check(CLI::IsMember({"none", "static", "greedy"}))
-            ->default_val("none")
+            ->default_val(mip_start_algorithm)
             ->excludes(mip_start_option);
         app.add_option("--time-limit", solver.time_limit,
                        "Time limit in seconds, after which the best solution "
@@ -111,9 +128,10 @@ protected:
         const spdlog::stopwatch sw;
         const double tol = solver.feasibility_tol;
         using namespace gecot::solvers;
-        const auto start = mip_start_algorithm == "static"
-                               ? Static{tol}.solve(instance, B)
-                               : Greedy{tol}.solve(instance, B);
+        const auto start =
+            mip_start_algorithm == "static"
+                ? Static{.feasibility_tol = tol}.solve(instance, B)
+                : Greedy{.feasibility_tol = tol}.solve(instance, B);
         solver.mip_start.emplace();
         for(auto && o : instance.options())
             if(start[o]) solver.mip_start->push_back(instance.option_name(o));
@@ -141,31 +159,27 @@ protected:
     }
 
     void add_big_M_option(gecot::big_M_kind & big_Ms) {
-        app.add_option_function<std::string>(
-               "--big-m",
-               [&big_Ms](const std::string & s) {
-                   using enum gecot::big_M_kind;
-                   big_Ms = s == "plain"              ? plain
-                            : s == "knapsack_dantzig" ? knapsack_dantzig
-                            : s == "tight"            ? tight
-                                                      : knapsack_bnb;
-               },
-               "The big-Ms: plain, with every quality gain (for comparison); "
-               "knapsack_bnb, with the gains of the best options within the "
-               "budget, by branch and bound; knapsack_dantzig, with the "
-               "linear relaxation of that knapsack, looser but faster; tight "
-               "(experimental), knapsack_bnb lowered per arc over the sources "
-               "that can use it")
-            ->check(CLI::IsMember(
-                {"plain", "knapsack_bnb", "knapsack_dantzig", "tight"}))
-            ->default_val("knapsack_bnb");
+        using enum gecot::big_M_kind;
+        add_choice_option<gecot::big_M_kind>(
+            app, "--big-m", big_Ms,
+            {{"plain", plain},
+             {"knapsack_bnb", knapsack_bnb},
+             {"knapsack_dantzig", knapsack_dantzig},
+             {"tight", tight}},
+            [&big_Ms](const gecot::big_M_kind kind) { big_Ms = kind; },
+            "The big-Ms: plain, with every quality gain (for comparison); "
+            "knapsack_bnb, with the gains of the best options within the "
+            "budget, by branch and bound; knapsack_dantzig, with the "
+            "linear relaxation of that knapsack, looser but faster; tight "
+            "(experimental), knapsack_bnb lowered per arc over the sources "
+            "that can use it");
     }
 
     void add_preprocessing_options(gecot::solvers::mip_solver_base & solver) {
         app.add_option("--resolution", solver.probability_resolution,
                        "Sets the resolution of the probabilities used by the "
                        "preprocessing algorithm")
-            ->default_val(1e-8);
+            ->default_val(solver.probability_resolution);
         app.add_option("--nb-mus", solver.num_mus,
                        "Sets the number of geometric steps between the "
                        "lagrangian multipliers of the constrained "
@@ -173,30 +187,31 @@ protected:
                        "(0: unconstrained preprocessing; experimental: 20, "
                        "or 9 on large instances)")
             ->check(CLI::NonNegativeNumber)
-            ->default_val(0);
-        app.add_option_function<std::string>(
-               "--mus-sweep",
-               [&solver](const std::string & s) {
-                   solver.decades_sweep = s == "decades";
-               },
-               "Range of the positive multipliers, up to the largest useful "
-               "one: decades spans at most the 3 decades below it and tests 0 "
-               "again last, full starts from the inverse of the largest option "
-               "cost per arc (needs --nb-mus > 0; experimental)")
-            ->check(CLI::IsMember({"decades", "full"}))
-            ->default_val("decades");
-        app.add_option_function<std::string>(
-               "--preprocessing",
-               [&solver](const std::string & s) {
-                   solver.contract_strong_arcs = s == "all" || s == "strong";
-                   solver.remove_useless_arcs = s == "all" || s == "useless";
-               },
-               "For comparison, what the strong and useless arcs are used "
-               "for: all; strong, only the contraction of the strong arcs; "
-               "useless, only the removal of the useless arcs; none, where "
-               "--resolution, --nb-mus and --mus-sweep have no effect")
-            ->check(CLI::IsMember({"all", "strong", "useless", "none"}))
-            ->default_val("all");
+            ->default_val(solver.num_mus);
+        add_choice_option<bool>(
+            app, "--mus-sweep", solver.decades_sweep,
+            {{"decades", true}, {"full", false}},
+            [&solver](const bool decades) { solver.decades_sweep = decades; },
+            "Range of the positive multipliers, up to the largest useful "
+            "one: decades spans at most the 3 decades below it and tests 0 "
+            "again last, full starts from the inverse of the largest option "
+            "cost per arc (needs --nb-mus > 0; experimental)");
+        // contract_strong_arcs, remove_useless_arcs
+        add_choice_option<std::pair<bool, bool>>(
+            app, "--preprocessing",
+            {solver.contract_strong_arcs, solver.remove_useless_arcs},
+            {{"all", {true, true}},
+             {"strong", {true, false}},
+             {"useless", {false, true}},
+             {"none", {false, false}}},
+            [&solver](const std::pair<bool, bool> & uses) {
+                solver.contract_strong_arcs = uses.first;
+                solver.remove_useless_arcs = uses.second;
+            },
+            "For comparison, what the strong and useless arcs are used "
+            "for: all; strong, only the contraction of the strong arcs; "
+            "useless, only the removal of the useless arcs; none, where "
+            "--resolution, --nb-mus and --mus-sweep have no effect");
         app.add_flag("--all-targets", solver.all_targets,
                      "For comparison: the vertices that can never be targets "
                      "are preprocessed and modelled as the others");

@@ -17,7 +17,7 @@ public:
         app.add_option("--iterations", method.iterations,
                        "Subgradient steps on the prices, each a pricing of "
                        "every pair of habitats")
-            ->default_val(30);
+            ->default_val(method.iterations);
         app.add_option("--time-limit", method.time_limit,
                        "Time limit in seconds, setup included, after which "
                        "the best bound of the complete steps is returned; for "
@@ -27,19 +27,18 @@ public:
                           "Score the steps aim at, the best known solution's "
                           "for instance (default: the score of the first "
                           "knapsack solution's whole options)");
-        app.add_option_function<std::string>(
-               "--theta",
-               [this](const std::string & s) {
-                   using enum gecot::qkp_planes::theta_start;
-                   method.vertex_side.start = s == "half"     ? half
-                                              : s == "target" ? target
-                                              : s == "source" ? source
-                                                              : best;
-               },
-               "Split of the quadratic terms of the quality gains, as for "
-               "qkp_planes")
-            ->check(CLI::IsMember({"best", "half", "target", "source"}))
-            ->default_val("best");
+        using theta_start = gecot::qkp_planes::theta_start;
+        add_choice_option<theta_start>(
+            app, "--theta", method.vertex_side.start,
+            {{"best", theta_start::best},
+             {"half", theta_start::half},
+             {"target", theta_start::target},
+             {"source", theta_start::source}},
+            [this](const theta_start start) {
+                method.vertex_side.start = start;
+            },
+            "Split of the quadratic terms of the quality gains, as for "
+            "qkp_planes");
     }
 
     gecot::bound_report compute(const Instance & instance,

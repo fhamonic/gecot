@@ -38,18 +38,31 @@
 namespace gecot {
 namespace solvers {
 
-// backends whose candidate solutions can be cut by lazy constraints and
-// handed back with the scores of their options (Benders)
+// Backends whose candidate solutions can be cut by lazy constraints and
+// handed back with the scores of their options (Benders). With the two
+// tolerances and the MIP start, which the base sets through helpers that
+// skip a missing one: a backend that lost a tolerance would keep its default
+// without a word, and one that lost the start would only warn.
 template <typename M>
 concept lazy_constraint_model =
-    mippp::has_candidate_solution_callback<M> &&
+    mippp::has_optimality_tolerance<M> && mippp::has_feasibility_tolerance<M> &&
+    mippp::has_mip_start<M> && mippp::has_candidate_solution_callback<M> &&
     mippp::has_lazy_constraints<mippp::candidate_solution_callback_handle_t<M>,
                                 M> &&
     mippp::has_solution_injection<
         mippp::candidate_solution_callback_handle_t<M>, M>;
 
 struct mip_solver_base {
-    double feasibility_tol = 0.0;
+    // the relative gap between a solution and the bound at which a MIP
+    // solver stops
+    static constexpr double mip_gap = 1e-10;
+
+    // -t, in several roles: the feasibility tolerance of the solver; the
+    // share of a flow by which a master may overestimate it before a cut;
+    // the slack of the budget, for a MIP start, for the tight big-Ms, and in
+    // path_lp for the columns of enumerate and the solution returned; how
+    // far under 1 an option of the relaxation still counts as bought
+    double feasibility_tol = default_feasibility_tol;
     double probability_resolution = 1e-8;
     int num_mus = 0;
     bool decades_sweep = true;
@@ -65,8 +78,6 @@ struct mip_solver_base {
     std::optional<std::vector<std::string>> mip_start;
     std::optional<double> time_limit;
 
-    // the variables of the sums, products and mins are free, {} rather than
-    // the default lower bound 0: a + min(b - 10, 0) is negative below b = 10
     template <typename M, typename V>
     struct formula_variable_visitor {
         std::reference_wrapper<M> model;
@@ -77,6 +88,11 @@ struct mip_solver_base {
 
         formula_variable_visitor(M & t_model, const V & t_C_vars)
             : model{t_model}, C_vars{t_C_vars} {}
+
+        // The variable of a sum, a product or a min: free, not with the
+        // default lower bound 0, as a + min(b - 10, 0) is negative below
+        // b = 10.
+        auto free_variable() { return model.get().add_variable({}); }
 
         // the variable of the formula e, kept for set_values
         auto variable(const criterion_formula & e) {
@@ -99,7 +115,7 @@ struct mip_solver_base {
         auto operator()(const criterion_var & v) { return C_vars.get()(v); }
         auto operator()(const criterion_sum & f) {
             using namespace mippp::operators;
-            auto var = model.get().add_variable({});
+            auto var = free_variable();
             std::vector<mippp::model_variable_t<M>> vars;
             for(auto && e : f.values) vars.emplace_back(variable(e));
             model.get().add_constraint(var == xsum(vars));
@@ -114,7 +130,7 @@ struct mip_solver_base {
                     "criterion "
                     "!");
 
-            auto var = model.get().add_variable({});
+            auto var = free_variable();
             model.get().add_constraint(
                 var == std::get<criterion_constant>(f.values[0]) *
                            variable(f.values[1]));
@@ -122,7 +138,7 @@ struct mip_solver_base {
         }
         auto operator()(const criterion_min & f) {
             using namespace mippp::operators;
-            auto var = model.get().add_variable({});
+            auto var = free_variable();
             for(auto && e : f.values) {
                 model.get().add_constraint(var <= variable(e));
             }
@@ -146,11 +162,11 @@ struct mip_solver_base {
     bool _is_target(const C & instance_case,
                     const melon::vertex_t<case_graph_t<C>> & t) const {
         return all_targets || instance_case.target_quality_map()[t] > 0 ||
-               std::ranges::any_of(instance_case.vertex_options_map()[t],
-                                   [](auto && e) {
-                                       auto && [sqg, tqg, o] = e;
-                                       return tqg > 0;
-                                   });
+               std::ranges::any_of(
+                   instance_case.vertex_options_map()[t], [](auto && e) {
+                       auto && [source_gain, target_gain, i] = e;
+                       return target_gain > 0;
+                   });
     }
 
     // Both kinds of arcs are labelled together: contracting or removing
@@ -165,10 +181,8 @@ struct mip_solver_base {
         };
         if(!contract_strong_arcs && !remove_useless_arcs)
             return std::make_pair(no_arcs(), no_arcs());
-        auto affordable = [&instance, &budget](const option_t & o) {
-            for(std::size_t r = 0; r < budget.size(); ++r)
-                if(instance.option_cost(o, r) > budget[r]) return false;
-            return true;
+        auto affordable = [&instance, &budget](const option_t & i) {
+            return fits_alone(instance, i, budget);
         };
         // on the cost dimension 0: dropping the others relaxes the problem
         auto labels = num_mus >= 1
@@ -353,36 +367,71 @@ struct mip_solver_base {
             throw std::invalid_argument(
                 "the budget needs a value per cost dimension");
         for(std::size_t r = 0; r < budget.size(); ++r)
-            model.add_constraint(xsum(instance.options(), [&](auto && o) {
-                                     return instance.option_cost(o, r) * x(o);
+            model.add_constraint(xsum(instance.options(), [&](auto && i) {
+                                     return instance.option_cost(i, r) * x(i);
                                  }) <= budget[r]);
         for(auto && set : instance.conflict_sets())
             model.add_constraint(xsum(set, x) <= 1);
     }
 
-    // backends without these setters keep their defaults
+    // gap: the relative MIP gap, which mippp calls the optimality tolerance;
+    // Gurobi's OptimalityTol is another parameter, set in _solve. Backends
+    // without these setters keep their defaults.
     template <typename M>
-    static void _set_tolerances(M & model, const double optimality_tol,
+    static void _set_tolerances(M & model, const double gap,
                                 const double feasibility_tol) {
         if constexpr(mippp::has_optimality_tolerance<M>)
-            model.set_optimality_tolerance(optimality_tol);
+            model.set_optimality_tolerance(gap);
         if constexpr(mippp::has_feasibility_tolerance<M>)
             model.set_feasibility_tolerance(feasibility_tol);
     }
 
+    // returns the start, if one is given, for the cuts a decomposition
+    // adds at it
     template <typename M, instance_c I>
-    void _add_mip_start(M & model, const I & instance,
-                        const auto & X_vars) const {
-        if(!mip_start) return;
-        if constexpr(mippp::has_mip_start<M>) {
-            instance_solution_t<I> mip_start_solution =
-                _mip_start_solution(instance);
-            model.add_mip_start(
-                std::views::transform(instance.options(), [&](auto o) {
-                    return std::make_pair(X_vars(o), mip_start_solution[o]);
-                }));
-        } else
+    std::optional<instance_solution_t<I>> _add_mip_start(M & model,
+                                                         const I & instance,
+                                                         const auto & x) const {
+        if(!mip_start) return std::nullopt;
+        instance_solution_t<I> start = _mip_start_solution(instance);
+        if constexpr(mippp::has_mip_start<M>)
+            model.add_mip_start(std::views::transform(
+                instance.options(),
+                [&](auto i) { return std::make_pair(x(i), start[i]); }));
+        else
             spdlog::warn("This solver has no MIP start: --mip-start ignored");
+        return start;
+    }
+
+    // a binary variable at the value the solver returns: 0 or 1 within its
+    // integrality tolerance
+    static bool _is_bought(const double value) { return value > 0.5; }
+
+    template <instance_c I>
+    static instance_solution_t<I> _bought_options(const I & instance,
+                                                  const auto & model_solution,
+                                                  const auto & x) {
+        instance_solution_t<I> solution = instance.create_option_map(false);
+        for(auto && i : instance.options())
+            solution[i] = _is_bought(model_solution[x(i)]);
+        return solution;
+    }
+
+    // Gives a candidate that received cuts back to the solver, as the
+    // scenario y with the scores of its cases: the solver drops such a
+    // candidate and may never propose its options again, although they are
+    // a solution. The caller has already written in candidate the other
+    // variables of its master at y (f_t and f^i_t, or theta_g): the solver
+    // refuses a point that breaks a row.
+    template <instance_c I>
+    static void _hand_back(auto & handle, auto & candidate, const I & instance,
+                           const auto & x, const auto & y, const auto & z,
+                           const auto & case_scores, const auto & formula) {
+        for(auto && i : instance.options()) candidate[x(i)] = y[i];
+        for(auto && instance_case : instance.cases())
+            candidate[z(instance_case.id())] = case_scores[instance_case.id()];
+        formula.set_values(candidate, case_scores);
+        handle.add_solution(candidate);
     }
 
     template <instance_c I>

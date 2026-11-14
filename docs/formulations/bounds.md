@@ -85,7 +85,7 @@ $$
 b = \sum_{p} R_p(\nu) + \max_{x \in [0,1]^\Phi} \Big\{ \sum_{i \in \Phi} \Big( u_i + \sum_{p} \nu_{pi} \Big) \cdot x_i \;:\; \sum_{i \in \Phi} c_i \cdot x_i \le \beta \Big\}\,.
 $$
 
-With several costs, this knapsack is the least of those of the dimensions, as for `qkp_planes`, and the conflict sets are ignored. The bound holds for any prices, and `--iterations` subgradient steps (30 by default) lower it, each step pricing every pair of habitats. `--time-limit` stops them and returns the best bound of the complete steps, and `--target` is the score that the steps aim at.
+With several costs, this knapsack is the least of those of the dimensions, as for `qkp_planes`, and the conflict sets are ignored. The bound holds for any prices, and `--iterations` subgradient steps (30 by default) lower it, each step pricing every pair of habitats. The price $\nu_{pi}$ stays at 0 for an option that cannot help the pair: one whose arcs share a vertex $v$ with $\overline{\Pi}(s,v) \cdot \overline{\Pi}(v,t) < \Pi(s,t)$. The search that prices a pair charges $\nu_{pi}$ once for each run of consecutive arcs of $i$ on its path, which the shape below makes once per path. `--time-limit` stops the steps and returns the best bound of the complete ones, and `--target` is the score that they aim at.
 
 To price a pair exactly, the method needs the options to have a simple shape, which it checks on each case, among the options that the budget can afford:
 

@@ -1,6 +1,11 @@
 #include <gtest/gtest.h>
+#include <ranges>
 #include <set>
 #include <string>
+#include <tuple>
+#include <vector>
+
+#include <tbb/global_control.h>
 
 #include "gecot/indices/parallel_pc_num.hpp"
 #include "gecot/solvers/greedy.hpp"
@@ -14,11 +19,9 @@
 
 using option_names = std::set<std::string>;
 
-// Mirrors gecot optimize, whose feasibility tolerance defaults to 1e-7: the
-// options bought statically are listed too.
+// Mirrors gecot optimize: the options bought statically are listed too.
 option_names solve_file(auto solver, const std::string & path,
                         const std::string & budget_text) {
-    solver.feasibility_tol = 1e-7;
     const Instance raw_instance = parse_instance(path);
     const gecot::budget_t budget = parse_budget(raw_instance, budget_text);
     const auto reformulated =
@@ -57,6 +60,50 @@ GTEST_TEST(solvers, a_score_is_the_same_at_every_evaluation) {
     const double first = score();
     for(int evaluation = 0; evaluation < 50; ++evaluation)
         ASSERT_EQ(score(), first);
+}
+
+// 32 cases of one vertex of quality 0.1, each with two options, of gains 0.3
+// and 0.5. Restored by the inverse operation, (0.1 + 0.3) - 0.3 is not 0.1:
+// the second option of a case, evaluated after the first in a block of the
+// parallel loop, would be scored from that quality, so its score would
+// follow how the threads cut the loop. With few options a block holds one,
+// and in a case of several vertices the sum of the score hides the digit.
+GTEST_TEST(solvers, an_option_scores_the_same_after_any_other) {
+    const std::size_t num_cases = 32;
+    std::vector<case_spec> cases;
+    for(gecot::option_t i = 0; i < 2 * num_cases; i += 2)
+        cases.push_back(case_spec{
+            1, {}, {}, {0.1}, {0.1}, {{{0.3, 0.3, i}, {0.5, 0.5, i + 1}}}, {}});
+    criterion_sum criterion;
+    for(gecot::case_id_t k = 0; k < num_cases; ++k)
+        criterion.values.emplace_back(k);
+    const Instance instance = build_instance(
+        std::vector<double>(2 * num_cases, 1.0), cases, criterion);
+    const tbb::global_control one_thread(
+        tbb::global_control::max_allowed_parallelism, 1);
+    const auto all = std::ranges::to<std::vector>(instance.options());
+    const auto solution = instance.create_option_map(true);
+    gecot::solvers::heuristic_landscape landscape(instance);
+    auto scores = [&](const bool with,
+                      const std::vector<gecot::option_t> & options) {
+        auto options_cases_pc_num =
+            instance.create_option_map(instance.create_case_map<double>());
+        if(with)
+            landscape.scores_with(options, options_cases_pc_num);
+        else
+            landscape.scores_without(solution, options, options_cases_pc_num);
+        return options_cases_pc_num;
+    };
+    for(const bool with : {true, false}) {
+        if(with)
+            landscape.set(std::vector<gecot::option_t>{});
+        else
+            landscape.set(all);
+        const auto together = scores(with, all);
+        for(const gecot::option_t i : all)
+            EXPECT_EQ(together[i][i / 2], scores(with, {i})[i][i / 2])
+                << (with ? "with " : "without ") << i;
+    }
 }
 
 GTEST_TEST(solvers, static_incremental) {

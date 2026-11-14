@@ -95,11 +95,11 @@ auto compute_knapsack_big_M_map(const I & instance, const budget_t & budget,
             std::vector<double> gains;
             std::vector<std::vector<double>> costs(budget.size());
             for(std::size_t r = 0; r < budget.size(); ++r)
-                for(auto && o : instance.options())
-                    costs[r].push_back(instance.option_cost(o, r));
-            auto fits = [&](const option_t o) {
+                for(auto && i : instance.options())
+                    costs[r].push_back(instance.option_cost(i, r));
+            auto fits = [&](const option_t i) {
                 for(std::size_t r = 0; r < budget.size(); ++r)
-                    if(costs[r][o] > budget[r]) return false;
+                    if(costs[r][i] > budget[r]) return false;
                 return true;
             };
 
@@ -120,8 +120,8 @@ auto compute_knapsack_big_M_map(const I & instance, const budget_t & budget,
                     if(dantzig_bound) {
                         // the options that do not fit would enter as fractions
                         gains.clear();
-                        for(auto && o : instance.options())
-                            gains.push_back(fits(o) ? option_gains[o] : 0.0);
+                        for(auto && i : instance.options())
+                            gains.push_back(fits(i) ? option_gains[i] : 0.0);
                         knapsack_value =
                             std::min(knapsack_value,
                                      lp_knapsack(gains, costs[r], budget[r]));
@@ -131,15 +131,15 @@ auto compute_knapsack_big_M_map(const I & instance, const budget_t & budget,
                     // branch and bound, they make it explode. Their gains are
                     // zeroed, not their items removed, for the same order.
                     double free_gains = 0.0;
-                    for(auto && o : instance.options()) {
-                        dimension_gains[o] = option_gains[o];
-                        if(costs[r][o] > 0) continue;
-                        free_gains += option_gains[o];
-                        dimension_gains[o] = 0.0;
+                    for(auto && i : instance.options()) {
+                        dimension_gains[i] = option_gains[i];
+                        if(costs[r][i] > 0) continue;
+                        free_gains += option_gains[i];
+                        dimension_gains[i] = 0.0;
                     }
                     melon::knapsack_bnb knapsack(
                         instance.options(), dimension_gains,
-                        [&](auto && o) { return costs[r][o]; }, budget[r]);
+                        [&](auto && i) { return costs[r][i]; }, budget[r]);
                     knapsack_value =
                         std::min(knapsack_value,
                                  free_gains + knapsack.run().solution_value());

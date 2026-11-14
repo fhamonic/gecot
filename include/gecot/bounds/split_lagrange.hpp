@@ -38,20 +38,9 @@
 
 namespace gecot {
 
-// Lagrangian bound on the vertex/arc split of the weighted case scores:
-//   Σ_k w_k pc_k(X) <= V(X) + A(X),
-// V the quality gains with every probability at P̄, bounded by
-// qkp_planes' u: V(X) <= Σ_{o∈X} u_o; A(X) = Σ_p w_p P_p(X) over the pairs
-// p = (k, s, t) of base qualities, w_p = w_k q^s_s q^t_t. For any ν >= 0,
-// weak duality on "p uses o" <= x_o gives
-//   A(X) <= Σ_p R_p(ν) + Σ_{o∈X} Σ_p ν_po,
-//   R_p(ν) = max over the s-t paths π and the options S used on π of
-//            w_p P_π(S) - Σ_{o∈S} ν_po,
-// so the bound is Σ_p R_p(ν) + max{Σ_o (u_o + Σ_p ν_po) x_o : c·x <= B},
-// the knapsack by its LP relaxation, ν improved by projected subgradient
-// steps. ν_po is kept at 0 unless o lies on a pair's corridor (a valid
-// choice). R_p is exact by a label search that charges ν_po once per run of
-// consecutive arcs of o, which check_structure makes once per path.
+// The Lagrangian bound of docs/formulations/bounds.md ("split_lagrange") on
+// the weighted case scores, split between the quality gains, bounded by the
+// u of qkp_planes, and the base qualities.
 struct split_lagrange {
     std::size_t iterations = 30;
     std::optional<double> time_limit;  // seconds, for each weighted bound
@@ -178,12 +167,12 @@ private:
     struct sweep_totals {
         double sum_R = 0.0, norm = 0.0;
         std::size_t labels = 0, used = 0, outside = 0;
-        sweep_totals & operator+=(const sweep_totals & o) {
-            sum_R += o.sum_R;
-            norm += o.norm;
-            labels += o.labels;
-            used += o.used;
-            outside += o.outside;
+        sweep_totals & operator+=(const sweep_totals & other) {
+            sum_R += other.sum_R;
+            norm += other.norm;
+            labels += other.labels;
+            used += other.used;
+            outside += other.outside;
             return *this;
         }
     };
@@ -204,13 +193,14 @@ private:
             heap.pop();
             if(dv > d[v]) continue;
             const auto & begin = reversed ? c.in_begin : c.out_begin;
-            for(std::size_t i = begin[v]; i < begin[v + 1]; ++i) {
-                const std::uint32_t a = reversed ? c.in_arcs[i] : c.out_arcs[i];
+            for(std::size_t pos = begin[v]; pos < begin[v + 1]; ++pos) {
+                const std::uint32_t a =
+                    reversed ? c.in_arcs[pos] : c.out_arcs[pos];
                 const case_arc & arc = c.arcs[a];
                 const double length =
                     improved ? arc.improved_length : arc.length;
                 if(!std::isfinite(length)) continue;
-                const std::uint32_t w = reversed ? c.in_sources[i] : arc.to;
+                const std::uint32_t w = reversed ? c.in_sources[pos] : arc.to;
                 if(dv + length < d[w]) {
                     d[w] = dv + length;
                     heap.push({d[w], w});
@@ -264,8 +254,9 @@ private:
                 }
                 continue;
             }
-            for(std::size_t i = c.out_begin[v]; i < c.out_begin[v + 1]; ++i) {
-                const case_arc & arc = c.arcs[c.out_arcs[i]];
+            for(std::size_t pos = c.out_begin[v]; pos < c.out_begin[v + 1];
+                ++pos) {
+                const case_arc & arc = c.arcs[c.out_arcs[pos]];
                 const double rest = -to_target[arc.to];
                 if(!std::isfinite(rest)) continue;
                 for(int improved = 0; improved < 2; ++improved) {
@@ -304,7 +295,7 @@ private:
         for(const std::uint32_t v : sc.touched)
             sc.min_charge_free[v] = sc.min_charge_paid[v] = infinity;
         sc.touched.clear();
-        for(const std::uint32_t o : corridor) sc.nu[o] = 0.0;
+        for(const std::uint32_t i : corridor) sc.nu[i] = 0.0;
         return best;
     }
 
@@ -346,8 +337,8 @@ public:
         std::vector<std::vector<double>> costs(
             budget.size(), std::vector<double>(num_options));
         for(std::size_t r = 0; r < budget.size(); ++r)
-            for(auto && o : instance.options())
-                costs[r][o] = instance.option_cost(o, r);
+            for(auto && i : instance.options())
+                costs[r][i] = instance.option_cost(i, r);
 
         const auto vertex_bounds =
             vertex_side.weighted(instance, budget, case_weights);
@@ -365,23 +356,26 @@ public:
         for(std::uint32_t k = 0; k < cases.size(); ++k) {
             const case_data & c = cases[k];
             max_vertices = std::max(max_vertices, c.out_begin.size() - 1);
-            for(std::uint32_t i = 0; i < c.sources.size(); ++i)
+            for(std::uint32_t source_no = 0; source_no < c.sources.size();
+                ++source_no)
                 for(std::uint32_t j = 0; j < c.targets.size(); ++j) {
-                    if(c.sources[i] == c.targets[j]) {
-                        constant_R += c.weight * c.source_qualities[i] *
+                    if(c.sources[source_no] == c.targets[j]) {
+                        constant_R += c.weight * c.source_qualities[source_no] *
                                       c.target_qualities[j];
                         continue;
                     }
-                    if(!std::isfinite(c.improved[i][c.targets[j]])) continue;
-                    pairs.push_back({k, i, j});
+                    if(!std::isfinite(c.improved[source_no][c.targets[j]]))
+                        continue;
+                    pairs.push_back({k, source_no, j});
                 }
         }
         const std::size_t num_pairs = pairs.size();
 
-        // corridors: o with P̄_{s v_o} P̄_{v_o t} >= P_st, rounded outwards
-        auto in_corridor = [&](const pair_t & p, std::uint32_t o) {
+        // corridors: the options i whose vertex v has Π̄(s, v) Π̄(v, t) >=
+        // Π(s, t), rounded outwards
+        auto in_corridor = [&](const pair_t & p, std::uint32_t i) {
             const case_data & c = cases[p.case_index];
-            const std::uint32_t v = c.option_vertex[o];
+            const std::uint32_t v = c.option_vertex[i];
             if(v == none) return false;
             return c.improved[p.source][v] +
                        c.improved_to_target[p.target][v] <=
@@ -391,9 +385,9 @@ public:
         tbb::parallel_for(tbb::blocked_range<std::size_t>(0, num_pairs),
                           [&](const tbb::blocked_range<std::size_t> & r) {
                               for(std::size_t p = r.begin(); p != r.end(); ++p)
-                                  for(std::uint32_t o = 0; o < num_options; ++o)
+                                  for(std::uint32_t i = 0; i < num_options; ++i)
                                       offsets[p + 1] +=
-                                          in_corridor(pairs[p], o);
+                                          in_corridor(pairs[p], i);
                           });
         for(std::size_t p = 0; p < num_pairs; ++p) offsets[p + 1] += offsets[p];
         const std::size_t num_entries = offsets[num_pairs];
@@ -411,9 +405,9 @@ public:
                               for(std::size_t p = r.begin(); p != r.end();
                                   ++p) {
                                   std::size_t k = offsets[p];
-                                  for(std::uint32_t o = 0; o < num_options; ++o)
-                                      if(in_corridor(pairs[p], o))
-                                          corridors[k++] = o;
+                                  for(std::uint32_t i = 0; i < num_options; ++i)
+                                      if(in_corridor(pairs[p], i))
+                                          corridors[k++] = i;
                               }
                           });
         std::vector<double> nu(num_entries, 0.0);
@@ -442,11 +436,11 @@ public:
                 // a solution within the budget: below the bound's minimum. x
                 // fits the dimension of the least knapsack only.
                 auto solution = instance.template create_option_map<bool>();
-                for(auto && o : instance.options()) {
-                    solution[o] = (x[o] == 1.0);
-                    if(solution[o] && !has_plain_budget(instance) &&
+                for(auto && i : instance.options()) {
+                    solution[i] = (x[i] == 1.0);
+                    if(solution[i] && !has_plain_budget(instance) &&
                        !is_feasible(instance, solution, budget, 0.0))
-                        solution[o] = false;
+                        solution[i] = false;
                 }
                 aim = weighted_score(instance, solution, case_weights);
                 spdlog::trace("split_lagrange: steps aim at {}", aim.value());
@@ -479,10 +473,10 @@ public:
                             z.begin() +
                                 static_cast<std::ptrdiff_t>(offsets[p + 1]),
                             0);
-                        for(const std::uint32_t o : sc.used) {
+                        for(const std::uint32_t i : sc.used) {
                             const auto it =
-                                std::ranges::lower_bound(corridor, o);
-                            if(it != corridor.end() && *it == o)
+                                std::ranges::lower_bound(corridor, i);
+                            if(it != corridor.end() && *it == i)
                                 z[offsets[p] + static_cast<std::size_t>(
                                                    it - corridor.begin())] = 1;
                             else
@@ -537,7 +531,7 @@ public:
         return result;
     }
 
-    // R_p of the pair (s, t) of a case, of weight q^s_s q^t_t, under the
+    // R_p of the pair (s, t) of a case, of weight w_s q_t, under the
     // prices nu of the options, by the label search: for the tests
     template <instance_c I, case_c C>
     static double pair_value(const I & instance, const C & instance_case,
@@ -546,19 +540,20 @@ public:
                              std::span<const double> nu) {
         const case_data c =
             make_case_data(instance, instance_case, budget, 1.0);
-        const auto i = std::ranges::find(c.sources, s) - c.sources.begin();
+        const auto source_no =
+            std::ranges::find(c.sources, s) - c.sources.begin();
         const auto j = std::ranges::find(c.targets, t) - c.targets.begin();
-        if(static_cast<std::size_t>(i) == c.sources.size() ||
+        if(static_cast<std::size_t>(source_no) == c.sources.size() ||
            static_cast<std::size_t>(j) == c.targets.size())
             throw std::invalid_argument("pair_value: s or t is no habitat");
         std::vector<std::uint32_t> corridor(nu.size());
-        for(std::uint32_t o = 0; o < corridor.size(); ++o) corridor[o] = o;
+        for(std::uint32_t i = 0; i < corridor.size(); ++i) corridor[i] = i;
         scratch sc(c.out_begin.size() - 1, nu.size());
         std::size_t num_labels = 0;
-        return price(
-            c,
-            {0, static_cast<std::uint32_t>(i), static_cast<std::uint32_t>(j)},
-            corridor, nu, sc, num_labels);
+        return price(c,
+                     {0, static_cast<std::uint32_t>(source_no),
+                      static_cast<std::uint32_t>(j)},
+                     corridor, nu, sc, num_labels);
     }
 
     template <instance_c I>
@@ -614,10 +609,10 @@ private:
         for(auto && a : melon::arcs(graph)) {
             std::uint32_t option = none;
             double improved = probability_map[a];
-            for(auto && [improved_probability, o] : arc_options_map[a])
+            for(auto && [improved_probability, i] : arc_options_map[a])
                 if(improved_probability > probability_map[a] &&
-                   fits_alone(instance, o, budget)) {
-                    option = o;
+                   fits_alone(instance, i, budget)) {
+                    option = i;
                     improved = std::max(improved, improved_probability);
                 }
             if(option != none) option_arcs[option].push_back(a);
@@ -626,10 +621,10 @@ private:
                 ln(probability_map[a]), ln(improved)};
         }
         c.option_vertex.assign(num_options, none);
-        for(std::uint32_t o = 0; o < num_options; ++o)
-            if(!option_arcs[o].empty())
-                c.option_vertex[o] = static_cast<std::uint32_t>(
-                    common_vertex(graph, option_arcs[o]).value());
+        for(std::uint32_t i = 0; i < num_options; ++i)
+            if(!option_arcs[i].empty())
+                c.option_vertex[i] = static_cast<std::uint32_t>(
+                    common_vertex(graph, option_arcs[i]).value());
         c.out_begin.assign(n + 1, 0);
         c.in_begin.assign(n + 1, 0);
         for(auto && a : melon::arcs(graph)) {
@@ -670,14 +665,16 @@ private:
         c.base.resize(c.sources.size());
         c.improved.resize(c.sources.size());
         c.improved_to_target.resize(c.targets.size());
-        tbb::parallel_for(
-            tbb::blocked_range<std::size_t>(0, c.sources.size()),
-            [&](const tbb::blocked_range<std::size_t> & r) {
-                for(std::size_t i = r.begin(); i != r.end(); ++i) {
-                    c.base[i] = distances(c, c.sources[i], false, false);
-                    c.improved[i] = distances(c, c.sources[i], true, false);
-                }
-            });
+        tbb::parallel_for(tbb::blocked_range<std::size_t>(0, c.sources.size()),
+                          [&](const tbb::blocked_range<std::size_t> & r) {
+                              for(std::size_t source_no = r.begin();
+                                  source_no != r.end(); ++source_no) {
+                                  c.base[source_no] = distances(
+                                      c, c.sources[source_no], false, false);
+                                  c.improved[source_no] = distances(
+                                      c, c.sources[source_no], true, false);
+                              }
+                          });
         tbb::parallel_for(tbb::blocked_range<std::size_t>(0, c.targets.size()),
                           [&](const tbb::blocked_range<std::size_t> & r) {
                               for(std::size_t j = r.begin(); j != r.end(); ++j)

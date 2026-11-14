@@ -4,9 +4,12 @@
 #include <algorithm>
 #include <cmath>
 #include <optional>
+#include <ranges>
+#include <stdexcept>
 #include <utility>
 #include <variant>
 
+#include "gecot/bounds/criterion_analysis.hpp"
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
 #include "melon/algorithm/strongly_connected_components.hpp"
@@ -15,13 +18,18 @@
 
 #include "instance.hpp"
 
-// the criterion of the scores divided by s: a product is homogeneous of the
-// degree of its non-constant factors, so [c, f] keeps its weight c
+// the criterion of the scores divided by s, each case under the id that
+// case_map gives it: a product is homogeneous of the degree of its
+// non-constant factors, so [c, f] keeps its weight c
+template <typename M>
 struct formula_scale_visitor {
     double s;
+    const M & case_map;
 
     criterion_formula operator()(const criterion_constant & c) { return c / s; }
-    criterion_formula operator()(const criterion_var & v) { return v; }
+    criterion_formula operator()(const criterion_var & v) {
+        return case_map[v].value();
+    }
     criterion_formula operator()(const criterion_sum & f) {
         return criterion_sum{scaled(f.values)};
     }
@@ -59,10 +67,10 @@ std::vector<std::string> cost_dimensions_names(const I & instance) {
 }
 
 template <gecot::instance_c I>
-std::vector<double> option_costs(const I & instance, const gecot::option_t o) {
+std::vector<double> option_costs(const I & instance, const gecot::option_t i) {
     std::vector<double> costs;
     for(std::size_t r = 0; r < instance.num_cost_dimensions(); ++r)
-        costs.push_back(instance.option_cost(o, r));
+        costs.push_back(instance.option_cost(i, r));
     return costs;
 }
 
@@ -73,8 +81,8 @@ void add_conflict_sets(const I & instance, Instance & new_instance,
                        const auto & option_map) {
     for(std::size_t l = 0; l < instance.conflict_sets().size(); ++l) {
         std::vector<gecot::option_t> set;
-        for(auto && o : instance.conflict_sets()[l])
-            if(option_map[o]) set.push_back(option_map[o].value());
+        for(auto && i : instance.conflict_sets()[l])
+            if(option_map[i]) set.push_back(option_map[i].value());
         if(set.size() >= 2)
             new_instance.add_conflict_set(instance.conflict_set_name(l),
                                           std::move(set));
@@ -83,6 +91,8 @@ void add_conflict_sets(const I & instance, Instance & new_instance,
 
 template <gecot::instance_c I>
 struct reformulation {
+    // its cases are those that the criterion reads, in their order: a case
+    // has another id in it as soon as one before it is left out
     Instance instance;
     double quality_scale;
     // the options of the original instance that are always bought
@@ -93,37 +103,54 @@ struct reformulation {
 // so its scores are divided by its square. Gurobi's absolute tolerances gave
 // wrong optima on scores near 1e11, and near 1e-2 on bike with its qualities
 // divided by the largest: the largest case score is brought into [1e5, 4e5),
-// and an instance whose cases score less is left unscaled
+// and an instance whose cases score less is left unscaled. Its criterion is
+// simplified_criterion's, and a case that this one does not read is left
+// out. Throws if it reads none.
 template <gecot::instance_c I>
 reformulation<I> trivial_reformulate_instance(const I & instance,
                                               const gecot::budget_t & budget,
                                               const bool merge = true) {
+    const criterion_formula criterion = gecot::simplified_criterion(
+        instance.criterion(), std::ranges::size(instance.cases()));
+    auto reformulated_case_map =
+        instance.template create_case_map<std::optional<gecot::case_id_t>>();
+    gecot::case_id_t num_read_cases = 0;
+    for(const gecot::case_id_t k : gecot::criterion_cases(criterion))
+        reformulated_case_map[k] = num_read_cases++;
+    if(num_read_cases == 0)
+        throw std::invalid_argument(
+            "the criterion reads no case: every selection of options has the "
+            "same score");
+
     // one factor for all cases: a sum or a min criterion weighs them
     const auto base_cases_pc_num = gecot::compute_base_cases_pc_num(instance);
     double max_case_score = 0;
     for(auto && instance_case : instance.cases())
-        max_case_score =
-            std::max(max_case_score, base_cases_pc_num[instance_case.id()]);
-    const double quality_scale = std::exp2(
-        std::max(0.0, std::floor(std::log2(max_case_score / 1e5) / 2)));
+        if(reformulated_case_map[instance_case.id()])
+            max_case_score =
+                std::max(max_case_score, base_cases_pc_num[instance_case.id()]);
+    const double quality_scale = std::ldexp(
+        1.0, static_cast<int>(std::max(
+                 0.0, std::floor(std::log2(max_case_score / 1e5) / 2))));
 
     Instance reformulated_instance;
     reformulated_instance.set_criterion(
-        std::visit(formula_scale_visitor{quality_scale * quality_scale},
-                   instance.criterion()));
+        std::visit(formula_scale_visitor{quality_scale * quality_scale,
+                                         reformulated_case_map},
+                   criterion));
 
     reformulated_instance.set_cost_dimensions(cost_dimensions_names(instance));
 
     // an option over the budget of a dimension is never bought
     auto affordable = instance.create_option_map(true);
-    for(auto && o : instance.options())
-        affordable[o] = gecot::fits_alone(instance, o, budget);
+    for(auto && i : instance.options())
+        affordable[i] = gecot::fits_alone(instance, i, budget);
     // a set of one affordable option or none constrains nothing
     auto in_conflict = instance.create_option_map(false);
     for(auto && set : instance.conflict_sets())
-        if(std::ranges::count_if(set, [&](auto o) { return affordable[o]; }) >=
+        if(std::ranges::count_if(set, [&](auto i) { return affordable[i]; }) >=
            2)
-            for(auto && o : set) in_conflict[o] = true;
+            for(auto && i : set) in_conflict[i] = true;
 
     auto reformulated_option_map =
         instance.template create_option_map<std::optional<gecot::option_t>>();
@@ -143,11 +170,11 @@ reformulation<I> trivial_reformulate_instance(const I & instance,
     }
     add_conflict_sets(instance, reformulated_instance, reformulated_option_map);
 
-    for(auto && instance_case : instance.cases()) {
-        trivial_reformulate_case(instance_case, reformulated_instance,
-                                 reformulated_option_map, static_options,
-                                 quality_scale, merge);
-    }
+    for(auto && instance_case : instance.cases())
+        if(reformulated_case_map[instance_case.id()])
+            trivial_reformulate_case(instance_case, reformulated_instance,
+                                     reformulated_option_map, static_options,
+                                     quality_scale, merge);
 
     return {std::move(reformulated_instance), quality_scale,
             std::move(static_options)};
@@ -204,11 +231,11 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
         }
     }
     for(const arc_t & a : melon::arcs(original_graph)) {
-        for(const auto & [improved_prob, option] :
+        for(const auto & [improved_probability, option] :
             original_arc_options_map[a]) {
             if(!free_options[option]) continue;
             original_probability_map[a] =
-                std::max(original_probability_map[a], improved_prob);
+                std::max(original_probability_map[a], improved_probability);
         }
     }
 
@@ -247,12 +274,12 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
     melon::static_digraph_builder<melon::static_digraph, double, std::string,
                                   arc_t>
         builder(num_components);
-    for(std::size_t i = 0; i < num_components; ++i) {
-        for(const vertex_t & v : components[i]) {
+    for(std::size_t c = 0; c < num_components; ++c) {
+        for(const vertex_t & v : components[c]) {
             for(const arc_t & a : melon::out_arcs(original_graph, v)) {
                 const vertex_t & w = melon::arc_target(original_graph, a);
-                if(i == component_num_map[w]) continue;
-                builder.add_arc({static_cast<vertex_t>(i),
+                if(c == component_num_map[w]) continue;
+                builder.add_arc({static_cast<vertex_t>(c),
                                  static_cast<vertex_t>(component_num_map[w])},
                                 original_probability_map[a],
                                 instance_case.arc_name(a), a);
@@ -292,11 +319,11 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
         melon::create_arc_map<std::vector<std::pair<double, gecot::option_t>>>(
             graph, {});
     for(arc_t a : melon::arcs(graph)) {
-        for(const auto & [improved_prob, original_option] :
+        for(const auto & [improved_probability, original_option] :
             original_arc_options_map[original_arc_map[a]]) {
             if(!reformulated_option_map[original_option].has_value()) continue;
             arc_options[a].emplace_back(
-                improved_prob,
+                improved_probability,
                 reformulated_option_map[original_option].value());
         }
     }

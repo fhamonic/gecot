@@ -1,7 +1,10 @@
 #pragma once
 
-#include <limits>
+#include <cstddef>
+#include <ranges>
 #include <stdexcept>
+#include <utility>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
@@ -14,151 +17,111 @@
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
-#include "gecot/preprocessing/compute_constrained_strong_and_useless_arcs.hpp"
+#include "gecot/preprocessing/compute_big_M_map.hpp"
 #include "gecot/preprocessing/compute_contracted_graph.hpp"
-#include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 
 #include "gecot/solvers/mip_solver_base.hpp"
 
 namespace gecot {
 namespace solvers {
 
+// The decomposition of docs/formulations/benders.md with a cut per target.
+// Each block of solve() builds what the section it names states.
 struct flow_benders : public mip_solver_base {
     // plain for comparison, tight experimental
     big_M_kind big_Ms = big_M_kind::knapsack_bnb;
-
-    template <case_c C>
-    auto _compute_dual_flow(const contracted_graph_data<C> & data,
-                            const auto & solution) const {
-        double opt = 0.0;
-        auto rho_values = melon::create_vertex_map<double>(data.graph, 0.0);
-
-        auto get_quality = [&](auto && u) {
-            double quality = data.source_quality_map[u];
-            for(auto && [source_quality_gain, option] :
-                data.source_options_map[u]) {
-                if(!solution[option]) continue;
-                quality += source_quality_gain;
-            }
-            return quality;
-        };
-
-        const auto & reversed_graph = melon::views::reverse(data.graph);
-        for(const auto & [u, prob] : melon::dijkstra(
-                detail::pc_num_dijkstra_traits<decltype(reversed_graph),
-                                               double>{},
-                reversed_graph,
-                [&](auto && a) {
-                    double prob = data.probability_map[a];
-                    for(auto && [improved_prob, option] :
-                        data.arc_options_map[a]) {
-                        if(!solution[option]) continue;
-                        prob = std::max(prob, improved_prob);
-                    }
-                    return prob;
-                },
-                data.t)) {
-            opt += get_quality(u) * prob;
-            rho_values[u] = prob;
-        }
-
-        return std::make_tuple(opt, rho_values);
-    }
+    // experimental: on the target quality gains only, the cuts keep their
+    // big-Ms
+    bool indicator_constraints = false;
 
     template <lazy_constraint_model M, instance_c I>
     solve_result<I> solve(const I & instance, const budget_t & budget) const {
-        _check_criterion(instance);
-        spdlog::stopwatch sw;
-        auto solution = instance.create_option_map(false);
-
         using namespace mippp;
         using namespace mippp::operators;
-
+        _check_criterion(instance);
+        if(indicator_constraints && !has_indicator_constraints<M>)
+            throw std::invalid_argument(
+                "this solver has no indicator constraints");
+        spdlog::stopwatch sw;
         M model;
+        _set_tolerances(model, mip_gap, feasibility_tol);
 
-        model.set_optimality_tolerance(1e-10);
-        model.set_feasibility_tolerance(feasibility_tol);
-
-        const auto C_vars = model.add_variables(
-            instance.cases().size(), [](const case_id_t & id) { return id; });
-
+        // Cases and criterion, in flow.md: the scores z_k under their
+        // criterion (Linearizing the criterion), the options x_i within the
+        // budgets and the conflict sets
+        const auto z = model.add_variables(
+            instance.cases().size(), [](const case_id_t & k) { return k; });
         model.set_maximization();
-        formula_variable_visitor formula{model, C_vars};
+        formula_variable_visitor formula{model, z};
         model.set_objective(formula.variable(instance.criterion()));
-
-        const auto X_vars = model.add_binary_variables(
+        const auto x = model.add_binary_variables(
             instance.options().size(), [](const option_t & i) { return i; });
+        _add_budget_rows(model, instance, budget, x);
 
-        _add_budget_rows(model, instance, budget, X_vars);
-
-        auto cases_contracted_data =
-            instance.template create_case_map<std::vector<
-                std::pair<mippp::model_variable_t<M>,
-                          contracted_graph_data<instance_case_t<I>>>>>();
-        // the flows of the target quality gains: case by case, target by
-        // target, in the order of the target's options
-        std::vector<mippp::model_variable_t<M>> F_prime_vars;
-
-        // with the vertices and the arcs of the contracted graphs, on average
+        struct target {
+            model_variable_t<M> f_t;
+            contracted_graph_data<instance_case_t<I>> G_t;
+        };
+        auto targets = instance.template create_case_map<std::vector<target>>();
+        // the f^i_t: case by case, target by target, in the order of the
+        // target's options
+        std::vector<model_variable_t<M>> f_gains;
+        // with the vertices and the arcs of the graphs G_t, on average
         std::vector<preprocessing_row<double, double>> preprocessing;
         for(auto && instance_case : instance.cases()) {
-            const auto case_id = instance_case.id();
-            const auto & original_graph = instance_case.graph();
-            const auto & original_target_quality_map =
+            const case_id_t k = instance_case.id();
+            const auto & target_quality_map =
                 instance_case.target_quality_map();
-            const auto & original_vertex_options_map =
+            const auto & vertex_options_map =
                 instance_case.vertex_options_map();
-
-            auto C_constr = model.add_constraint(C_vars(case_id) <= 0);
-
             const auto [strong_arcs_map, useless_arcs_map] =
                 _compute_strong_and_useless_arcs(instance, instance_case,
                                                  budget);
-
             spdlog::debug("Computing contractions and big-Ms of the '{}' graph",
                           instance_case.name());
-            {
-                progress_bar<spdlog::level::info, 64> pb(
-                    original_graph.num_vertices());
-                for(const auto & original_t : melon::vertices(original_graph)) {
-                    const double original_t_target_quality =
-                        original_target_quality_map[original_t];
-                    if(!_is_target(instance_case, original_t)) {
-                        pb.tick();
-                        continue;
-                    }
-                    const auto & [F_var, data] =
-                        cases_contracted_data[case_id].emplace_back(
-                            model.add_column({std::make_pair(
-                                C_constr, -original_t_target_quality)}),
-                            compute_contracted_graph_data(
-                                instance, instance_case, budget, original_t,
-                                strong_arcs_map[original_t],
-                                useless_arcs_map[original_t], big_Ms,
-                                feasibility_tol, !no_pruning));
 
-                    for(const auto & [sqg, target_quality_gain, option] :
-                        original_vertex_options_map[original_t]) {
-                        const auto F_prime_t_var = F_prime_vars.emplace_back(
-                            model.add_column({std::make_pair(
-                                C_constr, -target_quality_gain)}));
-                        model.add_constraint(F_prime_t_var <= F_var);
-                        model.add_constraint(F_prime_t_var <=
-                                             data.target_big_M(option) *
-                                                 X_vars(option));
-                        // model.add_indicator_constraint(X_vars(option), false,
-                        //                                F_prime_t_var <= 0);
-                    }
-                    pb.tick();
+            // flow_benders, the master: the score of the case, a row that
+            // the columns of its f_t and f^i_t fill
+            const auto z_row = model.add_constraint(z(k) <= 0);
+            progress_bar<spdlog::level::info, 64> pb(
+                instance_case.graph().num_vertices());
+            for(const auto & original_t :
+                melon::vertices(instance_case.graph())) {
+                pb.tick();
+                if(!_is_target(instance_case, original_t)) continue;
+                // the flow f_t of the target, and an f^i_t, equal to f_t if
+                // i is bought and to 0 otherwise, for each option of the
+                // vertex, a target quality gain of 0 included: the callback
+                // walks f_gains with this same loop
+                const auto & [f_t, G_t] = targets[k].emplace_back(
+                    model.add_column({std::make_pair(
+                        z_row, -target_quality_map[original_t])}),
+                    compute_contracted_graph_data(
+                        instance, instance_case, budget, original_t,
+                        strong_arcs_map[original_t],
+                        useless_arcs_map[original_t], big_Ms, feasibility_tol,
+                        !no_pruning));
+                for(const auto & [source_gain, target_gain, i] :
+                    vertex_options_map[original_t]) {
+                    const auto f_ti = f_gains.emplace_back(model.add_column(
+                        {std::make_pair(z_row, -target_gain)}));
+                    model.add_constraint(f_ti <= f_t);
+                    if(indicator_constraints) {
+                        if constexpr(has_indicator_constraints<M>)
+                            model.add_indicator_constraint(x(i), false,
+                                                           f_ti <= 0);
+                    } else
+                        model.add_constraint(f_ti <=
+                                             G_t.target_big_M(i) * x(i));
                 }
             }
             std::size_t num_vertices = 0, num_arcs = 0;
-            for(const auto & [var, data] : cases_contracted_data[case_id]) {
-                num_vertices += data.graph.num_vertices();
-                num_arcs += data.graph.num_arcs();
+            for(const auto & [f_t, G_t] : targets[k]) {
+                num_vertices += G_t.graph.num_vertices();
+                num_arcs += G_t.graph.num_arcs();
             }
-            const auto num_graphs = static_cast<double>(std::max<std::size_t>(
-                cases_contracted_data[case_id].size(), 1));
+            const auto num_graphs = static_cast<double>(
+                std::max<std::size_t>(targets[k].size(), 1));
             preprocessing.emplace_back(
                 instance_case.name(),
                 _average_size(instance_case, strong_arcs_map),
@@ -171,124 +134,93 @@ struct flow_benders : public mip_solver_base {
             log_column<10>{"vertices per target", log_format::fixed(2)},
             log_column<10>{"arcs per target", log_format::fixed(2)});
 
-        auto get_cut_expression =
-            [&](const contracted_graph_data<instance_case_t<I>> & data,
-                const auto & current_solution, const auto & rho_values) {
-                return xsum(data.graph.vertices(),
-                            [&](auto && u) {
-                                return (data.source_quality_map[u] +
-                                        xsum(data.source_options_map[u],
-                                             [&](auto && p) {
-                                                 auto && [source_quality_gain,
-                                                          option] = p;
-                                                 return source_quality_gain *
-                                                        X_vars(option);
-                                             })) *
-                                       rho_values[u];
-                            }) +
-                       xsum(data.graph.arcs(), [&](auto && a) {
-                           return xsum(
-                               std::views::iota(std::size_t{0},
-                                                data.arc_options_map[a].size()),
-                               [&, a](std::size_t k) {
-                                   auto && [improved_prob, option] =
-                                       data.arc_options_map[a][k];
-                                   auto u = data.graph.arc_source(a);
-                                   auto v = data.graph.arc_target(a);
-                                   auto cai =
-                                       current_solution[option]
-                                           ? 0.0
-                                           : std::max(
-                                                 0.0,
-                                                 improved_prob * rho_values[v] -
-                                                     rho_values[u]);
-                                   return data.improvement_big_M(a, k) *
-                                          X_vars(option) * cai;
-                               });
-                       });
-            };
+        // The cut of a target: cut_{t,y}(x), with the potentials rho of y
+        auto cut = [&](const contracted_graph_data<instance_case_t<I>> & G_t,
+                       const auto & y, const auto & rho) {
+            return xsum(G_t.graph.vertices(),
+                        [&](auto && u) {
+                            return (G_t.source_quality_map[u] +
+                                    xsum(G_t.source_options_map[u],
+                                         [&](auto && gain) {
+                                             auto && [source_gain, i] = gain;
+                                             return source_gain * x(i);
+                                         })) *
+                                   rho[u];
+                        }) +
+                   xsum(G_t.graph.arcs(), [&](auto && a) {
+                       return xsum(
+                           std::views::iota(std::size_t{0},
+                                            G_t.arc_options_map[a].size()),
+                           [&, a](std::size_t n) {
+                               auto && [improved_probability, i] =
+                                   G_t.arc_options_map[a][n];
+                               auto u = G_t.graph.arc_source(a);
+                               auto v = G_t.graph.arc_target(a);
+                               auto sigma =
+                                   y[i] ? 0.0
+                                        : std::max(0.0, improved_probability *
+                                                                rho[v] -
+                                                            rho[u]);
+                               return G_t.improvement_big_M(a, n) * x(i) *
+                                      sigma;
+                           });
+                   });
+        };
+        auto seed_cuts = [&](const auto & y) {
+            for(auto && instance_case : instance.cases())
+                for(const auto & [f_t, G_t] : targets[instance_case.id()]) {
+                    const auto [flow, rho] = G_t.flow_and_potentials(y);
+                    model.add_constraint(f_t <= cut(G_t, y, rho));
+                }
+        };
+        // The search, step 1: the cuts of the scenario that buys nothing
+        seed_cuts(instance.create_option_map(false));
 
-        for(auto && instance_case : instance.cases()) {
-            for(auto && [var, data] :
-                cases_contracted_data[instance_case.id()]) {
-                auto && [opt, rho_values] = _compute_dual_flow(data, solution);
-                model.add_constraint(
-                    var <= get_cut_expression(data, solution, rho_values));
-            }
-        }
-
+        // The search, steps 2 to 4: the flows of a candidate y, the cut at y
+        // of each target whose f_t exceeds its flow, and y handed back
         std::size_t num_cuts = 0;
         model.set_candidate_solution_callback(
             [&](typename M::candidate_solution_callback_handle & handle) {
-                auto master_solution = handle.get_solution();
-                auto sol = melon::maps::function([&](option_t i) {
-                    return master_solution[X_vars(i)] > 0.5;
+                auto candidate = handle.get_solution();
+                auto y = melon::maps::function([&](const option_t i) {
+                    return _is_bought(candidate[x(i)]);
                 });
                 auto case_scores = instance.create_case_map(0.0);
                 const std::size_t num_cuts_before = num_cuts;
-                auto F_prime_var = F_prime_vars.begin();
+                auto f_gain = f_gains.begin();
                 for(auto && instance_case : instance.cases()) {
-                    const auto case_id = instance_case.id();
-                    for(const auto & [var, data] :
-                        cases_contracted_data[case_id]) {
-                        auto && [opt, rho_values] =
-                            _compute_dual_flow(data, sol);
+                    const case_id_t k = instance_case.id();
+                    for(const auto & [f_t, G_t] : targets[k]) {
+                        const auto [flow, rho] = G_t.flow_and_potentials(y);
                         double quality =
-                            instance_case.target_quality_map()[data.original_t];
-                        for(const auto & [sqg, target_quality_gain, option] :
+                            instance_case.target_quality_map()[G_t.original_t];
+                        for(const auto & [source_gain, target_gain, i] :
                             instance_case
-                                .vertex_options_map()[data.original_t]) {
-                            master_solution[*F_prime_var++] =
-                                sol[option] ? opt : 0.0;
-                            if(sol[option]) quality += target_quality_gain;
+                                .vertex_options_map()[G_t.original_t]) {
+                            candidate[*f_gain++] = y[i] ? flow : 0.0;
+                            if(y[i]) quality += target_gain;
                         }
-                        case_scores[case_id] += quality * opt;
-                        if(std::exchange(master_solution[var], opt) - opt <=
-                           feasibility_tol * opt)
+                        case_scores[k] += quality * flow;
+                        if(std::exchange(candidate[f_t], flow) - flow <=
+                           feasibility_tol * flow)
                             continue;
                         ++num_cuts;
-                        handle.add_lazy_constraint(
-                            var <= get_cut_expression(data, sol, rho_values));
+                        handle.add_lazy_constraint(f_t <= cut(G_t, y, rho));
                     }
-                    master_solution[C_vars(case_id)] = case_scores[case_id];
                 }
-                // The solver drops a candidate that receives a cut and may
-                // never propose its options again, although they are a
-                // solution: it gets them back with their flows and scores.
-                if(num_cuts == num_cuts_before) return;
-                for(auto && o : instance.options())
-                    master_solution[X_vars(o)] = sol[o];
-                formula.set_values(master_solution, case_scores);
-                handle.add_solution(master_solution);
+                if(num_cuts > num_cuts_before)
+                    _hand_back(handle, candidate, instance, x, y, z,
+                               case_scores, formula);
             });
 
-        if(mip_start) {
-            instance_solution_t<I> mip_start_solution =
-                _mip_start_solution(instance);
-            model.add_mip_start(
-                std::views::transform(instance.options(), [&](auto o) {
-                    return std::make_pair(X_vars(o), mip_start_solution[o]);
-                }));
-
-            for(auto && instance_case : instance.cases()) {
-                for(auto && [var, data] :
-                    cases_contracted_data[instance_case.id()]) {
-                    auto && [opt, rho_values] =
-                        _compute_dual_flow(data, mip_start_solution);
-                    model.add_constraint(
-                        var <= get_cut_expression(data, mip_start_solution,
-                                                  rho_values));
-                }
-            }
-        }
+        // The search, step 1: the cuts of the MIP start
+        if(const auto start = _add_mip_start(model, instance, x))
+            seed_cuts(*start);
 
         auto [has_solution, report] = _solve(model, sw);
         report.stats.emplace_back("lazy_constraints", num_cuts);
         if(!has_solution) return {_fallback_solution(instance, budget), report};
-        const auto master_solution = model.get_solution();
-        for(const auto & i : instance.options())
-            solution[i] = (master_solution[X_vars(i)] > 0.5);
-        return {solution, report};
+        return {_bought_options(instance, model.get_solution(), x), report};
     }
 };
 

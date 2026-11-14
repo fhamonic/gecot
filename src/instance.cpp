@@ -1,5 +1,9 @@
 #include "instance.hpp"
 
+#include <algorithm>
+#include <stdexcept>
+#include <utility>
+
 // InstanceCase
 
 [[nodiscard]] InstanceCase::case_id_t InstanceCase::id() const noexcept {
@@ -124,12 +128,18 @@ Instance::conflict_sets() const noexcept {
     return _options_names.size();
 }
 void Instance::set_cost_dimensions(std::vector<std::string> names) {
-    assert(num_options() == 0 && !names.empty());
+    if(num_options() != 0)
+        throw std::logic_error(
+            "the cost dimensions are set before the first option");
+    if(names.empty())
+        throw std::invalid_argument("there is at least one cost dimension");
     _cost_dimensions_names = std::move(names);
 }
 gecot::option_t Instance::add_option(std::string identifier,
                                      const std::vector<double> & costs) {
-    assert(!_option_name_to_id_map.contains(identifier));
+    if(_option_name_to_id_map.contains(identifier))
+        throw std::invalid_argument("option id '" + identifier +
+                                    "' appears multiple times");
     if(costs.size() != num_cost_dimensions())
         throw std::invalid_argument(
             "option '" + identifier + "' has " + std::to_string(costs.size()) +
@@ -142,6 +152,16 @@ gecot::option_t Instance::add_option(std::string identifier,
 }
 void Instance::add_conflict_set(std::string name,
                                 std::vector<gecot::option_t> options) {
+    // a row of the models: an option twice would count 2 in it, and an
+    // unknown one is read out of range
+    for(auto it = options.begin(); it != options.end(); ++it) {
+        if(!contains_option(*it))
+            throw std::invalid_argument("conflict set '" + name +
+                                        "' holds an unknown option");
+        if(std::find(options.begin(), it, *it) != it)
+            throw std::invalid_argument("conflict set '" + name +
+                                        "' holds an option twice");
+    }
     _conflict_sets_names.emplace_back(std::move(name));
     _conflict_sets.emplace_back(std::move(options));
 }
@@ -159,7 +179,9 @@ gecot::option_t Instance::option_from_name(const std::string & name) const {
         throw std::invalid_argument("unknown option id '" + name + "'");
     return _option_name_to_id_map.at(name);
 }
-void Instance::set_criterion(criterion_formula && c) { _criterion = c; }
+void Instance::set_criterion(criterion_formula && c) {
+    _criterion = std::move(c);
+}
 void Instance::set_criterion(const criterion_formula & c) { _criterion = c; }
 gecot::case_id_t Instance::case_id_from_name(const std::string & name) const {
     for(auto && instance_case : _cases) {

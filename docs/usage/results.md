@@ -69,6 +69,8 @@ $ gecot optimize flow_mip three-woods.json 7 -o solution.json
 
 ```json
 {
+    "gecot_version":  "2.0",
+    "format_version": 1,
     "instance_path":  "/home/user/three-woods.json",
     "algorithm":  "flow_mip",
     "algorithm_parameters": {
@@ -84,7 +86,8 @@ $ gecot optimize flow_mip three-woods.json 7 -o solution.json
         "all-targets":           false,
         "no-pruning":            false,
         "big-m":                 "knapsack_bnb",
-        "lp-relaxation":         false
+        "lp-relaxation":         false,
+        "indicator-constraints": false
     },
     "command_parameters": {
         "reformulation":        "trivial",
@@ -93,6 +96,7 @@ $ gecot optimize flow_mip three-woods.json 7 -o solution.json
     },
     "computation_time_ms":  2,
     "initial_score":  18.4,
+    "base_score":     18.4,
     "initial_pc_num": {
         "squirrel": 18.4
     },
@@ -103,6 +107,7 @@ $ gecot optimize flow_mip three-woods.json 7 -o solution.json
     },
     "solution_cost":  7,
     "feasible":       true,
+    "guaranteed_share": 99.9,
     "solution": {
         "hedgerow":   1,
         "underpass":  1,
@@ -123,17 +128,23 @@ $ gecot optimize flow_mip three-woods.json 7 -o solution.json
 
 | Field | Meaning |
 |---|---|
+| `gecot_version` | the version of GECOT that wrote the file |
+| `format_version` | the version of this format, an integer: it is raised when a field changes its meaning or goes, and a new field leaves it as it is |
 | `instance_path` | the absolute path of the instance file |
 | `algorithm` | the algorithm |
 | `algorithm_parameters` | every [parameter](../reference/parameters.md) of the algorithm under its long name, with the value used, the defaults included: `true` or `false` for a switch, a number, a text, or `null` for a parameter that has no value |
 | `command_parameters` | in the same way, the parameters of `gecot optimize` that change the instance given to the algorithm: `--reformulation`, `--reformulation-params` and `--no-merging` |
 | `computation_time_ms` | the time of the algorithm, in milliseconds |
 | `initial_score`, `solution_score` | the criterion without options and with the solution |
-| `initial_pc_num`, `solution_pc_num` | the score of each case, without options and with the solution |
+| `base_score` | the criterion with only the options bought statically, the $s_0$ of the [guaranteed share](#the-result) |
+| `initial_pc_num`, `solution_pc_num` | the score of each case, without options and with the solution, including the cases that the criterion does not read |
 | `budget`, `solution_cost` | the budget and the cost of the solution; with several costs, an object with a number per dimension, as `{"area": 4, "money": 9}` |
-| `feasible` | `true` if the solution fits every budget and buys at most one option of each conflict set, as checked by the warnings below |
+| `feasible` | `true` if the solution fits every budget and buys at most one option of each conflict set, as checked by the warnings below. A cost counts as within its budget up to a relative $10^{-6}$ of the budget, or of 1 under a smaller budget; this margin is the one of the command and does not follow `-t`, so that a run with a larger `-t` can be reported as not feasible |
+| `guaranteed_share` | the guaranteed share, in %, as the text result prints it after the upper bound: it is computed from the larger of `best_bound` and `solution_score`. Absent when the algorithm proves no bound, when the solution is not feasible, and when that bound is not above `base_score` |
 | `solution` | for each option of the instance, 1 if it is bought and 0 otherwise |
-| `algorithm_report` | the status and what the algorithm reports about its run |
+| `algorithm_report` | the status and what the algorithm reports about its run; a value that is not a finite number is left out |
+
+The names of the options, of the cases and of the cost dimensions are written as they are in the instance, with their quotes, backslashes and control characters escaped. The file is UTF-8 when they are: a name read from a CSV file in another encoding keeps its bytes, and the file is then to be read in that encoding.
 
 The `algorithm_report` depends on the algorithm:
 
@@ -142,11 +153,11 @@ The `algorithm_report` depends on the algorithm:
 | `status` | all | see [above](#status) |
 | `best_bound` | the algorithms that prove a bound | the upper bound, as the solver or the relaxation gives it |
 | `gap` | same | (bound − score) / score |
-| `variables`, `constraints`, `nonzeros` | `flow_mip`, the Benders decompositions | the size of the model given to the solver; `path_lp` and `tree_lp` give the first two for their master |
+| `variables`, `constraints`, `nonzeros` | `flow_mip`, the Benders decompositions | the size of the model given to the solver; `path_lp` and `tree_lp` give the first two for their master. With `--indicator-constraints`, the indicator constraints are not counted |
 | `model_build_time_ms` | `flow_mip`, the Benders decompositions | the time before the solver starts, preprocessing included |
 | `nodes` | same, when the solver reports it | the nodes of the branch and bound |
-| `lazy_constraints` | the Benders decompositions | the cuts added during the search |
-| `sources`, `root_rounds`, `root_cuts`, `root_relaxation_value` | `multiflow_benders` | the source and target pairs, and the [cuts on the relaxation](../formulations/benders.md#multiflow_benders-cuts-per-source) |
+| `lazy_constraints` | the Benders decompositions | the cuts handed to the solver during the search. One that the candidate violates by at most the solver's tolerance is counted too, although CPLEX and COPT are then not given it |
+| `sources`, `root_rounds`, `root_cuts`, `root_relaxation_value` | `multiflow_benders` | the source and target pairs, and the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation): the relaxations solved before the search, the cuts they added, and the value of the last one |
 | `iterations`, `relaxation_value`, `pool_columns`, `evicted_columns` | `path_lp`, `tree_lp` | the rounds of the column generation and the value of the relaxation at the end |
 | `pairs`, `searches` or `columns` | `path_lp` | the pairs priced, and the searches or the columns of its pricing |
 | `reformulation_...`, `remaining_options` | with `--reformulation path_lp` | the report of the path relaxation, and the options it left |
@@ -155,7 +166,7 @@ A heuristic reports only its status. The file is also a valid [`--mip-start`](op
 
 ### CSV
 
-`--output-csv <file>` writes only the selection, one line per option of the instance:
+`--output-csv <file>` writes only the selection, one line per option of the instance, its name between quotes and a quote of the name doubled:
 
 ```text
 option_id,value

@@ -3,11 +3,11 @@
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
-#include <cstdint>
 #include <limits>
 #include <optional>
-#include <queue>
 #include <ranges>
+#include <tuple>
+#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -23,6 +23,8 @@
 
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
+#include "gecot/indices/pc_num.hpp"
+#include "gecot/preprocessing/compute_big_M_map.hpp"
 #include "gecot/preprocessing/compute_contracted_graph.hpp"
 
 #include "gecot/solvers/mip_solver_base.hpp"
@@ -31,315 +33,364 @@
 namespace gecot {
 namespace solvers {
 
-// Benders decomposition with a flow per source and target.
-//
-// Buying the options X within the budgets and the conflict sets, the quality
-// that reaches a target t is
-//     F_t(X) = q_t(X) + Σ_{s≠t} q_s(X) P_st(X),
-// the source qualities with their gains, each times the probability of its
-// most reliable path to t; t scores (tq_t + Σ_{o∈X} Δtq_to) F_t(X) and the
-// criterion φ combines the cases' scores. On the graph contracted for t,
-// the part of a source s is the optimum at x, the indicator of X, of
-//
-//     max  f
-//     s.t. Σ_{a∈δ⁺(u)} φ_a + [u = t] f
-//              <= Σ_{a∈δ⁻(u)} p_a φ_a + [u = s] q_s(x)    ρ_u   ∀ vertex u
-//          φ_a <= m_sa x_o                               σ_a   ∀ a improved by
-//          o φ, f >= 0
-//
-// on the arcs A_s that a most reliable path from s to t can take with some
-// options, where m_sa = q_s^max P^max(s, u) bounds what s brings to a = (u, w):
-// its quality with every gain times the probability of its most reliable
-// path to u with every option. Its dual does not depend on x: any ρ with
-// ρ_t = 1 and ρ_u >= p_a ρ_w on the arcs of A_s without option gives
-//     F_t <= cut_ρ(x) = q_t(x) + Σ_s [ ρ^s_s q_s(x)
-//                         + Σ_{a=(u,w)∈A_s improved by o}
-//                               m_sa (p_a ρ^s_w - ρ^s_u)⁺ x_o ]
-// for every X. flow_benders' cut has one ρ and one big-M per arc for all the
-// sources; here an option pays for a source only what that source can bring
-// to its arcs. The master is flow_benders':
-//
-//     max  φ(z)
-//     s.t. z_k <= Σ_{t∈k} (tq_t F_t + Σ_o Δtq_to F'_to)
-//          F'_to <= F_t,  F'_to <= M_t x_o
-//          F_t <= cut_ρ(x)               for each ρ separated
-//          Σ_o c_{o,r} x_o <= B_r,  Σ_{o∈S} x_o <= 1,  x binary
-//
-// The cut of a point x̄, fractional or not, takes for each source the ρ of
-// its largest flow at x̄. It is separated first on the linear relaxation,
-// until its optimum violates no cut, then at the solver's candidates.
+// The decomposition of docs/formulations/benders.md with a flow per source
+// and target. Each block of solve() builds what the section it names states.
 struct multiflow_benders : public mip_solver_base {
     // for comparison: no cut on the linear relaxation before the search, and
     // each optimum of the relaxation separated itself, without the center
     bool no_root_cuts = false;
     bool no_in_out = false;
+    // A cut is added to the relaxation when f_t exceeds it by more than
+    // this, relative and absolute. It does not follow feasibility_tol.
+    static constexpr double root_cut_tol = 1e-7;
 
-    // The graph contracted for a target t, each improvement an arc of its
-    // own, and for each source the arcs that can carry its flow to t.
+    // The graph G_t of a target t, each improved copy an arc of its own, and
+    // for each source the arcs that can carry its flow to t.
     struct target_block {
-        using vertex = std::uint32_t;
-        using arc_id = std::uint32_t;
+        using graph_t = melon::static_digraph;
+        using vertex = melon::vertex_t<graph_t>;
+        using arc = melon::arc_t<graph_t>;
+        template <typename V>
+        using vertex_map = melon::vertex_map_t<graph_t, V>;
+        template <typename V>
+        using arc_map = melon::arc_map_t<graph_t, V>;
         static constexpr double infinity =
             std::numeric_limits<double>::infinity();
-        static constexpr option_t no_option =
-            std::numeric_limits<option_t>::max();
+        // the relative slack of the test of A_s against the best path
+        // without option
+        static constexpr double path_tie = 1e-9;
+        // In the search of a flow, relative: a label improves by more than
+        // label_tie, an arc is full within arc_full of its capacity, and a
+        // flow under no_flow times the supply is none.
+        static constexpr double label_tie = 1e-12, arc_full = 1e-11,
+                                no_flow = 1e-12;
+        // Past these, the search gives up and the source takes the
+        // fallback: the steps of a search of labels and the arcs of a path,
+        // per vertex of the graph, and the pushes.
+        static constexpr std::size_t max_label_steps = 1000, max_path_arcs = 4,
+                                     max_pushes = 100000;
+        using reversed_traits = detail::pc_num_dijkstra_traits<
+            std::decay_t<decltype(melon::views::reverse(
+                std::declval<const graph_t &>()))>,
+            double>;
 
-        struct arc {
-            vertex tail, head;
-            double probability;
-            option_t option;  // no_option: there without option
-        };
-        // A_s, with m_sa for its improved arcs and infinity for the others
+        // A_s, and its improved copies with their m_sa
         struct source {
             vertex s;
-            std::vector<arc_id> arcs;
-            std::vector<double> big_Ms;
+            std::vector<arc> arcs;
+            std::vector<std::pair<arc, double>> improved_copies;
         };
-        // F_t <= constant + Σ_o coefficients[o] x_o for every X; value is
-        // the flow that reaches t at the point separated
+        // f_t <= constant + Σ_i coefficients[i] x_i in every scenario; value
+        // is the flow that reaches t at the point separated. When the flow
+        // of a source did not settle, it is a bound on that flow at a
+        // fractional point, and still the flow at a scenario.
         struct cut {
             double value = 0, constant = 0;
             std::vector<double> coefficients;
         };
 
         case_id_t case_id;
-        vertex t;
-        double target_quality;  // tq_t
+        double target_quality;  // q_t
         std::vector<std::pair<double, option_t>> target_quality_gains;
-        std::vector<double> qualities;  // q_u
-        std::vector<std::vector<std::pair<double, option_t>>> quality_gains;
-        std::vector<arc> arcs;
-        std::vector<std::vector<arc_id>> in_arcs, out_arcs;
+        graph_t graph;
+        vertex t;
+        vertex_map<double> source_quality_map;  // w_u
+        vertex_map<std::vector<std::pair<double, option_t>>> source_options_map;
+        // of an improved copy: its probability with its option
+        arc_map<double> probability_map;
+        arc_map<std::optional<option_t>> option_map;
         std::vector<source> sources;
 
+        // G_t: the graph of original_t as compute_contracted_flow_graph
+        // gives it. Its vertices are renumbered here.
         template <case_c C>
-        explicit target_block(const contracted_graph_data<C> & data)
-            : case_id(data.instance_case.get().id())
-            , t(static_cast<vertex>(data.t))
-            , target_quality(data.instance_case.get()
-                                 .target_quality_map()[data.original_t])
-            , in_arcs(data.graph.num_vertices())
-            , out_arcs(data.graph.num_vertices()) {
-            for(const auto & [sqg, tqg, o] :
-                data.instance_case.get().vertex_options_map()[data.original_t])
-                if(tqg > 0) target_quality_gains.emplace_back(tqg, o);
-            for(const auto & u : melon::vertices(data.graph)) {
-                qualities.push_back(data.source_quality_map[u]);
-                quality_gains.push_back(data.source_options_map[u]);
-            }
-            auto add_arc = [this](const vertex u, const vertex w,
-                                  const double p, const option_t o) {
-                out_arcs[u].push_back(static_cast<arc_id>(arcs.size()));
-                in_arcs[w].push_back(static_cast<arc_id>(arcs.size()));
-                arcs.push_back({u, w, p, o});
-            };
-            for(const auto & a : melon::arcs(data.graph)) {
-                const auto u = static_cast<vertex>(data.graph.arc_source(a));
-                const auto w = static_cast<vertex>(data.graph.arc_target(a));
-                if(data.probability_map[a] > 0)
-                    add_arc(u, w, data.probability_map[a], no_option);
-                for(const auto & [p, o] : data.arc_options_map[a])
-                    add_arc(u, w, p, o);
-            }
+        target_block(const C & instance_case, const auto & original_t,
+                     contracted_flow_graph && G_t)
+            : case_id(instance_case.id())
+            , target_quality(instance_case.target_quality_map()[original_t]) {
+            for(const auto & [source_gain, target_gain, i] :
+                instance_case.vertex_options_map()[original_t])
+                if(target_gain > 0)
+                    target_quality_gains.emplace_back(target_gain, i);
+            const auto vertex_cmp = [](auto && u, auto && v) { return u < v; };
+            t = static_cast<vertex>(std::ranges::count_if(
+                melon::vertices(G_t.graph),
+                [&](auto && u) { return vertex_cmp(u, G_t.t); }));
+            std::tie(graph, source_quality_map, source_options_map,
+                     probability_map, option_map) =
+                melon::make_static_digraph(
+                    G_t.graph, vertex_cmp,
+                    std::tie(G_t.source_quality_map, G_t.source_options_map),
+                    std::tie(G_t.probability_map, G_t.improvement_option_map));
         }
 
-        // the probabilities of the most reliable paths to root, or from it,
-        // with every option or none
-        std::vector<double> reach(const vertex root, const bool to_root,
-                                  const bool with_options) const {
-            std::vector<double> probabilities(qualities.size(), 0.0);
-            std::priority_queue<std::pair<double, vertex>> heap;
-            probabilities[root] = 1;
-            heap.emplace(1.0, root);
-            while(!heap.empty()) {
-                const auto [p, u] = heap.top();
-                heap.pop();
-                if(p < probabilities[u]) continue;
-                for(const arc_id a : to_root ? in_arcs[u] : out_arcs[u]) {
-                    if(!with_options && arcs[a].option != no_option) continue;
-                    const vertex w = to_root ? arcs[a].tail : arcs[a].head;
-                    const double q = p * arcs[a].probability;
-                    if(q <= probabilities[w]) continue;
-                    probabilities[w] = q;
-                    heap.emplace(q, w);
-                }
-            }
-            return probabilities;
-        }
-
-        // An arc a = (u, w) is in A_s if the best path of s through it, with
+        // An arc a = (u, v) is in A_s if the best path of s through it, with
         // every option, is as reliable as its best path without option: a
-        // most reliable path of s is at least that reliable whatever X.
+        // most reliable path of s is at least that reliable in every
+        // scenario.
         void compute_sources() {
-            const auto base_to_t = reach(t, true, false);
-            const auto best_to_t = reach(t, true, true);
-            for(vertex s = 0; s < qualities.size(); ++s) {
-                double best_quality = qualities[s];
-                for(const auto & [gain, o] : quality_gains[s])
-                    best_quality += gain;
+            const auto reversed_graph = melon::views::reverse(graph);
+            // the probabilities of connection to t, without option and with
+            // every one
+            auto base_to_t = melon::create_vertex_map<double>(graph, 0.0);
+            for(const auto & [u, probability] : melon::dijkstra(
+                    reversed_traits{}, reversed_graph,
+                    melon::maps::function([this](const arc & a) {
+                        return option_map[a] ? 0.0 : probability_map[a];
+                    }),
+                    t))
+                base_to_t[u] = probability;
+            auto best_to_t = melon::create_vertex_map<double>(graph, 0.0);
+            for(const auto & [u, probability] : melon::dijkstra(
+                    reversed_traits{}, reversed_graph, probability_map, t))
+                best_to_t[u] = probability;
+
+            auto from_s = melon::dijkstra(
+                detail::pc_num_dijkstra_traits<graph_t, double>{}, graph,
+                probability_map);
+            auto best_from_s = melon::create_vertex_map<double>(graph);
+            for(const vertex s : melon::vertices(graph)) {
+                double best_quality = source_quality_map[s];
+                for(const auto & [source_gain, i] : source_options_map[s])
+                    best_quality += source_gain;
                 if(s == t || best_quality <= 0 || best_to_t[s] <= 0) continue;
-                const auto best_from_s = reach(s, false, true);
+                best_from_s.fill(0.0);
+                from_s.reset().add_source(s);
+                for(const auto & [u, probability] : from_s)
+                    best_from_s[u] = probability;
                 source & source_s = sources.emplace_back(s);
-                for(arc_id a = 0; a < arcs.size(); ++a) {
-                    const double through = best_from_s[arcs[a].tail] *
-                                           arcs[a].probability *
-                                           best_to_t[arcs[a].head];
-                    if(through <= 0 || through < base_to_t[s] * (1 - 1e-9))
+                for(const arc a : melon::arcs(graph)) {
+                    const vertex u = melon::arc_source(graph, a);
+                    const double through =
+                        best_from_s[u] * probability_map[a] *
+                        best_to_t[melon::arc_target(graph, a)];
+                    if(through <= 0 || through < base_to_t[s] * (1 - path_tie))
                         continue;
                     source_s.arcs.push_back(a);
-                    source_s.big_Ms.push_back(
-                        arcs[a].option == no_option
-                            ? infinity
-                            : best_quality * best_from_s[arcs[a].tail]);
+                    if(option_map[a])
+                        source_s.improved_copies.emplace_back(
+                            a, best_quality * best_from_s[u]);
                 }
             }
         }
 
-        // The cut of the point x. For each source, its largest flow to t at
-        // x by highest-gain augmenting paths: ρ_u is the gain of the best
-        // path from u to t in the residual graph, and the ρ of the last one
-        // are an optimal dual solution. At the indicator of X one path
-        // takes the whole supply, so value is F_t(X).
-        cut separate(const std::vector<double> & x) const {
-            const std::size_t n = qualities.size();
-            cut result{qualities[t], qualities[t],
-                       std::vector<double>(x.size(), 0.0)};
-            for(const auto & [gain, o] : quality_gains[t]) {
-                result.coefficients[o] += gain;
-                result.value += gain * x[o];
-            }
-            std::vector<double> capacities(arcs.size()), flows(arcs.size()),
-                rho(n);
-            std::vector<char> in_A(arcs.size(), 0), queued(n, 0);
+        // What the searches of a separation reuse from a source to the next.
+        struct flow_search {
+            // of an arc without option: infinity, whatever the source
+            arc_map<double> capacities;
+            arc_map<double> flows;
+            arc_map<char> in_A_s;
+            // 0 outside the vertices of queue, which the next search resets
+            vertex_map<double> rho;
+            vertex_map<char> queued;
             // the first arc of the best residual path from a vertex to t,
             // and whether it is taken forward
-            std::vector<std::pair<arc_id, bool>> next(n);
+            vertex_map<std::pair<arc, bool>> next;
             std::vector<vertex> queue;
 
+            explicit flow_search(const graph_t & graph)
+                : capacities(melon::create_arc_map<double>(graph, infinity))
+                , flows(melon::create_arc_map<double>(graph))
+                , in_A_s(melon::create_arc_map<char>(graph, 0))
+                , rho(melon::create_vertex_map<double>(graph, 0.0))
+                , queued(melon::create_vertex_map<char>(graph, 0))
+                , next(melon::create_vertex_map<std::pair<arc, bool>>(graph)) {}
+        };
+
+        // The largest flow of the source to t at x̂, by highest-gain
+        // augmenting paths: returns what reaches t, and leaves in search.rho
+        // an optimal dual solution, ρ_u being the gain of the best path from
+        // u to t in the last residual graph. If the searches give up, ρ is
+        // the fallback's and the value returned a bound, exact at a scenario.
+        double _largest_flow(const source & source_s, const double supply,
+                             const std::vector<double> & x_hat,
+                             flow_search & search) const {
+            auto & [capacities, flows, in_A_s, rho, queued, next, queue] =
+                search;
+            const std::size_t n = graph.num_vertices();
+            const vertex s = source_s.s;
+            for(const arc a : source_s.arcs) {
+                in_A_s[a] = 1;
+                flows[a] = 0;
+            }
+            for(const auto & [a, big_M] : source_s.improved_copies)
+                capacities[a] = big_M * x_hat[option_map[a].value()];
+            const double negligible = no_flow * supply;
+            // Label-correcting from t: a residual arc taken backward has a
+            // gain above 1, which rules Dijkstra out. False if the labels do
+            // not settle.
+            const auto label = [&] {
+                for(const vertex v : queue) rho[v] = 0;
+                rho[t] = 1;
+                queue.assign(1, t);
+                for(std::size_t pos = 0; pos < queue.size(); ++pos) {
+                    if(pos > max_label_steps * n) {
+                        queued.fill(0);
+                        return false;
+                    }
+                    const vertex v = queue[pos];
+                    queued[v] = 0;
+                    auto improve = [&](const vertex u, const double gain,
+                                       const arc a, const bool forward) {
+                        if(gain <= rho[u] * (1 + label_tie)) return;
+                        rho[u] = gain;
+                        next[u] = {a, forward};
+                        if(queued[u]) return;
+                        queued[u] = 1;
+                        queue.push_back(u);
+                    };
+                    // infinity first: inf - flow <= arc_full inf holds, and
+                    // would fill the arcs without option
+                    for(const arc a : melon::in_arcs(graph, v))
+                        if(in_A_s[a] && (capacities[a] == infinity ||
+                                         capacities[a] - flows[a] >
+                                             arc_full * capacities[a]))
+                            improve(melon::arc_source(graph, a),
+                                    probability_map[a] * rho[v], a, true);
+                    for(const arc a : melon::out_arcs(graph, v))
+                        if(in_A_s[a] && flows[a] > negligible)
+                            improve(melon::arc_target(graph, a),
+                                    rho[v] / probability_map[a], a, false);
+                }
+                return true;
+            };
+            double remaining = supply, arrived = 0;
+            bool settled = true;
+            for(std::size_t pushes = 0;; ++pushes) {
+                settled = label();
+                if(!settled || remaining <= negligible || rho[s] <= 0) break;
+                // the most the path takes, in units leaving s
+                double amount = remaining, gain = 1;
+                std::size_t length = 0;
+                for(vertex u = s; u != t && settled;
+                    settled = ++length <= max_path_arcs * n) {
+                    const auto [a, forward] = next[u];
+                    if(forward) {
+                        amount =
+                            std::min(amount, (capacities[a] - flows[a]) / gain);
+                        gain *= probability_map[a];
+                        u = melon::arc_target(graph, a);
+                    } else {
+                        amount = std::min(amount,
+                                          flows[a] * probability_map[a] / gain);
+                        gain /= probability_map[a];
+                        u = melon::arc_source(graph, a);
+                    }
+                }
+                if(!settled || pushes == max_pushes) {
+                    settled = false;
+                    break;
+                }
+                remaining -= amount;
+                // whether the push changed the arcs that a label can take in
+                // the residual graph: it took one backward, or filled one
+                bool changed = false;
+                for(vertex u = s; u != t;) {
+                    const auto [a, forward] = next[u];
+                    if(forward) {
+                        flows[a] += amount;
+                        changed = changed || (capacities[a] != infinity &&
+                                              capacities[a] - flows[a] <=
+                                                  arc_full * capacities[a]);
+                        amount *= probability_map[a];
+                        u = melon::arc_target(graph, a);
+                    } else {
+                        amount /= probability_map[a];
+                        flows[a] -= amount;
+                        changed = true;
+                        u = melon::arc_source(graph, a);
+                    }
+                }
+                arrived += amount;
+                // The labels are then those of the next search: an arc that
+                // received flow gives its head, taken backward, the label it
+                // already has.
+                if(!changed && remaining <= negligible) break;
+            }
+            if(!settled) {
+                // The ρ of the arcs of A_s open at x̂, without any flow:
+                // feasible too. At a scenario they are the probabilities of
+                // connection, so the value returned stays the true flow: the
+                // callback hands it to the solver as the score of the
+                // candidate.
+                for(const vertex v : queue) rho[v] = 0;
+                queue.clear();
+                for(const auto & [u, probability] : melon::dijkstra(
+                        reversed_traits{}, melon::views::reverse(graph),
+                        melon::maps::function([&](const arc & a) {
+                            return in_A_s[a] && capacities[a] > 0
+                                       ? probability_map[a]
+                                       : 0.0;
+                        }),
+                        t)) {
+                    rho[u] = probability;
+                    queue.push_back(u);
+                }
+                arrived = rho[s] * supply;
+            }
+            for(const arc a : source_s.arcs) in_A_s[a] = 0;
+            return arrived;
+        }
+
+        // The cut of the point x̂: for each source, its largest flow to t at
+        // x̂ and the dual solution that comes with it. At a scenario y one
+        // path takes the whole supply, so value is f_t(y).
+        cut separate(const std::vector<double> & x_hat) const {
+            cut result{source_quality_map[t], source_quality_map[t],
+                       std::vector<double>(x_hat.size(), 0.0)};
+            for(const auto & [source_gain, i] : source_options_map[t]) {
+                result.coefficients[i] += source_gain;
+                result.value += source_gain * x_hat[i];
+            }
+            flow_search search(graph);
+            const auto & rho = search.rho;
             for(const source & source_s : sources) {
                 const vertex s = source_s.s;
-                double supply = qualities[s];
-                for(const auto & [gain, o] : quality_gains[s])
-                    supply += gain * x[o];
-                for(std::size_t k = 0; k < source_s.arcs.size(); ++k) {
-                    const arc_id a = source_s.arcs[k];
-                    in_A[a] = 1;
-                    flows[a] = 0;
-                    capacities[a] =
-                        arcs[a].option == no_option
-                            ? infinity
-                            : source_s.big_Ms[k] * x[arcs[a].option];
-                }
-                const double negligible = 1e-12 * supply;
-                // Label-correcting from t: a residual arc taken backward has
-                // a gain above 1, which rules Dijkstra out. False if the
-                // labels do not settle.
-                const auto label = [&] {
-                    std::ranges::fill(rho, 0.0);
-                    rho[t] = 1;
-                    queue.assign(1, t);
-                    for(std::size_t i = 0; i < queue.size(); ++i) {
-                        if(i > 1000 * n) {
-                            std::ranges::fill(queued, 0);
-                            return false;
-                        }
-                        const vertex w = queue[i];
-                        queued[w] = 0;
-                        auto improve = [&](const vertex u, const double gain,
-                                           const arc_id a, const bool forward) {
-                            if(gain <= rho[u] * (1 + 1e-12)) return;
-                            rho[u] = gain;
-                            next[u] = {a, forward};
-                            if(queued[u]) return;
-                            queued[u] = 1;
-                            queue.push_back(u);
-                        };
-                        // infinity first: inf - flow <= 1e-11 inf holds, and
-                        // would saturate the arcs without option
-                        for(const arc_id a : in_arcs[w])
-                            if(in_A[a] && (capacities[a] == infinity ||
-                                           capacities[a] - flows[a] >
-                                               1e-11 * capacities[a]))
-                                improve(arcs[a].tail,
-                                        arcs[a].probability * rho[w], a, true);
-                        for(const arc_id a : out_arcs[w])
-                            if(in_A[a] && flows[a] > negligible)
-                                improve(arcs[a].head,
-                                        rho[w] / arcs[a].probability, a, false);
-                    }
-                    return true;
-                };
-                double remaining = supply, arrived = 0;
-                bool settled = true;
-                for(std::size_t pushes = 0;; ++pushes) {
-                    settled = label();
-                    if(!settled || remaining <= negligible || rho[s] <= 0)
-                        break;
-                    // the most the path takes, in units leaving s
-                    double amount = remaining, gain = 1;
-                    std::size_t length = 0;
-                    for(vertex u = s; u != t && settled;
-                        settled = ++length <= 4 * n) {
-                        const auto [a, forward] = next[u];
-                        if(forward) {
-                            amount = std::min(
-                                amount, (capacities[a] - flows[a]) / gain);
-                            gain *= arcs[a].probability;
-                            u = arcs[a].head;
-                        } else {
-                            amount = std::min(
-                                amount, flows[a] * arcs[a].probability / gain);
-                            gain /= arcs[a].probability;
-                            u = arcs[a].tail;
-                        }
-                    }
-                    if(!settled || pushes == 100000) {
-                        settled = false;
-                        break;
-                    }
-                    remaining -= amount;
-                    for(vertex u = s; u != t;) {
-                        const auto [a, forward] = next[u];
-                        if(forward) {
-                            flows[a] += amount;
-                            amount *= arcs[a].probability;
-                            u = arcs[a].head;
-                        } else {
-                            amount /= arcs[a].probability;
-                            flows[a] -= amount;
-                            u = arcs[a].tail;
-                        }
-                    }
-                    arrived += amount;
-                }
-                if(!settled) {
-                    // the ρ with every arc of A_s free: feasible too, and
-                    // the options then pay nothing for s
-                    for(const arc_id a : source_s.arcs) {
-                        flows[a] = 0;
-                        capacities[a] = infinity;
-                    }
-                    label();
-                    arrived = rho[s] * supply;
-                }
-                result.value += arrived;
-                result.constant += rho[s] * qualities[s];
-                for(const auto & [gain, o] : quality_gains[s])
-                    result.coefficients[o] += rho[s] * gain;
-                for(std::size_t k = 0; k < source_s.arcs.size(); ++k) {
-                    const arc & a = arcs[source_s.arcs[k]];
-                    in_A[source_s.arcs[k]] = 0;
-                    if(a.option == no_option) continue;
+                double supply = source_quality_map[s];
+                for(const auto & [source_gain, i] : source_options_map[s])
+                    supply += source_gain * x_hat[i];
+                result.value += _largest_flow(source_s, supply, x_hat, search);
+                result.constant += rho[s] * source_quality_map[s];
+                for(const auto & [source_gain, i] : source_options_map[s])
+                    result.coefficients[i] += rho[s] * source_gain;
+                for(const auto & [a, big_M] : source_s.improved_copies) {
                     const double sigma =
-                        a.probability * rho[a.head] - rho[a.tail];
+                        probability_map[a] * rho[melon::arc_target(graph, a)] -
+                        rho[melon::arc_source(graph, a)];
                     if(sigma > 0)
-                        result.coefficients[a.option] +=
-                            source_s.big_Ms[k] * sigma;
+                        result.coefficients[option_map[a].value()] +=
+                            big_M * sigma;
                 }
             }
             return result;
         }
     };
+
+    // the sources of every block; returns their number
+    static std::size_t _compute_sources(std::vector<target_block> & blocks) {
+        tbb::parallel_for(
+            std::size_t{0}, blocks.size(),
+            [&](const std::size_t b) { blocks[b].compute_sources(); });
+        std::size_t num_sources = 0, num_source_arcs = 0;
+        for(const target_block & block : blocks) {
+            num_sources += block.sources.size();
+            for(const auto & source : block.sources)
+                num_source_arcs += source.arcs.size();
+        }
+        spdlog::debug("{} targets, {} sources, {} arcs over the sources",
+                      blocks.size(), num_sources, num_source_arcs);
+        return num_sources;
+    }
+
+    static std::vector<target_block::cut> _separate(
+        const std::vector<target_block> & blocks,
+        const std::vector<double> & x_hat) {
+        std::vector<target_block::cut> cuts(blocks.size());
+        tbb::parallel_for(
+            std::size_t{0}, blocks.size(),
+            [&](const std::size_t b) { cuts[b] = blocks[b].separate(x_hat); });
+        return cuts;
+    }
 
     template <lazy_constraint_model M, instance_c I>
     solve_result<I> solve(const I & instance, const budget_t & budget) const {
@@ -348,24 +399,25 @@ struct multiflow_benders : public mip_solver_base {
         using cut = target_block::cut;
         _check_criterion(instance);
         spdlog::stopwatch sw;
-
-        // The master: z with the criterion, x with the budget and conflict
-        // rows, and for each target its block, F_t and its F'_to, in the
-        // order of the block's target quality gains.
         M model;
-        model.set_optimality_tolerance(1e-10);
-        model.set_feasibility_tolerance(feasibility_tol);
-        model.set_maximization();
+        _set_tolerances(model, mip_gap, feasibility_tol);
+
+        // Cases and criterion, in flow.md: the scores z_k under their
+        // criterion (Linearizing the criterion), the options x_i within the
+        // budgets and the conflict sets
         const auto z = model.add_variables(
             instance.cases().size(), [](const case_id_t & k) { return k; });
+        model.set_maximization();
         formula_variable_visitor formula{model, z};
         model.set_objective(formula.variable(instance.criterion()));
         const auto x = model.add_binary_variables(
-            instance.options().size(), [](const option_t & o) { return o; });
+            instance.options().size(), [](const option_t & i) { return i; });
         _add_budget_rows(model, instance, budget, x);
 
         std::vector<target_block> blocks;
-        std::vector<model_variable_t<M>> F, F_prime;
+        // f_t block by block, and the f^i_t: block by block, in the order of
+        // the block's target quality gains
+        std::vector<model_variable_t<M>> f, f_gains;
         std::vector<preprocessing_row<>> preprocessing;
         for(auto && instance_case : instance.cases()) {
             const auto [strong_arcs_map, useless_arcs_map] =
@@ -377,119 +429,111 @@ struct multiflow_benders : public mip_solver_base {
                 _average_size(instance_case, useless_arcs_map));
             spdlog::debug("Computing contractions of the '{}' graph",
                           instance_case.name());
-            const auto z_row = model.add_constraint(z(instance_case.id()) <= 0);
+
+            // flow_benders, the master: the score of the case, a row that
+            // the columns of its f_t and f^i_t fill
+            const case_id_t k = instance_case.id();
+            const auto z_row = model.add_constraint(z(k) <= 0);
             progress_bar<spdlog::level::info, 64> pb(
                 instance_case.graph().num_vertices());
-            for(const auto & t : melon::vertices(instance_case.graph())) {
+            for(const auto & original_t :
+                melon::vertices(instance_case.graph())) {
                 pb.tick();
-                if(!_is_target(instance_case, t)) continue;
-                const auto data = compute_contracted_graph_data(
-                    instance, instance_case, budget, t, strong_arcs_map[t],
-                    useless_arcs_map[t], big_M_kind::knapsack_bnb,
-                    feasibility_tol, !no_pruning);
-                const target_block & block = blocks.emplace_back(data);
-                // M_t bounds F_t: without it the relaxation is unbounded
-                // until t receives a cut
-                const double M_t = data.big_M_map[data.t];
-                F.push_back(model.add_column(
+                if(!_is_target(instance_case, original_t)) continue;
+                contracted_flow_graph G_t = compute_contracted_flow_graph(
+                    instance, instance_case, budget, original_t,
+                    strong_arcs_map[original_t], useless_arcs_map[original_t],
+                    std::nullopt, feasibility_tol, !no_pruning);
+                // multiflow_benders: f_t within M^t_t, the only big-M of
+                // the vertices that is read here, without which the
+                // relaxation is unbounded until t receives a cut, and f^i_t
+                // for each positive target quality gain
+                const double M_t = compute_knapsack_big_M_map(
+                    instance, budget, false, G_t.graph, G_t.source_quality_map,
+                    G_t.source_options_map, G_t.probability_map,
+                    std::views::single(G_t.t))[G_t.t];
+                const target_block & block = blocks.emplace_back(
+                    instance_case, original_t, std::move(G_t));
+                f.push_back(model.add_column(
                     {std::make_pair(z_row, -block.target_quality)},
                     {.upper_bound = M_t}));
-                for(const auto & [gain, o] : block.target_quality_gains) {
-                    const auto F_o = F_prime.emplace_back(
-                        model.add_column({std::make_pair(z_row, -gain)}));
-                    model.add_constraint(F_o <= F.back());
-                    model.add_constraint(F_o <= M_t * x(o));
+                for(const auto & [target_gain, i] :
+                    block.target_quality_gains) {
+                    const auto f_ti = f_gains.emplace_back(model.add_column(
+                        {std::make_pair(z_row, -target_gain)}));
+                    model.add_constraint(f_ti <= f.back());
+                    model.add_constraint(f_ti <= M_t * x(i));
                 }
             }
         }
         _log_preprocessing(preprocessing);
-        tbb::parallel_for(
-            std::size_t{0}, blocks.size(),
-            [&](const std::size_t i) { blocks[i].compute_sources(); });
-        std::size_t num_sources = 0, num_source_arcs = 0;
-        for(const target_block & block : blocks) {
-            num_sources += block.sources.size();
-            for(const auto & source : block.sources)
-                num_source_arcs += source.arcs.size();
-        }
-        spdlog::debug("{} targets, {} sources, {} arcs over the sources",
-                      blocks.size(), num_sources, num_source_arcs);
+        const std::size_t num_sources = _compute_sources(blocks);
 
-        auto separate = [&](const std::vector<double> & point) {
-            std::vector<cut> cuts(blocks.size());
-            tbb::parallel_for(std::size_t{0}, blocks.size(),
-                              [&](const std::size_t i) {
-                                  cuts[i] = blocks[i].separate(point);
-                              });
-            return cuts;
-        };
-        // a lazy sum that reads the cut: only valid while the cut lives
-        auto cut_constraint = [&](const std::size_t i, const cut & c) {
-            return F[i] <=
+        // multiflow_benders: the cut of the block b as a row. A lazy sum
+        // that reads the cut: only valid while the cut lives.
+        auto cut_constraint = [&](const std::size_t b, const cut & c) {
+            return f[b] <=
                    c.constant + xsum(std::views::filter(
                                          instance.options(),
-                                         [&c](const option_t o) {
-                                             return c.coefficients[o] != 0;
+                                         [&c](const option_t i) {
+                                             return c.coefficients[i] != 0;
                                          }),
-                                     [&](const option_t o) {
-                                         return c.coefficients[o] * x(o);
+                                     [&](const option_t i) {
+                                         return c.coefficients[i] * x(i);
                                      });
         };
+        // The search, step 1: the cuts of the MIP start
         std::vector<double> point(instance.options().size());
-        if(mip_start) {
-            const auto start = _mip_start_solution(instance);
-            model.add_mip_start(std::views::transform(
-                instance.options(),
-                [&](auto o) { return std::make_pair(x(o), start[o]); }));
-            for(auto && o : instance.options()) point[o] = start[o];
-            const auto cuts = separate(point);
-            for(std::size_t i = 0; i < blocks.size(); ++i)
-                model.add_constraint(cut_constraint(i, cuts[i]));
+        if(const auto start = _add_mip_start(model, instance, x)) {
+            for(auto && i : instance.options()) point[i] = (*start)[i];
+            const auto cuts = _separate(blocks, point);
+            for(std::size_t b = 0; b < blocks.size(); ++b)
+                model.add_constraint(cut_constraint(b, cuts[b]));
         }
 
-        // The cuts of the linear relaxation, within half of the time limit.
-        // In-out: as long as it cuts, the point separated is a center that
-        // moves halfway to each optimum, whose cuts are deeper than the
-        // optimum's own; then the optimum itself, until it violates none.
+        // Cuts on the relaxation: the options are continuous for these
+        // rounds, which take at most half of the time limit
         auto root_time_left = [&] {
             return time_limit.value() / 2 - sw.elapsed().count();
         };
-        for(auto && o : instance.options()) model.set_continuous(x(o));
+        for(auto && i : instance.options()) model.set_continuous(x(i));
         std::size_t root_rounds = 0, root_cuts = 0;
         std::optional<double> root_value;
-        std::vector<double> center, flows(blocks.size());
+        std::vector<double> center, f_relaxed(blocks.size());
         for(bool in_out = !no_in_out; !no_root_cuts && !stop_requested &&
-                                      !(time_limit && root_time_left() <= 0);
-            ++root_rounds) {
+                                      !(time_limit && root_time_left() <= 0);) {
             if(time_limit)
                 model.set_time_limit(std::chrono::duration<double>(
                     std::max(0.0, root_time_left())));
             model.solve();
             if(!std::holds_alternative<status::optimal>(model.get_status()))
                 break;
+            ++root_rounds;
             root_value = model.get_solution_value();
             report_progress({.relaxation = root_value, .round = root_rounds});
             {
                 // readable until the model changes
                 const auto relaxation = model.get_solution();
-                for(auto && o : instance.options())
-                    point[o] = std::clamp(relaxation[x(o)], 0.0, 1.0);
-                for(std::size_t i = 0; i < blocks.size(); ++i)
-                    flows[i] = relaxation[F[i]];
+                for(auto && i : instance.options())
+                    point[i] = std::clamp(relaxation[x(i)], 0.0, 1.0);
+                for(std::size_t b = 0; b < blocks.size(); ++b)
+                    f_relaxed[b] = relaxation[f[b]];
             }
             if(in_out) {
                 if(center.empty()) center = point;
-                for(auto && o : instance.options())
-                    center[o] = (center[o] + point[o]) / 2;
+                for(auto && i : instance.options())
+                    center[i] = (center[i] + point[i]) / 2;
             }
-            const auto cuts = separate(in_out ? center : point);
+            const auto cuts = _separate(blocks, in_out ? center : point);
             std::size_t num_added = 0;
-            for(std::size_t i = 0; i < blocks.size(); ++i) {
-                double bound = cuts[i].constant;
-                for(auto && o : instance.options())
-                    bound += cuts[i].coefficients[o] * point[o];
-                if(flows[i] <= bound * (1 + 1e-7) + 1e-7) continue;
-                model.add_constraint(cut_constraint(i, cuts[i]));
+            for(std::size_t b = 0; b < blocks.size(); ++b) {
+                double cut_at_optimum = cuts[b].constant;
+                for(auto && i : instance.options())
+                    cut_at_optimum += cuts[b].coefficients[i] * point[i];
+                if(f_relaxed[b] <=
+                   cut_at_optimum * (1 + root_cut_tol) + root_cut_tol)
+                    continue;
+                model.add_constraint(cut_constraint(b, cuts[b]));
                 ++num_added;
             }
             root_cuts += num_added;
@@ -497,47 +541,42 @@ struct multiflow_benders : public mip_solver_base {
             if(!in_out) break;
             in_out = false;
         }
-        for(auto && o : instance.options()) model.set_binary(x(o));
+        for(auto && i : instance.options()) model.set_binary(x(i));
         report_progress({.end = true});
         spdlog::debug("{} rounds and {} cuts on the relaxation", root_rounds,
                       root_cuts);
 
-        // The solver drops a candidate that receives cuts and may never
-        // propose its options again, although they are a solution: it gets
-        // them back with their flows and scores.
+        // The search, steps 2 to 4: the flows of a candidate y, the cut at y
+        // of each target whose f_t exceeds its flow, and y handed back
         std::size_t num_cuts = 0;
         model.set_candidate_solution_callback(
             [&](typename M::candidate_solution_callback_handle & handle) {
                 auto candidate = handle.get_solution();
-                std::vector<double> Y(instance.options().size());
-                for(auto && o : instance.options())
-                    Y[o] = candidate[x(o)] > 0.5;
-                const auto cuts = separate(Y);
+                std::vector<double> y(instance.options().size());
+                for(auto && i : instance.options())
+                    y[i] = _is_bought(candidate[x(i)]);
+                const auto cuts = _separate(blocks, y);
                 auto case_scores = instance.create_case_map(0.0);
                 const std::size_t num_cuts_before = num_cuts;
-                auto F_o = F_prime.begin();
-                for(std::size_t i = 0; i < blocks.size(); ++i) {
-                    const double flow = cuts[i].value;
-                    double quality = blocks[i].target_quality;
-                    for(const auto & [gain, o] :
-                        blocks[i].target_quality_gains) {
-                        candidate[*F_o++] = Y[o] * flow;
-                        quality += Y[o] * gain;
+                auto f_gain = f_gains.begin();
+                for(std::size_t b = 0; b < blocks.size(); ++b) {
+                    const double flow = cuts[b].value;
+                    double quality = blocks[b].target_quality;
+                    for(const auto & [target_gain, i] :
+                        blocks[b].target_quality_gains) {
+                        candidate[*f_gain++] = y[i] * flow;
+                        quality += y[i] * target_gain;
                     }
-                    case_scores[blocks[i].case_id] += quality * flow;
-                    if(std::exchange(candidate[F[i]], flow) - flow <=
+                    case_scores[blocks[b].case_id] += quality * flow;
+                    if(std::exchange(candidate[f[b]], flow) - flow <=
                        feasibility_tol * flow)
                         continue;
                     ++num_cuts;
-                    handle.add_lazy_constraint(cut_constraint(i, cuts[i]));
+                    handle.add_lazy_constraint(cut_constraint(b, cuts[b]));
                 }
-                if(num_cuts == num_cuts_before) return;
-                for(auto && o : instance.options()) candidate[x(o)] = Y[o];
-                for(auto && instance_case : instance.cases())
-                    candidate[z(instance_case.id())] =
-                        case_scores[instance_case.id()];
-                formula.set_values(candidate, case_scores);
-                handle.add_solution(candidate);
+                if(num_cuts > num_cuts_before)
+                    _hand_back(handle, candidate, instance, x, y, z,
+                               case_scores, formula);
             });
 
         auto [has_solution, report] = _solve(model, sw);
@@ -554,11 +593,7 @@ struct multiflow_benders : public mip_solver_base {
                                             *root_value);
         }
         if(!has_solution) return {_fallback_solution(instance, budget), report};
-        const auto master_solution = model.get_solution();
-        auto solution = instance.create_option_map(false);
-        for(auto && o : instance.options())
-            solution[o] = master_solution[x(o)] > 0.5;
-        return {solution, report};
+        return {_bought_options(instance, model.get_solution(), x), report};
     }
 };
 

@@ -73,10 +73,11 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
         original_to_new_arc_map[a].emplace(new_arc);
         added_arcs.emplace_back(new_arc, original_probability_map[a],
                                 std::nullopt);
-        for(auto && [enhanced_prob, option] :
+        for(auto && [improved_probability, option] :
             instance_case.arc_options_map()[a]) {
             added_arcs.emplace_back(graph.create_arc(new_source, new_target),
-                                    enhanced_prob, std::make_optional(option));
+                                    improved_probability,
+                                    std::make_optional(option));
         }
     }
     auto probability_map = melon::create_arc_map<double>(graph);

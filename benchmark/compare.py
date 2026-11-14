@@ -10,8 +10,8 @@ initial score of the instance:
 - reached: its gain as a share of the best known gain;
 - guaranteed: its gain as a share of the largest gain its own bound allows.
 The times of the summary are shifted geometric means (shift of 1 s): the time
-of a run that ended by itself (solved, or a heuristic), the time limit of its
-result file otherwise.
+of a run that ended by itself (solved, a heuristic, a relaxation that
+converged), the time limit of its result file otherwise.
 
 A score above another file's bound by more than 1e-6 (relative) is reported:
 one of the two is wrong.
@@ -26,6 +26,9 @@ import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BEST = os.path.join(HERE, "best_known.csv")
+# the statuses, other than optimal, of a run that ended by itself: a
+# heuristic, a relaxation, a reformulation that left nothing to decide
+ENDED = {"completed", "converged", "relative gap reached", "no option left"}
 
 
 def number(text):
@@ -142,9 +145,11 @@ def main():
                 stat["solved"] += 1
                 stat["log_time"] += math.log(wall + 1)
                 cells.append(f"{wall:.1f} s")
-            elif r["status"] == "completed":  # a heuristic, at its end
+            elif r["status"] in ENDED:
                 stat["log_time"] += math.log(wall + 1)
-                cells.append(f"{percent(reached)} reached in {wall:.1f} s")
+                cells.append(f"{percent(reached)} reached" + (
+                    f", {percent(guaranteed)} guaranteed"
+                    if guaranteed is not None else "") + f" in {wall:.1f} s")
             else:
                 stat["log_time"] += math.log((limit or wall) + 1)
                 cells.append(f"{percent(reached)} reached, " + (

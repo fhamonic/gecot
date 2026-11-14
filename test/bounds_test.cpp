@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <format>
+#include <initializer_list>
 #include <limits>
 #include <random>
 #include <span>
@@ -29,6 +31,37 @@ Instance reformulated(const char * path, double budget) {
     return trivial_reformulate_instance(parse_instance(path),
                                         gecot::budget_t{{budget}})
         .instance;
+}
+
+// how a criterion is written, to compare two of them
+std::string written(const criterion_formula & criterion) {
+    struct visitor {
+        std::string operator()(const criterion_constant & c) const {
+            return std::format("{}", c);
+        }
+        std::string operator()(const criterion_var & v) const {
+            return std::format("z{}", v);
+        }
+        std::string operator()(const criterion_sum & f) const {
+            return list("sum", f.values);
+        }
+        std::string operator()(const criterion_product & f) const {
+            return list("product", f.values);
+        }
+        std::string operator()(const criterion_min & f) const {
+            return list("min", f.values);
+        }
+        std::string list(const char * operation,
+                         const std::vector<criterion_formula> & values) const {
+            std::string text = operation;
+            for(const char * separator = "("; auto && e : values) {
+                text += separator + std::visit(*this, e);
+                separator = ", ";
+            }
+            return text + ')';
+        }
+    };
+    return std::visit(visitor{}, criterion);
 }
 
 // cases of one vertex and no arc: only the criterion matters
@@ -446,6 +479,60 @@ GTEST_TEST(criterion_analysis, non_decreasing_criterion_of_an_instance) {
         2, criterion_min{{net_positive, criterion_var{1}}})));
 }
 
+// Normalizing these too would change the last digits of the scores and the
+// rows of the models of the instances that have nothing to simplify.
+GTEST_TEST(criterion_analysis, simplified_criterion_keeps_the_other_writings) {
+    for(const criterion_formula & criterion :
+        std::initializer_list<criterion_formula>{
+            criterion_var{1},
+            criterion_sum{{criterion_var{1}, criterion_var{0}, 3.0}},
+            criterion_sum{{criterion_product{{0.5, criterion_var{0}}},
+                           criterion_product{{0.5, criterion_var{1}}}}},
+            criterion_product{
+                {-1.0, criterion_product{{-2.0, criterion_var{0}}}}},
+            criterion_min{
+                {criterion_var{0}, criterion_product{{2.5, criterion_var{1}}}}},
+            // not linear as a whole: its two first terms stay apart
+            criterion_sum{
+                {criterion_product{{0.1, criterion_var{0}}},
+                 criterion_product{{0.05, criterion_var{0}}},
+                 criterion_min{{criterion_var{0},
+                                criterion_product{{0.5, criterion_var{0}}}}}}},
+        })
+        EXPECT_EQ(written(gecot::simplified_criterion(criterion, 2)),
+                  written(criterion));
+}
+
+GTEST_TEST(criterion_analysis, simplified_criterion_adds_up_a_linear_part) {
+    using gecot::simplified_criterion;
+    const criterion_product twice{{2.0, criterion_var{1}}};
+    const criterion_product minus{{-1.0, criterion_var{1}}};
+    EXPECT_EQ(written(simplified_criterion(criterion_sum{{twice, minus}}, 3)),
+              "z1");
+    EXPECT_EQ(written(simplified_criterion(
+                  criterion_sum{{criterion_var{0},
+                                 criterion_product{{0.0, criterion_var{2}}}}},
+                  3)),
+              "z0");
+    // in the order of the cases, the constant last
+    EXPECT_EQ(written(simplified_criterion(
+                  criterion_sum{{criterion_var{2},
+                                 criterion_product{{3.0, criterion_var{0}}},
+                                 criterion_var{2}, 5.0}},
+                  3)),
+              "sum(product(3, z0), product(2, z2), 5)");
+    // a linear term of a minimum, which is not linear
+    EXPECT_EQ(written(simplified_criterion(
+                  criterion_min{
+                      {criterion_sum{{criterion_var{0}, twice, minus, minus}},
+                       criterion_var{2}}},
+                  3)),
+              "min(z0, z2)");
+    EXPECT_EQ(written(simplified_criterion(
+                  criterion_sum{{criterion_var{1}, minus}}, 3)),
+              "0");
+}
+
 GTEST_TEST(criterion_analysis, bound_criterion_calls) {
     std::vector<std::vector<double>> calls;
     auto weighted_bound = [&calls](std::span<const double> w) {
@@ -815,6 +902,54 @@ GTEST_TEST(trivial_reformulation, keeps_free_options_that_exclude_others) {
     EXPECT_TRUE(reformulated.static_options[2]);
     EXPECT_TRUE(reformulated.instance.conflict_sets().empty());
     EXPECT_NEAR(brute_force_optimum(reformulated.instance, 2), 28.76, 1e-9);
+}
+
+GTEST_TEST(trivial_reformulation, leaves_out_the_cases_not_read) {
+    // three cases of one vertex, of scores 1, 4 and 1e12, and an option
+    auto instance_with = [](criterion_formula criterion) {
+        std::vector<case_spec> cases;
+        for(const double quality : {1.0, 2.0, 1e6})
+            cases.push_back(case_spec{1, {}, {}, {quality}, {quality}, {}, {}});
+        return build_instance({1.0}, cases, std::move(criterion));
+    };
+    const gecot::budget_t budget{{1}};
+    const criterion_product minus{{-1.0, criterion_var{1}}};
+    {
+        // 2 z1 - z1 + 0 z2: the case 1 alone, which becomes the case 0
+        const Instance raw = instance_with(
+            criterion_sum{{criterion_product{{2.0, criterion_var{1}}}, minus,
+                           criterion_product{{0.0, criterion_var{2}}}}});
+        const auto reformulated = trivial_reformulate_instance(raw, budget);
+        ASSERT_EQ(reformulated.instance.cases().size(), 1u);
+        EXPECT_EQ(reformulated.instance.cases().front().name(), "c1");
+        EXPECT_EQ(written(reformulated.instance.criterion()), "z0");
+        EXPECT_EQ(gecot::compute_base_score(reformulated.instance), 4.0);
+        // the score of the case 2 would have scaled the qualities
+        EXPECT_EQ(reformulated.quality_scale, 1.0);
+    }
+    {
+        // the case 1 left out between two others
+        const Instance raw = instance_with(criterion_sum{
+            {criterion_var{2}, criterion_var{0}, criterion_var{1}, minus}});
+        const auto reformulated = trivial_reformulate_instance(raw, budget);
+        ASSERT_EQ(reformulated.instance.cases().size(), 2u);
+        EXPECT_EQ(reformulated.instance.cases()[0].name(), "c0");
+        EXPECT_EQ(reformulated.instance.cases()[1].name(), "c2");
+        EXPECT_EQ(gecot::criterion_cases(reformulated.instance.criterion()),
+                  (std::vector<gecot::case_id_t>{0, 1}));
+        const double scale2 =
+            reformulated.quality_scale * reformulated.quality_scale;
+        EXPECT_GT(scale2, 1.0);
+        EXPECT_EQ(gecot::compute_base_score(reformulated.instance) * scale2,
+                  1e12 + 1.0);
+    }
+    // every selection has the same score
+    EXPECT_THROW(
+        trivial_reformulate_instance(
+            instance_with(criterion_sum{{criterion_var{1}, minus}}), budget),
+        std::invalid_argument);
+    EXPECT_THROW(trivial_reformulate_instance(instance_with(3.0), budget),
+                 std::invalid_argument);
 }
 
 GTEST_TEST(trivial_reformulation, keeps_the_optimum_with_conflicts_and_costs) {

@@ -1,5 +1,7 @@
 # Review: gecot Lagrangian preprocessing (compute_constrained_strong_and_useless_arcs.hpp)
 
+> **Status, 2026-11-14.** A record of a review of 2026-11-05, on the commit 6c59214. `lagrangian_preprocessing.md` builds on it. The code has moved since: the lines and the names of the algorithms are those of that time (`prep_mip` is now `flow_mip`).
+
 Date: 2026-11-05. Code reviewed: gecot `prep-mip-tight-big-m` at 6c59214.
 
 The review was a workflow of 50 agents:

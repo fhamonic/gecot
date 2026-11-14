@@ -1,5 +1,7 @@
 # path_lp: design note
 
+> **Status, 2026-11-14.** A record dated 2026-10-29, amended until 2026-11-12. The solver has changed since: it is `include/gecot/solvers/path_lp.hpp`, handles conflict sets and several costs, and shares its pricing margin and its evictor with `tree_lp` in `column_generation.hpp`. What it does today is stated in `docs/formulations/relaxations.md`.
+
 `path_lp` was named `path_rr`, and `tree_lp` `tree_rr`, until 2026-11-10: the branches and the commit messages cited below use the former names.
 
 Design note on gecot's `path_lp` solver, the path formulation relaxation solved by column generation. It is written for the owner and future maintainers, not as user documentation. Dated 2026-10-29, it lists every method that proved useful for `path_lp`, landed or not, with its mathematics made explicit, and the methods that were measured and set aside, so that "useful" reads as a selection. The code on branch `path-rr-rewrite`, on top of `path-rr-search-fixes`, was rewritten to follow the structure of §1 and §2; §2.8 maps the two. Its results are bit-identical to `path-rr-search-fixes` on 34 single-threaded runs covering both pricings, `--mip-start`, `--max-activations`, `--evict-age` and `--relative-gap`. On branch `path-rr-simplify` (2026-11-02), both pricings and the setup run one label search on the case graph, backwards from the target (§2.1, §2.4, §2.5): the split graph and the backtrack are gone, search prices every option shape, and `--mip-start` keeps the column without options (§2.2).

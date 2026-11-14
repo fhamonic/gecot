@@ -47,6 +47,15 @@ Finding the best column of a pair, the *pricing*, is a path problem: choose a pa
 
 The rounds stop when no column has a positive reduced cost: the master's optimum is then the optimum of the relaxation, and the status is `converged`.
 
+The master has the rows $(\sigma_p)$ and $(\lambda_{pi})$ of a pair only once one of its columns uses them: until then they are redundant, and their dual value is 0.
+
+### The labels of the pricing
+
+A label at a vertex $u$ is a triple $(S, \omega, W)$: a path from $u$ to $t$ that buys the options $S$, its value $\omega = q^S_t \cdot \Pi$ without the source quality, where $\Pi$ is the probability of the path with the options of $S$, and the weight $W$ of $S$.
+
+- With `search`, $W = \sum_{i \in S} \lambda_{pi}$. As $\lambda \ge 0$, a label $a$ is worth no less than a label $b$ at the same vertex if $\omega_a \ge \omega_b$ and if $W_a$, plus the prices of the options of $b$ that $a$ has not bought and that $b$ could use again further on, is at most $W_b$: $b$ is then dropped. At $s$, an option $i$ that improves the source quality of $s$ is bought if $\gamma_k \cdot w^i_s \cdot \omega > \lambda_{pi}$. A dual value that the solver returns a little below 0 counts as 0.
+- With `enumerate`, the labels are computed once per target. $W$ is the cost of $S$, at most the budget, in the first cost dimension, and $S$ stays within the other budgets and holds at most one option of each conflict set. A label is dropped if another label at the same vertex is worth at least as much and buys only options of $S$. This holds whatever the dual values, so the columns kept for a pair contain a best one for any of them.
+
 ### The Lagrangian bound
 
 The value of the master is *not* a bound before convergence, as columns are missing. But after each complete round, with $r_p = \max_S r_{pS}$ the best reduced cost of each pair, raising each $\sigma_p$ by $\max\{0, r_p\}$ makes the dual values feasible for the dual of the whole relaxation. By weak duality,
@@ -63,7 +72,7 @@ $$
 d_i = \sum_{p} \lambda_{pi} - c_i \cdot \eta \;\le\; 0
 $$
 
-is the reduced cost of $x_i$, so a solution that buys $i$ scores at most $L + d_i$. `gecot optimize --reformulation path_lp` uses these bounds to [remove options](preprocessing.md#removing-options-with-the-path-relaxation) before an exact algorithm runs.
+is the reduced cost of $x_i$, so a solution that buys $i$ scores at most $L + d_i$. `path_lp` counts the dual values $\lambda_{pi}$ as the search does, at 0 when a little below, and a positive $d_i$ as 0. `gecot optimize --reformulation path_lp` uses these bounds to [remove options](preprocessing.md#removing-options-with-the-path-relaxation) before an exact algorithm runs.
 
 ### The solution
 
@@ -93,9 +102,9 @@ $$
 v_t(S) = q^S_t \cdot \sum_{s} w^S_s \cdot \Pi^S(s,t)\,,
 $$
 
-the value of all the pairs of target $t$ at once, their most reliable paths forming a tree rooted at $t$. The program is the one above with $t$ in place of $p$, without the constant $C_k$. All the sources of a target must now agree on the options, which the path formulation does not require: the tree relaxation is at least as tight as the path relaxation.
+the value of all the pairs of target $t$ at once, their most reliable paths forming a tree rooted at $t$. The program is the one above with $t$ in place of $p$, without the constant $C_k$. Its master starts with the column without options of each target, so that the first dual values count every target. All the sources of a target must now agree on the options, which the path formulation does not require: the tree relaxation is at least as tight as the path relaxation.
 
-Its pricing is harder: for a target $t$, find the set of options that maximizes $\gamma_k \cdot v_t(S) - \sigma_t - \sum_{i \in S} \lambda_{ti}$. `tree_lp` solves it as a small MILP, the [flow formulation](flow.md) restricted to the target $t$ on its [reduced graph](preprocessing.md#the-graph-of-a-target) $G_t$, with the prices $\lambda_{ti}$ in the objective and the budget as a constraint. The pricing problems of a round are solved in parallel.
+Its pricing is harder: for a target $t$, find the set of options that maximizes $\gamma_k \cdot v_t(S) - \sigma_t - \sum_{i \in S} \lambda_{ti}$. `tree_lp` solves it as a small MILP, the [flow formulation](flow.md) restricted to the target $t$ on its [reduced graph](preprocessing.md#the-graph-of-a-target) $G_t$, with the prices $\lambda_{ti}$ in the objective and the budget as a constraint: its columns are the sets within the budget only, which tightens the relaxation further. The pricing problems of a round are solved in parallel.
 
 !!! warning "`tree_lp` returns the relaxation, not a solution within the budget"
 

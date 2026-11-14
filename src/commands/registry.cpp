@@ -13,9 +13,9 @@
 #include "solver_interfaces/greedy_interface.hpp"
 #include "solver_interfaces/multicut_benders_interface.hpp"
 #include "solver_interfaces/multiflow_benders_interface.hpp"
-#include "solver_interfaces/path_formulation_lp_interface.hpp"
+#include "solver_interfaces/path_lp_interface.hpp"
 #include "solver_interfaces/static_interface.hpp"
-#include "solver_interfaces/tree_formulation_lp_interface.hpp"
+#include "solver_interfaces/tree_lp_interface.hpp"
 
 std::vector<std::shared_ptr<AbstractSolverInterface>> make_solver_interfaces() {
     return {std::make_unique<StaticInterface>(),
@@ -24,8 +24,8 @@ std::vector<std::shared_ptr<AbstractSolverInterface>> make_solver_interfaces() {
             std::make_unique<MulticutBendersInterface>(),
             std::make_unique<FlowBendersInterface>(),
             std::make_unique<MultiflowBendersInterface>(),
-            std::make_unique<TreeFormulationLPInterface>(),
-            std::make_unique<PathFormulationLPInterface>()};
+            std::make_unique<TreeLpInterface>(),
+            std::make_unique<PathLpInterface>()};
 }
 
 std::vector<std::shared_ptr<AbstractBoundInterface>> make_bound_interfaces() {
@@ -33,28 +33,9 @@ std::vector<std::shared_ptr<AbstractBoundInterface>> make_bound_interfaces() {
         std::make_unique<AllOptionsInterface>(),
         std::make_unique<QkpPlanesInterface>(),
         std::make_unique<SplitLagrangeInterface>()};
-    // the algorithms whose relaxation proves a bound; tree_lp's pricing can
-    // miss improving trees, so its relaxation value bounds nothing
-    const std::vector<std::pair<std::string, std::string>> proving_algorithms{
-        {"flow_mip",
-         "Dual bound of the flow MIP, exact up to --resolution; needs an "
-         "incumbent."},
-        {"multicut_benders",
-         "Dual bound of the multicut Benders master; needs an incumbent."},
-        {"flow_benders",
-         "Dual bound of the flow Benders master; needs an incumbent."},
-        {"multiflow_benders",
-         "Dual bound of the multiflow Benders master; needs an incumbent."},
-        {"path_lp",
-         "Lagrangian bound of the path formulation relaxation, the lowest "
-         "over its complete pricing rounds."}};
-    for(auto & solver : make_solver_interfaces()) {
-        const auto it =
-            std::ranges::find(proving_algorithms, solver->name(),
-                              &std::pair<std::string, std::string>::first);
-        if(it == proving_algorithms.end()) continue;
-        methods.push_back(std::make_shared<AlgorithmBoundInterface>(
-            std::move(solver), it->second));
-    }
+    for(auto & solver : make_solver_interfaces())
+        if(const auto bound = solver->bound_description())
+            methods.push_back(std::make_shared<AlgorithmBoundInterface>(
+                std::move(solver), bound.value()));
     return methods;
 }

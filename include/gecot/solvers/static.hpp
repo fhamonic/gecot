@@ -69,8 +69,14 @@ struct Static {
                     return options_ratios[i1] < options_ratios[i2];
                 });
 
+            // once the cost fits, only the options whose removal raises the
+            // score, which only a criterion that can decrease allows: one of
+            // small cost and a removal that does not can come before them
             for(const option_t & i : options) {
-                if(purchased <= budget.front() + feasibility_tol) break;
+                if(purchased <= budget.front() + feasibility_tol &&
+                   options_ratios[i] * instance.option_cost(i) >=
+                       -tie_window * std::abs(max_score))
+                    continue;
                 purchased -= instance.option_cost(i);
                 solution[i] = false;
                 free_options.emplace_back(i);
@@ -131,6 +137,11 @@ struct Static {
 
             const auto options_sets = compute_options_conflict_sets(instance);
             for(const option_t & i : free_options) {
+                // the others, which come after, would lower the score too
+                if((costs[i] == 0 ? options_ratios[i]
+                                  : options_ratios[i] * costs[i]) <
+                   -tie_window * std::abs(decremental_score))
+                    break;
                 bool over = false;
                 for(std::size_t r = 0; r < budget.size(); ++r)
                     over = over || spent[r] + instance.option_cost(i, r) >

@@ -49,11 +49,21 @@ struct linear_form_visitor {
         return form;
     }
     // linear if at most one factor depends on the case scores: the scaled
-    // criterion of trivial_reformulate_instance puts its weight first
+    // criterion of trivial_reformulate_instance puts its weight first. A
+    // factor 0 makes it 0 wherever it stands: taken in order, a 0 after two
+    // factors that depend on the scores would come too late, and the same
+    // constant would be linear in one writing and not in the other.
     result operator()(const criterion_product & f) const {
+        std::vector<result> factors;
+        for(auto && e : f.values) factors.push_back(std::visit(*this, e));
+        const auto zero = [](const result & factor) {
+            return factor && is_constant(*factor) && factor->constant == 0.0;
+        };
+        if(std::ranges::any_of(factors, zero))
+            return criterion_linear_form{0.0,
+                                         std::vector<double>(num_cases, 0.0)};
         criterion_linear_form form{1.0, std::vector<double>(num_cases, 0.0)};
-        for(auto && e : f.values) {
-            result factor = std::visit(*this, e);
+        for(auto && factor : factors) {
             if(!factor) return std::nullopt;
             if(is_constant(*factor)) {
                 form.constant *= factor->constant;

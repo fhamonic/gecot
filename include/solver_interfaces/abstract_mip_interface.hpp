@@ -117,6 +117,14 @@ protected:
                        "Time limit in seconds, after which the best solution "
                        "found is returned")
             ->check(CLI::NonNegativeNumber);
+        app.add_flag("--numeric-focus", solver.numeric_focus,
+                     "Asks the solver for more care in its numerical "
+                     "computations, at some cost in time: NumericFocus 1 of "
+                     "gurobi, the numerical emphasis of cplex, "
+                     "NUMERICALEMPHASIS 1 of xpress, and for the MIP models "
+                     "of mosek its numerical emphasis level 1; copt, highs, "
+                     "cbc and glpk have none, and the numerics emphasis of "
+                     "scip is out of mippp's reach: they warn");
     }
 
     // solver with the solution of --mip-start-algorithm as its MIP start

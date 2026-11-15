@@ -418,6 +418,20 @@ GTEST_TEST(criterion_analysis, linear_forms) {
         criterion_product{{criterion_var{0}, criterion_var{1}}}, 2));
     EXPECT_FALSE(gecot::linear_form(
         criterion_min{{criterion_var{0}, criterion_var{1}}}, 2));
+
+    // a factor 0 after the two cases as before them
+    for(const criterion_product & zero :
+        {criterion_product{{criterion_var{0}, 0.0, criterion_var{1}}},
+         criterion_product{{criterion_var{0}, criterion_var{1}, 0.0}},
+         criterion_product{
+             {criterion_product{{criterion_var{0}, criterion_var{1}}},
+              criterion_sum{{criterion_var{0},
+                             criterion_product{{-1.0, criterion_var{0}}}}}}}}) {
+        const auto h = gecot::linear_form(zero, 2);
+        ASSERT_TRUE(h.has_value()) << written(zero);
+        EXPECT_EQ(h->constant, 0.0);
+        EXPECT_EQ(h->weights, (std::vector<double>{0.0, 0.0}));
+    }
 }
 
 GTEST_TEST(criterion_analysis, monotony) {
@@ -591,6 +605,12 @@ GTEST_TEST(bounds, all_options_refuses_a_decreasing_criterion) {
         reformulated(PROJECT_SOURCE_DIR "/test/instances/Aude/aude.json", 5);
     instance.set_criterion(criterion_product{{-1.0, criterion_var{0}}});
     EXPECT_THROW(gecot::all_options_bound(instance), std::invalid_argument);
+    // -(-2 z) is 2 z, which the other bounds and the MIP solvers accept
+    instance.set_criterion(criterion_product{{2.0, criterion_var{0}}});
+    const double twice = gecot::all_options_bound(instance).bound;
+    instance.set_criterion(
+        criterion_product{{-1.0, criterion_product{{-2.0, criterion_var{0}}}}});
+    EXPECT_EQ(gecot::all_options_bound(instance).bound, twice);
 }
 
 GTEST_TEST(bounds, lp_knapsack) {
@@ -948,8 +968,53 @@ GTEST_TEST(trivial_reformulation, leaves_out_the_cases_not_read) {
         trivial_reformulate_instance(
             instance_with(criterion_sum{{criterion_var{1}, minus}}), budget),
         std::invalid_argument);
+    for(const criterion_product & zero :
+        {criterion_product{{criterion_var{0}, 0.0, criterion_var{1}}},
+         criterion_product{{criterion_var{0}, criterion_var{1}, 0.0}}})
+        EXPECT_THROW(trivial_reformulate_instance(instance_with(zero), budget),
+                     std::invalid_argument)
+            << written(zero);
     EXPECT_THROW(trivial_reformulate_instance(instance_with(3.0), budget),
                  std::invalid_argument);
+}
+
+// The scores, their scale and the results would be infinite or not a
+// number. A score of 1e154 squared is still a double: the gains count too.
+GTEST_TEST(trivial_reformulation, refuses_qualities_whose_scores_overflow) {
+    auto instance_with = [](const double quality, const double gain) {
+        return build_instance(
+            {1.0},
+            {case_spec{
+                1, {}, {}, {quality}, {quality}, {{{gain, gain, 0}}}, {}}},
+            criterion_var{0});
+    };
+    const gecot::budget_t budget{{1}};
+    EXPECT_NO_THROW(
+        trivial_reformulate_instance(instance_with(1e154, 0), budget));
+    EXPECT_THROW(trivial_reformulate_instance(instance_with(1e155, 0), budget),
+                 std::invalid_argument);
+    EXPECT_THROW(
+        trivial_reformulate_instance(instance_with(1e154, 1e155), budget),
+        std::invalid_argument);
+    // A source of 1e200 that reaches no target, and a target of 1e200 that
+    // a source of 1 alone reaches: the scores stay near 1e200.
+    const Instance far_apart = build_instance({1.0},
+                                              {case_spec{3,
+                                                         {{1, 0}, {2, 1}},
+                                                         {0.5, 0.5},
+                                                         {1e200, 0.0, 1.0},
+                                                         {0.0, 1e200, 1.0},
+                                                         {},
+                                                         {{}, {{0.9, 0}}}}},
+                                              criterion_var{0});
+    EXPECT_NO_THROW(trivial_reformulate_instance(far_apart, budget));
+    // its score overflows with an option over the budget only
+    EXPECT_NO_THROW(trivial_reformulate_instance(
+        build_instance(
+            {2.0},
+            {case_spec{1, {}, {}, {1.0}, {1.0}, {{{1e155, 1e155, 0}}}, {}}},
+            criterion_var{0}),
+        budget));
 }
 
 GTEST_TEST(trivial_reformulation, keeps_the_optimum_with_conflicts_and_costs) {

@@ -1,6 +1,6 @@
 # Maintainability review: proposals to rule on
 
-This note reviews the code of gecot at main fd12a84 (2026-11-14), once the problem formulation is considered frozen, and proposes refactorings and design changes for maintainability. It is written for the owner, who rules on each proposal: nothing below is implemented.
+This note reviews the code of gecot at main fd12a84 (2026-11-14), once the problem formulation is considered frozen, and proposes refactorings and design changes for maintainability. It is written for the owner, who rules on each proposal. The rulings are recorded where they were given, and what was implemented from them in the Implementation log at the end.
 
 - **Aims set by the owner.**
   - The command line stays the privileged target.
@@ -683,4 +683,46 @@ One line per step done, with its commit, so that the work can be resumed from th
     4. A product with a factor 0 is a constant for `linear_form` only if the 0 comes before its second factor that reads a case: `product(squirrel, 0, hedgehog)` is refused as reading no case, `product(squirrel, hedgehog, 0)` runs.
   - Checks: 69 tests; 837 of 837 cases identical to the capture of 901ac31; the Latin-1 instance of the reader gives its ids back.
 
-Nothing ruled is left to do. For the owner: NumericFocus (the table above); whether a case that the criterion does not read stays in the results; the refusal of a criterion that reads no case; the names that are not UTF-8, which keep their bytes in a result file, so that O1, "JSON always valid", holds but for such names and for scores that overflow (the other ways were to refuse these names when the instance is read, or to replace their bytes); the four findings of the review that are older than these commits, the first above all. Not ruled, so not started: the parser (PR), the static library (L1), O3 to O5, the README, Windows and the releases.
+## Rulings of 2026-11-15, after the merge
+
+The branch was squash-merged into main as fac89d0. The owner then agreed with the five recommendations of the report:
+
+1. A bound under the score of its own solution is no longer shown; the scale of the criterion is a task of its own.
+2. A case that the criterion does not read stays in the results.
+3. A criterion that reads no case is refused.
+4. The names that are not UTF-8 keep their bytes in a result file.
+5. The four findings of the review that are older than these commits are fixed. The report gave no recommendation for this item; agreement was read as fixing them.
+
+On NumericFocus, the owner asked for an option that enables it, or its equivalent for the solver chosen, off by default.
+
+- 2026-11-15, fb49c22 (branch `numeric-focus`): the check of the bound, and the four findings of item 5.
+  - `gecot optimize` drops an algorithm's bound that is under the score of its solution by more than `bound_margin` (1e-6 of the score, or of 1): it warns, shows no upper bound and no guaranteed share; the report keeps `best_bound` and `gap` as the algorithm gave them. `guaranteed_gain_share` applies the same margin, so the progress table shows no share either. `gecot bound` keeps its own refusal, at 1e-9.
+  - The qualities of a case whose scores could exceed the largest double are refused when the instance is reformulated: as a probability is at most 1, no score exceeds the product of the sums of the qualities with every gain. The scores printed by both commands are checked to be finite: only a criterion of huge weights or products could still make one infinite.
+  - The heuristics buy no option that lowers the score, and `--decremental` goes on removing while a removal raises it; only a criterion that decreases with the score of a case allows either. `greedy --worst` keeps no such rule. `greedy --decremental` tests the criterion first: on a non-decreasing one, the extra evaluation would cost the time of a step.
+  - `linear_form` gives 0 for a product with a factor 0 wherever the 0 stands: the same constant was linear in one writing and not in the other, so refused as reading no case in one and run in the other.
+  - `all_options` and the line "All options bound" of `gecot bound` take `has_non_decreasing_criterion`, the test of the other bounds and of the MIP solvers: `[-1, [-2, z]]` is 2 z.
+  - Checks: 71 tests; the five new or extended ones fail on the code of main (built against it); 837 of 837 cases identical to main; the reproducers of the review give the warning, the refusal, −18.4 where greedy gave −28.76, and the refusal of `product(squirrel, hedgehog, 0)`.
+- 2026-11-15, 20a1f6e: `--numeric-focus`, off by default, for every algorithm that takes `--solver`, on every model it solves: the MIP of `flow_mip` and the Benders, the masters of `path_lp` and `tree_lp`, and the pricing MIPs of `tree_lp`. Without the flag nothing is set; before, Gurobi's MIPs had NumericFocus 1.
+  - The settings, each the first level above the default, from the installed headers and the solvers' documentation:
+
+    | Solver | Setting | Value | Models |
+    |---|---|---|---|
+    | Gurobi 13.0 | `NumericFocus` | 1 (0 to 3) | LP and MIP |
+    | CPLEX 22.1 | `CPXPARAM_Emphasis_Numerical`, id 1083 | 1 (on or off) | LP and MIP |
+    | Xpress 9.6, 9.9 | `XPRS_NUMERICALEMPHASIS`, id 8416 | 1, mild (default −1, automatic; 0 asks for speed) | LP and MIP |
+    | MOSEK 11.0 | `MSK_IPAR_MIO_NUMERICAL_EMPHASIS_LEVEL`, id 84 | 1 (0 to 2) | MIP |
+    | COPT 8.0, HiGHS 1.10, CBC, GLPK | none | | |
+    | SCIP 8.0 | the numerics emphasis, through `SCIPsetEmphasis`, which mippp's table does not load | | |
+
+  - The ids are written out: mippp's tables do not name them. MOSEK's is the position of the name in an enum ordered by names, as are the ids that mippp itself writes out for MOSEK (100, 110), so a parameter added or removed before it would move those too, which the versions that mippp validates (11.0 to 11.3) rule out. A solver without a setting warns once per kind of model, as for `--time-limit`.
+  - Checks: on the three woods, with each of the nine solvers and `flow_mip`, `path_lp`, `tree_lp` and `multicut_benders` where the solver is accepted, the optimum 42.44, the setting in the solver's own log for the MIPs of Gurobi, CPLEX and Xpress, the warning for the others; a scratch program sets the option on a model of each of the seven kinds and reads the value back through the solver's getter: 1 for each, after the defaults 0, 0, −1 and 0. 71 tests. Against main, the lines of the new flag set aside, 112 of 837 cases differ, every one in what the solver's path changes: nodes (52 lines), the share 99.9 or 100 at the optimum (19), the last digits of a bound (9), lazy cuts (5), the help text (11), and 16 selections, all optimal before and after with the same score to the last bit (aix30 at 8 and dks30, which have ties); one score changes, under `--lp-relaxation`, where the relaxation's value is the same. No status changes. `check.py` whole, 1234 runs, 0 failures. The benchmark of §9.6 was the measurement.
+- 2026-11-15, 0f49bb7: the review of the two branches (two readers, on what the captures and the oracle do not see), its findings on this branch.
+  - `greedy` checked the sign on the option that its tie rule takes. The window of a tie grows with 1 / the cost of the best option, so an option of id below it and of negative gain could be tied with it: the purchases stopped, though options that raise the score still fitted. The tie now skips the options that lower the score, and the purchases stop only when the best lowers it. Before the sign rule, the same tie bought the option that lowers the score.
+  - The decremental steps, once the cost fits, stopped on the option of smallest loss per unit of cost, whose removal can raise the score by less than the window while that of another raises it more. Both heuristics now remove, among the options whose removal raises the score, the one they would have taken; `greedy` with the same choice and tie as before the cost fits, `static` in its order.
+  - `multiflow_benders` solves its rounds on the relaxation before `_solve`: it sets the option where it builds the model.
+  - The help, the warning and parameters.md said the other solvers have no such setting: SCIP has its numerics emphasis, which mippp cannot set. results.md says the margin of the bound is 1e-6 under a score below 1, as the code does.
+  - Checks: 73 tests, the two new ones fail before the fix; 837 cases identical to the capture of 20a1f6e but the 11 listings of the reworded help; `check.py` on the heuristics and `multiflow_benders`, 145 runs, 0 failures.
+  - Found, left as it is: a score under 1 is checked against a margin of 1e-6, not 1e-6 of itself, as the budget is; an instance of qualities near 1e-5 has scores near 1e-9, which the qualities are never scaled up to correct, and a bound of 0 then passes.
+- 2026-11-15, this commit: the test of the qualities of fb49c22 refused instances that main ran: it took every gain, of options over the budget too, and counted sources and targets that never connect. The product of the sums of the qualities, with the gains of the options that fit alone, is now a bound only: when it overflows, the scores with those options are computed, and only one that is not finite refuses the instance. Two unit tests, a source and a target of 1e200 that never connect and a gain of 1e155 over the budget; 73 tests; the capture as for 0f49bb7.
+
+For the owner: nothing ruled is left on this branch. Not ruled, so not started: the parser (PR), the static library (L1), O3 to O5, the README, Windows and the releases. Found while adding the option, not done: SCIP's numerics emphasis needs `SCIPsetEmphasis` in mippp's table for SCIP; MOSEK's setting could be set by its name with `MSK_putnaintparam`, which mippp does not load either.

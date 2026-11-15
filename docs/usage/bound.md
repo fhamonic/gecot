@@ -56,6 +56,7 @@ The solutions that the bound covers are those of `gecot optimize`: the options o
         "mip-start":             null,
         "mip-start-algorithm":   "none",
         "time-limit":            null,
+        "numeric-focus":         false,
         "evict-age":             0,
         "pricing":               "search",
         "max-activations":       0,

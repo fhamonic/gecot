@@ -14,7 +14,7 @@ namespace gecot {
 // grow with the options bought, so does a non-decreasing criterion
 template <instance_c I>
 bound_report all_options_bound(const I & instance) {
-    if(!is_non_decreasing(instance.criterion()))
+    if(!has_non_decreasing_criterion(instance))
         throw std::invalid_argument(
             "all_options: the criterion is not non-decreasing in the case "
             "scores");

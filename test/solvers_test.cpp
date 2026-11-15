@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <cmath>
 #include <ranges>
 #include <set>
 #include <string>
@@ -104,6 +105,93 @@ GTEST_TEST(solvers, an_option_scores_the_same_after_any_other) {
             EXPECT_EQ(together[i][i / 2], scores(with, {i})[i][i / 2])
                 << (with ? "with " : "without ") << i;
     }
+}
+
+// Two cases of two woods, each with the option that improves its arcs, and
+// the criterion z_0 - z_1: the option of the case 1 lowers the score, and
+// both fit in the budget.
+GTEST_TEST(solvers, no_option_that_lowers_the_score) {
+    auto improvable = [](const gecot::option_t i) {
+        return case_spec{
+            2,  {{0, 1}, {1, 0}},        {0.5, 0.5}, {1.0, 1.0}, {1.0, 1.0},
+            {}, {{{0.9, i}}, {{0.9, i}}}};
+    };
+    const Instance instance = build_instance(
+        {1.0, 1.0}, {improvable(0), improvable(1)},
+        criterion_sum{
+            {criterion_var{0}, criterion_product{{-1.0, criterion_var{1}}}}});
+    const gecot::budget_t budget{{2}};
+    auto bought = [&](const auto & solver) {
+        const auto solution = solver.solve(instance, budget);
+        return std::vector<bool>{solution[0], solution[1]};
+    };
+    using gecot::solvers::Greedy, gecot::solvers::Static;
+    const std::vector<bool> first_only{true, false};
+    EXPECT_EQ(bought(Greedy{}), first_only);
+    EXPECT_EQ(bought(Static{}), first_only);
+    // the cost of both fits: the second is removed for the score
+    EXPECT_EQ(bought(Greedy{.decremental = true}), first_only);
+    EXPECT_EQ(bought(Static{.decremental = true}), first_only);
+    EXPECT_EQ(bought(Greedy{.decremental = true, .only_dec = true}),
+              first_only);
+    EXPECT_EQ(bought(Static{.decremental = true, .only_dec = true}),
+              first_only);
+    // the reference of the worst choices spends the budget
+    EXPECT_EQ(bought(Greedy{.worst = true}), (std::vector<bool>{true, true}));
+}
+
+// The criterion z_0 - z_1, z_0 of 1e6. Option 0 (cost 1000) adds 0.04 to
+// z_1, option 1 (cost 0.01) 5e-7 to z_0, option 2 (cost 1e4) 0.4 to z_0:
+// the ratio of 0 is tied with that of 1, the best, whose window grows with
+// 1 / its cost. The tie takes the lowest id, 0, which lowers the score.
+GTEST_TEST(solvers, greedy_takes_no_tie_that_lowers_the_score) {
+    const Instance instance = build_instance(
+        {1000.0, 0.01, 1e4},
+        {case_spec{1,
+                   {},
+                   {},
+                   {1000.0},
+                   {1000.0},
+                   {{{2.5e-10, 2.5e-10, 1}, {2e-4, 2e-4, 2}}},
+                   {}},
+         case_spec{1, {}, {}, {0.0}, {0.0}, {{{0.2, 0.2, 0}}}, {}}},
+        criterion_sum{
+            {criterion_var{0}, criterion_product{{-1.0, criterion_var{1}}}}});
+    const auto solution =
+        gecot::solvers::Greedy{}.solve(instance, gecot::budget_t{{20000}});
+    EXPECT_EQ((std::vector<bool>{solution[0], solution[1], solution[2]}),
+              (std::vector<bool>{false, true, true}));
+}
+
+// The criterion z_0 - z_1, z_0 of 1e6, and z_1 the sum of two vertices:
+// option 0 (cost 5e-7) adds 9e-7 to it, option 1 (cost 1) adds 1. Both fit.
+// The smallest loss per unit of cost is that of 0, -1.8, inside the tie
+// window of the score: removing it raises the score by less than the window,
+// removing 1 by 1.
+GTEST_TEST(solvers, decremental_removes_what_raises_the_score) {
+    const Instance instance = build_instance(
+        {5e-7, 1.0},
+        {case_spec{1, {}, {}, {1000.0}, {1000.0}, {}, {}},
+         case_spec{2,
+                   {},
+                   {},
+                   {0.0, 0.0},
+                   {0.0, 0.0},
+                   {{{std::sqrt(9e-7), std::sqrt(9e-7), 0}}, {{1.0, 1.0, 1}}},
+                   {}}},
+        criterion_sum{
+            {criterion_var{0}, criterion_product{{-1.0, criterion_var{1}}}}});
+    const gecot::budget_t budget{{2}};
+    auto bought = [&](const auto & solver) {
+        const auto solution = solver.solve(instance, budget);
+        return std::vector<bool>{solution[0], solution[1]};
+    };
+    using gecot::solvers::Greedy, gecot::solvers::Static;
+    const std::vector<bool> first_only{true, false};
+    EXPECT_EQ(bought(Greedy{.decremental = true, .only_dec = true}),
+              first_only);
+    EXPECT_EQ(bought(Static{.decremental = true, .only_dec = true}),
+              first_only);
 }
 
 GTEST_TEST(solvers, static_incremental) {

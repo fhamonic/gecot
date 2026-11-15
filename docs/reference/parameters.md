@@ -70,6 +70,7 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 | `--mip-start <file>` | | a solution file (JSON, as written by `-o`) to start the solver from. Excludes `--mip-start-algorithm` |
 | `--mip-start-algorithm <name>` | `none` | the heuristic whose solution starts the solver, run in its incremental form: `none`, `static`, `greedy`. Its time counts in `--time-limit`. Excludes `--mip-start` |
 | `--time-limit <seconds>` | | after this time, the best solution found is returned |
+| `--numeric-focus` | off | asks the solver for more care in its numerical computations, at some cost in time, on every model the algorithm solves: `NumericFocus` 1 for Gurobi, the numerical emphasis for CPLEX, `NUMERICALEMPHASIS` 1 for Xpress, and the numerical emphasis level 1 of MOSEK's MIP optimizer. COPT, HiGHS, CBC and GLPK have no such setting, and SCIP's numerics emphasis cannot be set through mippp: these warn |
 
 See [Optimizing](../usage/optimize.md#parameters-of-the-algorithms).
 

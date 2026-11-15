@@ -22,7 +22,10 @@
 #include <tbb/concurrent_vector.h>
 
 #include "mippp/model_concepts.hpp"
+#include "mippp/solvers/cplex/all.hpp"
 #include "mippp/solvers/gurobi/all.hpp"
+#include "mippp/solvers/mosek/all.hpp"
+#include "mippp/solvers/xpress/all.hpp"
 
 #include "melon/graph.hpp"
 
@@ -52,6 +55,15 @@ concept lazy_constraint_model =
     mippp::has_solution_injection<
         mippp::candidate_solution_callback_handle_t<M>, M>;
 
+// Backends whose models _set_numeric_focus can set; MOSEK has the setting
+// for its MIP optimizer alone.
+template <typename M>
+inline constexpr bool has_numeric_focus =
+    std::same_as<M, mippp::gurobi_milp> || std::same_as<M, mippp::gurobi_lp> ||
+    std::same_as<M, mippp::cplex_milp> || std::same_as<M, mippp::cplex_lp> ||
+    std::same_as<M, mippp::xpress_milp> || std::same_as<M, mippp::xpress_lp> ||
+    std::same_as<M, mippp::mosek_milp>;
+
 struct mip_solver_base {
     // the relative gap between a solution and the bound at which a MIP
     // solver stops
@@ -77,6 +89,8 @@ struct mip_solver_base {
     bool no_pruning = false;
     std::optional<std::vector<std::string>> mip_start;
     std::optional<double> time_limit;
+    // the solver asked for more care in its numerical computations
+    bool numeric_focus = false;
 
     template <typename M, typename V>
     struct formula_variable_visitor {
@@ -254,9 +268,9 @@ struct mip_solver_base {
             // absolute: at its default 1e-6, the bound ended 2e-8 below the
             // optimum on the scaled scores of trivial_reformulate_instance
             GRB.setdblparam(env, "OptimalityTol", 1e-9);
-            // pruned better solutions before the scores were scaled
-            GRB.setintparam(env, "NumericFocus", 1);
         }
+        _warn_without_numeric_focus<M>("MIP");
+        _set_numeric_focus(model);
         if constexpr(mippp::has_progress_callback<M>)
             model.set_progress_callback([](auto & handle) noexcept {
                 if(stop_requested) {
@@ -377,6 +391,52 @@ struct mip_solver_base {
     // gap: the relative MIP gap, which mippp calls the optimality tolerance;
     // Gurobi's OptimalityTol is another parameter, set in _solve. Backends
     // without these setters keep their defaults.
+    // With numeric_focus, the setting of the solver for the numerical care
+    // of model, at its first level above the default. The ids are those of
+    // the solvers' headers, which mippp's tables do not name.
+    template <typename M>
+    void _set_numeric_focus(M & model) const {
+        if(!numeric_focus) return;
+        int error = 0;
+        if constexpr(std::same_as<M, mippp::gurobi_milp> ||
+                     std::same_as<M, mippp::gurobi_lp>)
+            error = model.native_api().setintparam(model.native_model().first,
+                                                   "NumericFocus", 1);
+        else if constexpr(std::same_as<M, mippp::cplex_milp> ||
+                          std::same_as<M, mippp::cplex_lp>)
+            // CPXPARAM_Emphasis_Numerical, which has no other level
+            error = model.native_api().setintparam(model.native_model().first,
+                                                   1083, 1);
+        else if constexpr(std::same_as<M, mippp::xpress_milp> ||
+                          std::same_as<M, mippp::xpress_lp>)
+            // XPRS_NUMERICALEMPHASIS: its default is -1, automatic, and 0
+            // asks for speed
+            error =
+                model.native_api().setintcontrol(model.native_model(), 8416, 1);
+        else if constexpr(std::same_as<M, mippp::mosek_milp>)
+            // MSK_IPAR_MIO_NUMERICAL_EMPHASIS_LEVEL. The id is the position
+            // of the name in an enum ordered by names, as are those that
+            // mippp writes out for MOSEK (100, 110): a parameter added or
+            // removed before it would move these too, which the versions
+            // that mippp validates rule out.
+            error = static_cast<int>(model.native_api().putintparam(
+                model.native_model().second,
+                static_cast<mippp::mosek::impl::v1::MSKiparame>(84), 1));
+        if(error)
+            throw std::runtime_error(std::format(
+                "--numeric-focus: the solver refused its setting (error {})",
+                error));
+    }
+    // once per kind of model, not per model: tree_lp has one per target
+    template <typename M>
+    void _warn_without_numeric_focus(const std::string_view models) const {
+        if(numeric_focus && !has_numeric_focus<M>)
+            spdlog::warn(
+                "No numeric focus is set for the {} models of this solver: "
+                "--numeric-focus ignored for them",
+                models);
+    }
+
     template <typename M>
     static void _set_tolerances(M & model, const double gap,
                                 const double feasibility_tol) {

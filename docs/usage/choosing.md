@@ -85,16 +85,16 @@ Instances with [conflict sets](instance.md#conflict-sets) or [several costs](ins
 
 Every solver can run `flow_mip` and `path_lp`, but not with the same features. GECOT warns when a parameter asks for a feature that the solver lacks.
 
-| Solver | Algorithms | `--mip-start` | Gap of $10^{-10}$ | Bound in the result | `--evict-age` |
-|---|---|:-:|:-:|:-:|:-:|
-| Gurobi | all | ✓ | ✓ | ✓ | ✓ |
-| CPLEX | all | ✓ | ✓ | ✓ | ✓ |
-| COPT | all | ✓ | ✓ | ✓ | – |
-| Xpress | `flow_mip`, `path_lp`, `tree_lp` | ✓ | ✓ | ✓ | – |
-| MOSEK | `flow_mip`, `path_lp`, `tree_lp` | ✓ | – | ✓ | – |
-| HiGHS | `flow_mip`, `path_lp`, `tree_lp` | ✓ | ✓ | ✓ | ✓ |
-| SCIP | `flow_mip`, `path_lp`, `tree_lp` | – | ✓ | ✓ | ✓ |
-| CBC | `flow_mip`, `path_lp`, `tree_lp` | ✓ | ✓ | ✓ | ✓ |
-| GLPK | `flow_mip`, `path_lp` | – | – | – | – |
+| Solver | Algorithms | `--mip-start` | Gap of $10^{-10}$ | Bound in the result | `--evict-age` | `--numeric-focus` |
+|---|---|:-:|:-:|:-:|:-:|:-:|
+| Gurobi | all | ✓ | ✓ | ✓ | ✓ | ✓ |
+| CPLEX | all | ✓ | ✓ | ✓ | ✓ | ✓ |
+| COPT | all | ✓ | ✓ | ✓ | – | – |
+| Xpress | `flow_mip`, `path_lp`, `tree_lp` | ✓ | ✓ | ✓ | – | ✓ |
+| MOSEK | `flow_mip`, `path_lp`, `tree_lp` | ✓ | – | ✓ | – | MIP only |
+| HiGHS | `flow_mip`, `path_lp`, `tree_lp` | ✓ | ✓ | ✓ | ✓ | – |
+| SCIP | `flow_mip`, `path_lp`, `tree_lp` | – | ✓ | ✓ | ✓ | – |
+| CBC | `flow_mip`, `path_lp`, `tree_lp` | ✓ | ✓ | ✓ | ✓ | – |
+| GLPK | `flow_mip`, `path_lp` | – | – | – | – | – |
 
 Every solver honours `--time-limit`. Without the optimality gap setting, a solver stops at its own default gap, and `optimal` then means optimal within this gap. Ctrl-C reaches a solver when it next reports its progress: within seconds with Gurobi, later with HiGHS, never with CBC.

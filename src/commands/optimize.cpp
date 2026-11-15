@@ -191,6 +191,7 @@ optimize_outcome evaluate(const prepared_instance & prepared,
         cases_pc_num[raw_instance.case_id_from_name(instance_case.name())] =
             read_cases_pc_num[instance_case.id()] * score_scale;
     const double score = raw_instance.eval_criterion(cases_pc_num);
+    check_finite_score(score, "the score of the solution");
     std::vector<double> cost;
     for(std::size_t r = 0; r < prepared.budget.size(); ++r)
         cost.push_back(gecot::compute_solution_cost(instance, solution, r));
@@ -202,9 +203,18 @@ optimize_outcome evaluate(const prepared_instance & prepared,
         const double bound = report.best_bound.value() * score_scale;
         report.stats.emplace_back("best_bound", bound);
         if(score > 0) report.stats.emplace_back("gap", (bound - score) / score);
-        // at the optimum, a few ulps below the recomputed score; an
-        // infeasible selection is no proof of its own score
-        best_bound = feasible ? std::max(bound, score) : bound;
+        // Shown as the score, a bound further under it would read as a
+        // proof of optimality. An infeasible selection is no proof of its
+        // own score.
+        if(!feasible)
+            best_bound = bound;
+        else if(bound >= score - bound_margin * std::max(1.0, std::abs(score)))
+            best_bound = std::max(bound, score);
+        else
+            spdlog::warn(
+                "The bound {} of the algorithm is below the score {} of its "
+                "solution: no bound is shown, nor any share guaranteed",
+                bound, score);
     }
     return {.status = std::move(report.status),
             .option_values = std::move(option_values),

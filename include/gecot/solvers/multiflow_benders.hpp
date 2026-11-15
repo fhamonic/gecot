@@ -401,6 +401,8 @@ struct multiflow_benders : public mip_solver_base {
         spdlog::stopwatch sw;
         M model;
         _set_tolerances(model, mip_gap, feasibility_tol);
+        // the rounds on the relaxation solve the model before _solve does
+        _set_numeric_focus(model);
 
         // Cases and criterion, in flow.md: the scores z_k under their
         // criterion (Linearizing the criterion), the options x_i within the

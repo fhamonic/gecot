@@ -32,8 +32,17 @@ std::string format_score(double score);
 std::string format_percent(double percent, bool sign);
 // "+11.28 %" over initial_score, the score itself if initial_score <= 0
 std::string format_gain(double score, double initial_score);
+// throws if score, which what names, is not a finite number, which JSON has
+// not: the qualities are checked when the instance is reformulated, so the
+// weights or the products of the criterion are too large
+void check_finite_score(double score, std::string_view what);
+// How far under the score of a solution, relative to the score or to 1, a
+// bound still counts as one: at the optimum, the bound of a solver is a few
+// ulps under the recomputed score. Further under, its tolerances failed.
+inline constexpr double bound_margin = 1e-6;
 // in %, rounded down: the share of the best possible gain, bound -
-// base_score, that score - base_score reaches
+// base_score, that score - base_score reaches; none if bound is not above
+// base_score, or is under score by more than bound_margin
 std::optional<double> guaranteed_gain_share(double score, double bound,
                                             double base_score);
 std::string format_duration(double seconds);

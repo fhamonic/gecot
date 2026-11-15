@@ -542,6 +542,8 @@ struct path_lp : public mip_solver_base {
         LP model;
         if constexpr(has_feasibility_tolerance<LP>)
             model.set_feasibility_tolerance(feasibility_tol);
+        _warn_without_numeric_focus<LP>("LP");
+        _set_numeric_focus(model);
         model.set_maximization();
         const auto x = model.add_variables(
             instance.options().size(), [](const option_t & i) { return i; });

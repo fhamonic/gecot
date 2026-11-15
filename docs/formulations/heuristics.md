@@ -34,7 +34,7 @@ There are two heuristics, `static` and `greedy`, and each works in two direction
 
 With `--decremental`, `--only-dec` skips these final purchases.
 
-The incremental steps, these final purchases included, buy as long as an option fits, even one that gains nothing.
+The incremental steps, these final purchases included, buy as long as an option fits, even one that gains nothing, but not one that would lower the score. Only a [criterion that decreases](../usage/instance.md#which-formulas-the-algorithms-accept) in the score of a case allows such an option, and for such a criterion the decremental steps go on once the cost fits, as long as a removal raises the score. `greedy --worst` keeps no such rule.
 
 When several options are tied for the best gain or the smallest loss, `greedy` takes the first of them in the order of the instance. Tied means that their gains, or losses, differ by less than $10^{-12}$ of the score per unit of cost: within the rounding of the scores, which would otherwise choose among options that gain the same.
 

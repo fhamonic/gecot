@@ -12,6 +12,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include "gecot/bounds/criterion_analysis.hpp"
 #include "gecot/concepts/instance.hpp"
 #include "gecot/helper.hpp"
 #include "gecot/solvers/heuristics_common.hpp"
@@ -82,11 +83,13 @@ struct Greedy {
         const auto weight = [&](const option_t & i) {
             return costs[i] == 0 ? 1.0 : 1 / costs[i];
         };
+        // excluded: the options that cannot be taken, even tied
         const auto first_tied = [&](std::vector<option_t> & candidates,
-                                    const auto best_it) {
+                                    const auto best_it, auto && excluded) {
             auto first_it = best_it;
             for(auto it = candidates.begin(); it != candidates.end(); ++it)
-                if(*it < *first_it && tier(*it) == tier(*best_it) &&
+                if(*it < *first_it && !excluded(*it) &&
+                   tier(*it) == tier(*best_it) &&
                    (costs[*it] == 0) == (costs[*best_it] == 0) &&
                    std::abs(key(*it) - key(*best_it)) <=
                        tie_window * std::abs(previous_score) *
@@ -95,9 +98,14 @@ struct Greedy {
             return first_it;
         };
         // --decremental: the option of smallest loss per unit of cost
-        // (largest with --worst) is removed, until the cost fits the budget
+        // (largest with --worst) is removed, until the cost fits the budget;
+        // then, without --worst, while removing one raises the score, which
+        // only a criterion that can decrease allows: for the others, the
+        // test would cost a last evaluation of every option
+        const bool can_decrease =
+            !worst && !has_non_decreasing_criterion(instance);
         while(!options.empty() &&
-              purchased > budget.front() + feasibility_tol) {
+              (purchased > budget.front() + feasibility_tol || can_decrease)) {
             landscape.scores_without(solution, options, options_cases_pc_num);
             for(const option_t & i : options) {
                 options_ratios[i] =
@@ -105,9 +113,22 @@ struct Greedy {
                      instance.eval_criterion(options_cases_pc_num[i])) /
                     instance.option_cost(i);
             }
-            auto worst_option_it = first_tied(
-                options, worst ? std::ranges::max_element(options, by_ratio)
-                               : std::ranges::min_element(options, by_ratio));
+            // once the cost fits, an option whose removal does not raise the
+            // score is kept: the smallest ratio can be that of such an option
+            // of small cost, beside a removal that raises the score
+            const bool fits = purchased <= budget.front() + feasibility_tol;
+            const auto kept = [&](const option_t & i) {
+                return fits && options_ratios[i] * instance.option_cost(i) >=
+                                   -tie_window * std::abs(previous_score);
+            };
+            auto worst_option_it = options.end();
+            for(auto it = options.begin(); it != options.end(); ++it)
+                if(!kept(*it) && (worst_option_it == options.end() ||
+                                  (worst ? by_ratio(*worst_option_it, *it)
+                                         : by_ratio(*it, *worst_option_it))))
+                    worst_option_it = it;
+            if(worst_option_it == options.end()) break;
+            worst_option_it = first_tied(options, worst_option_it, kept);
             option_t worst_option = *worst_option_it;
             const double worst_option_price =
                 instance.option_cost(worst_option);
@@ -224,10 +245,24 @@ struct Greedy {
                         previous_score;
                     options_ratios[i] = costs[i] == 0 ? gain : gain / costs[i];
                 }
-                auto best_option_it = first_tied(
-                    free_options,
+                // Without --worst, no option that lowers the score is bought,
+                // which only a criterion that can decrease allows, not even
+                // one tied with the best. If the best does, all the others
+                // do: only the swaps are left.
+                const auto lowers = [&](const option_t & i) {
+                    return !worst &&
+                           (costs[i] == 0 ? options_ratios[i]
+                                          : options_ratios[i] * costs[i]) <
+                               -tie_window * std::abs(previous_score);
+                };
+                const auto best_it =
                     worst ? std::ranges::min_element(free_options, by_ratio)
-                          : std::ranges::max_element(free_options, by_ratio));
+                          : std::ranges::max_element(free_options, by_ratio);
+                if(lowers(*best_it)) {
+                    free_options.clear();
+                    continue;
+                }
+                auto best_option_it = first_tied(free_options, best_it, lowers);
                 option_t best_option = *best_option_it;
                 // as the ratio times the cost, as before the cost dimensions
                 if(costs[best_option] == 0)

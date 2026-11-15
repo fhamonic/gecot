@@ -178,6 +178,9 @@ struct tree_lp : public mip_solver_base {
         LP model;
         if constexpr(has_feasibility_tolerance<LP>)
             model.set_feasibility_tolerance(feasibility_tol);
+        _warn_without_numeric_focus<LP>("LP");
+        _set_numeric_focus(model);
+        _warn_without_numeric_focus<MILP>("pricing MIP");
         model.set_maximization();
         const auto x = model.add_variables(
             instance.options().size(), [](const option_t & i) { return i; });
@@ -212,6 +215,7 @@ struct tree_lp : public mip_solver_base {
                 targets.emplace_back(instance, budget, instance_case,
                                      strong_arcs_map[t], useless_arcs_map[t], t,
                                      !no_pruning);
+                _set_numeric_focus(targets.back().model);
             }
             for(const auto & p : std::views::drop(targets, first_target)) {
                 auto & rows = purchase_rows.emplace_back();

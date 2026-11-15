@@ -86,10 +86,13 @@ bound_outcome evaluate(const prepared_instance & prepared,
                        const long long computation_time_ms) {
     const double score_scale = prepared.score_scale;
     const double bound = report.bound * score_scale;
+    check_finite_score(bound, "the bound");
     std::optional<double> all_options_bound;
-    if(gecot::is_non_decreasing(prepared.instance.criterion()))
+    if(gecot::has_non_decreasing_criterion(prepared.instance)) {
         all_options_bound =
             gecot::all_options_bound(prepared.instance).bound * score_scale;
+        check_finite_score(all_options_bound.value(), "the all options bound");
+    }
     for(const auto & [key, value] : report.score_stats)
         report.stats.emplace_back(key, value * score_scale);
     return {.status = std::move(report.status),

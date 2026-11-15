@@ -200,11 +200,11 @@ The scores of two cases can differ by orders of magnitude, since they grow with 
 |---|---|---|---|
 | sums, minimums, products by non-negative constants | yes | yes | yes |
 | product of formulas that depend on the scores | yes | error | yes |
-| decreasing in the score of a case (a negative constant in a product, for instance) | evaluated as written | error | error |
+| decreasing in the score of a case (a negative constant in a product, for instance) | evaluated as written, and no option that lowers it is bought | error | error |
 
 !!! note "Keep the criterion non-decreasing"
 
-    The exact algorithms and the relaxations [model the score of each case as an upper bound](../formulations/flow.md#linearizing-the-criterion), which is right only if a higher score of a case never lowers the criterion. They refuse the others, such as `[-1, "trout"]`, with the error `the criterion is not non-decreasing in the case scores`. In a formula made of sums and products by constants only, what matters is the total weight of each case: `{"operation": "sum", "values": [[2, "trout"], [-1, "trout"]]}` is fine, and GECOT [adds up such terms](../formulations/preprocessing.md#the-instance-given-to-the-algorithms) before the run. Otherwise every term must be non-decreasing: a minimum with a decreasing term is refused. The bound `all_options` is stricter, and refuses any term that still decreases once the terms are added up, as `[-1, [-2, "trout"]]`. A heuristic evaluates any formula, unless it is run with `--reformulation path_lp`, which goes through the path relaxation.
+    The exact algorithms and the relaxations [model the score of each case as an upper bound](../formulations/flow.md#linearizing-the-criterion), which is right only if a higher score of a case never lowers the criterion. They refuse the others, such as `[-1, "trout"]`, with the error `the criterion is not non-decreasing in the case scores`. In a formula made of sums and products by constants only, what matters is the total weight of each case: `{"operation": "sum", "values": [[2, "trout"], [-1, "trout"]]}` is fine, and GECOT [adds up such terms](../formulations/preprocessing.md#the-instance-given-to-the-algorithms) before the run. Otherwise every term must be non-decreasing: a minimum with a decreasing term is refused. A heuristic evaluates any formula, unless it is run with `--reformulation path_lp`, which goes through the path relaxation.
 
 ## Errors
 
@@ -215,6 +215,7 @@ GECOT checks the instance when it reads it, and stops with a message that starts
 | `option id '...' appears multiple times` (also for vertices and arcs) | two rows with the same identifier |
 | `unknown vertex id '...'`, `unknown arc id '...'`, `unknown option id '...'`, `unknown case '...'` | a row, or the criterion, refers to an identifier that no table defines |
 | `'...' is not a valid probability`, `qualities must be non-negative`, `quality gains must be non-negative`, `qualities must be finite numbers`, `quality gains must be finite numbers`, `'...' is not a valid cost` | a value out of range in a CSV file, or one too large to be a number, as `1e400` |
+| `the qualities of the case '...' are too large: with the options that fit in the budget, its score exceeds the largest number`, `... is not a finite number: the weights or the products of the criterion are too large` | a score would exceed the largest number of the machine, about $1.8 \cdot 10^{308}$ |
 | `the criterion reads no case: every selection of options has the same score` | the criterion is a constant, or its terms cancel out, as in `{"operation": "sum", "values": ["trout", [-1, "trout"]]}` |
 | `option '...' must have the cost dimensions of the first option`, `option '...' has named costs, the first option a number` | the costs of an inline table name other dimensions than its first option's |
 | `option id '...' appears multiple times in conflict set '...'` | a row of the `conflicts` table is repeated |

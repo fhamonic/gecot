@@ -79,6 +79,7 @@ $ gecot optimize flow_mip three-woods.json 7 -o solution.json
         "mip-start":             null,
         "mip-start-algorithm":   "none",
         "time-limit":            null,
+        "numeric-focus":         false,
         "resolution":            1e-08,
         "nb-mus":                0,
         "mus-sweep":             "decades",
@@ -140,7 +141,7 @@ $ gecot optimize flow_mip three-woods.json 7 -o solution.json
 | `initial_pc_num`, `solution_pc_num` | the score of each case, without options and with the solution, including the cases that the criterion does not read |
 | `budget`, `solution_cost` | the budget and the cost of the solution; with several costs, an object with a number per dimension, as `{"area": 4, "money": 9}` |
 | `feasible` | `true` if the solution fits every budget and buys at most one option of each conflict set, as checked by the warnings below. A cost counts as within its budget up to a relative $10^{-6}$ of the budget, or of 1 under a smaller budget; this margin is the one of the command and does not follow `-t`, so that a run with a larger `-t` can be reported as not feasible |
-| `guaranteed_share` | the guaranteed share, in %, as the text result prints it after the upper bound: it is computed from the larger of `best_bound` and `solution_score`. Absent when the algorithm proves no bound, when the solution is not feasible, and when that bound is not above `base_score` |
+| `guaranteed_share` | the guaranteed share, in %, as the text result prints it after the upper bound: it is computed from the larger of `best_bound` and `solution_score`. Absent when the algorithm proves no bound, when the solution is not feasible, when that bound is not above `base_score`, and when the algorithm's bound is under `solution_score` by more than $10^{-6}$ of it, or by more than $10^{-6}$ when it is under 1, which the [warnings](#warnings-worth-reading) tell |
 | `solution` | for each option of the instance, 1 if it is bought and 0 otherwise |
 | `algorithm_report` | the status and what the algorithm reports about its run; a value that is not a finite number is left out |
 
@@ -285,6 +286,7 @@ Ctrl-C stops the algorithm and keeps its best result so far, with the status `in
 | `The solution costs ..., over the budget ...` | `tree_lp` returned its relaxation, see [above](#status) |
 | `The solution costs ... in <dimension>, over the budget ...`, `The solution buys ... options of the conflict set '...'` | should not happen with the algorithms that support several costs and conflict sets; report it |
 | `Solver stopped: time limit reached` | the result is the best so far, not a proved optimum |
+| `The bound ... of the algorithm is below the score ... of its solution: no bound is shown, nor any share guaranteed` | the solver's tolerances failed, typically on a criterion whose value is far smaller than the scores of its cases; the status, `optimal` included, is not proved either. The report keeps the algorithm's `best_bound` and `gap` |
 | `Solver stopped without a solution: ..., returning the MIP start` | the solver found nothing in the time given |
 | `This solver has no time limit: --time-limit ignored` and similar | the solver lacks a feature that a parameter asks for |
 | `mippp: warning: the ... wrapper is validated for versions ...` | the solver library is outside the range of versions that mippp was tested with |

@@ -132,9 +132,20 @@ std::string format_gain(double score, double initial_score) {
     return format_percent((score - initial_score) / initial_score * 100, true);
 }
 
+void check_finite_score(const double score, const std::string_view what) {
+    if(!std::isfinite(score))
+        throw std::invalid_argument(std::format(
+            "{} is not a finite number: the weights or the products of the "
+            "criterion are too large",
+            what));
+}
+
 std::optional<double> guaranteed_gain_share(double score, double bound,
                                             double base_score) {
     if(bound <= base_score) return std::nullopt;
+    // its share would read 100 %
+    if(bound < score - bound_margin * std::max(1.0, std::abs(score)))
+        return std::nullopt;
     // at most 100 %: the bound can be a few ulps below
     const double share =
         std::clamp((score - base_score) / (bound - base_score), 0.0, 1.0);
@@ -226,6 +237,9 @@ prepared_instance prepare_instance(const std::filesystem::path & instance_file,
     const double base_score =
         instance.eval_criterion(gecot::compute_base_cases_pc_num(instance)) *
         score_scale;
+    check_finite_score(initial_score, "the initial score");
+    check_finite_score(base_score,
+                       "the score with the options bought statically");
     spdlog::debug("Qualities scaled by 1/{:g}: {}'s scores scaled by 1/{:g}",
                   quality_scale, noun, score_scale);
     spdlog::debug("Initial score: {:g} (was {:g})", initial_score / score_scale,

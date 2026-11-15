@@ -110,6 +110,47 @@ template <gecot::instance_c I>
 reformulation<I> trivial_reformulate_instance(const I & instance,
                                               const gecot::budget_t & budget,
                                               const bool merge = true) {
+    // an option over the budget of a dimension is never bought
+    auto affordable = instance.create_option_map(true);
+    for(auto && i : instance.options())
+        affordable[i] = gecot::fits_alone(instance, i, budget);
+    // The scores of the cases with every option that fits, computed once if
+    // needed: as a score only grows with the options bought, none of a
+    // solution exceeds them.
+    std::optional<decltype(gecot::compute_solution_cases_pc_num(instance,
+                                                                affordable))>
+        fit_cases_pc_num;
+    const auto fit_scores = [&]() -> const auto & {
+        if(!fit_cases_pc_num)
+            fit_cases_pc_num.emplace(
+                gecot::compute_solution_cases_pc_num(instance, affordable));
+        return *fit_cases_pc_num;
+    };
+    // Beyond the largest double, the scales below and the results would be
+    // infinite or not a number. As a probability is at most 1, the product
+    // of the sums of the qualities with the gains that fit bounds the score;
+    // it counts sources and targets that never connect, so only when it
+    // overflows is the score computed.
+    for(auto && instance_case : instance.cases()) {
+        double source_qualities = 0, target_qualities = 0;
+        for(auto && v : melon::vertices(instance_case.graph())) {
+            source_qualities += instance_case.source_quality_map()[v];
+            target_qualities += instance_case.target_quality_map()[v];
+            for(auto && [source_gain, target_gain, i] :
+                instance_case.vertex_options_map()[v])
+                if(affordable[i]) {
+                    source_qualities += source_gain;
+                    target_qualities += target_gain;
+                }
+        }
+        if(!std::isfinite(source_qualities * target_qualities) &&
+           !std::isfinite(fit_scores()[instance_case.id()]))
+            throw std::invalid_argument(
+                "the qualities of the case '" + instance_case.name() +
+                "' are too large: with the options that fit in the budget, "
+                "its score exceeds the largest number");
+    }
+
     const criterion_formula criterion = gecot::simplified_criterion(
         instance.criterion(), std::ranges::size(instance.cases()));
     auto reformulated_case_map =
@@ -141,10 +182,6 @@ reformulation<I> trivial_reformulate_instance(const I & instance,
 
     reformulated_instance.set_cost_dimensions(cost_dimensions_names(instance));
 
-    // an option over the budget of a dimension is never bought
-    auto affordable = instance.create_option_map(true);
-    for(auto && i : instance.options())
-        affordable[i] = gecot::fits_alone(instance, i, budget);
     // a set of one affordable option or none constrains nothing
     auto in_conflict = instance.create_option_map(false);
     for(auto && set : instance.conflict_sets())

@@ -18,31 +18,48 @@
 
 #include "instance.hpp"
 
-// the criterion of the scores divided by s, each case under the id that
-// case_map gives it: a product is homogeneous of the degree of its
-// non-constant factors, so [c, f] keeps its weight c
+// The criterion φ' of z' = z / s, the scores of the cases divided by s, with
+// φ'(z') = c φ(s z') / s, each case under the id that case_map gives it; s
+// and c are powers of 2, so that φ' is exactly c φ / s. A product is
+// homogeneous of the degree of its non-constant factors, so [w, f] keeps its
+// weight w, and gets c first for a case. With c = 1 the formula keeps its
+// writing.
 template <typename M>
 struct formula_scale_visitor {
     double s;
+    double c;
     const M & case_map;
 
-    criterion_formula operator()(const criterion_constant & c) { return c / s; }
+    // what divides a formula, s / c
+    double divisor() const { return s / c; }
+
+    criterion_formula operator()(const criterion_constant & k) {
+        return k / divisor();
+    }
     criterion_formula operator()(const criterion_var & v) {
-        return case_map[v].value();
+        const criterion_var z = case_map[v].value();
+        if(c == 1) return z;
+        return criterion_product{{c, z}};
     }
     criterion_formula operator()(const criterion_sum & f) {
         return criterion_sum{scaled(f.values)};
     }
+    // a case in the product is s z', any other factor divisor() f'
     criterion_formula operator()(const criterion_product & f) {
         criterion_product product;
-        double weight = 1 / s;  // exactly 1 for [c, f], s being a power of 2
+        double weight = 1 / divisor();  // exactly 1 for [w, f]
         for(auto && e : f.values) {
             if(std::holds_alternative<criterion_constant>(e)) {
                 product.values.push_back(e);
                 continue;
             }
+            if(const auto * v = std::get_if<criterion_var>(&e)) {
+                product.values.push_back(case_map[*v].value());
+                weight *= s;
+                continue;
+            }
             product.values.push_back(std::visit(*this, e));
-            weight *= s;
+            weight *= divisor();
         }
         if(weight != 1) product.values.insert(product.values.begin(), weight);
         return product;
@@ -57,6 +74,111 @@ struct formula_scale_visitor {
         return scaled_values;
     }
 };
+
+// The size of the criterion, at which it varies with the scores of its
+// cases: |w z_k| for a case, w the product of the constants above it; the
+// largest of the terms of a sum, the smallest of those of a minimum, which
+// holds its value; a product of several formulas that read cases as a
+// whole. A constant added is left out: z + 1e8 has the size of z.
+template <typename M>
+double criterion_size(const criterion_formula & criterion,
+                      const M & cases_pc_num, const double weight = 1) {
+    return std::visit(
+        [&]<typename F>(const F & f) -> double {
+            if constexpr(std::same_as<F, criterion_constant>)
+                return 0;
+            else if constexpr(std::same_as<F, criterion_var>)
+                return std::abs(weight * cases_pc_num[f]);
+            else if constexpr(std::same_as<F, criterion_product>) {
+                double w = weight;
+                std::vector<const criterion_formula *> formulas;
+                for(auto && e : f.values) {
+                    if(const auto * k = std::get_if<criterion_constant>(&e))
+                        w *= *k;
+                    else
+                        formulas.push_back(&e);
+                }
+                if(formulas.empty()) return 0;
+                if(formulas.size() == 1)
+                    return criterion_size(*formulas.front(), cases_pc_num, w);
+                return std::abs(weight *
+                                gecot::formula_eval_visitor{cases_pc_num}(f));
+            } else {
+                std::optional<double> size;
+                for(auto && e : f.values) {
+                    if(std::holds_alternative<criterion_constant>(e)) continue;
+                    const double s = criterion_size(e, cases_pc_num, weight);
+                    size = !size ? s
+                           : std::same_as<F, criterion_min>
+                               ? std::min(*size, s)
+                               : std::max(*size, s);
+                }
+                return size.value_or(0);
+            }
+        },
+        criterion);
+}
+
+// The power of 2 c that brings the size of the criterion to the largest
+// score of the cases it reads; 1 if they are within a factor 2^10, as for a
+// sum of cases. Weighted by 1e-8 on cases whose scores differ as much, the
+// criterion was near 1e-3 in the unit of the solver, under its absolute
+// tolerances: bounds under the optimum, wrong optima, and duals under the
+// margins of the pricings. Multiplying it by 1e8 fixed them, and leaves its
+// maximizers.
+// Both are taken where nothing is bought and with every option that fits
+// alone, which bound them at every solution, and c is the middle of the two
+// ratios: if together they grow by at most 2^20 from one to the other, c
+// times the size at any solution is within 2^10 of its largest score.
+// Beyond, c is 1: no factor serves every solution, and one taken at either
+// point failed.
+// Where nothing is bought, a case at 0 and weighted more than the others
+// ends far above the scores once improved; with every option, a case that
+// only options excluding one another improve sets the factor of a solution
+// that none reaches. base_cases_pc_num are the scores where nothing is
+// bought, fit_scores() gives the others.
+template <gecot::instance_c I>
+double compute_criterion_scale(const I & instance,
+                               const criterion_formula & criterion,
+                               const auto & base_cases_pc_num,
+                               auto && fit_scores, const auto & read_case_map) {
+    const auto scale = [](const double log_ratio) {
+        if(!std::isfinite(log_ratio) || std::abs(log_ratio) <= 10) return 1.0;
+        // beyond 2^100, c times a score or a weight could overflow
+        return std::ldexp(1.0, static_cast<int>(std::clamp(
+                                   std::lround(log_ratio), -100L, 100L)));
+    };
+    // Linear, its cases of one weight w, a single case or their sum: the
+    // ratio is 1 / |w| at every solution, and the scores need not be
+    // computed.
+    if(const auto form =
+           gecot::linear_form(criterion, std::ranges::size(instance.cases()))) {
+        std::optional<double> weight;
+        bool one_weight = true;
+        for(const double w : form->weights)
+            if(w != 0) {
+                one_weight = one_weight && (!weight || *weight == std::abs(w));
+                weight = std::abs(w);
+            }
+        if(weight && one_weight) return scale(-std::log2(*weight));
+    }
+    // the logarithms of the largest score and of the size of the criterion
+    const auto sizes = [&](const auto & cases_pc_num) {
+        double max_case_score = 0;
+        for(auto && instance_case : instance.cases())
+            if(read_case_map[instance_case.id()])
+                max_case_score =
+                    std::max(max_case_score, cases_pc_num[instance_case.id()]);
+        return std::pair{std::log2(max_case_score),
+                         std::log2(criterion_size(criterion, cases_pc_num))};
+    };
+    const auto [base_score, base_size] = sizes(base_cases_pc_num);
+    const auto [fit_score, fit_size] = sizes(fit_scores());
+    if(!std::isfinite(base_score + base_size + fit_score + fit_size) ||
+       fit_score - base_score + fit_size - base_size > 20)
+        return 1;
+    return scale((base_score - base_size + fit_score - fit_size) / 2);
+}
 
 template <gecot::instance_c I>
 std::vector<std::string> cost_dimensions_names(const I & instance) {
@@ -94,18 +216,24 @@ struct reformulation {
     // its cases are those that the criterion reads, in their order: a case
     // has another id in it as soon as one before it is left out
     Instance instance;
+    // its qualities are divided by quality_scale, so the scores of its cases
+    // by its square, and its criterion is multiplied by criterion_scale on
+    // top: a score of its criterion is criterion_scale / quality_scale² that
+    // of the instance given
     double quality_scale;
+    double criterion_scale;
     // the options of the original instance that are always bought
     gecot::instance_solution_t<I> static_options;
 };
 
-// returns the instance with its qualities divided by the returned power of 2,
-// so its scores are divided by its square. Gurobi's absolute tolerances gave
-// wrong optima on scores near 1e11, and near 1e-2 on bike with its qualities
+// returns the instance with its qualities divided by a power of 2, so its
+// scores are divided by its square. Gurobi's absolute tolerances gave wrong
+// optima on scores near 1e11, and near 1e-2 on bike with its qualities
 // divided by the largest: the largest case score is brought into [1e5, 4e5),
 // and an instance whose cases score less is left unscaled. Its criterion is
-// simplified_criterion's, and a case that this one does not read is left
-// out. Throws if it reads none.
+// simplified_criterion's, multiplied by compute_criterion_scale, and a case
+// that it does not read is left out. Throws if it reads none, or if a score
+// could exceed the largest double.
 template <gecot::instance_c I>
 reformulation<I> trivial_reformulate_instance(const I & instance,
                                               const gecot::budget_t & budget,
@@ -173,12 +301,15 @@ reformulation<I> trivial_reformulate_instance(const I & instance,
     const double quality_scale = std::ldexp(
         1.0, static_cast<int>(std::max(
                  0.0, std::floor(std::log2(max_case_score / 1e5) / 2))));
+    const double criterion_scale =
+        compute_criterion_scale(instance, criterion, base_cases_pc_num,
+                                fit_scores, reformulated_case_map);
 
     Instance reformulated_instance;
-    reformulated_instance.set_criterion(
-        std::visit(formula_scale_visitor{quality_scale * quality_scale,
-                                         reformulated_case_map},
-                   criterion));
+    reformulated_instance.set_criterion(std::visit(
+        formula_scale_visitor{quality_scale * quality_scale, criterion_scale,
+                              reformulated_case_map},
+        criterion));
 
     reformulated_instance.set_cost_dimensions(cost_dimensions_names(instance));
 
@@ -213,7 +344,7 @@ reformulation<I> trivial_reformulate_instance(const I & instance,
                                      reformulated_option_map, static_options,
                                      quality_scale, merge);
 
-    return {std::move(reformulated_instance), quality_scale,
+    return {std::move(reformulated_instance), quality_scale, criterion_scale,
             std::move(static_options)};
 }
 

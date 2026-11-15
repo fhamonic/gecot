@@ -219,7 +219,7 @@ prepared_instance prepare_instance(const std::filesystem::path & instance_file,
                          options_total_cost);
     }
 
-    auto [instance, quality_scale, static_options] =
+    auto [instance, quality_scale, criterion_scale, static_options] =
         trivial_reformulate_instance(raw_instance, budget, merge);
 
     spdlog::debug("Removed {} options and {} species",
@@ -230,7 +230,8 @@ prepared_instance prepare_instance(const std::filesystem::path & instance_file,
         spdlog::warn("Budget doesn't allow purchasing any options");
     }
     // the algorithm's scores, bounds and logs are in this unit
-    const double score_scale = quality_scale * quality_scale;
+    const double case_score_scale = quality_scale * quality_scale;
+    const double score_scale = case_score_scale / criterion_scale;
     auto initial_cases_pc_num = gecot::compute_base_cases_pc_num(raw_instance);
     const double initial_score =
         raw_instance.eval_criterion(initial_cases_pc_num);
@@ -242,12 +243,18 @@ prepared_instance prepare_instance(const std::filesystem::path & instance_file,
                        "the score with the options bought statically");
     spdlog::debug("Qualities scaled by 1/{:g}: {}'s scores scaled by 1/{:g}",
                   quality_scale, noun, score_scale);
+    if(criterion_scale != 1)
+        spdlog::debug(
+            "The criterion multiplied by {:g}, to the size of the scores of "
+            "its cases",
+            criterion_scale);
     spdlog::debug("Initial score: {:g} (was {:g})", initial_score / score_scale,
                   initial_score);
 
     return {std::move(raw_instance),
             std::move(instance),
             score_scale,
+            case_score_scale,
             std::move(initial_cases_pc_num),
             initial_score,
             base_score,

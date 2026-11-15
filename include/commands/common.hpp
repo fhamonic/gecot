@@ -59,9 +59,13 @@ std::unique_ptr<std::FILE, void (*)(std::FILE *)> open_output_file(
 struct prepared_instance {
     Instance raw_instance;
     // trivial_reformulate_instance's: options bought statically applied,
-    // options over the budget removed, qualities divided by sqrt(score_scale)
+    // options over the budget removed, qualities divided by
+    // sqrt(case_score_scale)
     Instance instance;
+    // a score of the criterion of the raw instance is score_scale times the
+    // instance's; a score of a case, case_score_scale times
     double score_scale;
+    double case_score_scale;
     // of raw_instance, options bought statically not applied
     melon::static_map<gecot::case_id_t, double> initial_cases_pc_num;
     double initial_score;

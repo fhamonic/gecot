@@ -189,7 +189,7 @@ optimize_outcome evaluate(const prepared_instance & prepared,
         gecot::compute_solution_cases_pc_num(instance, solution);
     for(const auto & instance_case : instance.cases())
         cases_pc_num[raw_instance.case_id_from_name(instance_case.name())] =
-            read_cases_pc_num[instance_case.id()] * score_scale;
+            read_cases_pc_num[instance_case.id()] * prepared.case_score_scale;
     const double score = raw_instance.eval_criterion(cases_pc_num);
     check_finite_score(score, "the score of the solution");
     std::vector<double> cost;

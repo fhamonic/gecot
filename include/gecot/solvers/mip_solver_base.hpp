@@ -135,19 +135,26 @@ struct mip_solver_base {
             model.get().add_constraint(var == xsum(vars));
             return var;
         }
+        // the literal constants of the product times its one other
+        // factor, wherever they stand: the scaled criterion of
+        // trivial_reformulate_instance puts its weight in front of [w, z]
         auto operator()(const criterion_product & f) {
             using namespace mippp::operators;
-            if(!std::holds_alternative<criterion_constant>(f.values[0]) ||
-               f.values.size() != 2)
-                throw std::invalid_argument(
-                    "mip doesn't support products of variables in the "
-                    "criterion "
-                    "!");
-
+            double weight = 1;
+            const criterion_formula * formula = nullptr;
+            for(auto && e : f.values) {
+                if(const auto * k = std::get_if<criterion_constant>(&e))
+                    weight *= *k;
+                else if(formula)
+                    throw std::invalid_argument(
+                        "mip doesn't support products of variables in the "
+                        "criterion !");
+                else
+                    formula = &e;
+            }
+            if(!formula) return (*this)(criterion_constant{weight});
             auto var = free_variable();
-            model.get().add_constraint(
-                var == std::get<criterion_constant>(f.values[0]) *
-                           variable(f.values[1]));
+            model.get().add_constraint(var == weight * variable(*formula));
             return var;
         }
         auto operator()(const criterion_min & f) {

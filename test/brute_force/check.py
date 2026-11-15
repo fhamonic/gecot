@@ -14,9 +14,11 @@ is optimal and its score the optimum. A bound passes if it is at least the
 optimum; split_lagrange refusing the shape of the options is no failure. The instances are variants of the repository's
 three woods, Aude, conflicts and two species instances, written to a temporary
 directory. The two species come with criteria that gecot simplifies, leaving a
-case out. Three oracles bypass the new rows: a second dimension equal to the
-first, an all-zero one, and renamed dimensions, each with the same optimum as
-its plain twin. Needs numpy.
+case out, and with weights of 1e-8 to 1e12 on copies of the squirrel whose
+scores differ as much, which the scale of the criterion must serve. Three
+oracles bypass the new rows: a second dimension equal to the first, an
+all-zero one, and renamed dimensions, each with the same optimum as its plain
+twin. Needs numpy.
 """
 import copy, csv, json, os, random, subprocess, sys, tempfile
 
@@ -105,6 +107,43 @@ def write_instances(out):
         j["criterion"] = criterion
         json.dump(j, open(f"{out}/{name}.json", "w"))
         cases.append((f"{out}/{name}.json", ["3", "5", "7"]))
+    # a second squirrel whose scores are 1e8 and 1e10 times larger, weighted by 1e-8 and 1e-10:
+    # without the scale of the criterion, bounds under the optimum and a wrong optimum
+    # and both 1e5 times larger, under a minimum held by its term of weight 1e-10
+    def scaled(case, factor):
+        case = copy.deepcopy(case)
+        for v in case["vertices"]:
+            v["source_quality"] *= factor
+            v["target_quality"] *= factor
+        for g in case.get("vertices_improvements", []):
+            g["source_quality_gain"] *= factor
+            g["target_quality_gain"] *= factor
+        return case
+    min_of = lambda *values: {"operation": "min", "values": list(values)}
+    for name, factors, criterion in (
+            ("weighted_sum", (1, 1e4), term("squirrel", [1e-8, "copy"])),
+            ("weighted_min", (1, 1e5), min_of("squirrel", [1e-10, "copy"])),
+            ("weighted_alike", (1e5, 1e5), min_of("squirrel", [1e-10, "copy"]))):
+        j = copy.deepcopy(species)
+        del j["cases"]["hedgehog"]
+        twin = scaled(j["cases"]["squirrel"], factors[1])
+        j["cases"]["squirrel"] = scaled(j["cases"]["squirrel"], factors[0])
+        j["cases"]["copy"] = twin
+        j["criterion"] = criterion
+        json.dump(j, open(f"{out}/{name}.json", "w"))
+        cases.append((f"{out}/{name}.json", ["2", "4", "5", "7"]))
+    # a case weighted by 1e12, at 0 unless an option over every budget is bought
+    j = copy.deepcopy(species)
+    del j["cases"]["hedgehog"]
+    j["options"].append({"id": "bridge", "cost": 100})
+    j["cases"]["ghost"] = {
+        "vertices": [{"id": "a", "source_quality": 6, "target_quality": 0},
+                     {"id": "b", "source_quality": 0, "target_quality": 6}],
+        "arcs": [{"id": "a_b", "from": "a", "to": "b", "probability": 0}],
+        "arcs_improvements": [{"arc_id": "a_b", "option_id": "bridge", "improved_probability": 1}]}
+    j["criterion"] = term("squirrel", [1e12, "ghost"])
+    json.dump(j, open(f"{out}/weighted_out_of_reach.json", "w"))
+    cases.append((f"{out}/weighted_out_of_reach.json", ["3", "5", "7"]))
     # (instance, its budget, twin, the twin's budget, budget values)
     same = lambda b: b
     oracles = [(aude_variant("aude_dup", lambda i: {"money": money(i), "copy": money(i)}),

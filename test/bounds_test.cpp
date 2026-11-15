@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <format>
 #include <initializer_list>
@@ -976,6 +977,127 @@ GTEST_TEST(trivial_reformulation, leaves_out_the_cases_not_read) {
             << written(zero);
     EXPECT_THROW(trivial_reformulate_instance(instance_with(3.0), budget),
                  std::invalid_argument);
+}
+
+// Two cases of one vertex, of scores 1 and 1e12, and 1e-12 on the second: the
+// criterion is near 1 where the largest score is near 1e12. Kept so, it
+// would be near 1e-5 in the unit of the solver.
+GTEST_TEST(trivial_reformulation, scales_a_criterion_far_from_its_cases) {
+    auto instance_with = [](const double first_quality,
+                            criterion_formula criterion) {
+        return build_instance({1.0},
+                              {case_spec{1,
+                                         {},
+                                         {},
+                                         {first_quality},
+                                         {first_quality},
+                                         {{{1.0, 1.0, 0}}},
+                                         {}},
+                               case_spec{1, {}, {}, {1e6}, {1e6}, {}, {}}},
+                              std::move(criterion));
+    };
+    const gecot::budget_t budget{{1}};
+    // the constant is scaled as the rest, and does not set the factor
+    const criterion_sum weighted{
+        {criterion_min{
+             {criterion_var{0}, criterion_product{{1e-12, criterion_var{1}}}}},
+         0.5}};
+    // a first case of score 0 where nothing is bought: no factor is known to
+    // serve every solution
+    EXPECT_EQ(trivial_reformulate_instance(instance_with(0.0, weighted), budget)
+                  .criterion_scale,
+              1.0);
+    {
+        const Instance raw = instance_with(1.0, weighted);
+        const auto reformulated = trivial_reformulate_instance(raw, budget);
+        const double c = reformulated.criterion_scale;
+        const double s =
+            reformulated.quality_scale * reformulated.quality_scale;
+        EXPECT_GT(c, 1e10);
+        EXPECT_EQ(std::exp2(std::round(std::log2(c))), c);
+        // the scaled scores are exactly c / s times those of the raw instance
+        auto all = raw.create_option_map(true);
+        for(const auto & bought : {raw.create_option_map(false), all})
+            EXPECT_EQ(
+                reformulated.instance.eval_criterion(
+                    gecot::compute_solution_cases_pc_num(reformulated.instance,
+                                                         bought)),
+                c / s *
+                    raw.eval_criterion(
+                        gecot::compute_solution_cases_pc_num(raw, bought)));
+        EXPECT_EQ(written(reformulated.instance.criterion()),
+                  std::format("sum(min(product({}, z0), product({}, 1e-12, "
+                              "z1)), {})",
+                              c, c, 0.5 / (s / c)));
+    }
+    // terms near the scores of the cases, a constant beside them, and a
+    // ratio of 800, under 2^10
+    for(const criterion_formula & near :
+        {criterion_formula{criterion_var{1}},
+         criterion_formula{criterion_sum{{criterion_var{0}, criterion_var{1}}}},
+         criterion_formula{criterion_sum{{criterion_var{1}, 1e20}}},
+         criterion_formula{criterion_product{{1.0 / 800, criterion_var{1}}}}}) {
+        const auto reformulated =
+            trivial_reformulate_instance(instance_with(1.0, near), budget);
+        EXPECT_EQ(reformulated.criterion_scale, 1.0) << written(near);
+    }
+    EXPECT_EQ(trivial_reformulate_instance(
+                  instance_with(
+                      1.0, criterion_product{{1.0 / 2000, criterion_var{1}}}),
+                  budget)
+                  .criterion_scale,
+              2048.0);
+    // A case of score 0 at first and 1e6 with the option, beside one of
+    // 2.5e5 weighted by 1e-12: measured where nothing is bought, the
+    // criterion, 2.5e-7, would get a factor near 1e12, and reach 1e18 once
+    // the first case is improved.
+    const Instance zero_at_first = build_instance(
+        {1.0},
+        {case_spec{1, {}, {}, {0.0}, {0.0}, {{{1e3, 1e3, 0}}}, {}},
+         case_spec{1, {}, {}, {500.0}, {500.0}, {}, {}}},
+        criterion_sum{
+            {criterion_var{0}, criterion_product{{1e-12, criterion_var{1}}}}});
+    EXPECT_EQ(
+        trivial_reformulate_instance(zero_at_first, budget).criterion_scale,
+        1.0);
+    // the same, the first case improved by an option over the budget only:
+    // no solution reaches 1e6, the criterion stays near 2.5e-7
+    const Instance over_budget = build_instance(
+        {2.0},
+        {case_spec{1, {}, {}, {0.0}, {0.0}, {{{1e3, 1e3, 0}}}, {}},
+         case_spec{1, {}, {}, {500.0}, {500.0}, {}, {}}},
+        criterion_sum{
+            {criterion_var{0}, criterion_product{{1e-12, criterion_var{1}}}}});
+    EXPECT_GT(trivial_reformulate_instance(over_budget, budget).criterion_scale,
+              1e10);
+    // A minimum held by its term of weight 1e-10, on two cases alike: the
+    // largest term is that of the other case, the value is 1e10 times less.
+    const Instance alike = build_instance(
+        {1.0},
+        {case_spec{1, {}, {}, {1e3}, {1e3}, {}, {}},
+         case_spec{1, {}, {}, {1e3}, {1e3}, {}, {}}},
+        criterion_min{
+            {criterion_var{0}, criterion_product{{1e-10, criterion_var{1}}}}});
+    EXPECT_GT(trivial_reformulate_instance(alike, budget).criterion_scale, 1e9);
+    // A case weighted by 1e12, at 0 unless two options that exclude each
+    // other, each within the budget, are bought: with every option that fits,
+    // it would set a factor near 1e-12 for a criterion that no solution makes
+    // larger than the first case.
+    const Instance exclusive = build_instance(
+        {"cost"}, {{1.0}, {1.0}}, {{0, 1}},
+        {case_spec{1, {}, {}, {1e3}, {1e3}, {}, {}},
+         case_spec{3,
+                   {{0, 1}, {1, 2}},
+                   {0.0, 0.0},
+                   {6.0, 0.0, 0.0},
+                   {0.0, 0.0, 6.0},
+                   {},
+                   {{{1.0, 0}}, {{1.0, 1}}}}},
+        criterion_sum{
+            {criterion_var{0}, criterion_product{{1e12, criterion_var{1}}}}});
+    EXPECT_EQ(trivial_reformulate_instance(exclusive, gecot::budget_t{{2}})
+                  .criterion_scale,
+              1.0);
 }
 
 // The scores, their scale and the results would be infinite or not a

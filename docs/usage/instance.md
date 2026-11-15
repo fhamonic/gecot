@@ -192,7 +192,7 @@ For instance $PC_{\text{squirrel}} + \tfrac{1}{2} PC_{\text{hedgehog}}$, then th
 }
 ```
 
-The scores of two cases can differ by orders of magnitude, since they grow with the square of the qualities: weights are what makes a minimum or a sum meaningful. The initial score of each case, printed in the `initial_pc_num` field of the [JSON output](results.md#json), is a natural basis for them.
+The scores of two cases can differ by orders of magnitude, since they grow with the square of the qualities: weights are what makes a minimum or a sum meaningful. The initial score of each case, printed in the `initial_pc_num` field of the [JSON output](results.md#json), is a natural basis for them. GECOT [rescales the criterion](../formulations/preprocessing.md#the-instance-given-to-the-algorithms) for the solvers when its weights put it far from the scores of its cases. A weight of $10^{11}$ or more on a case can still leave the model too ill-conditioned for the Benders decompositions with Gurobi, which then report an unbounded model: `--numeric-focus` helps there.
 
 ### Which formulas the algorithms accept
 

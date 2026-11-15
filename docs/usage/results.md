@@ -248,7 +248,7 @@ For `path_lp` and `tree_lp`, each row is a round of the column generation:
 | `-v` | also the parameters of the algorithm with their values, the size of the instance after its reformulation, the factor by which the qualities are divided, a table of the preprocessing of each species, the size of the model; the progress table has a row every second or every round, and a `nodes` column |
 | `-vv` | also the details of each step, such as a table of the options that a heuristic buys or removes (a swap of `greedy` reads `a -> b`), and the solver's own log, which goes to the standard output |
 
-With `-v`, the line `Qualities scaled by 1/...` gives the factor of the [rescaling](../formulations/preprocessing.md#the-instance-given-to-the-algorithms): the solver's own log is in the rescaled unit, everything else in the unit of the instance.
+With `-v`, the line `Qualities scaled by 1/...` gives the factor of the [rescaling](../formulations/preprocessing.md#the-instance-given-to-the-algorithms), and the line `The criterion multiplied by ...`, if any, the factor of the criterion on top. The solver's own log is in the rescaled unit, and so are the lines that GECOT logs about the run itself at `-v` and `-vv`, such as `Initial score: ... (was ...)` and those of the bound methods; the summary, the result files and the progress table are in the unit of the instance.
 
 With `-v` again, the algorithms that [preprocess](../formulations/preprocessing.md) the graphs log a table once every species is preprocessed, here for `flow_benders`:
 

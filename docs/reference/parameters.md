@@ -55,7 +55,7 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 | `flow_mip` | ✓ | ✓ | `--big-m`, `--lp-relaxation`, `--indicator-constraints` |
 | `multicut_benders` | ✓ | ✓ | `--groups`, `--grouping`, `--grouping-seed`, `--big-m` |
 | `flow_benders` | ✓ | ✓ | `--big-m`, `--indicator-constraints` |
-| `multiflow_benders` | ✓ | ✓ | `--no-root-cuts`, `--no-in-out` |
+| `multiflow_benders` | ✓ | ✓ | `--no-root-cuts`, `--no-in-out`, `--no-stored-arcs` |
 | `tree_lp` | ✓ | ✓ | `--evict-age` |
 | `path_lp` | ✓ | – | `--evict-age`, `--pricing`, `--max-activations`, `--relative-gap` |
 | `static` | – | – | `-t`, `--decremental`, `--only-dec` |
@@ -119,6 +119,7 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` and `tre
 |---|---|---|
 | `--no-root-cuts` | off | for comparison: no cut on the linear relaxation before the search |
 | `--no-in-out` | off | for comparison: separates each optimum of the relaxation, without the center that moves halfway to it |
+| `--no-stored-arcs` | off | keeps no [set $A_s$](../formulations/benders.md#separation) per source but rebuilds them at each separation: the same cuts, slower, in less memory |
 
 ### `path_lp`
 

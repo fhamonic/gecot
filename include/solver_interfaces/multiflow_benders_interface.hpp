@@ -19,6 +19,10 @@ public:
                      "For comparison: the cuts of each optimum of the "
                      "relaxation, without the center that moves halfway to "
                      "it");
+        app.add_flag("--no-stored-arcs", solver.no_stored_arcs,
+                     "Keeps no set A_s of arcs per source but rebuilds them at "
+                     "each separation: the same cuts, slower, in less memory "
+                     "when the sets add up to too much");
     }
 
     gecot::solve_result<Instance> solve(

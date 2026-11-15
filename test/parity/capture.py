@@ -75,6 +75,7 @@ ALGORITHMS = HEURISTICS + [
     "flow_benders --big-m plain", "flow_benders --mip-start-algorithm static",
     "flow_benders --indicator-constraints",
     "multiflow_benders", "multiflow_benders --no-root-cuts", "multiflow_benders --no-in-out",
+    "multiflow_benders --no-stored-arcs",
     "tree_lp", "path_lp", "path_lp --pricing enumerate", "path_lp --mip-start-algorithm greedy",
 ]
 CHEAP_BOUNDS = ["all_options", "qkp_planes", "qkp_planes --iterations 20", "split_lagrange"]

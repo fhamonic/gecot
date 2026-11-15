@@ -1,6 +1,6 @@
 # multiflow_benders: where the separation spends its time, and what could be tried
 
-Status, 2026-11-15: a record of measurements and of leads. The search of labels is Dijkstra's algorithm since the branch `multiflow-dijkstra`, which did what the first two leads of 2026-11-14 asked for: "Dijkstra on reduced gains" says what it changed. "What was measured" is the label-correcting search of commit da6b556. Nothing else here is implemented. The code is `include/gecot/solvers/multiflow_benders.hpp`; the algorithm is stated in `docs/formulations/benders.md`, "`multiflow_benders`: cuts per source".
+Status, 2026-11-15: a record of measurements and of leads. The search of labels is Dijkstra's algorithm since the branch `multiflow-dijkstra`, which did what the first two leads of 2026-11-14 asked for: "Dijkstra on reduced gains" says what it changed. Since the branch `multiflow-no-source-arcs`, a pruned Dijkstra computes the sets A_s, and `--no-stored-arcs` rebuilds them at each separation: "A_s rebuilt at each separation". "What was measured" is the label-correcting search of commit da6b556. Nothing else here is implemented. The code is `include/gecot/solvers/multiflow_benders.hpp`; the algorithm is stated in `docs/formulations/benders.md`, "`multiflow_benders`: cuts per source".
 
 ## What a separation does
 
@@ -58,6 +58,22 @@ The short suite at 30 s per run, one run of each, alone on the machine, before (
 
 The 5 % on `species-natural` is within the noise of the suite: no gain there. Counted with the instrumented build, the queue search run on the same residual graphs scans 2.17 billion vertices on `species-natural` at 6000, where Dijkstra scans 1.12 billion, 1.9 times fewer; on `periurban-mixed` at 6000, 3.87 and 1.43 billion (2.7 times); on `bike-squirrel-town` at 300, 2.20 and 0.57 billion (3.9 times); on `bike-town` at 500, 3.03 and 0.69 billion (4.4 times). Where the queue search scans a vertex about twice, the heap costs what the scans save.
 
+## A_s rebuilt at each separation, 2026-11-15
+
+Since the branch `multiflow-no-source-arcs`: `--no-stored-arcs`, off by default (the owner's choice: the sets stay kept by default). The sets A_s with the m_sa of their improved copies are computed once and kept, 4 bytes per arc and 16 per improved copy. Their sizes add up to at most the arcs of G_t times its sources, summed over the targets. On `hexagon_instances/1_1900_3800` at budget 151: 1456 targets, 2.08 million sources, 8.92 billion pairs of a source and an arc, of which 2.14 billion improved copies, at least 70 GB before the slack of the vectors. G_t barely shrinks there (4077 of 4368 vertices), and A_s keeps 36 % of its arcs, the test counting every option where the budget buys 5 % of their cost.
+
+With the flag, a block keeps its sources and the two maps of the test, Π(·, t) and Π̄(·, t), and each separation rebuilds A_s and the m_sa of a source before its flow, with the forward Dijkstra and the test of before. Without it, the same function computes them once, as before. That Dijkstra does not go on from a vertex u with Π̄(s, u) · Π̄(u, t) under the threshold Π(s, t) · (1 − 10⁻⁹), less a relative 10⁻¹² for the rounding of the test: no arc of A_s leaves u, nor any vertex reached through it, and the vertices it does go on from keep their exact Π̄(s, u). A_s and the m_sa are those of before, so are the cuts.
+
+The measurements below were made before the flag, with builds that always rebuild.
+
+- Hexagon at 151, 900 s, rebuilt without the pruning: 1.8 GB through the rounds, 4.7 GB at the peak. 9 rounds in 450 s, root value +103.57 % of gain; at the limit +81.5 % for a bound of +103.5 %, 78.7 % guaranteed. The peak is the master, 18.2 million nonzeros over 15,879 rows: the cuts are nearly dense in the 1386 options, about 2 million nonzeros more per round or separation at a candidate, so the master is the next wall.
+- Hexagon at 151, 100 s, the two rebuilds: on 4 separations (8.3 million sources), the rebuild takes 1254 s of CPU without the pruning, 738 s with it, against 869 s for the flows, and the same 35.7 billion pairs. A round goes from 36 s to 28 s; the flows alone would take about 14 s.
+- The short suite at 30 s, against main 7e2fd43: the 31 runs that reach optimality have the same rounds, cuts, lazy cuts, nodes, root values and scores, bit for bit; of the 11 others, 9 have the same rounds, cuts and root value, and 2 do fewer rounds before the clock. No bound or root value under the best known score. The 31 take 201.4 s before, 228.1 s rebuilt, 225.4 s with the pruning (+12 %); the rounds 155.9, 178.7, 176.4 s. The pruning hardly helps there, where A_s holds most of a small G_t.
+- Peak memory: `species-natural` at 6000 680 MB before, 241 MB after; `urban-greening-large` at 1600 1021 and 258 MB; `bike-town` at 500 287 and 249 MB.
+- The oracle: 201 of 201 runs, before and after the pruning.
+- With the flag, the debug line of the sources no longer counts their arcs, which are not kept.
+- With the flag's build, the short suite at 30 s against main 7e2fd43. Without the flag, the 31 optimal runs are identical in rounds, cuts, lazy cuts, nodes, root values and scores (201.2 s against 201.4 s). With it, 30 of them are identical, and `urban-greening-large` at 8000 has the same cuts, nodes and score but ends its rounds on the clock at 15.2 s, one round short of the one that adds nothing; the 31 take 230.1 s (+14 %). The oracle on five configurations, two of them with the flag: 335 of 335 runs; on the four of `check.py` with `max_pushes` at 0 and at 1: 268 of 268 each. Hexagon at 151 over 100 s: 1.2 GB with the flag, two rounds by 56.4 s; without it, past 6 GB within seconds of the setup. The parity captures of main and of the branch are the same in their 837 common cases, models included, and each case with the flag matches the same case without it.
+
 ## Tried and dropped
 
 - **One Dijkstra per target, shared by the sources.** The labels of a search from t over every arc open at x̂ are a feasible dual solution for each source, and an optimal one for a source whose best path fills no arc. Those sources then need no search of their own. Valid, and the oracle passes, but: no faster on the suite (226 s against 220 s on the 31 runs), because at the points of the relaxation most sources fill an arc and search anyway; and the cuts are weaker, the shared labels being larger than a source's own away from its path (`species-natural` at 12000: 388 nodes against 14, 8858 lazy cuts against 770).
@@ -65,7 +81,7 @@ The 5 % on `species-natural` is within the noise of the suite: no gain there. Co
 
 ## Leads
 
-A change that moves the labels cannot be checked bit for bit: the check is the oracle (`test/brute_force/check.py` on the three configurations of `multiflow_benders`), the fallback forced (below), and the suite, comparing the cuts on the relaxation, the lazy cuts and the nodes, not only the time.
+A change that moves the labels cannot be checked bit for bit: the check is the oracle (`test/brute_force/check.py` on the four configurations of `multiflow_benders`), the fallback forced (below), and the suite, comparing the cuts on the relaxation, the lazy cuts and the nodes, not only the time.
 
 1. **Keeping the part of a source from a round to the next.** The part of s depends on x̂ through the options of its quality gains and of the improved copies of A_s only. When none of them moved since the last separation, the part is the same. It needs the part of each source kept sparse (its ρ_s and its coefficients), which is memory in the order of the pairs of a source and an improved copy. Worth it in the late rounds, where few options move; useless at the candidates, which differ from one another.
 2. **Smaller A_s.** The test keeps an arc when the best path of s through it, with every option, is as reliable as its best path without any. A test within the budget (the best path through the arc with the options that the budget allows) would remove more, and shorten every search. It is the tight big-M of `docs/formulations/preprocessing.md` applied to the membership of A_s; the cut stays valid as long as the test is.
@@ -81,4 +97,4 @@ $ python3 benchmark/compare.py benchmark/results/before.csv benchmark/results/af
 
 Run alone on the machine: the suite varies by about 5 % from one run to the next. The reports of the runs (`benchmark/results/<label>/*.json`) hold `root_rounds`, `root_cuts`, `lazy_constraints` and `nodes`: a run that reaches optimality with the same cuts and nodes computed the same thing.
 
-To exercise the fallback, build once with `max_pushes = 0` in `target_block` (every source gives up after its first search), once with `max_pushes = 1` (every source that needs a second push gives up), and run the oracle on each: 201 of 201 runs must pass.
+To exercise the fallback, build once with `max_pushes = 0` in `target_block` (every source gives up after its first search), once with `max_pushes = 1` (every source that needs a second push gives up), and run the oracle on each: 268 of 268 runs must pass.

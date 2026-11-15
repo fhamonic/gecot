@@ -37,6 +37,7 @@ CONFIGS = [
     "flow_benders", "flow_benders --big-m knapsack_dantzig", "flow_benders --nb-mus 3",
     "flow_benders --indicator-constraints",
     "multiflow_benders", "multiflow_benders --no-root-cuts", "multiflow_benders --no-in-out",
+    "multiflow_benders --no-stored-arcs",
     "path_lp", "path_lp --pricing enumerate", "flow_mip --reformulation path_lp",
     "multicut_benders --reformulation path_lp --reformulation-params pricing=enumerate",
     "static", "greedy", "greedy --worst",

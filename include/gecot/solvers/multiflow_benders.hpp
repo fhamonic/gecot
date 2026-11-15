@@ -41,6 +41,9 @@ struct multiflow_benders : public mip_solver_base {
     // each optimum of the relaxation separated itself, without the center
     bool no_root_cuts = false;
     bool no_in_out = false;
+    // the sets A_s are not kept but rebuilt at each separation: the same
+    // cuts, slower, for instances whose sets do not fit in memory
+    bool no_stored_arcs = false;
     // A cut is added to the relaxation when f_t exceeds it by more than
     // this, relative and absolute. It does not follow feasibility_tol.
     static constexpr double root_cut_tol = 1e-7;
@@ -71,7 +74,9 @@ struct multiflow_benders : public mip_solver_base {
                 std::declval<const graph_t &>()))>,
             double>;
 
-        // A_s, and its improved copies with their m_sa
+        // A_s, and its improved copies with their m_sa, kept unless
+        // no_stored_arcs: they add up to at most the arcs of G_t times its
+        // sources
         struct source {
             vertex s;
             std::vector<arc> arcs;
@@ -97,6 +102,9 @@ struct multiflow_benders : public mip_solver_base {
         arc_map<double> probability_map;
         arc_map<std::optional<option_t>> option_map;
         std::vector<source> sources;
+        // the probabilities of connection to t, without option and with
+        // every one
+        vertex_map<double> base_to_t, best_to_t;
 
         // G_t: the graph of original_t as compute_contracted_flow_graph
         // gives it. Its vertices are renumbered here.
@@ -121,15 +129,19 @@ struct multiflow_benders : public mip_solver_base {
                     std::tie(G_t.probability_map, G_t.improvement_option_map));
         }
 
-        // An arc a = (u, v) is in A_s if the best path of s through it, with
-        // every option, is as reliable as its best path without option: a
-        // most reliable path of s is at least that reliable in every
-        // scenario.
-        void compute_sources() {
+        // w̄_s, with every source quality gain
+        double _best_quality(const vertex s) const {
+            double best_quality = source_quality_map[s];
+            for(const auto & [source_gain, i] : source_options_map[s])
+                best_quality += source_gain;
+            return best_quality;
+        }
+
+        // the sources: the vertices that can bring something to t, with
+        // their A_s if keep_arcs
+        void compute_sources(const bool keep_arcs) {
             const auto reversed_graph = melon::views::reverse(graph);
-            // the probabilities of connection to t, without option and with
-            // every one
-            auto base_to_t = melon::create_vertex_map<double>(graph, 0.0);
+            base_to_t = melon::create_vertex_map<double>(graph, 0.0);
             for(const auto & [u, probability] : melon::dijkstra(
                     reversed_traits{}, reversed_graph,
                     melon::maps::function([this](const arc & a) {
@@ -137,37 +149,90 @@ struct multiflow_benders : public mip_solver_base {
                     }),
                     t))
                 base_to_t[u] = probability;
-            auto best_to_t = melon::create_vertex_map<double>(graph, 0.0);
+            best_to_t = melon::create_vertex_map<double>(graph, 0.0);
             for(const auto & [u, probability] : melon::dijkstra(
                     reversed_traits{}, reversed_graph, probability_map, t))
                 best_to_t[u] = probability;
-
-            auto from_s = melon::dijkstra(
-                detail::pc_num_dijkstra_traits<graph_t, double>{}, graph,
-                probability_map);
-            auto best_from_s = melon::create_vertex_map<double>(graph);
+            source_search search(graph);
             for(const vertex s : melon::vertices(graph)) {
-                double best_quality = source_quality_map[s];
-                for(const auto & [source_gain, i] : source_options_map[s])
-                    best_quality += source_gain;
-                if(s == t || best_quality <= 0 || best_to_t[s] <= 0) continue;
-                best_from_s.fill(0.0);
-                from_s.reset().add_source(s);
-                for(const auto & [u, probability] : from_s)
-                    best_from_s[u] = probability;
+                if(s == t || _best_quality(s) <= 0 || best_to_t[s] <= 0)
+                    continue;
                 source & source_s = sources.emplace_back(s);
-                for(const arc a : melon::arcs(graph)) {
-                    const vertex u = melon::arc_source(graph, a);
-                    const double through =
-                        best_from_s[u] * probability_map[a] *
-                        best_to_t[melon::arc_target(graph, a)];
-                    if(through <= 0 || through < base_to_t[s] * (1 - path_tie))
+                if(keep_arcs) _source_arcs(source_s, search);
+            }
+        }
+
+        // What the search from a source reuses from a source to the next.
+        struct source_search {
+            // Π̄(s, u), 0 outside the vertices of visited, which the next
+            // search resets
+            vertex_map<double> best_from_s;
+            // 0 outside the heap, 1 in it, 2 settled
+            vertex_map<char> status;
+            std::vector<vertex> visited;
+            detail::pc_num_dijkstra_traits<graph_t, double>::heap heap;
+
+            explicit source_search(const graph_t & graph)
+                : best_from_s(melon::create_vertex_map<double>(graph, 0.0))
+                , status(melon::create_vertex_map<char>(graph, 0))
+                , heap(std::greater<double>{},
+                       melon::create_vertex_map<std::size_t>(graph)) {}
+        };
+
+        // An arc a = (u, v) is in A_s if the best path of s through it, with
+        // every option, is as reliable as its best path without option: a
+        // most reliable path of s is at least that reliable in every
+        // scenario.
+        void _source_arcs(source & source_s, source_search & search) const {
+            auto & [best_from_s, status, visited, heap] = search;
+            const vertex s = source_s.s;
+            const double best_quality = _best_quality(s);
+            const double threshold = base_to_t[s] * (1 - path_tie);
+            source_s.arcs.clear();
+            source_s.improved_copies.clear();
+            for(const vertex v : visited) {
+                best_from_s[v] = 0;
+                status[v] = 0;
+            }
+            // Dijkstra from s, which does not go on from a vertex u with
+            // Π̄(s, u) Π̄(u, t) under the threshold: no arc of A_s leaves u or
+            // a vertex reached through it. A best path to the other vertices
+            // crosses none of those, so their Π̄(s, u) are exact. The slack
+            // covers the rounding of Π̄(s, u) π_a Π̄(v, t) against it.
+            best_from_s[s] = 1;
+            visited.assign(1, s);
+            heap.push({s, 1.0});
+            while(!heap.empty()) {
+                const vertex u = heap.top().first;
+                heap.pop();
+                status[u] = 2;
+                if(best_from_s[u] * best_to_t[u] < threshold * (1 - 1e-12))
+                    continue;
+                for(const arc a : melon::out_arcs(graph, u)) {
+                    const vertex v = melon::arc_target(graph, a);
+                    const double probability =
+                        best_from_s[u] * probability_map[a];
+                    if(status[v] == 2 || probability <= best_from_s[v])
                         continue;
-                    source_s.arcs.push_back(a);
-                    if(option_map[a])
-                        source_s.improved_copies.emplace_back(
-                            a, best_quality * best_from_s[u]);
+                    best_from_s[v] = probability;
+                    if(status[v] == 1) {
+                        heap.promote(v, probability);
+                        continue;
+                    }
+                    status[v] = 1;
+                    heap.push({v, probability});
+                    visited.push_back(v);
                 }
+            }
+            for(const arc a : melon::arcs(graph)) {
+                const vertex u = melon::arc_source(graph, a);
+                const double through = best_from_s[u] * probability_map[a] *
+                                       best_to_t[melon::arc_target(graph, a)];
+                if(through <= 0 || through < threshold) continue;
+                source_s.arcs.push_back(a);
+                if(option_map[a])
+                    source_s.improved_copies.emplace_back(
+                        a, best_quality * best_from_s[u]);
             }
         }
 
@@ -333,8 +398,10 @@ struct multiflow_benders : public mip_solver_base {
 
         // The cut of the point x̂: for each source, its largest flow to t at
         // x̂ and the dual solution that comes with it. At a scenario y one
-        // path takes the whole supply, so value is f_t(y).
-        cut separate(const std::vector<double> & x_hat) const {
+        // path takes the whole supply, so value is f_t(y). rebuild: the
+        // sources have no A_s kept.
+        cut separate(const std::vector<double> & x_hat,
+                     const bool rebuild) const {
             cut result{source_quality_map[t], source_quality_map[t],
                        std::vector<double>(x_hat.size(), 0.0)};
             for(const auto & [source_gain, i] : source_options_map[t]) {
@@ -343,7 +410,14 @@ struct multiflow_benders : public mip_solver_base {
             }
             flow_search search(graph);
             const auto & rho = search.rho;
-            for(const source & source_s : sources) {
+            source_search from_s(graph);
+            source rebuilt{};
+            for(const source & kept : sources) {
+                if(rebuild) {
+                    rebuilt.s = kept.s;
+                    _source_arcs(rebuilt, from_s);
+                }
+                const source & source_s = rebuild ? rebuilt : kept;
                 const vertex s = source_s.s;
                 double supply = source_quality_map[s];
                 for(const auto & [source_gain, i] : source_options_map[s])
@@ -366,28 +440,33 @@ struct multiflow_benders : public mip_solver_base {
     };
 
     // the sources of every block; returns their number
-    static std::size_t _compute_sources(std::vector<target_block> & blocks) {
-        tbb::parallel_for(
-            std::size_t{0}, blocks.size(),
-            [&](const std::size_t b) { blocks[b].compute_sources(); });
+    std::size_t _compute_sources(std::vector<target_block> & blocks) const {
+        tbb::parallel_for(std::size_t{0}, blocks.size(),
+                          [&](const std::size_t b) {
+                              blocks[b].compute_sources(!no_stored_arcs);
+                          });
         std::size_t num_sources = 0, num_source_arcs = 0;
         for(const target_block & block : blocks) {
             num_sources += block.sources.size();
             for(const auto & source : block.sources)
                 num_source_arcs += source.arcs.size();
         }
-        spdlog::debug("{} targets, {} sources, {} arcs over the sources",
-                      blocks.size(), num_sources, num_source_arcs);
+        if(no_stored_arcs)
+            spdlog::debug("{} targets, {} sources", blocks.size(), num_sources);
+        else
+            spdlog::debug("{} targets, {} sources, {} arcs over the sources",
+                          blocks.size(), num_sources, num_source_arcs);
         return num_sources;
     }
 
-    static std::vector<target_block::cut> _separate(
+    std::vector<target_block::cut> _separate(
         const std::vector<target_block> & blocks,
-        const std::vector<double> & x_hat) {
+        const std::vector<double> & x_hat) const {
         std::vector<target_block::cut> cuts(blocks.size());
         tbb::parallel_for(
-            std::size_t{0}, blocks.size(),
-            [&](const std::size_t b) { cuts[b] = blocks[b].separate(x_hat); });
+            std::size_t{0}, blocks.size(), [&](const std::size_t b) {
+                cuts[b] = blocks[b].separate(x_hat, no_stored_arcs);
+            });
         return cuts;
     }
 

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
+#include <functional>
 #include <limits>
 #include <optional>
 #include <ranges>
@@ -59,16 +60,12 @@ struct multiflow_benders : public mip_solver_base {
         // the relative slack of the test of A_s against the best path
         // without option
         static constexpr double path_tie = 1e-9;
-        // In the search of a flow, relative: a label improves by more than
-        // label_tie, an arc is full within arc_full of its capacity, and a
-        // flow under no_flow times the supply is none.
-        static constexpr double label_tie = 1e-12, arc_full = 1e-11,
-                                no_flow = 1e-12;
-        // Past these, the search gives up and the source takes the
-        // fallback: the steps of a search of labels and the arcs of a path,
-        // per vertex of the graph, and the pushes.
-        static constexpr std::size_t max_label_steps = 1000, max_path_arcs = 4,
-                                     max_pushes = 100000;
+        // In the search of a flow, relative: an arc is full within arc_full
+        // of its capacity, and a flow under no_flow times the supply is none.
+        static constexpr double arc_full = 1e-11, no_flow = 1e-12;
+        // Past this many pushes, the search gives up and the source takes
+        // the fallback.
+        static constexpr std::size_t max_pushes = 100000;
         using reversed_traits = detail::pc_num_dijkstra_traits<
             std::decay_t<decltype(melon::views::reverse(
                 std::declval<const graph_t &>()))>,
@@ -180,34 +177,40 @@ struct multiflow_benders : public mip_solver_base {
             arc_map<double> capacities;
             arc_map<double> flows;
             arc_map<char> in_A_s;
-            // 0 outside the vertices of queue, which the next search resets
+            // 0 outside reached, which the next search resets
             vertex_map<double> rho;
-            vertex_map<char> queued;
+            // the labels of the last search, only read where it reached
+            vertex_map<double> potentials;
+            // 0 outside the heap, 1 in it, 2 settled
+            vertex_map<char> status;
             // the first arc of the best residual path from a vertex to t,
             // and whether it is taken forward
             vertex_map<std::pair<arc, bool>> next;
-            std::vector<vertex> queue;
+            std::vector<vertex> reached;
+            detail::pc_num_dijkstra_traits<graph_t, double>::heap heap;
 
             explicit flow_search(const graph_t & graph)
                 : capacities(melon::create_arc_map<double>(graph, infinity))
                 , flows(melon::create_arc_map<double>(graph))
                 , in_A_s(melon::create_arc_map<char>(graph, 0))
                 , rho(melon::create_vertex_map<double>(graph, 0.0))
-                , queued(melon::create_vertex_map<char>(graph, 0))
-                , next(melon::create_vertex_map<std::pair<arc, bool>>(graph)) {}
+                , potentials(melon::create_vertex_map<double>(graph))
+                , status(melon::create_vertex_map<char>(graph, 0))
+                , next(melon::create_vertex_map<std::pair<arc, bool>>(graph))
+                , heap(std::greater<double>{},
+                       melon::create_vertex_map<std::size_t>(graph)) {}
         };
 
         // The largest flow of the source to t at x̂, by highest-gain
         // augmenting paths: returns what reaches t, and leaves in search.rho
         // an optimal dual solution, ρ_u being the gain of the best path from
-        // u to t in the last residual graph. If the searches give up, ρ is
+        // u to t in the last residual graph. If the search gives up, ρ is
         // the fallback's and the value returned a bound, exact at a scenario.
         double _largest_flow(const source & source_s, const double supply,
                              const std::vector<double> & x_hat,
                              flow_search & search) const {
-            auto & [capacities, flows, in_A_s, rho, queued, next, queue] =
-                search;
-            const std::size_t n = graph.num_vertices();
+            auto & [capacities, flows, in_A_s, rho, potentials, status, next,
+                    reached, heap] = search;
             const vertex s = source_s.s;
             for(const arc a : source_s.arcs) {
                 in_A_s[a] = 1;
@@ -216,28 +219,38 @@ struct multiflow_benders : public mip_solver_base {
             for(const auto & [a, big_M] : source_s.improved_copies)
                 capacities[a] = big_M * x_hat[option_map[a].value()];
             const double negligible = no_flow * supply;
-            // Label-correcting from t: a residual arc taken backward has a
-            // gain above 1, which rules Dijkstra out. False if the labels do
-            // not settle.
-            const auto label = [&] {
-                for(const vertex v : queue) rho[v] = 0;
+            // Dijkstra from t, the highest label first. A residual arc taken
+            // backward has a gain above 1, so past the first search the order
+            // is that of the labels reduced by those of the last search,
+            // ρ_u / p_u: a push adds residual arcs on its path only, where
+            // the p are tight, so no reduced gain exceeds 1 and the search
+            // reaches no vertex that the last one did not.
+            const auto label = [&](const bool first) {
+                for(const vertex v : reached) {
+                    potentials[v] = rho[v];
+                    rho[v] = 0;
+                    status[v] = 0;
+                }
                 rho[t] = 1;
-                queue.assign(1, t);
-                for(std::size_t pos = 0; pos < queue.size(); ++pos) {
-                    if(pos > max_label_steps * n) {
-                        queued.fill(0);
-                        return false;
-                    }
-                    const vertex v = queue[pos];
-                    queued[v] = 0;
+                reached.assign(1, t);
+                heap.push({t, 1.0});
+                while(!heap.empty()) {
+                    const vertex v = heap.top().first;
+                    heap.pop();
+                    status[v] = 2;
                     auto improve = [&](const vertex u, const double gain,
                                        const arc a, const bool forward) {
-                        if(gain <= rho[u] * (1 + label_tie)) return;
+                        if(status[u] == 2 || gain <= rho[u]) return;
                         rho[u] = gain;
                         next[u] = {a, forward};
-                        if(queued[u]) return;
-                        queued[u] = 1;
-                        queue.push_back(u);
+                        const double key = first ? gain : gain / potentials[u];
+                        if(status[u] == 1) {
+                            heap.promote(u, key);
+                            return;
+                        }
+                        status[u] = 1;
+                        heap.push({u, key});
+                        reached.push_back(u);
                     };
                     // infinity first: inf - flow <= arc_full inf holds, and
                     // would fill the arcs without option
@@ -252,18 +265,19 @@ struct multiflow_benders : public mip_solver_base {
                             improve(melon::arc_target(graph, a),
                                     rho[v] / probability_map[a], a, false);
                 }
-                return true;
             };
             double remaining = supply, arrived = 0;
             bool settled = true;
             for(std::size_t pushes = 0;; ++pushes) {
-                settled = label();
-                if(!settled || remaining <= negligible || rho[s] <= 0) break;
+                label(pushes == 0);
+                if(remaining <= negligible || rho[s] <= 0) break;
+                if(pushes == max_pushes) {
+                    settled = false;
+                    break;
+                }
                 // the most the path takes, in units leaving s
                 double amount = remaining, gain = 1;
-                std::size_t length = 0;
-                for(vertex u = s; u != t && settled;
-                    settled = ++length <= max_path_arcs * n) {
+                for(vertex u = s; u != t;) {
                     const auto [a, forward] = next[u];
                     if(forward) {
                         amount =
@@ -276,10 +290,6 @@ struct multiflow_benders : public mip_solver_base {
                         gain /= probability_map[a];
                         u = melon::arc_source(graph, a);
                     }
-                }
-                if(!settled || pushes == max_pushes) {
-                    settled = false;
-                    break;
                 }
                 remaining -= amount;
                 // whether the push changed the arcs that a label can take in
@@ -313,19 +323,8 @@ struct multiflow_benders : public mip_solver_base {
                 // connection, so the value returned stays the true flow: the
                 // callback hands it to the solver as the score of the
                 // candidate.
-                for(const vertex v : queue) rho[v] = 0;
-                queue.clear();
-                for(const auto & [u, probability] : melon::dijkstra(
-                        reversed_traits{}, melon::views::reverse(graph),
-                        melon::maps::function([&](const arc & a) {
-                            return in_A_s[a] && capacities[a] > 0
-                                       ? probability_map[a]
-                                       : 0.0;
-                        }),
-                        t)) {
-                    rho[u] = probability;
-                    queue.push_back(u);
-                }
+                for(const arc a : source_s.arcs) flows[a] = 0;
+                label(true);
                 arrived = rho[s] * supply;
             }
             for(const arc a : source_s.arcs) in_A_s[a] = 0;

@@ -184,7 +184,7 @@ On a large landscape an exact algorithm can take too long. A heuristic solution 
 $ gecot bound path_lp three-woods.json 3 -q
 Status             converged
 Initial score      18.4
-Upper bound        28.70286468 (at most +55.99 %)
+Upper bound        28.70285768 (at most +55.99 %)
 All options bound  42.44
 Budget             3
 Time               2 ms

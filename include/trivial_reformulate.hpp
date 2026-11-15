@@ -18,36 +18,35 @@
 
 #include "instance.hpp"
 
-// The criterion φ' of z' = z / s, the scores of the cases divided by s, with
-// φ'(z') = c φ(s z') / s, each case under the id that case_map gives it; s
-// and c are powers of 2, so that φ' is exactly c φ / s. A product is
-// homogeneous of the degree of its non-constant factors, so [w, f] keeps its
-// weight w, and gets c first for a case. With c = 1 the formula keeps its
-// writing.
+// The criterion φ' of z' = 2^a z, the scores of the cases times 2^a, with
+// φ'(z') = 2^b φ(2^-a z'), b = a + criterion_exponent, each case under the id
+// that case_map gives it: exact, as powers of 2. A product is homogeneous of
+// the degree of its non-constant factors, so [w, f] keeps its weight w, and
+// gets 2^criterion_exponent first for a case. With criterion_exponent 0 the
+// formula keeps its writing.
 template <typename M>
 struct formula_scale_visitor {
-    double s;
-    double c;
+    int case_exponent;  // a
+    int criterion_exponent;
     const M & case_map;
 
-    // what divides a formula, s / c
-    double divisor() const { return s / c; }
+    int exponent() const { return case_exponent + criterion_exponent; }  // b
 
     criterion_formula operator()(const criterion_constant & k) {
-        return k / divisor();
+        return std::ldexp(k, exponent());
     }
     criterion_formula operator()(const criterion_var & v) {
         const criterion_var z = case_map[v].value();
-        if(c == 1) return z;
-        return criterion_product{{c, z}};
+        if(criterion_exponent == 0) return z;
+        return criterion_product{{std::ldexp(1.0, criterion_exponent), z}};
     }
     criterion_formula operator()(const criterion_sum & f) {
         return criterion_sum{scaled(f.values)};
     }
-    // a case in the product is s z', any other factor divisor() f'
+    // a case in the product is 2^-a z', any other factor 2^-b f'
     criterion_formula operator()(const criterion_product & f) {
         criterion_product product;
-        double weight = 1 / divisor();  // exactly 1 for [w, f]
+        int weight = exponent();  // exactly 0 for [w, f]
         for(auto && e : f.values) {
             if(std::holds_alternative<criterion_constant>(e)) {
                 product.values.push_back(e);
@@ -55,13 +54,15 @@ struct formula_scale_visitor {
             }
             if(const auto * v = std::get_if<criterion_var>(&e)) {
                 product.values.push_back(case_map[*v].value());
-                weight *= s;
+                weight -= case_exponent;
                 continue;
             }
             product.values.push_back(std::visit(*this, e));
-            weight *= divisor();
+            weight -= exponent();
         }
-        if(weight != 1) product.values.insert(product.values.begin(), weight);
+        if(weight != 0)
+            product.values.insert(product.values.begin(),
+                                  std::ldexp(1.0, weight));
         return product;
     }
     criterion_formula operator()(const criterion_min & f) {
@@ -119,12 +120,12 @@ double criterion_size(const criterion_formula & criterion,
         criterion);
 }
 
-// The power of 2 c that brings the size of the criterion to the largest
-// score of the cases it reads; 1 if they are within a factor 2^10, as for a
-// sum of cases. Weighted by 1e-8 on cases whose scores differ as much, the
-// criterion was near 1e-3 in the unit of the solver, under its absolute
-// tolerances: bounds under the optimum, wrong optima, and duals under the
-// margins of the pricings. Multiplying it by 1e8 fixed them, and leaves its
+// The exponent of the power of 2 c that brings the size of the criterion to
+// the largest score of the cases it reads; 0 if they are within a factor
+// 2^10, as for a sum of cases. Weighted by 1e-8 on cases whose scores differ as
+// much, the criterion was near 1e-3 in the unit of the solver, under its
+// absolute tolerances: bounds under the optimum, wrong optima, and duals under
+// the margins of the pricings. Multiplying it by 1e8 fixed them, and leaves its
 // maximizers.
 // Both are taken where nothing is bought and with every option that fits
 // alone, which bound them at every solution, and c is the middle of the two
@@ -138,15 +139,15 @@ double criterion_size(const criterion_formula & criterion,
 // that none reaches. base_cases_pc_num are the scores where nothing is
 // bought, fit_scores() gives the others.
 template <gecot::instance_c I>
-double compute_criterion_scale(const I & instance,
+int compute_criterion_exponent(const I & instance,
                                const criterion_formula & criterion,
                                const auto & base_cases_pc_num,
                                auto && fit_scores, const auto & read_case_map) {
     const auto scale = [](const double log_ratio) {
-        if(!std::isfinite(log_ratio) || std::abs(log_ratio) <= 10) return 1.0;
+        if(!std::isfinite(log_ratio) || std::abs(log_ratio) <= 10) return 0;
         // beyond 2^100, c times a score or a weight could overflow
-        return std::ldexp(1.0, static_cast<int>(std::clamp(
-                                   std::lround(log_ratio), -100L, 100L)));
+        return static_cast<int>(
+            std::clamp(std::lround(log_ratio), -100L, 100L));
     };
     // Linear, its cases of one weight w, a single case or their sum: the
     // ratio is 1 / |w| at every solution, and the scores need not be
@@ -176,7 +177,7 @@ double compute_criterion_scale(const I & instance,
     const auto [fit_score, fit_size] = sizes(fit_scores());
     if(!std::isfinite(base_score + base_size + fit_score + fit_size) ||
        fit_score - base_score + fit_size - base_size > 20)
-        return 1;
+        return 0;
     return scale((base_score - base_size + fit_score - fit_size) / 2);
 }
 
@@ -216,24 +217,25 @@ struct reformulation {
     // its cases are those that the criterion reads, in their order: a case
     // has another id in it as soon as one before it is left out
     Instance instance;
-    // its qualities are divided by quality_scale, so the scores of its cases
-    // by its square, and its criterion is multiplied by criterion_scale on
-    // top: a score of its criterion is criterion_scale / quality_scale² that
-    // of the instance given
-    double quality_scale;
-    double criterion_scale;
+    // its qualities are those of the instance given times 2^quality_exponent,
+    // so the scores of its cases times 2^(2 quality_exponent), and its
+    // criterion is multiplied by 2^criterion_exponent on top: a score of its
+    // criterion is 2^(2 quality_exponent + criterion_exponent) that of the
+    // instance given
+    int quality_exponent;
+    int criterion_exponent;
     // the options of the original instance that are always bought
     gecot::instance_solution_t<I> static_options;
 };
 
-// returns the instance with its qualities divided by a power of 2, so its
-// scores are divided by its square. Gurobi's absolute tolerances gave wrong
-// optima on scores near 1e11, and near 1e-2 on bike with its qualities
-// divided by the largest: the largest case score is brought into [1e5, 4e5),
-// and an instance whose cases score less is left unscaled. Its criterion is
-// simplified_criterion's, multiplied by compute_criterion_scale, and a case
-// that it does not read is left out. Throws if it reads none, or if a score
-// could exceed the largest double.
+// returns the instance with its qualities multiplied by a power of 2, so its
+// scores by its square, that brings the largest initial score of a case into
+// [1e5, 4e5): Gurobi's absolute tolerances gave wrong optima on scores near
+// 1e11, near 1e-2 on bike with its qualities divided by the largest, and near
+// 1e-9 left as they were. Its criterion is simplified_criterion's, multiplied
+// by 2^compute_criterion_exponent, and a case that it does not read is left
+// out. Throws if it reads none, or if a score could exceed the largest
+// double.
 template <gecot::instance_c I>
 reformulation<I> trivial_reformulate_instance(const I & instance,
                                               const gecot::budget_t & budget,
@@ -259,6 +261,10 @@ reformulation<I> trivial_reformulate_instance(const I & instance,
     // of the sums of the qualities with the gains that fit bounds the score;
     // it counts sources and targets that never connect, so only when it
     // overflows is the score computed.
+    // per case, the product of its sums of qualities with the gains that
+    // fit, which bounds its score at every solution, and the larger sum
+    auto score_bounds = instance.template create_case_map<double>();
+    auto quality_sums = instance.template create_case_map<double>();
     for(auto && instance_case : instance.cases()) {
         double source_qualities = 0, target_qualities = 0;
         for(auto && v : melon::vertices(instance_case.graph())) {
@@ -271,7 +277,10 @@ reformulation<I> trivial_reformulate_instance(const I & instance,
                     target_qualities += target_gain;
                 }
         }
-        if(!std::isfinite(source_qualities * target_qualities) &&
+        score_bounds[instance_case.id()] = source_qualities * target_qualities;
+        quality_sums[instance_case.id()] =
+            std::max(source_qualities, target_qualities);
+        if(!std::isfinite(score_bounds[instance_case.id()]) &&
            !std::isfinite(fit_scores()[instance_case.id()]))
             throw std::invalid_argument(
                 "the qualities of the case '" + instance_case.name() +
@@ -293,21 +302,38 @@ reformulation<I> trivial_reformulate_instance(const I & instance,
 
     // one factor for all cases: a sum or a min criterion weighs them
     const auto base_cases_pc_num = gecot::compute_base_cases_pc_num(instance);
-    double max_case_score = 0;
+    double max_case_score = 0, max_score_bound = 0, max_quality_sum = 0;
     for(auto && instance_case : instance.cases())
-        if(reformulated_case_map[instance_case.id()])
-            max_case_score =
-                std::max(max_case_score, base_cases_pc_num[instance_case.id()]);
-    const double quality_scale = std::ldexp(
-        1.0, static_cast<int>(std::max(
-                 0.0, std::floor(std::log2(max_case_score / 1e5) / 2))));
-    const double criterion_scale =
-        compute_criterion_scale(instance, criterion, base_cases_pc_num,
-                                fit_scores, reformulated_case_map);
+        if(const auto k = instance_case.id(); reformulated_case_map[k]) {
+            max_case_score = std::max(max_case_score, base_cases_pc_num[k]);
+            max_score_bound = std::max(max_score_bound, score_bounds[k]);
+            max_quality_sum = std::max(max_quality_sum, quality_sums[k]);
+        }
+    // Up, by 2^100 at most, and never so far that the bound on a score of a
+    // solution passes 4e5, nor a sum of qualities 2^500. From the initial
+    // scores alone, a case that the options raise from 1e-6 to 18 ended near
+    // 5e12, where multicut_benders failed; and a source of 1e290 that reaches
+    // no target counts in no initial score. Down, from the initial scores.
+    int quality_exponent = 0;
+    if(max_case_score > 0) {
+        quality_exponent =
+            static_cast<int>(-std::floor(std::log2(max_case_score / 1e5) / 2));
+        if(quality_exponent > 0)
+            quality_exponent = std::min(
+                {quality_exponent, 100,
+                 std::isfinite(max_score_bound)
+                     ? std::max(0, static_cast<int>(std::floor(
+                                       std::log2(4e5 / max_score_bound) / 2)))
+                     : 0,
+                 std::max(0, 499 - std::ilogb(max_quality_sum))});
+    }
+    const int criterion_exponent =
+        compute_criterion_exponent(instance, criterion, base_cases_pc_num,
+                                   fit_scores, reformulated_case_map);
 
     Instance reformulated_instance;
     reformulated_instance.set_criterion(std::visit(
-        formula_scale_visitor{quality_scale * quality_scale, criterion_scale,
+        formula_scale_visitor{2 * quality_exponent, criterion_exponent,
                               reformulated_case_map},
         criterion));
 
@@ -342,10 +368,10 @@ reformulation<I> trivial_reformulate_instance(const I & instance,
         if(reformulated_case_map[instance_case.id()])
             trivial_reformulate_case(instance_case, reformulated_instance,
                                      reformulated_option_map, static_options,
-                                     quality_scale, merge);
+                                     quality_exponent, merge);
 
-    return {std::move(reformulated_instance), quality_scale, criterion_scale,
-            std::move(static_options)};
+    return {std::move(reformulated_instance), quality_exponent,
+            criterion_exponent, std::move(static_options)};
 }
 
 // the instance without the options that keep rejects, the others under their
@@ -367,7 +393,7 @@ Instance restrict_instance(const I & instance, const auto & keep,
     for(auto && instance_case : instance.cases())
         trivial_reformulate_case(instance_case, restricted_instance,
                                  restricted_option_map,
-                                 instance.create_option_map(false), 1.0, merge);
+                                 instance.create_option_map(false), 0, merge);
     return restricted_instance;
 }
 
@@ -375,7 +401,7 @@ template <gecot::case_c C>
 void trivial_reformulate_case(const C & instance_case, Instance & instance,
                               auto && reformulated_option_map,
                               const auto & free_options,
-                              const double quality_scale, const bool merge) {
+                              const int quality_exponent, const bool merge) {
     using graph_t = gecot::case_graph_t<C>;
     using vertex_t = melon::vertex_t<graph_t>;
     using arc_t = melon::arc_t<graph_t>;
@@ -427,9 +453,9 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
         components.emplace_back();
         for(const vertex_t & v : component) {
             source_quality_map.back() +=
-                original_source_quality_map[v] / quality_scale;
+                std::ldexp(original_source_quality_map[v], quality_exponent);
             target_quality_map.back() +=
-                original_target_quality_map[v] / quality_scale;
+                std::ldexp(original_target_quality_map[v], quality_exponent);
             if(!vertex_names_map.back().empty())
                 vertex_names_map.back().append("+");
             vertex_names_map.back().append(instance_case.vertex_name(v));
@@ -477,8 +503,8 @@ void trivial_reformulate_case(const C & instance_case, Instance & instance,
                 if(!reformulated_option_map[original_option].has_value())
                     continue;
                 vertex_options[v].emplace_back(
-                    source_quality_gain / quality_scale,
-                    target_quality_gain / quality_scale,
+                    std::ldexp(source_quality_gain, quality_exponent),
+                    std::ldexp(target_quality_gain, quality_exponent),
                     reformulated_option_map[original_option].value());
             }
         }

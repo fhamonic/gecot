@@ -108,7 +108,7 @@ $ gecot optimize flow_mip three-woods.json 7 -o solution.json
     },
     "solution_cost":  7,
     "feasible":       true,
-    "guaranteed_share": 99.9,
+    "guaranteed_share": 100,
     "solution": {
         "hedgerow":   1,
         "underpass":  1,
@@ -121,8 +121,8 @@ $ gecot optimize flow_mip three-woods.json 7 -o solution.json
         "nonzeros": 60,
         "model_build_time_ms": 2,
         "nodes": 0,
-        "best_bound": 42.44000000000001,
-        "gap": 3.3484577557026403e-16
+        "best_bound": 42.44,
+        "gap": 0
     }
 }
 ```
@@ -248,7 +248,7 @@ For `path_lp` and `tree_lp`, each row is a round of the column generation:
 | `-v` | also the parameters of the algorithm with their values, the size of the instance after its reformulation, the factor by which the qualities are divided, a table of the preprocessing of each species, the size of the model; the progress table has a row every second or every round, and a `nodes` column |
 | `-vv` | also the details of each step, such as a table of the options that a heuristic buys or removes (a swap of `greedy` reads `a -> b`), and the solver's own log, which goes to the standard output |
 
-With `-v`, the line `Qualities scaled by 1/...` gives the factor of the [rescaling](../formulations/preprocessing.md#the-instance-given-to-the-algorithms), and the line `The criterion multiplied by ...`, if any, the factor of the criterion on top. The solver's own log is in the rescaled unit, and so are the lines that GECOT logs about the run itself at `-v` and `-vv`, such as `Initial score: ... (was ...)` and those of the bound methods; the summary, the result files and the progress table are in the unit of the instance.
+With `-v`, the line `Qualities scaled by 2^...` gives the factor of the [rescaling](../formulations/preprocessing.md#the-instance-given-to-the-algorithms), and the line `The criterion multiplied by 2^...`, if any, the factor of the criterion on top. The solver's own log is in the rescaled unit, and so are the lines that GECOT logs about the run itself at `-v` and `-vv`, such as `Initial score: ... (was ...)` and those of the bound methods; the summary, the result files and the progress table are in the unit of the instance.
 
 With `-v` again, the algorithms that [preprocess](../formulations/preprocessing.md) the graphs log a table once every species is preprocessed, here for `flow_benders`:
 
@@ -286,6 +286,7 @@ Ctrl-C stops the algorithm and keeps its best result so far, with the status `in
 | `The solution costs ..., over the budget ...` | `tree_lp` returned its relaxation, see [above](#status) |
 | `The solution costs ... in <dimension>, over the budget ...`, `The solution buys ... options of the conflict set '...'` | should not happen with the algorithms that support several costs and conflict sets; report it |
 | `Solver stopped: time limit reached` | the result is the best so far, not a proved optimum |
+| `The criterion is ... times its terms where nothing is bought: an added constant dominates it, ...` | a constant added to the criterion, as in `{"operation": "sum", "values": ["trout", 1e8]}`, is more than $2^{20}$ times the terms that the options change. It changes no choice, but the relative tolerances of the solvers, and the margin of $10^{-6}$ of the check of a bound, apply to the whole value, so they can hide the gains. Taking the constant out of the criterion lifts that |
 | `The bound ... of the algorithm is below the score ... of its solution: no bound is shown, nor any share guaranteed` | the solver's tolerances failed, typically on a criterion whose value is far smaller than the scores of its cases; the status, `optimal` included, is not proved either. The report keeps the algorithm's `best_bound` and `gap` |
 | `Solver stopped without a solution: ..., returning the MIP start` | the solver found nothing in the time given |
 | `This solver has no time limit: --time-limit ignored` and similar | the solver lacks a feature that a parameter asks for |

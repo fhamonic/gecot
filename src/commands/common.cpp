@@ -219,7 +219,7 @@ prepared_instance prepare_instance(const std::filesystem::path & instance_file,
                          options_total_cost);
     }
 
-    auto [instance, quality_scale, criterion_scale, static_options] =
+    auto [instance, quality_exponent, criterion_exponent, static_options] =
         trivial_reformulate_instance(raw_instance, budget, merge);
 
     spdlog::debug("Removed {} options and {} species",
@@ -230,24 +230,38 @@ prepared_instance prepare_instance(const std::filesystem::path & instance_file,
         spdlog::warn("Budget doesn't allow purchasing any options");
     }
     // the algorithm's scores, bounds and logs are in this unit
-    const double case_score_scale = quality_scale * quality_scale;
-    const double score_scale = case_score_scale / criterion_scale;
+    const double case_score_scale = std::ldexp(1.0, -2 * quality_exponent);
+    const double score_scale =
+        std::ldexp(1.0, -2 * quality_exponent - criterion_exponent);
     auto initial_cases_pc_num = gecot::compute_base_cases_pc_num(raw_instance);
     const double initial_score =
         raw_instance.eval_criterion(initial_cases_pc_num);
-    const double base_score =
-        instance.eval_criterion(gecot::compute_base_cases_pc_num(instance)) *
-        score_scale;
+    const auto base_cases_pc_num = gecot::compute_base_cases_pc_num(instance);
+    const double base_value = instance.eval_criterion(base_cases_pc_num);
+    const double base_score = base_value * score_scale;
     check_finite_score(initial_score, "the initial score");
     check_finite_score(base_score,
                        "the score with the options bought statically");
-    spdlog::debug("Qualities scaled by 1/{:g}: {}'s scores scaled by 1/{:g}",
-                  quality_scale, noun, score_scale);
-    if(criterion_scale != 1)
+    spdlog::debug("Qualities scaled by 2^{}: {}'s scores by 2^{}",
+                  quality_exponent, noun,
+                  2 * quality_exponent + criterion_exponent);
+    if(criterion_exponent != 0)
         spdlog::debug(
-            "The criterion multiplied by {:g}, to the size of the scores of "
-            "its cases",
-            criterion_scale);
+            "The criterion multiplied by 2^{} on top, to the size of the "
+            "scores of its cases",
+            criterion_exponent);
+    // The relative tolerances of the solvers, a gap of 1e-10, and the margin
+    // of 1e-6 of the check of a bound, apply to the whole value of the
+    // criterion: an added constant that makes it 2^20 times its terms puts
+    // that margin at their size.
+    if(const double size =
+           criterion_size(instance.criterion(), base_cases_pc_num);
+       size > 0 && std::abs(base_value) > 0x1p20 * size)
+        spdlog::warn(
+            "The criterion is {:.3g} times its terms where nothing is bought: "
+            "an added constant dominates it, and the relative tolerances of "
+            "the solvers and of the check of their bounds can hide gains",
+            std::abs(base_value) / size);
     spdlog::debug("Initial score: {:g} (was {:g})", initial_score / score_scale,
                   initial_score);
 

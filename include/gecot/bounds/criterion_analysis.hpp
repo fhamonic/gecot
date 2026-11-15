@@ -167,6 +167,28 @@ struct cases_visitor {
     }
 };
 
+// A formula that reads no case replaced by its value, computed as the
+// criterion computes it: the MIP solvers take a product of literal constants
+// and one formula, which product(product(2, 3), z) is not.
+struct fold_visitor {
+    criterion_formula operator()(const criterion_constant & c) const {
+        return c;
+    }
+    criterion_formula operator()(const criterion_var & v) const { return v; }
+    template <typename F>
+    criterion_formula operator()(const F & f) const {
+        std::vector<case_id_t> read;
+        cases_visitor{read}(f);
+        if(read.empty()) {
+            static const std::vector<double> no_scores;
+            return formula_eval_visitor{no_scores}(f);
+        }
+        F folded;
+        for(auto && e : f.values) folded.values.push_back(std::visit(*this, e));
+        return folded;
+    }
+};
+
 struct simplify_visitor {
     std::size_t num_cases;
 
@@ -247,13 +269,16 @@ inline std::vector<case_id_t> criterion_cases(
 
 // The criterion with each linear part that reads a case score twice, or with
 // weights that add up to 0, written as constant + Σ_k w_k z_k over its cases
-// of non-zero weight: 2 z_1 - z_1 + 0 z_2 becomes z_1. Every other part is
-// returned as it is written. Rewriting those too, to one normal form, would
+// of non-zero weight: 2 z_1 - z_1 + 0 z_2 becomes z_1. A part that reads no
+// case becomes its value, the number that the criterion computed for it.
+// Every other part is returned as it is written. Rewriting those too, to one
+// normal form, would
 // change the order of the operations of a criterion that has nothing to
 // simplify, so the last digits of its scores and the rows of its models.
 inline criterion_formula simplified_criterion(
     const criterion_formula & criterion, std::size_t num_cases) {
-    return std::visit(detail::simplify_visitor{num_cases}, criterion);
+    return std::visit(detail::simplify_visitor{num_cases},
+                      std::visit(detail::fold_visitor{}, criterion));
 }
 
 // A bound on the criterion from a bound on its weighted case scores:

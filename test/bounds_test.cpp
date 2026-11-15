@@ -518,6 +518,20 @@ GTEST_TEST(criterion_analysis, simplified_criterion_keeps_the_other_writings) {
                   written(criterion));
 }
 
+// The MIP solvers take a product of literal constants and one formula.
+GTEST_TEST(criterion_analysis, simplified_criterion_folds_what_reads_no_case) {
+    using gecot::simplified_criterion;
+    EXPECT_EQ(written(simplified_criterion(
+                  criterion_product{
+                      {criterion_product{{2.0, 3.0}}, criterion_var{1}}},
+                  2)),
+              "product(6, z1)");
+    EXPECT_EQ(
+        written(simplified_criterion(
+            criterion_min{{criterion_var{0}, criterion_sum{{1.0, 2.0}}}}, 2)),
+        "min(z0, 3)");
+}
+
 GTEST_TEST(criterion_analysis, simplified_criterion_adds_up_a_linear_part) {
     using gecot::simplified_criterion;
     const criterion_product twice{{2.0, criterion_var{1}}};
@@ -903,6 +917,12 @@ GTEST_TEST(bounds, qkp_planes_takes_the_least_knapsack_of_the_dimensions) {
 
 GTEST_TEST(trivial_reformulation, keeps_free_options_that_exclude_others) {
     const Instance raw = three_woods_conflict();
+    // the optimum of the reformulated instance, in the unit of raw
+    const auto optimum = [](const auto & reformulated, const double budget) {
+        return std::ldexp(brute_force_optimum(reformulated.instance, budget),
+                          -2 * reformulated.quality_exponent -
+                              reformulated.criterion_exponent);
+    };
     // buying the free plantation statically would give the infeasible
     // {plantation, underpass} 35.40, deleting the underpass 28.76 at B=5
     EXPECT_NEAR(brute_force_optimum(raw, 3), 28.76, 1e-9);
@@ -913,7 +933,7 @@ GTEST_TEST(trivial_reformulation, keeps_free_options_that_exclude_others) {
         EXPECT_TRUE(reformulated.instance.contains_option("o2"));
         EXPECT_FALSE(reformulated.static_options[2]);
         EXPECT_EQ(reformulated.instance.conflict_sets().size(), 1u);
-        EXPECT_NEAR(brute_force_optimum(reformulated.instance, budget),
+        EXPECT_NEAR(optimum(reformulated, budget),
                     brute_force_optimum(raw, budget), 1e-9);
     }
     // the underpass over the budget, the set constrains nothing
@@ -922,7 +942,7 @@ GTEST_TEST(trivial_reformulation, keeps_free_options_that_exclude_others) {
     EXPECT_FALSE(reformulated.instance.contains_option("o2"));
     EXPECT_TRUE(reformulated.static_options[2]);
     EXPECT_TRUE(reformulated.instance.conflict_sets().empty());
-    EXPECT_NEAR(brute_force_optimum(reformulated.instance, 2), 28.76, 1e-9);
+    EXPECT_NEAR(optimum(reformulated, 2), 28.76, 1e-9);
 }
 
 GTEST_TEST(trivial_reformulation, leaves_out_the_cases_not_read) {
@@ -944,9 +964,10 @@ GTEST_TEST(trivial_reformulation, leaves_out_the_cases_not_read) {
         ASSERT_EQ(reformulated.instance.cases().size(), 1u);
         EXPECT_EQ(reformulated.instance.cases().front().name(), "c1");
         EXPECT_EQ(written(reformulated.instance.criterion()), "z0");
-        EXPECT_EQ(gecot::compute_base_score(reformulated.instance), 4.0);
-        // the score of the case 2 would have scaled the qualities
-        EXPECT_EQ(reformulated.quality_scale, 1.0);
+        // the qualities scaled up for the case 1 alone, its score 4 to
+        // 2^18: the score of the case 2 would have scaled them down
+        EXPECT_EQ(reformulated.quality_exponent, 8);
+        EXPECT_EQ(gecot::compute_base_score(reformulated.instance), 0x1p18);
     }
     {
         // the case 1 left out between two others
@@ -959,7 +980,7 @@ GTEST_TEST(trivial_reformulation, leaves_out_the_cases_not_read) {
         EXPECT_EQ(gecot::criterion_cases(reformulated.instance.criterion()),
                   (std::vector<gecot::case_id_t>{0, 1}));
         const double scale2 =
-            reformulated.quality_scale * reformulated.quality_scale;
+            std::ldexp(1.0, -2 * reformulated.quality_exponent);
         EXPECT_GT(scale2, 1.0);
         EXPECT_EQ(gecot::compute_base_score(reformulated.instance) * scale2,
                   1e12 + 1.0);
@@ -977,6 +998,57 @@ GTEST_TEST(trivial_reformulation, leaves_out_the_cases_not_read) {
             << written(zero);
     EXPECT_THROW(trivial_reformulate_instance(instance_with(3.0), budget),
                  std::invalid_argument);
+}
+
+// A case of one vertex, of quality q: its score q^2 is brought into
+// [1e5, 4e5) by 2^(2 e), the qualities by 2^e, up as down.
+GTEST_TEST(trivial_reformulation, scales_the_qualities_up_and_down) {
+    auto exponent_of = [](const std::vector<double> & qualities) {
+        return trivial_reformulate_instance(
+                   build_instance({1.0},
+                                  {case_spec{qualities.size(),
+                                             {},
+                                             {},
+                                             qualities,
+                                             qualities,
+                                             {},
+                                             {}}},
+                                  criterion_var{0}),
+                   gecot::budget_t{{1}})
+            .quality_exponent;
+    };
+    for(const double quality : {1e-5, 1.0, 400.0, 1e3, 1e8}) {
+        const int e = exponent_of({quality});
+        const double score = std::ldexp(quality * quality, 2 * e);
+        EXPECT_GE(score, 1e5) << quality;
+        EXPECT_LT(score, 4e5) << quality;
+    }
+    // up by 2^100 at most
+    EXPECT_EQ(exponent_of({1e-40}), 100);
+    // A source of 3 and a target of 2 that an arc of probability 0 links,
+    // which an option raises to 1, and a vertex of qualities 1e-3: the score
+    // goes from 1e-6 to 6. Scaled up for 1e-6, by 2^19, 6 would end near
+    // 1.6e12; scaled so that its bound, near 3 · 2, stays under 4e5, by 2^8.
+    const Instance rising = build_instance({1.0},
+                                           {case_spec{3,
+                                                      {{0, 1}},
+                                                      {0.0},
+                                                      {3.0, 0.0, 1e-3},
+                                                      {0.0, 2.0, 1e-3},
+                                                      {},
+                                                      {{{1.0, 0}}}}},
+                                           criterion_var{0});
+    EXPECT_EQ(trivial_reformulate_instance(rising, gecot::budget_t{{1}})
+                  .quality_exponent,
+              8);
+    // not up when a sum of qualities would pass 2^500: here a source of
+    // 1e290 at a vertex that reaches no target, its target quality 0
+    const Instance far = build_instance(
+        {1.0}, {case_spec{2, {}, {}, {1e290, 1e-5}, {0.0, 1e-5}, {}, {}}},
+        criterion_var{0});
+    EXPECT_EQ(trivial_reformulate_instance(far, gecot::budget_t{{1}})
+                  .quality_exponent,
+              0);
 }
 
 // Two cases of one vertex, of scores 1 and 1e12, and 1e-12 on the second: the
@@ -1005,16 +1077,14 @@ GTEST_TEST(trivial_reformulation, scales_a_criterion_far_from_its_cases) {
     // a first case of score 0 where nothing is bought: no factor is known to
     // serve every solution
     EXPECT_EQ(trivial_reformulate_instance(instance_with(0.0, weighted), budget)
-                  .criterion_scale,
-              1.0);
+                  .criterion_exponent,
+              0);
     {
         const Instance raw = instance_with(1.0, weighted);
         const auto reformulated = trivial_reformulate_instance(raw, budget);
-        const double c = reformulated.criterion_scale;
-        const double s =
-            reformulated.quality_scale * reformulated.quality_scale;
+        const double c = std::ldexp(1.0, reformulated.criterion_exponent);
+        const double s = std::ldexp(1.0, -2 * reformulated.quality_exponent);
         EXPECT_GT(c, 1e10);
-        EXPECT_EQ(std::exp2(std::round(std::log2(c))), c);
         // the scaled scores are exactly c / s times those of the raw instance
         auto all = raw.create_option_map(true);
         for(const auto & bought : {raw.create_option_map(false), all})
@@ -1039,14 +1109,14 @@ GTEST_TEST(trivial_reformulation, scales_a_criterion_far_from_its_cases) {
          criterion_formula{criterion_product{{1.0 / 800, criterion_var{1}}}}}) {
         const auto reformulated =
             trivial_reformulate_instance(instance_with(1.0, near), budget);
-        EXPECT_EQ(reformulated.criterion_scale, 1.0) << written(near);
+        EXPECT_EQ(reformulated.criterion_exponent, 0) << written(near);
     }
     EXPECT_EQ(trivial_reformulate_instance(
                   instance_with(
                       1.0, criterion_product{{1.0 / 2000, criterion_var{1}}}),
                   budget)
-                  .criterion_scale,
-              2048.0);
+                  .criterion_exponent,
+              11);
     // A case of score 0 at first and 1e6 with the option, beside one of
     // 2.5e5 weighted by 1e-12: measured where nothing is bought, the
     // criterion, 2.5e-7, would get a factor near 1e12, and reach 1e18 once
@@ -1058,8 +1128,8 @@ GTEST_TEST(trivial_reformulation, scales_a_criterion_far_from_its_cases) {
         criterion_sum{
             {criterion_var{0}, criterion_product{{1e-12, criterion_var{1}}}}});
     EXPECT_EQ(
-        trivial_reformulate_instance(zero_at_first, budget).criterion_scale,
-        1.0);
+        trivial_reformulate_instance(zero_at_first, budget).criterion_exponent,
+        0);
     // the same, the first case improved by an option over the budget only:
     // no solution reaches 1e6, the criterion stays near 2.5e-7
     const Instance over_budget = build_instance(
@@ -1068,8 +1138,9 @@ GTEST_TEST(trivial_reformulation, scales_a_criterion_far_from_its_cases) {
          case_spec{1, {}, {}, {500.0}, {500.0}, {}, {}}},
         criterion_sum{
             {criterion_var{0}, criterion_product{{1e-12, criterion_var{1}}}}});
-    EXPECT_GT(trivial_reformulate_instance(over_budget, budget).criterion_scale,
-              1e10);
+    EXPECT_GT(
+        trivial_reformulate_instance(over_budget, budget).criterion_exponent,
+        33);
     // A minimum held by its term of weight 1e-10, on two cases alike: the
     // largest term is that of the other case, the value is 1e10 times less.
     const Instance alike = build_instance(
@@ -1078,7 +1149,8 @@ GTEST_TEST(trivial_reformulation, scales_a_criterion_far_from_its_cases) {
          case_spec{1, {}, {}, {1e3}, {1e3}, {}, {}}},
         criterion_min{
             {criterion_var{0}, criterion_product{{1e-10, criterion_var{1}}}}});
-    EXPECT_GT(trivial_reformulate_instance(alike, budget).criterion_scale, 1e9);
+    EXPECT_GT(trivial_reformulate_instance(alike, budget).criterion_exponent,
+              29);
     // A case weighted by 1e12, at 0 unless two options that exclude each
     // other, each within the budget, are bought: with every option that fits,
     // it would set a factor near 1e-12 for a criterion that no solution makes
@@ -1096,8 +1168,8 @@ GTEST_TEST(trivial_reformulation, scales_a_criterion_far_from_its_cases) {
         criterion_sum{
             {criterion_var{0}, criterion_product{{1e12, criterion_var{1}}}}});
     EXPECT_EQ(trivial_reformulate_instance(exclusive, gecot::budget_t{{2}})
-                  .criterion_scale,
-              1.0);
+                  .criterion_exponent,
+              0);
 }
 
 // The scores, their scale and the results would be infinite or not a
@@ -1146,7 +1218,8 @@ GTEST_TEST(trivial_reformulation, keeps_the_optimum_with_conflicts_and_costs) {
         auto [raw, budget] = random_conflicts_instance(rng);
         const auto reformulated = trivial_reformulate_instance(raw, budget);
         const double scale2 =
-            reformulated.quality_scale * reformulated.quality_scale;
+            std::ldexp(1.0, -2 * reformulated.quality_exponent -
+                                reformulated.criterion_exponent);
         const double optimum = brute_force_optimum(raw, budget);
         EXPECT_NEAR(brute_force_optimum(reformulated.instance, budget) * scale2,
                     optimum, 1e-9 * std::max(1.0, optimum))

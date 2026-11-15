@@ -11,7 +11,7 @@ method with their main options. A run passes if its selection is feasible, its
 reported score is the brute-force score of that selection, its bound, if any,
 is at least the brute-force optimum, and, for an exact algorithm, its status
 is optimal and its score the optimum. A bound passes if it is at least the
-optimum; split_lagrange refusing the shape of the options is no failure. The instances are variants of the repository's
+optimum, each up to 1e-6 of it; split_lagrange refusing the shape of the options is no failure. The instances are variants of the repository's
 three woods, Aude, conflicts and two species instances, written to a temporary
 directory. The two species come with criteria that gecot simplifies, leaving a
 case out, and with weights of 1e-8 to 1e12 on copies of the squirrel whose
@@ -132,6 +132,34 @@ def write_instances(out):
         j["criterion"] = criterion
         json.dump(j, open(f"{out}/{name}.json", "w"))
         cases.append((f"{out}/{name}.json", ["2", "4", "5", "7"]))
+    # the squirrel with scores near 1e-9, which the qualities are scaled up for; and a criterion
+    # with a product of constants in a product, which the reformulation folds for the MIP solvers
+    j = copy.deepcopy(species)
+    del j["cases"]["hedgehog"]
+    j["cases"]["squirrel"] = scaled(j["cases"]["squirrel"], 1e-5)
+    j["criterion"] = "squirrel"
+    json.dump(j, open(f"{out}/tiny.json", "w"))
+    cases.append((f"{out}/tiny.json", ["3", "5", "7"]))
+    # sources and targets apart, linked by arcs of probability 0 that options raise to 0.9, and
+    # a vertex of qualities 1e-3: the score goes from 1e-6 to tens, which bounds the scale-up
+    vertices = [{"id": f"s{i}", "source_quality": q, "target_quality": 0} for i, q in enumerate((3, 1, 2, 2))]
+    vertices += [{"id": f"t{i}", "source_quality": 0, "target_quality": q} for i, q in enumerate((2, 3, 1, 1))]
+    vertices.append({"id": "w", "source_quality": 1e-3, "target_quality": 1e-3})
+    links = [(i, k) for i in range(4) for k in range(4) if (i + k) % 2 == 0]
+    j = {"options": [{"id": f"o{i}{k}", "cost": 1 + (i + 2 * k) % 3} for i, k in links],
+         "cases": {"c": {"vertices": vertices,
+                         "arcs": [{"id": f"a{i}{k}", "from": f"s{i}", "to": f"t{k}", "probability": 0}
+                                  for i, k in links],
+                         "arcs_improvements": [{"arc_id": f"a{i}{k}", "option_id": f"o{i}{k}",
+                                                "improved_probability": 0.9} for i, k in links]}},
+         "criterion": "c"}
+    json.dump(j, open(f"{out}/rising.json", "w"))
+    cases.append((f"{out}/rising.json", ["3", "5", "8"]))
+    j = copy.deepcopy(species)
+    j["criterion"] = min_of("hedgehog", {"operation": "product", "values": [
+        {"operation": "product", "values": [2, 3]}, "squirrel"]})
+    json.dump(j, open(f"{out}/folded.json", "w"))
+    cases.append((f"{out}/folded.json", ["3", "5", "7"]))
     # a case weighted by 1e12, at 0 unless an option over every budget is bought
     j = copy.deepcopy(species)
     del j["cases"]["hedgehog"]
@@ -230,7 +258,7 @@ def main():
                             print(f"  {config:42s} refused: {error[:80]}")
                             continue
                         ok = result is not None \
-                            and result["bound"] >= optimum - 1e-6 * max(1, optimum)
+                            and result["bound"] >= optimum - 1e-6 * abs(optimum)
                         print(f"  {config:42s} {result['bound'] if result else error[:80]} "
                               f"{'ok' if ok else 'FAIL'}")
                         if not ok:
@@ -246,11 +274,11 @@ def main():
                     status = result["algorithm_report"]["status"]
                     bound = result["algorithm_report"].get("best_bound", float("inf"))
                     ok = brute.feasible(instance, X, B) and result.get("feasible", True) \
-                        and abs(score - result["solution_score"]) <= 1e-6 * max(1, score) \
-                        and bound >= optimum - 1e-6 * max(1, optimum)
+                        and abs(score - result["solution_score"]) <= 1e-6 * abs(score) \
+                        and bound >= optimum - 1e-6 * abs(optimum)
                     if not relaxed(config):
                         ok = ok and status in ("optimal", "no option left") \
-                            and abs(score - optimum) <= 1e-6 * max(1, optimum)
+                            and abs(score - optimum) <= 1e-6 * abs(optimum)
                     print(f"  {config:42s} {status:15s} {score:.10g} {'ok' if ok else 'FAIL'}")
                     if not ok:
                         failures.append(f"{os.path.basename(path)} {b} {config}: score {score}, "
@@ -267,7 +295,7 @@ def main():
                         failures.append(f"oracle {os.path.basename(path)} {b} {config}: {e1 or e2}")
                         continue
                     s1, s2 = first["solution_score"], second["solution_score"]
-                    ok = abs(s1 - s2) <= 1e-6 * max(1, s2)
+                    ok = abs(s1 - s2) <= 1e-6 * abs(s2)
                     print(f"  oracle {os.path.basename(path)} {b} {config}: {s1:.10g} | {s2:.10g} "
                           f"{'ok' if ok else 'FAIL'}")
                     if not ok:

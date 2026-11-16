@@ -1,5 +1,7 @@
 #pragma once
 
+#include <limits>
+
 #include "gecot/solvers/multiflow_benders.hpp"
 
 #include "solver_interfaces/abstract_mip_interface.hpp"
@@ -13,6 +15,18 @@ public:
         add_benders_options(solver, column_solvers);
         add_preprocessing_options(solver);
         add_big_M_option(solver.big_Ms);
+        app.add_option("--root-cut-tolerance", solver.root_cut_tol,
+                       "Relative tolerance of the cuts on the linear "
+                       "relaxation before the search: a cut is added when the "
+                       "relaxation's flow exceeds it by more than this share, "
+                       "and the rounds end when none does. A larger value "
+                       "ends them sooner, the relaxation then above its "
+                       "value with all the cuts by about this share at most, "
+                       "unless the criterion subtracts a constant")
+            ->check(CLI::Range(gecot::default_feasibility_tol,
+                               std::numeric_limits<double>::max(),
+                               "AT LEAST 1e-07"))
+            ->default_val(solver.root_cut_tol);
         app.add_flag("--no-root-cuts", solver.no_root_cuts,
                      "For comparison: no cut on the linear relaxation before "
                      "the search");

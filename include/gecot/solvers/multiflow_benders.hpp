@@ -48,8 +48,12 @@ struct multiflow_benders : public mip_solver_base {
     // tight experimental, a constant per target quality gain
     big_M_kind big_Ms = big_M_kind::knapsack_bnb;
     // A cut is added to the relaxation when f_t exceeds it by more than
-    // this, relative and absolute. It does not follow feasibility_tol.
-    static constexpr double root_cut_tol = 1e-7;
+    // root_cut_tol of it, and by root_cut_abs_tol: the rounds end when none
+    // is. Neither follows feasibility_tol. Under 1e-7, the default -t, a
+    // round can add again a cut that the relaxation holds: the test reads x
+    // clamped to [0,1], and f_t as the solver returns it.
+    double root_cut_tol = 1e-7;
+    static constexpr double root_cut_abs_tol = 1e-7;
 
     // The graph G_t of a target t, each improved copy an arc of its own, and
     // for each source the arcs that can carry its flow to t.
@@ -614,11 +618,13 @@ struct multiflow_benders : public mip_solver_base {
                 double cut_at_optimum = cuts[b].constant;
                 for(auto && i : instance.options())
                     cut_at_optimum += cuts[b].coefficients[i] * point[i];
-                if(f_relaxed[b] <=
-                   cut_at_optimum * (1 + root_cut_tol) + root_cut_tol)
-                    continue;
-                model.add_constraint(cut_constraint(b, cuts[b]));
-                ++num_added;
+                // not `<=` then skip: a NaN --root-cut-tolerance, which the
+                // CLI's range lets through, would add every cut forever
+                if(f_relaxed[b] >
+                   cut_at_optimum * (1 + root_cut_tol) + root_cut_abs_tol) {
+                    model.add_constraint(cut_constraint(b, cuts[b]));
+                    ++num_added;
+                }
             }
             root_cuts += num_added;
             if(num_added) continue;

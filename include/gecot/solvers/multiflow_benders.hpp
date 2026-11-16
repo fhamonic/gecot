@@ -44,6 +44,9 @@ struct multiflow_benders : public mip_solver_base {
     // the sets A_s are not kept but rebuilt at each separation: the same
     // cuts, slower, for instances whose sets do not fit in memory
     bool no_stored_arcs = false;
+    // the bound of f_t and the big-Ms of the f^i_t: plain for comparison,
+    // tight experimental, a constant per target quality gain
+    big_M_kind big_Ms = big_M_kind::knapsack_bnb;
     // A cut is added to the relaxation when f_t exceeds it by more than
     // this, relative and absolute. It does not follow feasibility_tol.
     static constexpr double root_cut_tol = 1e-7;
@@ -520,30 +523,32 @@ struct multiflow_benders : public mip_solver_base {
                 melon::vertices(instance_case.graph())) {
                 pb.tick();
                 if(!_is_target(instance_case, original_t)) continue;
-                contracted_flow_graph G_t = compute_contracted_flow_graph(
-                    instance, instance_case, budget, original_t,
-                    strong_arcs_map[original_t], useless_arcs_map[original_t],
-                    std::nullopt, feasibility_tol, !no_pruning);
-                // multiflow_benders: f_t within M^t_t, the only big-M of
-                // the vertices that is read here, without which the
+                // the big-Ms of t only: those of the arcs are per source
+                contracted_flow_graph G_t =
+                    compute_contracted_flow_graph<false>(
+                        instance, instance_case, budget, original_t,
+                        strong_arcs_map[original_t],
+                        useless_arcs_map[original_t], big_Ms, feasibility_tol,
+                        !no_pruning, _options_model<M>(instance, budget));
+                // multiflow_benders: f_t within M^t_t, without which the
                 // relaxation is unbounded until t receives a cut, and f^i_t
-                // for each positive target quality gain
-                const double M_t = compute_knapsack_big_M_map(
-                    instance, budget, false, G_t.graph, G_t.source_quality_map,
-                    G_t.source_options_map, G_t.probability_map,
-                    std::views::single(G_t.t))[G_t.t];
-                const target_block & block = blocks.emplace_back(
-                    instance_case, original_t, std::move(G_t));
+                // for each positive target quality gain, in the order of
+                // the block's target_quality_gains. A lowered constant of i
+                // covers only the scenarios that buy i: no bound of f_t.
                 f.push_back(model.add_column(
-                    {std::make_pair(z_row, -block.target_quality)},
-                    {.upper_bound = M_t}));
-                for(const auto & [target_gain, i] :
-                    block.target_quality_gains) {
+                    {std::make_pair(
+                        z_row,
+                        -instance_case.target_quality_map()[original_t])},
+                    {.upper_bound = G_t.big_M_map.value()[G_t.t]}));
+                for(const auto & [source_gain, target_gain, i] :
+                    instance_case.vertex_options_map()[original_t]) {
+                    if(!(target_gain > 0)) continue;
                     const auto f_ti = f_gains.emplace_back(model.add_column(
                         {std::make_pair(z_row, -target_gain)}));
                     model.add_constraint(f_ti <= f.back());
-                    model.add_constraint(f_ti <= M_t * x(i));
+                    model.add_constraint(f_ti <= G_t.target_big_M(i) * x(i));
                 }
+                blocks.emplace_back(instance_case, original_t, std::move(G_t));
             }
         }
         _log_preprocessing(preprocessing);

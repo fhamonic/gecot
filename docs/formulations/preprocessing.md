@@ -216,7 +216,7 @@ For a scenario $x$ of cost at most $\beta$ and a simple path $Q$, the options th
 
 ## Big-M constants
 
-The constant $M^t_u$ of the constraints $\phi^t_{a^i} \le M^t_u \cdot x_i$ and $f^i_t \le M^t_t \cdot x_i$ must be at least the flow that can reach the vertex $u$ on its way to $t$. The smaller it is, the tighter the linear relaxation, and the faster the search: with a constant $100$ times too large, $x_i = 0.01$ is enough to open an arc completely. `--big-m` chooses among four constants, all computed on the reduced graph $G_t$, where $\overline{\Pi}_{G_t}(s,u)$ is the probability of connection in $G_t$ with every option bought.
+The constant $M^t_u$ of the constraints $\phi^t_{a^i} \le M^t_u \cdot x_i$ and $f^i_t \le M^t_t \cdot x_i$ must be at least the flow that can reach the vertex $u$ on its way to $t$. The smaller it is, the tighter the linear relaxation, and the faster the search: with a constant $100$ times too large, $x_i = 0.01$ is enough to open an arc completely. `--big-m` chooses among five constants, all computed on the reduced graph $G_t$, where $\overline{\Pi}_{G_t}(s,u)$ is the probability of connection in $G_t$ with every option bought.
 
 **`plain`** counts every quality gain:
 
@@ -241,7 +241,15 @@ a knapsack problem solved exactly by branch and bound for each vertex that needs
 
 **`tight`** (experimental) lowers the `knapsack_bnb` constant of each improved copy $a^i$ of an arc $(u,v)$, by keeping only the sources that can use it, those whose best path through $a^i$ with every option is at least as reliable as their best path without any option, and by bounding the probabilities within the budget left by $i$ with a Lagrangian relaxation, in the first cost dimension when there are several. [The tight constants](#the-tight-constants) gives the two bounds.
 
-`--big-m` is a parameter of `flow_mip`, `multicut_benders` and `flow_benders`. `multiflow_benders` has its own constants, one per source and arc, and `tree_lp` uses the plain ones.
+**`exact`** (for comparison, slow) is the value that `knapsack_bnb` bounds: the largest flow that can reach $u$ in $G_t$ over the scenarios within the budgets and the conflict sets. It takes a MIP per vertex that needs a constant:
+- the [flow formulation](flow.md) on the vertices of $G_t$ that reach $u$, with $u$ as the sink and the `knapsack_bnb` constants on its copies;
+- the constant is its dual bound, raised by $10^{-6}$ relative, and at most the `knapsack_bnb` one.
+
+The copies read the constant of their tail and the target quality gains that of $t$, as with `knapsack_bnb`. It is the exact value of what `knapsack_bnb` bounds, not the least valid constant: a source can reach $u$ and still have a better path to $t$ that avoids it, so less than this flow can leave $u$.
+
+The MIPs run in parallel, one solver thread each. On a landscape of 2,571 vertices and 122 options, they take about three minutes of 16 cores, where `knapsack_bnb` takes under a second. The time limit counts them: below their time, the solver has none left and stops without a solution, unless it has a MIP start. `-v` on `flow_mip` logs by how much the constants are lowered and how many copies keep the `knapsack_bnb` constant. It needs a solver with a dual bound: an error otherwise.
+
+`--big-m` is a parameter of `flow_mip`, `multicut_benders`, `flow_benders` and `multiflow_benders`. `multiflow_benders` reads only $M^t_t$, as its arcs have their own constants, one per source and arc. `tree_lp` uses the plain ones.
 
 ### The tight constants
 
@@ -275,7 +283,7 @@ The constant $M^t_t$ of the target quality gain of $i$ is bounded in the same wa
 | Contracting the strong arcs | `--preprocessing useless` or `none` | same |
 | Pruning | `--no-pruning` | same |
 | Budget-aware labels | off unless `--nb-mus N` | same |
-| Big-M constants within the budget | `--big-m plain` | `flow_mip`, `multicut_benders`, `flow_benders` |
+| Big-M constants within the budget | `--big-m plain` | `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` |
 
 `--preprocessing` takes `all` (the default), `strong` (only the contraction), `useless` (only the removal) or `none`. Both kinds of labels are computed together, so `strong` and `useless` measure the size of the model and the time to solve it, not the time to label.
 

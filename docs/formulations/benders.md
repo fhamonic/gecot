@@ -152,7 +152,7 @@ f_t(x) \;\le\; w^x_t + \sum_{s \neq t} \Big[ \; & \rho^s_s \cdot w^x_s \\
 \end{aligned}
 $$
 
-An option now pays, for each source, only what this source can bring to its arcs. The master is the one of `flow_benders` with these cuts in place of $\operatorname{cut}_{t,y}$, and with each $f_t$ bounded by $M^t_t$: without this bound its relaxation is unbounded until $t$ receives a cut. The constant $M^t_t$ is the `knapsack_bnb` one, as `multiflow_benders` has no `--big-m`, and only the gains $q^i_t > 0$ get a variable $f^i_t$. Its linear relaxation is much closer to the optimum.
+An option now pays, for each source, only what this source can bring to its arcs. The master is the one of `flow_benders` with these cuts in place of $\operatorname{cut}_{t,y}$, and with each $f_t$ bounded by $M^t_t$: without this bound its relaxation is unbounded until $t$ receives a cut. The constant $M^t_t$ is the one of `--big-m`, `knapsack_bnb` by default; `tight` and `exact` lower that of the $f^i_t$ only, as the constant of a scenario that buys $i$ does not bound $f_t$. Only the gains $q^i_t > 0$ get a variable $f^i_t$. Its linear relaxation is much closer to the optimum.
 
 ### Separation
 
@@ -183,6 +183,6 @@ The three decompositions need a solver that accepts lazy constraints in a callba
 |---|---|
 | `multicut_benders` | `--groups`, `--grouping`, `--grouping-seed`, `--big-m` |
 | `flow_benders` | `--big-m`, `--indicator-constraints` |
-| `multiflow_benders` | `--no-root-cuts`, `--no-in-out`, `--no-stored-arcs` |
+| `multiflow_benders` | `--big-m`, `--no-root-cuts`, `--no-in-out`, `--no-stored-arcs` |
 
 Their report adds `lazy_constraints`, the number of cuts added during the search, and for `multiflow_benders` `sources`, `root_rounds`, `root_cuts` and `root_relaxation_value`.

@@ -395,6 +395,25 @@ struct mip_solver_base {
             model.add_constraint(xsum(set, x) <= 1);
     }
 
+    // the options_model of --big-m exact (compute_exact_big_M_map): a model
+    // of M with the options and their rows, at the tolerances of the solver;
+    // none for a solver without a dual bound
+    template <typename M, instance_c I>
+    auto _options_model(const I & instance, const budget_t & budget) const {
+        if constexpr(mippp::has_dual_bound<M> && std::move_constructible<M>)
+            return [this, &instance, &budget] {
+                M model;
+                _set_tolerances(model, mip_gap, feasibility_tol);
+                const auto x = model.add_binary_variables(
+                    instance.options().size(),
+                    [](const option_t & i) { return i; });
+                _add_budget_rows(model, instance, budget, x);
+                return std::make_pair(std::move(model), x);
+            };
+        else
+            return nullptr;
+    }
+
     // gap: the relative MIP gap, which mippp calls the optimality tolerance;
     // Gurobi's OptimalityTol is another parameter, set in _solve. Backends
     // without these setters keep their defaults.

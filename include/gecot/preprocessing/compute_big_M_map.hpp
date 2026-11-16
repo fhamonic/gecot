@@ -24,8 +24,9 @@ namespace gecot {
 // knapsack_bnb: with the gains of its best options within the budget;
 // knapsack_dantzig: with the linear relaxation of that knapsack, looser but
 // without the branch and bound's blow-ups; tight: knapsack_bnb, lowered per
-// improvement by compute_tight_big_M_maps
-enum class big_M_kind { plain, knapsack_bnb, knapsack_dantzig, tight };
+// improvement by compute_tight_big_M_maps; exact: the value knapsack_bnb
+// bounds, by compute_exact_big_M_map
+enum class big_M_kind { plain, knapsack_bnb, knapsack_dantzig, tight, exact };
 
 template <typename GR, typename QM, typename VOM, typename PM>
 auto compute_big_M_map(const GR & graph, const QM & source_quality_map,

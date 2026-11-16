@@ -2,9 +2,12 @@
 #define GECOT_COMPUTE_CONTRACTED_GRAPH_HPP
 
 #include <algorithm>
+#include <cstddef>
 #include <optional>
 #include <ranges>
+#include <stdexcept>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -16,6 +19,7 @@
 #include "gecot/indices/pc_num.hpp"
 #include "gecot/preprocessing/compute_big_M_map.hpp"
 #include "gecot/preprocessing/compute_contracted_generalized_flow_graph.hpp"
+#include "gecot/preprocessing/compute_exact_big_M_map.hpp"
 #include "gecot/preprocessing/compute_tight_big_M_maps.hpp"
 
 #include "melon/container/static_digraph.hpp"
@@ -50,31 +54,35 @@ struct contracted_flow_graph {
     arc_map<std::vector<std::pair<double, option_t>>> arc_options_map;
     // none when no big-M is asked for: the two accessors below then throw
     std::optional<vertex_map<double>> big_M_map;
-    // with tight big-Ms only: per arc, the big-M of its improvement, and per
-    // option the big-M of a target quality gain at t
+    // with tight and exact big-Ms only, below big_M_map: per arc, the big-M
+    // of its improvement, and per option the big-M of a target quality gain
+    // at t
     std::optional<std::pair<arc_map<std::vector<double>>, std::vector<double>>>
-        tight_big_Ms;
+        lowered_big_Ms;
 
-    // a must be an improvement: with the tight big-Ms, an arc that is not
-    // one has an empty list, and reading its first entry is undefined
+    // a must be an improvement: with lowered big-Ms, an arc that is not one
+    // has an empty list, and reading its first entry is undefined
     double improvement_big_M(const arc & a) const {
-        const double M = big_M_map.value()[melon::arc_source(graph, a)];
-        return tight_big_Ms ? std::min(M, tight_big_Ms->first[a][0]) : M;
+        return lowered_big_Ms ? lowered_big_Ms->first[a][0]
+                              : big_M_map.value()[melon::arc_source(graph, a)];
     }
     // of the target quality gain of the option i at t
     double target_big_M(const option_t i) const {
-        const double M = big_M_map.value()[t];
-        return tight_big_Ms ? std::min(M, tight_big_Ms->second[i]) : M;
+        return lowered_big_Ms ? lowered_big_Ms->second[i]
+                              : big_M_map.value()[t];
     }
 };
 
-// big_Ms: the big-Ms to compute, none without a value
-template <instance_c I, case_c C>
+// big_Ms: the big-Ms to compute, none without a value; without ArcBigMs,
+// those of t only. options_model: of compute_exact_big_M_map, for exact.
+template <bool ArcBigMs = true, instance_c I, case_c C,
+          typename OM = std::nullptr_t>
 contracted_flow_graph compute_contracted_flow_graph(
     const I & instance, const C & instance_case, const budget_t & budget,
     const auto & original_t, const auto & strong_arcs,
     const auto & useless_arcs, const std::optional<big_M_kind> big_Ms,
-    const double tolerance, const bool pruning) {
+    const double tolerance, const bool pruning,
+    const OM & options_model = nullptr) {
     auto [graph, source_quality_map, source_options_map, arc_no_map,
           probability_map, improvement_option_map, t] =
         compute_contracted_generalized_flow_graph(
@@ -91,34 +99,88 @@ contracted_flow_graph compute_contracted_flow_graph(
         else
             base_probability_map[a] = probability_map[a];
     }
-    auto big_M_vertices =
-        std::views::filter(melon::vertices(graph), [&](auto && u) {
-            return u == t ||
-                   std::ranges::any_of(
-                       melon::out_arcs(graph, u), [&](auto && a) {
-                           return improvement_option_map[a].has_value();
-                       });
+    auto is_tail = [&](auto && u) {
+        return std::ranges::any_of(melon::out_arcs(graph, u), [&](auto && a) {
+            return improvement_option_map[a].has_value();
         });
+    };
+    // t, and the tails of the improvements
+    auto tails_and_t =
+        std::views::filter(melon::vertices(graph),
+                           [&](auto && u) { return u == t || is_tail(u); });
+    auto big_M_vertices = [&] {
+        if constexpr(ArcBigMs)
+            return tails_and_t;
+        else
+            return std::views::single(t);
+    }();
+    auto compute_map = [&](auto && vertices) {
+        return big_Ms == big_M_kind::plain
+                   ? compute_big_M_map(graph, source_quality_map,
+                                       source_options_map, probability_map,
+                                       vertices)
+                   : compute_knapsack_big_M_map(
+                         instance, budget,
+                         big_Ms == big_M_kind::knapsack_dantzig, graph,
+                         source_quality_map, source_options_map,
+                         probability_map, vertices);
+    };
     std::optional<contracted_flow_graph::vertex_map<double>> big_M_map;
-    if(big_Ms)
-        big_M_map =
-            big_Ms == big_M_kind::plain
-                ? compute_big_M_map(graph, source_quality_map,
-                                    source_options_map, probability_map,
-                                    big_M_vertices)
-                : compute_knapsack_big_M_map(
-                      instance, budget, big_Ms == big_M_kind::knapsack_dantzig,
-                      graph, source_quality_map, source_options_map,
-                      probability_map, big_M_vertices);
-    auto tight_big_Ms =
-        big_Ms == big_M_kind::tight
-            ? std::make_optional(compute_tight_big_M_maps(
-                  instance, budget[0], tolerance, graph, source_quality_map,
-                  source_options_map, base_probability_map, arc_options_map, t,
-                  std::views::transform(
-                      instance_case.vertex_options_map()[original_t],
-                      [](auto && e) { return std::get<2>(e); })))
-            : std::nullopt;
+    // exact's MIPs bound their copies by the constants of their tails: it
+    // needs those of every tail
+    if(big_Ms == big_M_kind::exact)
+        big_M_map = compute_map(tails_and_t);
+    else if(big_Ms)
+        big_M_map = compute_map(big_M_vertices);
+    const auto target_options =
+        std::views::transform(instance_case.vertex_options_map()[original_t],
+                              [](auto && e) { return std::get<2>(e); });
+    std::optional<std::pair<contracted_flow_graph::arc_map<std::vector<double>>,
+                            std::vector<double>>>
+        lowered_big_Ms;
+    if(big_Ms == big_M_kind::tight) {
+        lowered_big_Ms = compute_tight_big_M_maps<ArcBigMs>(
+            instance, budget[0], tolerance, graph, source_quality_map,
+            source_options_map, base_probability_map, arc_options_map, t,
+            target_options);
+        auto & [arc_big_M_map, target_big_M_map] = lowered_big_Ms.value();
+        for(const auto & a : melon::arcs(graph))
+            for(double & M : arc_big_M_map[a])
+                M = std::min(M, big_M_map.value()[melon::arc_source(graph, a)]);
+        // those of the other options are read nowhere
+        std::vector<double> lowered(target_big_M_map.size(),
+                                    big_M_map.value()[t]);
+        for(const option_t i : target_options)
+            lowered[i] = std::min(lowered[i], target_big_M_map[i]);
+        target_big_M_map = std::move(lowered);
+    }
+    if(big_Ms == big_M_kind::exact) {
+        if constexpr(std::is_null_pointer_v<OM>)
+            throw std::invalid_argument(
+                "--big-m exact needs a MIP solver with a dual bound");
+        else {
+            // the constants read: of t only for its options or as a tail
+            const auto exact_big_M_map = compute_exact_big_M_map(
+                options_model, graph, source_quality_map, source_options_map,
+                probability_map, improvement_option_map, arc_no_map,
+                big_M_map.value(),
+                std::views::filter(big_M_vertices, [&](auto && u) {
+                    return u != t || !std::ranges::empty(target_options) ||
+                           is_tail(t);
+                }));
+            // the layer of tight: the copies of the arcs that leave u and
+            // the target quality gains read exact_big_M_map[u]
+            auto & [arc_big_M_map, target_big_M_map] = lowered_big_Ms.emplace(
+                melon::create_arc_map<std::vector<double>>(graph, {}),
+                std::vector<double>(std::ranges::size(instance.options()),
+                                    exact_big_M_map[t]));
+            if constexpr(ArcBigMs)
+                for(const auto & a : melon::arcs(graph))
+                    if(improvement_option_map[a].has_value())
+                        arc_big_M_map[a] = {
+                            exact_big_M_map[melon::arc_source(graph, a)]};
+        }
+    }
     return {.graph = std::move(graph),
             .t = t,
             .source_quality_map = std::move(source_quality_map),
@@ -129,7 +191,7 @@ contracted_flow_graph compute_contracted_flow_graph(
             .base_probability_map = std::move(base_probability_map),
             .arc_options_map = std::move(arc_options_map),
             .big_M_map = std::move(big_M_map),
-            .tight_big_Ms = std::move(tight_big_Ms)};
+            .lowered_big_Ms = std::move(lowered_big_Ms)};
 }
 
 template <case_c C>
@@ -230,17 +292,15 @@ public:
 // compute_contracted_flow_graph with its vertices renumbered, as the Benders
 // decompositions read it. Its probability_map is the base one: 0 for an
 // improvement, whose probability with its option is in arc_options_map.
-template <instance_c I, case_c C>
+template <instance_c I, case_c C, typename OM = std::nullptr_t>
 contracted_graph_data<C> compute_contracted_graph_data(
     const I & instance, const C & instance_case, const budget_t & budget,
     const auto & original_t, const auto & strong_arcs,
     const auto & useless_arcs, const big_M_kind big_Ms, const double tolerance,
-    const bool pruning) {
-    const auto & original_vertex_options_map =
-        instance_case.vertex_options_map();
+    const bool pruning, const OM & options_model = nullptr) {
     contracted_flow_graph G = compute_contracted_flow_graph(
         instance, instance_case, budget, original_t, strong_arcs, useless_arcs,
-        big_Ms, tolerance, pruning);
+        big_Ms, tolerance, pruning, options_model);
     const auto & graph = G.graph;
     auto & big_M_map = G.big_M_map.value();
 
@@ -251,7 +311,7 @@ contracted_graph_data<C> compute_contracted_graph_data(
         std::ranges::count_if(melon::vertices(graph),
                               [&](auto && u) { return vertex_cmp(u, G.t); }));
 
-    if(big_Ms != big_M_kind::tight) {
+    if(!G.lowered_big_Ms) {
         auto [sgraph, ssource_quality_map, ssource_options_map, sbig_M_map,
               sprobability_map, sarc_options_map] =
             melon::make_static_digraph(
@@ -265,25 +325,7 @@ contracted_graph_data<C> compute_contracted_graph_data(
             std::move(sbig_M_map), {}, {});
     }
 
-    const auto num_options = std::ranges::size(instance.options());
-    auto arc_big_M_map = melon::create_arc_map<std::vector<double>>(graph, {});
-    std::vector<double> target_big_M_map(num_options, big_M_map[G.t]);
-    for(const auto & a : melon::arcs(graph))
-        arc_big_M_map[a].assign(G.arc_options_map[a].size(),
-                                big_M_map[melon::arc_source(graph, a)]);
-    {
-        const auto & [tight_arc_big_M_map, tight_target_big_M] =
-            G.tight_big_Ms.value();
-        for(const auto & a : melon::arcs(graph))
-            for(std::size_t k = 0; k < arc_big_M_map[a].size(); ++k)
-                arc_big_M_map[a][k] =
-                    std::min(arc_big_M_map[a][k], tight_arc_big_M_map[a][k]);
-        for(auto && [sqg, tqg, option] :
-            original_vertex_options_map[original_t])
-            target_big_M_map[option] =
-                std::min(target_big_M_map[option], tight_target_big_M[option]);
-    }
-
+    auto & [arc_big_M_map, target_big_M_map] = G.lowered_big_Ms.value();
     auto [sgraph, ssource_quality_map, ssource_options_map, sbig_M_map,
           sprobability_map, sarc_options_map, sarc_big_M_map] =
         melon::make_static_digraph(

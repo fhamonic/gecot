@@ -100,7 +100,7 @@ struct flow_benders : public mip_solver_base {
                         instance, instance_case, budget, original_t,
                         strong_arcs_map[original_t],
                         useless_arcs_map[original_t], big_Ms, feasibility_tol,
-                        !no_pruning));
+                        !no_pruning, _options_model<M>(instance, budget)));
                 for(const auto & [source_gain, target_gain, i] :
                     vertex_options_map[original_t]) {
                     const auto f_ti = f_gains.emplace_back(model.add_column(

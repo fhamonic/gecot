@@ -55,7 +55,7 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 | `flow_mip` | ✓ | ✓ | `--big-m`, `--lp-relaxation`, `--indicator-constraints` |
 | `multicut_benders` | ✓ | ✓ | `--groups`, `--grouping`, `--grouping-seed`, `--big-m` |
 | `flow_benders` | ✓ | ✓ | `--big-m`, `--indicator-constraints` |
-| `multiflow_benders` | ✓ | ✓ | `--no-root-cuts`, `--no-in-out`, `--no-stored-arcs` |
+| `multiflow_benders` | ✓ | ✓ | `--big-m`, `--no-root-cuts`, `--no-in-out`, `--no-stored-arcs` |
 | `tree_lp` | ✓ | ✓ | `--evict-age` |
 | `path_lp` | ✓ | – | `--evict-age`, `--pricing`, `--max-activations`, `--relative-gap` |
 | `static` | – | – | `-t`, `--decremental`, `--only-dec` |
@@ -93,7 +93,7 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` and `tre
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `--big-m plain`, `knapsack_bnb`, `knapsack_dantzig`, `tight` | `knapsack_bnb` | the [big-M constants](../formulations/preprocessing.md#big-m-constants). `plain`: with every quality gain, for comparison. `knapsack_bnb`: with the gains of the best options within the budget, by branch and bound. `knapsack_dantzig`: with the linear relaxation of that knapsack, looser but faster to compute. `tight`: experimental, lowered per arc over the sources that can use it. With [several costs](../usage/instance.md#several-costs), the knapsacks are solved per dimension and the least is kept, and `tight` reads only the first dimension, in the [order of their names](../usage/instance.md#several-costs) |
+| `--big-m plain`, `knapsack_bnb`, `knapsack_dantzig`, `tight`, `exact` | `knapsack_bnb` | the [big-M constants](../formulations/preprocessing.md#big-m-constants). `plain`: with every quality gain, for comparison. `knapsack_bnb`: with the gains of the best options within the budget, by branch and bound. `knapsack_dantzig`: with the linear relaxation of that knapsack, looser but faster to compute. `tight`: experimental, lowered per improvement and per target quality gain over the sources that can use them. `exact`: for comparison, the value that `knapsack_bnb` bounds, by a MIP per vertex: slow. With [several costs](../usage/instance.md#several-costs), the knapsacks are solved per dimension and the least is kept, and `tight` reads only the first dimension, in the [order of their names](../usage/instance.md#several-costs) |
 | `--lp-relaxation` | off | experimental: solves the [continuous relaxation](../formulations/flow.md#what-flow_mip-solves) |
 | `--indicator-constraints` | off | experimental: an [improved copy](../formulations/flow.md#improved-arcs) and a [target quality gain](../formulations/flow.md#target-quality-gains) are closed by an indicator constraint on their option, in place of their big-M constraint. `--big-m` then has no effect: no constant is computed. With `gurobi` or `cplex` only, and not with `--lp-relaxation`: an error otherwise |
 
@@ -104,19 +104,20 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` and `tre
 | `--groups <n>` | `2` | the groups of targets per case, each with its own cuts. `1`: a single cut per case. `0`: a group per target |
 | `--grouping voronoi`, `consecutive`, `random` | `voronoi` | how the targets are grouped. `voronoi`: the cells of a network Voronoi diagram around targets of value far from each other. `consecutive`: runs of consecutive targets. `random`: at random, as a control |
 | `--grouping-seed <n>` | `0` | the seed of `--grouping random` |
-| `--big-m plain`, `knapsack_bnb`, `knapsack_dantzig`, `tight` | `knapsack_bnb` | as for `flow_mip` |
+| `--big-m plain`, `knapsack_bnb`, `knapsack_dantzig`, `tight`, `exact` | `knapsack_bnb` | as for `flow_mip` |
 
 ### `flow_benders`
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `--big-m plain`, `knapsack_bnb`, `knapsack_dantzig`, `tight` | `knapsack_bnb` | as for `flow_mip` |
+| `--big-m plain`, `knapsack_bnb`, `knapsack_dantzig`, `tight`, `exact` | `knapsack_bnb` | as for `flow_mip` |
 | `--indicator-constraints` | off | experimental: a [target quality gain](../formulations/flow.md#target-quality-gains) is closed by an indicator constraint on its option, in place of its big-M constraint. The cuts keep the constants of `--big-m`. With `gurobi` or `cplex` only: an error otherwise |
 
 ### `multiflow_benders`
 
 | Parameter | Default | Meaning |
 |---|---|---|
+| `--big-m plain`, `knapsack_bnb`, `knapsack_dantzig`, `tight`, `exact` | `knapsack_bnb` | as for `flow_mip`, for $M^t_t$ only: the bound of $f_t$, and the constant of its [target quality gains](../formulations/benders.md#multiflow_benders-cuts-per-source), which `tight` and `exact` lower |
 | `--no-root-cuts` | off | for comparison: no cut on the linear relaxation before the search |
 | `--no-in-out` | off | for comparison: separates each optimum of the relaxation, without the center that moves halfway to it |
 | `--no-stored-arcs` | off | keeps no [set $A_s$](../formulations/benders.md#separation) per source but rebuilds them at each separation: the same cuts, slower, in less memory |

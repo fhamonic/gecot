@@ -173,14 +173,18 @@ protected:
             {{"plain", plain},
              {"knapsack_bnb", knapsack_bnb},
              {"knapsack_dantzig", knapsack_dantzig},
-             {"tight", tight}},
+             {"tight", tight},
+             {"exact", exact}},
             [&big_Ms](const gecot::big_M_kind kind) { big_Ms = kind; },
             "The big-Ms: plain, with every quality gain (for comparison); "
             "knapsack_bnb, with the gains of the best options within the "
             "budget, by branch and bound; knapsack_dantzig, with the "
             "linear relaxation of that knapsack, looser but faster; tight "
-            "(experimental), knapsack_bnb lowered per arc over the sources "
-            "that can use it");
+            "(experimental), knapsack_bnb lowered per improvement and per "
+            "target quality gain over the sources that can use them; exact "
+            "(for comparison, slow), the largest flow that can reach each "
+            "vertex within the budget, which knapsack_bnb bounds, by a MIP "
+            "per vertex");
     }
 
     void add_preprocessing_options(gecot::solvers::mip_solver_base & solver) {

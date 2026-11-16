@@ -27,9 +27,9 @@ namespace gecot {
 // The graph gives each arc a base probability and the (improved probability,
 // option) pairs of its improvements; flow_mip's graph has an arc of base
 // probability 0 per improvement. The costs and the budget are those of the
-// cost dimension 0.
-template <instance_c I, typename GR, typename QM, typename SOM, typename BPM,
-          typename IM>
+// cost dimension 0. Without WithArcs, the arcs get no big-M.
+template <bool WithArcs = true, instance_c I, typename GR, typename QM,
+          typename SOM, typename BPM, typename IM>
 auto compute_tight_big_M_maps(const I & instance, const double budget,
                               const double tolerance, const GR & graph,
                               const QM & source_quality_map,
@@ -191,6 +191,7 @@ auto compute_tight_big_M_maps(const I & instance, const double budget,
         graph, std::vector<double>{});
     std::vector<arc_t> improved_arcs;
     for(auto && a : melon::arcs(graph)) {
+        if constexpr(!WithArcs) break;
         arc_big_M_map[a].assign(std::ranges::size(improvements_map[a]), 0.0);
         if(!arc_big_M_map[a].empty()) improved_arcs.push_back(a);
     }

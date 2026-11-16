@@ -189,7 +189,7 @@ struct multicut_benders : public mip_solver_base {
                     targets[k].push_back(compute_contracted_graph_data(
                         instance, instance_case, budget, t, strong_arcs_map[t],
                         useless_arcs_map[t], big_Ms, feasibility_tol,
-                        !no_pruning));
+                        !no_pruning, _options_model<M>(instance, budget)));
                     pb.tick();
                 }
             }

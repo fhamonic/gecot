@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <optional>
 #include <stdexcept>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -15,6 +16,7 @@
 #include "melon/graph.hpp"
 
 #include "gecot/concepts/instance.hpp"
+#include "gecot/flow_rows.hpp"
 #include "gecot/helper.hpp"
 #include "gecot/preprocessing/compute_big_M_map.hpp"
 #include "gecot/preprocessing/compute_contracted_graph.hpp"
@@ -34,14 +36,14 @@ struct flow_mip : public mip_solver_base {
     // experimental: no big-M is then computed, and big_Ms is not read
     bool indicator_constraints = false;
 
-    // by how much the tight big-Ms lower the knapsack ones
-    struct tight_big_M_statistics {
+    // by how much the tight or exact big-Ms lower the knapsack ones
+    struct lowered_big_M_statistics {
         double arc_sum = 0, arc_knapsack_sum = 0, target_sum = 0,
                target_knapsack_sum = 0;
-        std::size_t num_arcs = 0, num_arcs_halved = 0;
+        std::size_t num_arcs = 0, num_arcs_halved = 0, num_arcs_kept = 0;
 
         void add(const contracted_flow_graph & G_t, const auto & target_gains) {
-            if(!G_t.tight_big_Ms) return;
+            if(!G_t.lowered_big_Ms) return;
             const auto & knapsack_big_M_map = G_t.big_M_map.value();
             for(const auto & [source_gain, target_gain, i] : target_gains) {
                 target_sum += G_t.target_big_M(i);
@@ -55,14 +57,15 @@ struct flow_mip : public mip_solver_base {
                 arc_knapsack_sum += knapsack_M;
                 ++num_arcs;
                 num_arcs_halved += G_t.improvement_big_M(a) <= knapsack_M / 2;
+                num_arcs_kept += G_t.improvement_big_M(a) >= knapsack_M;
             }
         }
-        void log() const {
+        void log(const std::string_view kind) const {
             spdlog::debug(
-                "flow_mip tight big-Ms: arcs {:.4g} of the knapsack ones ({} "
-                "of {} halved at least), target gains {:.4g}",
-                arc_knapsack_sum > 0 ? arc_sum / arc_knapsack_sum : 1.0,
-                num_arcs_halved, num_arcs,
+                "flow_mip {} big-Ms: arcs {:.4g} of the knapsack ones ({} "
+                "of {} halved at least, {} not lowered), target gains {:.4g}",
+                kind, arc_knapsack_sum > 0 ? arc_sum / arc_knapsack_sum : 1.0,
+                num_arcs_halved, num_arcs, num_arcs_kept,
                 target_knapsack_sum > 0 ? target_sum / target_knapsack_sum
                                         : 1.0);
         }
@@ -106,7 +109,7 @@ struct flow_mip : public mip_solver_base {
 
         const std::optional<big_M_kind> computed_big_Ms =
             indicator_constraints ? std::nullopt : std::optional(big_Ms);
-        tight_big_M_statistics tight_statistics;
+        lowered_big_M_statistics lowered_statistics;
         std::vector<preprocessing_row<>> preprocessing;
         for(auto && instance_case : instance.cases()) {
             const case_id_t k = instance_case.id();
@@ -140,10 +143,11 @@ struct flow_mip : public mip_solver_base {
                 const contracted_flow_graph G_t = compute_contracted_flow_graph(
                     instance, instance_case, budget, original_t,
                     strong_arcs_map[original_t], useless_arcs_map[original_t],
-                    computed_big_Ms, feasibility_tol, !no_pruning);
+                    computed_big_Ms, feasibility_tol, !no_pruning,
+                    _options_model<M>(instance, budget));
                 const auto & graph = G_t.graph;
                 const auto & t = G_t.t;
-                tight_statistics.add(G_t, vertex_options_map[original_t]);
+                lowered_statistics.add(G_t, vertex_options_map[original_t]);
 
                 // A linear program for the score: the flow f_t that reaches
                 // t. Target quality gains: for each gain f^i_t, equal to f_t
@@ -173,38 +177,8 @@ struct flow_mip : public mip_solver_base {
                     [&G_t](const contracted_flow_graph::arc & a) {
                         return G_t.arc_no_map[a];
                     });
-                model.add_constraints(
-                    melon::vertices(graph),
-                    [&](auto && u) {
-                        return (u == t)
-                                   ? std::make_optional(
-                                         f_t + xsum(graph.out_arcs(t), phi) <=
-                                         xsum(
-                                             graph.in_arcs(t),
-                                             [&](auto && a) {
-                                                 return G_t.probability_map[a] *
-                                                        phi(a);
-                                             }) +
-                                             G_t.source_quality_map[t] +
-                                             xsum(G_t.source_options_map[t],
-                                                  [&x](auto && gain) {
-                                                      return gain.first *
-                                                             x(gain.second);
-                                                  }))
-                                   : std::nullopt;
-                    },
-                    [&](auto && u) {
-                        return xsum(graph.out_arcs(u), phi) <=
-                               xsum(graph.in_arcs(u),
-                                    [&](auto && a) {
-                                        return G_t.probability_map[a] * phi(a);
-                                    }) +
-                                   G_t.source_quality_map[u] +
-                                   xsum(G_t.source_options_map[u],
-                                        [&x](auto && gain) {
-                                            return gain.first * x(gain.second);
-                                        });
-                    });
+                add_flow_rows(model, graph, t, f_t, phi, x, G_t.probability_map,
+                              G_t.source_quality_map, G_t.source_options_map);
 
                 // Improved arcs: an improved copy carries flow only if its
                 // option is bought
@@ -233,7 +207,10 @@ struct flow_mip : public mip_solver_base {
             model.add_constraint(z(k) <= v);
         }
         _log_preprocessing(preprocessing);
-        if(computed_big_Ms == big_M_kind::tight) tight_statistics.log();
+        if(computed_big_Ms == big_M_kind::tight)
+            lowered_statistics.log("tight");
+        if(computed_big_Ms == big_M_kind::exact)
+            lowered_statistics.log("exact");
         _add_mip_start(model, instance, x);
 
         const auto [has_solution, report] = _solve(model, sw);

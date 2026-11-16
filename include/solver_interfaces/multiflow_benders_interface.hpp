@@ -12,6 +12,7 @@ public:
     MultiflowBendersInterface() : AbstractMipInterface("multiflow_benders") {
         add_mip_options(solver, lazy_constraint_solvers);
         add_preprocessing_options(solver);
+        add_big_M_option(solver.big_Ms);
         app.add_flag("--no-root-cuts", solver.no_root_cuts,
                      "For comparison: no cut on the linear relaxation before "
                      "the search");

@@ -21,9 +21,9 @@
 #include "melon/graph.hpp"
 
 #include "gecot/concepts/instance.hpp"
+#include "gecot/flow_rows.hpp"
 #include "gecot/helper.hpp"
-#include "gecot/preprocessing/compute_big_M_map.hpp"
-#include "gecot/preprocessing/compute_contracted_generalized_flow_graph.hpp"
+#include "gecot/preprocessing/compute_contracted_graph.hpp"
 
 #include "gecot/solvers/column_generation.hpp"
 #include "gecot/solvers/mip_solver_base.hpp"
@@ -70,20 +70,20 @@ struct tree_lp : public mip_solver_base {
             _set_tolerances(model, mip_gap, 1e-8);
             model.set_maximization();
 
-            const auto [graph, source_quality_map, vertex_options_map,
-                        arc_no_map, probability_map, arc_option_map, t] =
-                compute_contracted_generalized_flow_graph(
-                    instance_case, strong_arcs, useless_arcs, original_t,
-                    pruning);
+            const contracted_flow_graph G = compute_contracted_flow_graph(
+                instance, instance_case, budget_t{{budget}}, original_t,
+                strong_arcs, useless_arcs, big_M_kind::plain, 1e-8, pruning);
+            const auto & graph = G.graph;
+            const auto & t = G.t;
 
             std::vector<option_t> options;
             options.append_range(std::views::join(std::views::transform(
-                vertex_options_map, [](const auto & vertex_options) {
+                G.source_options_map, [](const auto & vertex_options) {
                     return std::views::values(vertex_options);
                 })));
             options.append_range(std::views::transform(
                 std::views::filter(
-                    arc_option_map,
+                    G.improvement_option_map,
                     [](const auto & option) { return option.has_value(); }),
                 [](const auto & option) { return option.value(); }));
             std::ranges::sort(options);
@@ -98,58 +98,29 @@ struct tree_lp : public mip_solver_base {
                                      return instance.option_cost(i) * X_i;
                                  }) <= budget);
 
-            const auto M = compute_big_M_map(
-                graph, source_quality_map, vertex_options_map, probability_map,
-                std::views::filter(
-                    melon::vertices(graph),
-                    [&graph, &arc_option_map, t](const auto & u) {
-                        return u == t ||
-                               std::ranges::any_of(
-                                   melon::out_arcs(graph, u),
-                                   [&arc_option_map](const auto & a) {
-                                       return arc_option_map[a].has_value();
-                                   });
-                    }));
-
             const auto F = model.add_variable();
             v += instance_case.target_quality_map()[original_t] * F;
             for(const auto & [source_gain, target_gain, i] :
                 instance_case.vertex_options_map()[original_t]) {
                 const auto F_i = model.add_variable();
                 model.add_constraint(F_i <= F);
-                model.add_constraint(F_i <= M[t] * X.at(i));
+                model.add_constraint(F_i <= G.target_big_M(i) * X.at(i));
                 v += target_gain * F_i;
             }
 
             const auto Phi = model.add_variables(
-                graph.num_arcs(),
-                [&arc_no_map](const melon::arc_t<decltype(graph)> & a) {
-                    return arc_no_map[a];
+                graph.num_arcs(), [&G](const contracted_flow_graph::arc & a) {
+                    return G.arc_no_map[a];
                 });
-            auto inflow = [&](const auto & u) {
-                return xsum(graph.in_arcs(u),
-                            [&](const auto & a) {
-                                return probability_map[a] * Phi(a);
-                            }) +
-                       source_quality_map[u] +
-                       xsum(vertex_options_map[u], [this](const auto & e) {
-                           const auto & [source_gain, i] = e;
-                           return source_gain * X.at(i);
-                       });
-            };
-            for(const auto & u : melon::vertices(graph)) {
-                if(u == t)
-                    model.add_constraint(F + xsum(graph.out_arcs(u), Phi) <=
-                                         inflow(u));
-                else
-                    model.add_constraint(xsum(graph.out_arcs(u), Phi) <=
-                                         inflow(u));
-            }
+            add_flow_rows(
+                model, graph, t, F, Phi,
+                [this](const option_t i) { return X.at(i); }, G.probability_map,
+                G.source_quality_map, G.source_options_map);
             for(const auto & a : melon::arcs(graph))
-                if(arc_option_map[a].has_value())
-                    model.add_constraint(Phi(a) <=
-                                         X.at(arc_option_map[a].value()) *
-                                             M[melon::arc_source(graph, a)]);
+                if(G.improvement_option_map[a].has_value())
+                    model.add_constraint(
+                        Phi(a) <= X.at(G.improvement_option_map[a].value()) *
+                                      G.improvement_big_M(a));
         }
     };
 

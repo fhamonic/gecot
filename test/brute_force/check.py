@@ -38,6 +38,8 @@ CONFIGS = [
     "flow_benders --indicator-constraints",
     "multiflow_benders", "multiflow_benders --no-root-cuts", "multiflow_benders --no-in-out",
     "multiflow_benders --no-stored-arcs",
+    "flow_mip --big-m exact", "multicut_benders --big-m exact", "flow_benders --big-m exact",
+    "multiflow_benders --big-m exact",
     "path_lp", "path_lp --pricing enumerate", "flow_mip --reformulation path_lp",
     "multicut_benders --reformulation path_lp --reformulation-params pricing=enumerate",
     "static", "greedy", "greedy --worst",

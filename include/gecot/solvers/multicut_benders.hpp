@@ -138,7 +138,7 @@ struct multicut_benders : public mip_solver_base {
         return std::make_pair(quality * flow, std::move(rho));
     }
 
-    template <lazy_constraint_model M, instance_c I>
+    template <typename M, instance_c I>
     solve_result<I> solve(const I & instance, const budget_t & budget) const {
         using namespace mippp;
         using namespace mippp::operators;
@@ -292,38 +292,26 @@ struct multicut_benders : public mip_solver_base {
         if(const auto start = _add_mip_start(model, instance, x))
             seed_cuts(*start);
 
-        // The search, steps 2 to 4: the values of a candidate y, the cut at
-        // y of each group whose theta_g exceeds its value, and y handed back
-        std::size_t num_cuts = 0;
-        model.set_candidate_solution_callback(
-            [&](typename M::candidate_solution_callback_handle & handle) {
-                auto candidate = handle.get_solution();
-                auto y = melon::maps::function([&](const option_t i) {
-                    return _is_bought(candidate[x(i)]);
-                });
-                auto case_scores = instance.create_case_map(0.0);
-                const std::size_t num_cuts_before = num_cuts;
-                for_each_group(y, [&](const case_id_t k, const group & g,
-                                      const double value, auto && group_cut) {
-                    case_scores[k] += value;
-                    if(std::exchange(candidate[g.theta], value) - value <=
-                       feasibility_tol * value)
-                        return;
-                    ++num_cuts;
-                    handle.add_lazy_constraint(
-                        std::forward<decltype(group_cut)>(group_cut));
-                });
-                if(num_cuts > num_cuts_before)
-                    _hand_back(handle, candidate, instance, x, y, z,
-                               case_scores, formula);
+        // The search, steps 2 to 4: the values of a candidate y and the cut
+        // at y of each group whose theta_g exceeds its value
+        auto cuts = [&](auto & candidate, const auto & y, auto && add) {
+            auto case_scores = instance.create_case_map(0.0);
+            for_each_group(y, [&](const case_id_t k, const group & g,
+                                  const double value, auto && group_cut) {
+                case_scores[k] += value;
+                if(std::exchange(candidate[g.theta], value) - value <=
+                   feasibility_tol * value)
+                    return;
+                add(std::forward<decltype(group_cut)>(group_cut));
             });
+            return case_scores;
+        };
 
         spdlog::info("Solving the optimization model");
-        auto [has_solution, report] = _solve(model, sw);
-        report.stats.emplace_back("lazy_constraints", num_cuts);
-        spdlog::debug("Cuts on the candidates of the search: {}", num_cuts);
-        if(!has_solution) return {_fallback_solution(instance, budget), report};
-        return {_bought_options(instance, model.get_solution(), x), report};
+        auto [solution, report] =
+            _benders_search(model, sw, instance, budget, x, z, formula, cuts);
+        if(!solution) return {_fallback_solution(instance, budget), report};
+        return {std::move(*solution), report};
     }
 };
 

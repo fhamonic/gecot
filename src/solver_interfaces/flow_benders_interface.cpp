@@ -3,8 +3,7 @@
 gecot::solve_result<Instance> FlowBendersInterface::solve(
     const Instance & instance, const gecot::budget_t & B) const {
     const auto started = with_mip_start(solver, instance, B);
-    return with_solver(
-        [&]<typename LP, gecot::solvers::lazy_constraint_model MILP>() {
-            return started.template solve<MILP>(instance, B);
-        });
+    return with_solver([&]<typename LP, mippp::has_column_generation MILP>() {
+        return started.template solve<MILP>(instance, B);
+    });
 }

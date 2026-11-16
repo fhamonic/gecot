@@ -10,7 +10,7 @@ private:
 
 public:
     MulticutBendersInterface() : AbstractMipInterface("multicut_benders") {
-        add_mip_options(solver, lazy_constraint_solvers);
+        add_benders_options(solver);
         add_preprocessing_options(solver);
         app.add_option("--groups", solver.num_groups,
                        "Groups of targets per graph, each with its own cuts "

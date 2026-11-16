@@ -64,9 +64,10 @@ GECOT talks to the solvers through mippp, which loads the solver's shared librar
 | The heuristics; the bounds `all_options`, `qkp_planes`, `split_lagrange` | none needed |
 | `flow_mip`, `path_lp` | `gurobi`, `cplex`, `copt`, `xpress`, `mosek`, `highs`, `scip`, `cbc`, `glpk` |
 | `tree_lp` | the same without `glpk` |
-| `multicut_benders`, `flow_benders`, `multiflow_benders` | `gurobi`, `cplex`, `copt` |
+| `multicut_benders` | all of them; lazy constraints with `gurobi`, `cplex`, `copt` only |
+| `flow_benders`, `multiflow_benders` | the same without `scip` |
 
-The default is `gurobi`. [HiGHS](https://highs.dev), [SCIP](https://www.scipopt.org), [CBC](https://github.com/coin-or/Cbc) and [GLPK](https://www.gnu.org/software/glpk/) are free and open source; Gurobi, CPLEX, COPT, Xpress and MOSEK are commercial, with free academic licences. The Benders decompositions, usually the fastest exact algorithms, need one of the three solvers that accept lazy constraints through mippp.
+The default is `gurobi`. [HiGHS](https://highs.dev), [SCIP](https://www.scipopt.org), [CBC](https://github.com/coin-or/Cbc) and [GLPK](https://www.gnu.org/software/glpk/) are free and open source; Gurobi, CPLEX, COPT, Xpress and MOSEK are commercial, with free academic licences. The Benders decompositions, usually the fastest exact algorithms, add their cuts as lazy constraints with the three solvers that accept them through mippp; with the others, they [solve their master again](../formulations/benders.md#without-lazy-constraints), which is slower.
 
 ### How a solver library is found
 

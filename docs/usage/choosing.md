@@ -46,7 +46,7 @@ One instance does not make a benchmark, but it gives orders of magnitude. On the
 
 **You have Gurobi, CPLEX or COPT.** Run `multiflow_benders`, and `multicut_benders` if it struggles. Their master program has one variable per option and a few per target, whatever the size of the graphs, where `flow_mip` carries every flow in its model: they usually need less memory and less time.
 
-**You only have an open-source solver.** `flow_mip --solver highs` is the exact algorithm, and `path_lp --solver highs` gives a solution with a bound. The Benders decompositions need lazy constraints, which GECOT only has for the three solvers above.
+**You only have an open-source solver.** Run `multiflow_benders --solver highs`. Without lazy constraints it [solves its master again](../formulations/benders.md#without-lazy-constraints) until the cuts settle, which its cuts on the relaxation make a matter of a few solves; `flow_mip --solver highs` is the exact algorithm that carries every flow in its model, and `path_lp --solver highs` gives a solution with a bound.
 
 **The exact algorithm does not end.** Give it a time limit and a starting solution:
 

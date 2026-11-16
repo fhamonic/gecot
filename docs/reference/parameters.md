@@ -53,9 +53,9 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 | Algorithm | Common | Preprocessing | Own parameters |
 |---|:-:|:-:|---|
 | `flow_mip` | ✓ | ✓ | `--big-m`, `--lp-relaxation`, `--indicator-constraints` |
-| `multicut_benders` | ✓ | ✓ | `--groups`, `--grouping`, `--grouping-seed`, `--big-m` |
-| `flow_benders` | ✓ | ✓ | `--big-m`, `--indicator-constraints` |
-| `multiflow_benders` | ✓ | ✓ | `--big-m`, `--no-root-cuts`, `--no-in-out`, `--no-stored-arcs` |
+| `multicut_benders` | ✓ | ✓ | `--groups`, `--grouping`, `--grouping-seed`, `--big-m`, `--no-lazy-constraints` |
+| `flow_benders` | ✓ | ✓ | `--big-m`, `--indicator-constraints`, `--no-lazy-constraints` |
+| `multiflow_benders` | ✓ | ✓ | `--big-m`, `--no-root-cuts`, `--no-in-out`, `--no-stored-arcs`, `--no-lazy-constraints` |
 | `tree_lp` | ✓ | ✓ | `--evict-age` |
 | `path_lp` | ✓ | – | `--evict-age`, `--pricing`, `--max-activations`, `--relative-gap` |
 | `static` | – | – | `-t`, `--decremental`, `--only-dec` |
@@ -65,7 +65,7 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `--solver <name>` | `gurobi` | the solver, used through mippp. `flow_mip` and `path_lp`: `gurobi`, `cplex`, `copt`, `xpress`, `mosek`, `highs`, `scip`, `cbc`, `glpk`. `tree_lp`: the same without `glpk`. Benders decompositions: `gurobi`, `cplex`, `copt` |
+| `--solver <name>` | `gurobi` | the solver, used through mippp. `flow_mip` and `path_lp`: `gurobi`, `cplex`, `copt`, `xpress`, `mosek`, `highs`, `scip`, `cbc`, `glpk`. `tree_lp`: the same without `glpk`. `multicut_benders`: all of them; `flow_benders` and `multiflow_benders`: all but `scip`. Only `gurobi`, `cplex` and `copt` give the Benders decompositions [lazy constraints](../formulations/benders.md#without-lazy-constraints) |
 | `-t`, `--feasibility-tolerance <value>` | `1e-07` | the tolerance for rounding errors: the solver's feasibility tolerance, and the relative error accepted on a candidate of a Benders decomposition |
 | `--mip-start <file>` | | a solution file (JSON, as written by `-o`) to start the solver from. Excludes `--mip-start-algorithm` |
 | `--mip-start-algorithm <name>` | `none` | the heuristic whose solution starts the solver, run in its incremental form: `none`, `static`, `greedy`. Its time counts in `--time-limit`. With `--reformulation path_lp`, the solution of the relaxation replaces it. Excludes `--mip-start` |
@@ -105,6 +105,7 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` and `tre
 | `--grouping voronoi`, `consecutive`, `random` | `voronoi` | how the targets are grouped. `voronoi`: the cells of a network Voronoi diagram around targets of value far from each other. `consecutive`: runs of consecutive targets. `random`: at random, as a control |
 | `--grouping-seed <n>` | `0` | the seed of `--grouping random` |
 | `--big-m plain`, `knapsack_bnb`, `knapsack_dantzig`, `tight`, `exact` | `knapsack_bnb` | as for `flow_mip` |
+| `--no-lazy-constraints` | off | for comparison: the master [solved again](../formulations/benders.md#without-lazy-constraints) with the cuts of its solution, as with the solvers without lazy constraints. The same for `flow_benders` and `multiflow_benders` |
 
 ### `flow_benders`
 

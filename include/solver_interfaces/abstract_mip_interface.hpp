@@ -30,12 +30,15 @@
 
 #include "solver_interfaces/abstract_solver_interface.hpp"
 
-// lazy_constraint_solvers is written by hand: without these, a backend of
-// the list that no longer satisfied the concept would be refused only at run
-// time, when chosen
+// the backends that the help of --no-lazy-constraints names: without these,
+// one that no longer satisfied the concept would search without lazy
+// constraints without a word
 static_assert(gecot::solvers::lazy_constraint_model<mippp::gurobi_milp>);
 static_assert(gecot::solvers::lazy_constraint_model<mippp::cplex_milp>);
 static_assert(gecot::solvers::lazy_constraint_model<mippp::copt_milp>);
+// column_solvers leaves SCIP out: its mippp model has no add_column, with
+// which flow_benders and multiflow_benders build their masters
+static_assert(!mippp::has_column_generation<mippp::scip_milp>);
 // the same for the two backends that the help of --indicator-constraints names
 static_assert(mippp::has_indicator_constraints<mippp::gurobi_milp>);
 static_assert(mippp::has_indicator_constraints<mippp::cplex_milp>);
@@ -88,8 +91,8 @@ protected:
     static inline const std::vector<std::string> all_solvers{
         "gurobi", "cplex", "copt", "xpress", "mosek",
         "highs",  "scip",  "cbc",  "glpk"};
-    static inline const std::vector<std::string> lazy_constraint_solvers{
-        "gurobi", "cplex", "copt"};
+    static inline const std::vector<std::string> column_solvers{
+        "gurobi", "cplex", "copt", "xpress", "mosek", "highs", "cbc", "glpk"};
     // GLPK is not thread-safe, tree_lp prices in parallel
     static inline const std::vector<std::string> thread_safe_solvers{
         "gurobi", "cplex", "copt", "xpress", "mosek", "highs", "scip", "cbc"};
@@ -128,6 +131,18 @@ protected:
                      "of mosek its numerical emphasis level 1; copt, highs, "
                      "cbc and glpk have none, and the numerics emphasis of "
                      "scip is out of mippp's reach: they warn");
+    }
+
+    // add_mip_options, for a Benders decomposition
+    void add_benders_options(
+        gecot::solvers::mip_solver_base & solver,
+        const std::vector<std::string> & solvers = all_solvers) {
+        add_mip_options(solver, solvers);
+        app.add_flag("--no-lazy-constraints", solver.no_lazy_constraints,
+                     "For comparison: solves the master again with the cuts "
+                     "of its solution until it receives none, as with the "
+                     "solvers that have no lazy constraints (all but gurobi, "
+                     "cplex and copt)");
     }
 
     // solver with the solution of --mip-start-algorithm as its MIP start

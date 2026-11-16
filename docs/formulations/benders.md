@@ -175,9 +175,15 @@ The three masters are solved by the branch and bound of a MILP solver, with the 
 
 The search ends when the solver has proved its best solution optimal for the master, whose cuts then describe the score exactly where it matters. A candidate is accepted when the master overestimates none of its targets by more than `-t`, so the result is exact up to this tolerance, to the solver's own, and to the [resolution](preprocessing.md#resolution) of the preprocessing.
 
+### Without lazy constraints
+
+Only Gurobi, CPLEX and COPT take lazy constraints through mippp. With the other solvers, GECOT solves the master again instead. It solves the master, computes the cuts at its solution $y$ as in steps 2 and 3, adds them to the master as constraints, and solves it again, until a solution receives no cut. The true score of each solution is then known: GECOT keeps the best one, starting from the MIP start, and gives it to the next solve as its start. The bound is the lowest of the bounds of the masters. The search also ends when the bound is within the solver's gap of the best score. A scenario that the master proposes a second time receives the cuts of all its targets or groups, not only of those that the master overestimates: the first time, a target that the master did not overestimate received none, and a later master can overestimate it. Proposed a third time, the scenario ends the search, since the master then overestimates it only by the solver's tolerances.
+
+Each solve starts a new branch and bound, so this search is slower than one with lazy constraints. `--no-lazy-constraints` makes Gurobi, CPLEX and COPT search this way too, for comparison. `flow_benders` and `multiflow_benders` cannot use SCIP, whose model in mippp cannot add columns.
+
 ## Parameters
 
-The three decompositions need a solver that accepts lazy constraints in a callback: `--solver gurobi` (the default), `cplex` or `copt`. They take the [common parameters](../reference/parameters.md#common-to-the-milp-based-algorithms) and the [preprocessing parameters](../reference/parameters.md#preprocessing), plus:
+The three decompositions take any solver, but `flow_benders` and `multiflow_benders` not SCIP. With `--solver gurobi` (the default), `cplex` or `copt` the cuts are lazy constraints, with the others the master is [solved again](#without-lazy-constraints). They take the [common parameters](../reference/parameters.md#common-to-the-milp-based-algorithms) and the [preprocessing parameters](../reference/parameters.md#preprocessing), plus:
 
 | Algorithm | Parameters |
 |---|---|
@@ -185,4 +191,4 @@ The three decompositions need a solver that accepts lazy constraints in a callba
 | `flow_benders` | `--big-m`, `--indicator-constraints` |
 | `multiflow_benders` | `--big-m`, `--no-root-cuts`, `--no-in-out`, `--no-stored-arcs` |
 
-Their report adds `lazy_constraints`, the number of cuts added during the search, and for `multiflow_benders` `sources`, `root_rounds`, `root_cuts` and `root_relaxation_value`.
+and `--no-lazy-constraints`, for comparison. Their report adds `lazy_constraints`, the number of cuts added during the search, `master_solves` when the master is solved again, and for `multiflow_benders` `sources`, `root_rounds`, `root_cuts` and `root_relaxation_value`.

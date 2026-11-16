@@ -34,7 +34,7 @@ struct flow_benders : public mip_solver_base {
     // big-Ms
     bool indicator_constraints = false;
 
-    template <lazy_constraint_model M, instance_c I>
+    template <mippp::has_column_generation M, instance_c I>
     solve_result<I> solve(const I & instance, const budget_t & budget) const {
         using namespace mippp;
         using namespace mippp::operators;
@@ -164,53 +164,41 @@ struct flow_benders : public mip_solver_base {
         // The search, step 1: the cuts of the scenario that buys nothing
         seed_cuts(instance.create_option_map(false));
 
-        // The search, steps 2 to 4: the flows of a candidate y, the cut at y
-        // of each target whose f_t exceeds its flow, and y handed back
-        std::size_t num_cuts = 0;
-        model.set_candidate_solution_callback(
-            [&](typename M::candidate_solution_callback_handle & handle) {
-                auto candidate = handle.get_solution();
-                auto y = melon::maps::function([&](const option_t i) {
-                    return _is_bought(candidate[x(i)]);
-                });
-                auto case_scores = instance.create_case_map(0.0);
-                const std::size_t num_cuts_before = num_cuts;
-                auto f_gain = f_gains.begin();
-                for(auto && instance_case : instance.cases()) {
-                    const case_id_t k = instance_case.id();
-                    for(const auto & [f_t, G_t] : targets[k]) {
-                        const auto [flow, rho] = G_t.flow_and_potentials(y);
-                        double quality =
-                            instance_case.target_quality_map()[G_t.original_t];
-                        for(const auto & [source_gain, target_gain, i] :
-                            instance_case
-                                .vertex_options_map()[G_t.original_t]) {
-                            candidate[*f_gain++] = y[i] ? flow : 0.0;
-                            if(y[i]) quality += target_gain;
-                        }
-                        case_scores[k] += quality * flow;
-                        if(std::exchange(candidate[f_t], flow) - flow <=
-                           feasibility_tol * flow)
-                            continue;
-                        ++num_cuts;
-                        handle.add_lazy_constraint(f_t <= cut(G_t, y, rho));
+        // The search, steps 2 to 4: the flows of a candidate y and the cut at
+        // y of each target whose f_t exceeds its flow
+        auto cuts = [&](auto & candidate, const auto & y, auto && add) {
+            auto case_scores = instance.create_case_map(0.0);
+            auto f_gain = f_gains.begin();
+            for(auto && instance_case : instance.cases()) {
+                const case_id_t k = instance_case.id();
+                for(const auto & [f_t, G_t] : targets[k]) {
+                    const auto [flow, rho] = G_t.flow_and_potentials(y);
+                    double quality =
+                        instance_case.target_quality_map()[G_t.original_t];
+                    for(const auto & [source_gain, target_gain, i] :
+                        instance_case.vertex_options_map()[G_t.original_t]) {
+                        candidate[*f_gain++] = y[i] ? flow : 0.0;
+                        if(y[i]) quality += target_gain;
                     }
+                    case_scores[k] += quality * flow;
+                    if(std::exchange(candidate[f_t], flow) - flow <=
+                       feasibility_tol * flow)
+                        continue;
+                    add(f_t <= cut(G_t, y, rho));
                 }
-                if(num_cuts > num_cuts_before)
-                    _hand_back(handle, candidate, instance, x, y, z,
-                               case_scores, formula);
-            });
+            }
+            return case_scores;
+        };
 
         // The search, step 1: the cuts of the MIP start
         if(const auto start = _add_mip_start(model, instance, x))
             seed_cuts(*start);
 
         spdlog::info("Solving the optimization model");
-        auto [has_solution, report] = _solve(model, sw);
-        report.stats.emplace_back("lazy_constraints", num_cuts);
-        spdlog::debug("Cuts on the candidates of the search: {}", num_cuts);
-        if(!has_solution) return {_fallback_solution(instance, budget), report};
-        return {_bought_options(instance, model.get_solution(), x), report};
+        auto [solution, report] =
+            _benders_search(model, sw, instance, budget, x, z, formula, cuts);
+        if(!solution) return {_fallback_solution(instance, budget), report};
+        return {std::move(*solution), report};
     }
 };
 

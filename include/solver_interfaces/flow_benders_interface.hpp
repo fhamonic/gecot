@@ -10,7 +10,7 @@ private:
 
 public:
     FlowBendersInterface() : AbstractMipInterface("flow_benders") {
-        add_mip_options(solver, lazy_constraint_solvers);
+        add_benders_options(solver, column_solvers);
         add_preprocessing_options(solver);
         add_big_M_option(solver.big_Ms);
         app.add_flag("--indicator-constraints", solver.indicator_constraints,

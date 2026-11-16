@@ -470,7 +470,7 @@ struct multiflow_benders : public mip_solver_base {
         return cuts;
     }
 
-    template <lazy_constraint_model M, instance_c I>
+    template <mippp::has_column_generation M, instance_c I>
     solve_result<I> solve(const I & instance, const budget_t & budget) const {
         using namespace mippp;
         using namespace mippp::operators;
@@ -630,45 +630,36 @@ struct multiflow_benders : public mip_solver_base {
         spdlog::debug("Rounds on the relaxation: {}, cuts: {}", root_rounds,
                       root_cuts);
 
-        // The search, steps 2 to 4: the flows of a candidate y, the cut at y
-        // of each target whose f_t exceeds its flow, and y handed back
-        std::size_t num_cuts = 0;
-        model.set_candidate_solution_callback(
-            [&](typename M::candidate_solution_callback_handle & handle) {
-                auto candidate = handle.get_solution();
-                std::vector<double> y(instance.options().size());
-                for(auto && i : instance.options())
-                    y[i] = _is_bought(candidate[x(i)]);
-                const auto cuts = _separate(blocks, y);
-                auto case_scores = instance.create_case_map(0.0);
-                const std::size_t num_cuts_before = num_cuts;
-                auto f_gain = f_gains.begin();
-                for(std::size_t b = 0; b < blocks.size(); ++b) {
-                    const double flow = cuts[b].value;
-                    double quality = blocks[b].target_quality;
-                    for(const auto & [target_gain, i] :
-                        blocks[b].target_quality_gains) {
-                        candidate[*f_gain++] = y[i] * flow;
-                        quality += y[i] * target_gain;
-                    }
-                    case_scores[blocks[b].case_id] += quality * flow;
-                    if(std::exchange(candidate[f[b]], flow) - flow <=
-                       feasibility_tol * flow)
-                        continue;
-                    ++num_cuts;
-                    handle.add_lazy_constraint(cut_constraint(b, cuts[b]));
+        // The search, steps 2 to 4: the flows of a candidate y and the cut at
+        // y of each target whose f_t exceeds its flow
+        auto cuts_at = [&](auto & candidate, const auto & bought, auto && add) {
+            std::vector<double> y(instance.options().size());
+            for(auto && i : instance.options()) y[i] = bought[i];
+            const auto cuts = _separate(blocks, y);
+            auto case_scores = instance.create_case_map(0.0);
+            auto f_gain = f_gains.begin();
+            for(std::size_t b = 0; b < blocks.size(); ++b) {
+                const double flow = cuts[b].value;
+                double quality = blocks[b].target_quality;
+                for(const auto & [target_gain, i] :
+                    blocks[b].target_quality_gains) {
+                    candidate[*f_gain++] = y[i] * flow;
+                    quality += y[i] * target_gain;
                 }
-                if(num_cuts > num_cuts_before)
-                    _hand_back(handle, candidate, instance, x, y, z,
-                               case_scores, formula);
-            });
+                case_scores[blocks[b].case_id] += quality * flow;
+                if(std::exchange(candidate[f[b]], flow) - flow <=
+                   feasibility_tol * flow)
+                    continue;
+                add(cut_constraint(b, cuts[b]));
+            }
+            return case_scores;
+        };
 
-        auto [has_solution, report] = _solve(model, sw);
+        auto [solution, report] = _benders_search(model, sw, instance, budget,
+                                                  x, z, formula, cuts_at);
         report.stats.emplace_back("sources", num_sources);
         report.stats.emplace_back("root_rounds", root_rounds);
         report.stats.emplace_back("root_cuts", root_cuts);
-        report.stats.emplace_back("lazy_constraints", num_cuts);
-        spdlog::debug("Cuts on the candidates of the search: {}", num_cuts);
         // the relaxation with its cuts bounds the optimum too, better than
         // the solver's bound when the search is cut short
         if(root_value) {
@@ -677,8 +668,8 @@ struct multiflow_benders : public mip_solver_base {
             report.score_stats.emplace_back("root_relaxation_value",
                                             *root_value);
         }
-        if(!has_solution) return {_fallback_solution(instance, budget), report};
-        return {_bought_options(instance, model.get_solution(), x), report};
+        if(!solution) return {_fallback_solution(instance, budget), report};
+        return {std::move(*solution), report};
     }
 };
 

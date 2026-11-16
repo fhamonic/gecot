@@ -5,6 +5,9 @@
 #include <cmath>
 #include <concepts>
 #include <format>
+#include <functional>
+#include <limits>
+#include <map>
 #include <optional>
 #include <ranges>
 #include <stdexcept>
@@ -83,6 +86,9 @@ struct mip_solver_base {
     bool remove_useless_arcs = true;
     bool all_targets = false;
     bool no_pruning = false;
+    // for comparison, the search of a Benders decomposition as on a solver
+    // without lazy constraints
+    bool no_lazy_constraints = false;
     std::optional<std::vector<std::string>> mip_start;
     std::optional<double> time_limit;
     // the solver asked for more care in its numerical computations
@@ -280,19 +286,22 @@ struct mip_solver_base {
     }
 
     // sw starts with solve(): the time limit also counts the preprocessing
-    // returns false if the solver found no solution, the caller then returns
-    // _fallback_solution
     template <typename M>
-    std::pair<bool, solve_report> _solve(M & model,
-                                         const spdlog::stopwatch & sw) const {
-        namespace status = mippp::status;
-        const auto build_time = sw.elapsed();
-        if constexpr(mippp::has_time_limit<M>) {
+    void _set_time_left(M & model, const spdlog::stopwatch & sw) const {
+        if constexpr(mippp::has_time_limit<M>)
             if(time_limit)
                 model.set_time_limit(std::chrono::duration<double>(
-                    std::max(0.0, time_limit.value() - build_time.count())));
-        } else if(time_limit)
-            spdlog::warn("This solver has no time limit: --time-limit ignored");
+                    std::max(0.0, time_limit.value() - sw.elapsed().count())));
+    }
+    // The settings of a search, its time limit apart, and its progress
+    // callback, which reports the values of the solver through adjust.
+    // Returns whether the solver prints its own log.
+    template <typename M>
+    bool _set_search(M & model, auto adjust) const {
+        if constexpr(!mippp::has_time_limit<M>)
+            if(time_limit)
+                spdlog::warn(
+                    "This solver has no time limit: --time-limit ignored");
         if constexpr(!mippp::has_optimality_tolerance<M>)
             spdlog::warn("This solver keeps its default optimality gap");
         if constexpr(std::same_as<M, mippp::gurobi_milp>) {
@@ -309,35 +318,38 @@ struct mip_solver_base {
             mippp::has_verbosity<M> && spdlog::should_log(spdlog::level::trace);
         if constexpr(mippp::has_verbosity<M>) model.set_verbose(solver_log);
         if constexpr(mippp::has_progress_callback<M>)
-            model.set_progress_callback([solver_log](auto & handle) noexcept {
-                if(stop_requested) {
-                    handle.interrupt();
-                    return;
-                }
-                // a row would print among the lines of the solver's log: a
-                // progress without values logs only the line on Ctrl-C
-                if(solver_log) {
-                    report_progress({});
-                    return;
-                }
-                // infinite until the solver has one
-                auto finite = [](const double v) {
-                    return std::isfinite(v) ? std::optional<double>{v}
-                                            : std::nullopt;
-                };
-                progress p{.score = finite(handle.get_solution_value()),
-                           .bound = finite(handle.get_dual_bound())};
-                if constexpr(mippp::has_node_count<
-                                 std::remove_cvref_t<decltype(handle)>>)
-                    p.nodes = handle.get_node_count();
-                report_progress(p);
-            });
+            model.set_progress_callback(
+                [solver_log, adjust](auto & handle) noexcept {
+                    if(stop_requested) {
+                        handle.interrupt();
+                        return;
+                    }
+                    // a row would print among the lines of the solver's log:
+                    // a progress without values logs only the line on Ctrl-C
+                    if(solver_log) {
+                        report_progress({});
+                        return;
+                    }
+                    // infinite until the solver has one
+                    auto finite = [](const double v) {
+                        return std::isfinite(v) ? std::optional<double>{v}
+                                                : std::nullopt;
+                    };
+                    progress p{.score = finite(handle.get_solution_value()),
+                               .bound = finite(handle.get_dual_bound())};
+                    if constexpr(mippp::has_node_count<
+                                     std::remove_cvref_t<decltype(handle)>>)
+                        p.nodes = handle.get_node_count();
+                    report_progress(adjust(p));
+                });
         spdlog::debug("Model: {} variables, {} constraints, {} nonzeros",
                       model.num_variables(), model.num_constraints(),
                       model.num_nonzeros());
-        model.solve();
-        const auto & s = model.get_status();
-        const std::string_view reason = std::visit(
+        return solver_log;
+    }
+    static std::string_view _status_text(const auto & s) {
+        namespace status = mippp::status;
+        return std::visit(
             []<typename S>(const S &) -> std::string_view {
                 if constexpr(std::derived_from<S, status::optimal>)
                     return "optimal";
@@ -360,8 +372,12 @@ struct mip_solver_base {
                     return "unknown status";
             },
             s);
-        solve_report report{
-            std::string(reason),
+    }
+    template <typename M>
+    static solve_report _model_report(M & model, const std::string_view status,
+                                      const auto build_time) {
+        return {
+            std::string(status),
             {},
             {{"variables", model.num_variables()},
              {"constraints", model.num_constraints()},
@@ -369,12 +385,32 @@ struct mip_solver_base {
              {"model_build_time_ms",
               std::chrono::duration_cast<std::chrono::milliseconds>(build_time)
                   .count()}}};
+    }
+    // the end of a search that found no solution: the caller then returns
+    // _fallback_solution
+    void _no_solution(const std::string_view reason) const {
+        report_progress({.end = true});
+        if(!mip_start)
+            throw std::runtime_error(std::format(
+                "the solver stopped without a solution: {}", reason));
+        spdlog::warn("Solver stopped: {}, MIP start kept", reason);
+    }
+
+    // returns false if the solver found no solution, the caller then returns
+    // _fallback_solution
+    template <typename M>
+    std::pair<bool, solve_report> _solve(M & model,
+                                         const spdlog::stopwatch & sw) const {
+        namespace status = mippp::status;
+        const auto build_time = sw.elapsed();
+        _set_time_left(model, sw);
+        _set_search(model, std::identity{});
+        model.solve();
+        const auto & s = model.get_status();
+        const std::string_view reason = _status_text(s);
+        solve_report report = _model_report(model, reason, build_time);
         if(!status::solution_available(s)) {
-            report_progress({.end = true});
-            if(!mip_start)
-                throw std::runtime_error(std::format(
-                    "the solver stopped without a solution: {}", reason));
-            spdlog::warn("Solver stopped: {}, MIP start kept", reason);
+            _no_solution(reason);
             return {false, report};
         }
         // as the solution, defined only after a stop or at the optimum
@@ -393,6 +429,181 @@ struct mip_solver_base {
                         : spdlog::level::warn,
                     "Solver stopped: {}", reason);
         return {true, report};
+    }
+
+    // The search of a Benders decomposition, steps 2 to 4 of benders.md.
+    // cuts(candidate, y, add) writes in candidate, a point of the master,
+    // its other variables at the scenario y (f_t and f^i_t, or theta_g),
+    // calls add with the cut at y of each block that candidate overvalues,
+    // and returns the scores of the cases at y. With lazy constraints, in a
+    // callback of the solver; without, the master solved again with the cuts
+    // of its solution as rows, until it receives none. No solution if the
+    // solver found none: the caller then returns _fallback_solution.
+    template <typename M, instance_c I>
+    std::pair<std::optional<instance_solution_t<I>>, solve_report>
+    _benders_search(M & model, const spdlog::stopwatch & sw, const I & instance,
+                    const budget_t & budget, const auto & x, const auto & z,
+                    const auto & formula, auto && cuts) const {
+        namespace status = mippp::status;
+        std::size_t num_cuts = 0;
+        if constexpr(lazy_constraint_model<M>)
+            if(!no_lazy_constraints) {
+                model.set_candidate_solution_callback(
+                    [&](typename M::candidate_solution_callback_handle &
+                            handle) {
+                        auto candidate = handle.get_solution();
+                        const auto y = _bought_options(instance, candidate, x);
+                        const std::size_t num_cuts_before = num_cuts;
+                        const auto case_scores =
+                            cuts(candidate, y, [&](auto && cut) {
+                                ++num_cuts;
+                                handle.add_lazy_constraint(
+                                    std::forward<decltype(cut)>(cut));
+                            });
+                        if(num_cuts > num_cuts_before)
+                            _hand_back(handle, candidate, instance, x, y, z,
+                                       case_scores, formula);
+                    });
+                auto [has_solution, report] = _solve(model, sw);
+                report.stats.emplace_back("lazy_constraints", num_cuts);
+                spdlog::debug("Cuts on the candidates of the search: {}",
+                              num_cuts);
+                if(!has_solution) return {std::nullopt, report};
+                return {_bought_options(instance, model.get_solution(), x),
+                        report};
+            }
+
+        const auto build_time = sw.elapsed();
+        // the best scenario, by its score; the bound, the lowest of those
+        // of the masters
+        std::optional<instance_solution_t<I>> best;
+        double best_score = 0;
+        std::optional<double> bound;
+        std::size_t num_solves = 0, nodes = 0;
+        // the solver's score, that of a master which may overvalue its
+        // solution, is not shown
+        const bool solver_log = _set_search(model, [&](progress p) {
+            p.score = best ? std::optional{best_score} : std::nullopt;
+            if(bound) p.bound = std::min(*bound, p.bound.value_or(*bound));
+            if(p.nodes) *p.nodes += nodes;
+            return p;
+        });
+        solve_report report = _model_report(model, {}, build_time);
+        // the score of y; values is the point of the master, which cuts
+        // reads and writes in as the point of a callback
+        auto score_of = [&](std::vector<double> values, const auto & y,
+                            auto && add) {
+            mippp::entity_mapping<mippp::model_variable_t<M>,
+                                  std::vector<double>>
+                candidate(std::move(values));
+            return instance.eval_criterion(cuts(candidate, y, add));
+        };
+        // the MIP start is the first best, as the first incumbent of a
+        // callback: its cuts are already rows, and a master that overvalues
+        // another scenario would never return it
+        if(mip_start)
+            if(auto start = _mip_start_solution(instance);
+               is_feasible(instance, start, budget, feasibility_tol)) {
+                best_score =
+                    score_of(std::vector<double>(model.num_variables()), start,
+                             [](auto &&) {});
+                best = std::move(start);
+            }
+        // the times the masters proposed each scenario. The second time,
+        // all its cuts are added: the first added only those of the blocks
+        // that the master overvalued then, and another one can overvalue
+        // another block. A third time, the master overvalues it only by the
+        // tolerances of the solver.
+        std::map<std::vector<bool>, int> proposed;
+        std::string_view reason;
+        for(bool optimal = false; !optimal;) {
+            _set_time_left(model, sw);
+            model.solve();
+            ++num_solves;
+            const auto & s = model.get_status();
+            reason = _status_text(s);
+            if(!status::solution_available(s)) break;
+            if constexpr(mippp::has_dual_bound<M>)
+                if(const double b = model.get_dual_bound();
+                   b < model.infinity())
+                    bound = std::min(b, bound.value_or(b));
+            if constexpr(mippp::has_node_count<M>)
+                nodes += static_cast<std::size_t>(model.get_node_count());
+            const auto solution = model.get_solution();
+            std::vector<double> values(model.num_variables());
+            for(std::size_t j = 0; j < values.size(); ++j)
+                values[j] = solution[mippp::model_variable_t<M>(
+                    static_cast<decltype(x(0).id())>(j))];
+            auto y = _bought_options(instance, solution, x);
+            const int times = ++proposed[std::ranges::to<std::vector<bool>>(
+                std::views::transform(
+                    instance.options(),
+                    [&y](const option_t i) { return bool{y[i]}; }))];
+            // above any value: every block exceeds it, and receives its cut
+            if(times == 2)
+                std::ranges::fill(values,
+                                  std::numeric_limits<double>::infinity());
+            const std::size_t num_cuts_before = num_cuts;
+            const double score =
+                score_of(std::move(values), y, [&](auto && cut) {
+                    ++num_cuts;
+                    model.add_constraint(std::forward<decltype(cut)>(cut));
+                });
+            if(!best || score > best_score) {
+                best_score = score;
+                best = std::move(y);
+                // the start of the next solve, if the loaded library has the
+                // function: a HiGHS without Highs_setSparseSolution throws
+                if constexpr(mippp::has_mip_start<M>) {
+                    try {
+                        model.add_mip_start(std::views::transform(
+                            instance.options(), [&](const option_t i) {
+                                return std::make_pair(x(i),
+                                                      (*best)[i] ? 1.0 : 0.0);
+                            }));
+                    } catch(const mippp::feature_unavailable_error &) {
+                    }
+                }
+            }
+            // no row among the lines of the solver's log
+            report_progress(
+                solver_log ? progress{}
+                           : progress{.score = best_score, .bound = bound});
+            // the master's value is the score of its solution, or it has
+            // no better solution than the best
+            optimal = (std::holds_alternative<status::optimal>(s) &&
+                       (num_cuts == num_cuts_before || times > 2)) ||
+                      (bound &&
+                       *bound <= best_score + mip_gap * std::abs(best_score));
+            if(optimal)
+                reason = "optimal";
+            else if(!std::holds_alternative<status::optimal>(s))
+                break;
+            else if(stop_requested) {
+                reason = "interrupted";
+                break;
+            } else if(time_limit && sw.elapsed().count() >= *time_limit) {
+                reason = "time limit reached";
+                break;
+            }
+        }
+        report.status = std::string(reason);
+        report.stats.emplace_back("lazy_constraints", num_cuts);
+        report.stats.emplace_back("master_solves", num_solves);
+        if constexpr(mippp::has_node_count<M>)
+            report.stats.emplace_back("nodes", nodes);
+        if(best) {
+            report.best_bound = bound;
+            report_progress({.score = best_score, .bound = bound, .end = true});
+            spdlog::log(reason == "optimal" ? spdlog::level::debug
+                                            : spdlog::level::warn,
+                        "Solver stopped: {}", reason);
+        } else
+            _no_solution(reason);
+        spdlog::debug(
+            "Cuts on the candidates of the search: {}, master solved {} times",
+            num_cuts, num_solves);
+        return {std::move(best), report};
     }
 
     template <instance_c I>

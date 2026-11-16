@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <stdexcept>
 #include <string>
@@ -71,10 +72,12 @@ public:
         return taken_option_names;
     }
 
-    // the MIP start, unless --mip-start or --mip-start-algorithm gives one
-    void set_start(std::vector<std::string> option_names) override {
-        if(!mip_solver->mip_start && mip_start_algorithm == "none")
-            mip_solver->mip_start = std::move(option_names);
+    // the MIP start, unless --mip-start gives one; with_mip_start then does
+    // not compute that of --mip-start-algorithm
+    bool set_start(std::vector<std::string> option_names) override {
+        if(mip_solver->mip_start) return false;
+        mip_solver->mip_start = std::move(option_names);
+        return true;
     }
 
 protected:
@@ -131,7 +134,8 @@ protected:
     template <typename S>
     S with_mip_start(S solver, const Instance & instance,
                      const gecot::budget_t & B) const {
-        if(mip_start_algorithm == "none") return solver;
+        // or with that of set_start: --mip-start excludes the algorithm
+        if(mip_start_algorithm == "none" || solver.mip_start) return solver;
         spdlog::info("Computing the MIP start with {}", mip_start_algorithm);
         const spdlog::stopwatch sw;
         const double tol = solver.feasibility_tol;
@@ -139,13 +143,28 @@ protected:
         const auto start =
             mip_start_algorithm == "static"
                 ? Static{.feasibility_tol = tol}.solve(instance, B)
-                : Greedy{.feasibility_tol = tol}.solve(instance, B);
+                : Greedy{.feasibility_tol = tol}.solve<spdlog::level::trace>(
+                      instance, B);
         solver.mip_start.emplace();
         for(auto && o : instance.options())
             if(start[o]) solver.mip_start->push_back(instance.option_name(o));
-        if(solver.time_limit)
+        if(spdlog::should_log(spdlog::level::info))
+            spdlog::info(
+                "MIP start: {}{}",
+                gecot::gain_text(instance.eval_criterion(
+                    gecot::compute_solution_cases_pc_num(instance, start))),
+                B.size() == 1 ? std::format(", cost {:.10g} of {:.10g}",
+                                            gecot::compute_solution_cost(
+                                                instance, start, 0),
+                                            B[0])
+                              : std::string());
+        if(solver.time_limit) {
             solver.time_limit =
                 std::max(0.0, *solver.time_limit - sw.elapsed().count());
+            if(*solver.time_limit == 0)
+                spdlog::warn(
+                    "No time is left for the algorithm after the MIP start");
+        }
         return solver;
     }
 

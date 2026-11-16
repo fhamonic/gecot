@@ -392,9 +392,8 @@ public:
         for(std::size_t p = 0; p < num_pairs; ++p) offsets[p + 1] += offsets[p];
         const std::size_t num_entries = offsets[num_pairs];
         spdlog::debug(
-            "split_lagrange: {} pairs, {} corridor entries ({:.1f} per pair), "
-            "{:.0f} MB of prices",
-            num_pairs, num_entries,
+            "split_lagrange: {} pairs, {:.1f} options per corridor, {:.0f} MB",
+            num_pairs,
             num_pairs ? static_cast<double>(num_entries) /
                             static_cast<double>(num_pairs)
                       : 0.0,
@@ -568,9 +567,9 @@ public:
             if(target) weighted_target = target.value() - form->constant;
         } else {
             spdlog::info(
-                "split_lagrange: the criterion is not linear, one bound per "
-                "case it reads{}",
-                target ? ", --target ignored" : "");
+                "split_lagrange: one bound per case, the criterion is not "
+                "linear");
+            if(target) spdlog::info("split_lagrange: --target ignored");
         }
         std::size_t total_iterations = 0;
         bool timed_out = false;

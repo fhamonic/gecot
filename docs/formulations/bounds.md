@@ -6,7 +6,7 @@ $$
 \frac{s - s_0}{b - s_0}
 $$
 
-is a share of the best possible gain that the solution is *proved* to reach. This is the percentage that `gecot optimize` prints next to its upper bound, where $s_0$ is the score with only the options [bought statically](preprocessing.md#the-instance-given-to-the-algorithms): those of cost $0$, unless a [conflict set](../usage/instance.md#conflict-sets) makes them a choice, as when a free option [models the harm of another](../usage/modeling.md#actions-that-harm-the-landscape). `gecot bound` computes such bounds on their own, to certify a solution obtained otherwise, a heuristic one for instance. Its methods go from free and loose to costly and exact.
+is a share of the best possible gain that the solution is *proved* to reach. This is the percentage that `gecot optimize` prints on its `Guaranteed` line, where $s_0$ is the score with only the options [bought statically](preprocessing.md#the-instance-given-to-the-algorithms): those of cost $0$, unless a [conflict set](../usage/instance.md#conflict-sets) makes them a choice, as when a free option [models the harm of another](../usage/modeling.md#actions-that-harm-the-landscape). `gecot bound` computes such bounds on their own, to certify a solution obtained otherwise, a heuristic one for instance. Its methods go from free and loose to costly and exact.
 
 Every method accepts [conflict sets and several costs](problem.md#several-costs-and-conflict-sets). Buying nothing stays feasible and buying more never lowers a score, so a method that ignores some of these constraints still gives an upper bound, only a looser one.
 

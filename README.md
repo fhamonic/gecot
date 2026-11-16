@@ -27,7 +27,7 @@ Otherwise, [here](https://github.com/fhamonic/gecot_docker) is a Docker containe
 ```
 $ gecot --help
 GECOT — Graph-based Ecological Connectivity Optimization Tool
-Version: 2.0 (built on Nov  5 2026)
+Version: 2.0
 
 Usage:
   gecot --help
@@ -47,7 +47,7 @@ Commands:
 ```
 $ gecot optimize --help
 GECOT — Graph-based Ecological Connectivity Optimization Tool
-Version: 2.0 (built on Nov  5 2026)
+Version: 2.0
 
 Usage:
   gecot optimize --help
@@ -86,7 +86,8 @@ OPTIONS:
                               log on stdout
   -q,     --quiet             Silence all logging except errors
           --max-threads UINT:POSITIVE
-                              Limits the number of threads used
+                              Limits the number of threads of GECOT's own computations, not
+                              those of the solver
 ```
 
 `gecot bound` computes an upper bound on the scores `gecot optimize` can reach within the budget, the options of cost 0 being always bought unless a conflict set makes them a choice, which certifies how far a solution is from the optimum:
@@ -94,7 +95,7 @@ OPTIONS:
 ```
 $ gecot bound --help
 GECOT — Graph-based Ecological Connectivity Optimization Tool
-Version: 2.0 (built on Nov  5 2026)
+Version: 2.0
 
 Usage:
   gecot bound --help
@@ -120,15 +121,16 @@ OPTIONS:
                               log on stdout
   -q,     --quiet             Silence all logging except errors
           --max-threads UINT:POSITIVE
-                              Limits the number of threads used
+                              Limits the number of threads of GECOT's own computations, not
+                              those of the solver
 ```
 
 `gecot optimize --list-algorithms` and `gecot bound --list-methods` describe the algorithms and the bound methods, and `--list-params` their parameters.
 The `gecot_optimize <algorithm> ...` command of former releases is now `gecot optimize <algorithm> ...`.
 Of its algorithms, `prep_mip` is now `flow_mip` and `mip` is `flow_mip --preprocessing none`; `static_incr` and `greedy_incr` are `static` and `greedy`, `static_decr` and `greedy_decr` are `static --decremental` and `greedy --decremental`.
 
-The result is printed on stdout, unless `-o` or `--output-csv` writes it to a file. The log goes to stderr, each line after the seconds since the start: the steps of the run, then a table of the algorithm's progress, with a row when a value changes, at most every 5 s and at least every minute. Its `gain` is the best solution's over the initial score, `max gain` the best possible gain, proven, and `guaranteed` the share of this best possible gain that the solution is proven to reach. The rows of `tree_lp` and `path_lp` are their rounds, with the gain of their `relaxation`.
-Ctrl-C stops the algorithm and keeps its best result so far, with the status `interrupted`; a second Ctrl-C quits at once. A MIP solver notices it only when it next reports its progress: within seconds with Gurobi (2 s into a root relaxation on Quebec), up to about 15 s apart with HiGHS on the same model, never with CBC, which reports none. The column generations of `tree_lp` and `path_lp` stop at the end of their current round, and the heuristics run to the end.
+The result is printed on stdout, unless `-o` or `--output-csv` writes it to a file. The log goes to stderr, each line after the seconds since the start: the steps of the run, then a table of the algorithm's progress, with a row when a value changes, at most every 5 s and at least every minute, and a last row with the state it ended in. Its `gain` is the best solution's over the initial score, `max gain` the best possible gain, proven, and `guaranteed` the share of this best possible gain that the solution is proven to reach. The rows of `tree_lp` and `path_lp` are their rounds, with the gain of their `relaxation`; `multiflow_benders` first shows the rounds of its cuts on the relaxation, whose value is a `max gain`.
+Ctrl-C stops the algorithm and keeps its best result so far, with the status `interrupted`; a second Ctrl-C quits at once. A MIP solver notices it only when it next reports its progress: within seconds with Gurobi once it has begun to report, which can take tens of seconds on a large model, up to about 15 s apart with HiGHS on a large model, never with CBC, which reports none. The column generations of `tree_lp` and `path_lp` stop in their pricing, `greedy` after its current step, and `static` runs to the end.
 
 
 ## Citation

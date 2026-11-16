@@ -5,6 +5,7 @@
 #include <cerrno>
 #include <chrono>
 #include <cmath>
+#include <concepts>
 #include <csignal>
 #include <format>
 #include <iterator>
@@ -15,6 +16,7 @@
 #include <string_view>
 #include <system_error>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <spdlog/pattern_formatter.h>
@@ -72,13 +74,47 @@ extern "C" void request_stop(int) {
     std::signal(SIGINT, SIG_DFL);  // a second Ctrl-C ends gecot
 }
 
+// The criterion on one line, its cases by their names and its numbers to 3
+// digits: min(9.65e-07 deer, 1.18e-06 bike - 14.2). A sum or a product of a
+// single formula is that formula, so a single case reads as its name.
+std::string criterion_text(const Instance & instance,
+                           const gecot::criterion_formula & criterion) {
+    return std::visit(
+        [&]<typename F>(const F & f) -> std::string {
+            if constexpr(std::same_as<F, gecot::criterion_constant>)
+                return std::format("{:.3g}", f);
+            else if constexpr(std::same_as<F, gecot::criterion_var>)
+                return instance.cases()[f].name();
+            else {
+                constexpr bool is_sum = std::same_as<F, gecot::criterion_sum>;
+                constexpr bool is_min = std::same_as<F, gecot::criterion_min>;
+                std::string text;
+                for(auto && e : f.values) {
+                    std::string term = criterion_text(instance, e);
+                    if(!is_sum && !is_min &&
+                       (std::holds_alternative<gecot::criterion_sum>(e) ||
+                        (&e != &f.values.front() && term.starts_with('-'))))
+                        term = '(' + term + ')';
+                    if(&e == &f.values.front())
+                        text = std::move(term);
+                    else if(is_sum && term.starts_with('-'))
+                        text += " - " + term.substr(1);
+                    else
+                        text += (is_sum ? " + " : is_min ? ", " : " ") + term;
+                }
+                return is_min ? "min(" + text + ')' : text;
+            }
+        },
+        criterion);
+}
+
 }  // namespace
 
 void print_soft_name() {
     std::print(
         "GECOT — Graph-based Ecological Connectivity "
-        "Optimization Tool\nVersion: {} (built on {})\n\n",
-        PROJECT_VERSION, __DATE__);
+        "Optimization Tool\nVersion: {}\n\n",
+        PROJECT_VERSION);
 }
 
 void setup_logging() {
@@ -120,9 +156,11 @@ std::string format_score(double score) {
 std::string format_percent(double percent, bool sign) {
     // not -3.78e-12 % for a relaxation at the initial score
     if(std::abs(percent) < 1e-9) percent = 0;
+    // from 999.995 on, two decimals would read 1000.00
     std::string s = percent != 0 && std::abs(percent) < 0.01
                         ? std::format("{:.2e}", percent)
-                        : std::format("{:.2f}", percent);
+                        : std::format("{:.{}f}", percent,
+                                      std::abs(percent) < 999.995 ? 2 : 0);
     if(sign && percent >= 0) s.insert(0, "+");
     return s + " %";
 }
@@ -146,9 +184,10 @@ std::optional<double> guaranteed_gain_share(double score, double bound,
     // its share would read 100 %
     if(bound < score - bound_margin * std::max(1.0, std::abs(score)))
         return std::nullopt;
-    // at most 100 %: the bound can be a few ulps below
+    // only after the test above, which a bound far under the score fails
+    if(bound <= score + gecot::mip_gap * std::abs(score)) return 100.0;
     const double share =
-        std::clamp((score - base_score) / (bound - base_score), 0.0, 1.0);
+        std::max((score - base_score) / (bound - base_score), 0.0);
     return std::floor(share * 1000) / 10;
 }
 
@@ -195,9 +234,18 @@ prepared_instance prepare_instance(const std::filesystem::path & instance_file,
                                    const std::string & budget_text,
                                    std::string_view noun, const bool merge) {
     Instance raw_instance = parse_instance(instance_file);
-    spdlog::info("Instance: {}",
-                 std::filesystem::absolute(instance_file).string());
+    spdlog::info(
+        "Instance: {}",
+        std::filesystem::absolute(instance_file).lexically_normal().string());
     print_instance_size<spdlog::level::info>(raw_instance);
+    if(spdlog::should_log(spdlog::level::debug)) {
+        const std::string criterion =
+            criterion_text(raw_instance, raw_instance.criterion());
+        if(std::ranges::none_of(raw_instance.cases(), [&](auto && c) {
+               return c.name() == criterion;
+           }))
+            spdlog::debug("Criterion: {}", criterion);
+    }
     const std::size_t num_dimensions = raw_instance.num_cost_dimensions();
     if(num_dimensions > 1 || !raw_instance.conflict_sets().empty())
         spdlog::info("Cost dimensions: {}, conflict sets: {}", num_dimensions,
@@ -211,21 +259,54 @@ prepared_instance prepare_instance(const std::filesystem::path & instance_file,
         const auto share =
             format_percent(budget[r] / options_total_cost * 100, false);
         if(num_dimensions == 1)
-            spdlog::info("Budget {:g}: {} of the options' total cost ({:g})",
-                         budget[r], share, options_total_cost);
+            spdlog::info(
+                "Budget {:.10g}: {} of the options' total cost ({:.10g})",
+                budget[r], share, options_total_cost);
         else
-            spdlog::info("Budget {}={:g}: {} of the options' total ({:g})",
-                         raw_instance.cost_dimension_name(r), budget[r], share,
-                         options_total_cost);
+            spdlog::info(
+                "Budget {}={:.10g}: {} of the options' total ({:.10g})",
+                raw_instance.cost_dimension_name(r), budget[r], share,
+                options_total_cost);
     }
 
     auto [instance, quality_exponent, criterion_exponent, static_options] =
         trivial_reformulate_instance(raw_instance, budget, merge);
 
-    spdlog::debug("Removed {} options and {} species",
-                  raw_instance.num_options() - instance.num_options(),
-                  raw_instance.cases().size() - instance.cases().size());
-    print_instance_size<spdlog::level::debug>(instance);
+    if(spdlog::should_log(spdlog::level::debug)) {
+        std::size_t bought = 0, merged = 0, removed_arcs = 0;
+        for(auto && i : raw_instance.options()) bought += static_options[i];
+        for(const auto & instance_case : instance.cases()) {
+            const auto & raw_graph =
+                raw_instance
+                    .cases()[raw_instance.case_id_from_name(
+                        instance_case.name())]
+                    .graph();
+            merged +=
+                raw_graph.num_vertices() - instance_case.graph().num_vertices();
+            removed_arcs +=
+                raw_graph.num_arcs() - instance_case.graph().num_arcs();
+        }
+        bool changed = false;
+        auto log_change = [&changed](const char * kind,
+                                     const std::size_t count) {
+            if(count == 0) return;
+            spdlog::debug("{}: {}", kind, count);
+            changed = true;
+        };
+        log_change(
+            "Options over the budget, removed",
+            raw_instance.num_options() - instance.num_options() - bought);
+        log_change("Options of cost 0, bought", bought);
+        log_change("Cases that the criterion does not read, removed",
+                   raw_instance.cases().size() - instance.cases().size());
+        log_change("Vertices merged into others by arcs of probability 1",
+                   merged);
+        log_change("Arcs inside a vertex, removed", removed_arcs);
+        if(changed)
+            print_instance_size<spdlog::level::debug>(instance);
+        else
+            spdlog::debug("The reformulation removes, buys and merges nothing");
+    }
     if(instance.num_options() == 0) {
         spdlog::warn("Budget doesn't allow purchasing any options");
     }
@@ -247,8 +328,8 @@ prepared_instance prepare_instance(const std::filesystem::path & instance_file,
                   2 * quality_exponent + criterion_exponent);
     if(criterion_exponent != 0)
         spdlog::debug(
-            "The criterion multiplied by 2^{} on top, to the size of the "
-            "scores of its cases",
+            "The criterion multiplied by 2^{} on top, to the size of its "
+            "cases",
             criterion_exponent);
     // The relative tolerances of the solvers, a gap of 1e-10, and the margin
     // of 1e-6 of the check of a bound, apply to the whole value of the
@@ -257,13 +338,12 @@ prepared_instance prepare_instance(const std::filesystem::path & instance_file,
     if(const double size =
            criterion_size(instance.criterion(), base_cases_pc_num);
        size > 0 && std::abs(base_value) > 0x1p20 * size)
-        spdlog::warn(
-            "The criterion is {:.3g} times its terms where nothing is bought: "
-            "an added constant dominates it, and the relative tolerances of "
-            "the solvers and of the check of their bounds can hide gains",
-            std::abs(base_value) / size);
-    spdlog::debug("Initial score: {:g} (was {:g})", initial_score / score_scale,
-                  initial_score);
+        spdlog::warn("A constant {:.3g} times the other terms can hide gains",
+                     std::abs(base_value) / size);
+    if(score_scale != 1 && spdlog::should_log(spdlog::level::debug))
+        spdlog::debug("Initial score {}, for the {} {}",
+                      format_score(initial_score), noun,
+                      format_score(initial_score / score_scale));
 
     return {std::move(raw_instance),
             std::move(instance),
@@ -302,7 +382,9 @@ void print_json_head(
         "{{\n    \"gecot_version\":  \"{}\",\n    \"format_version\": {},\n    "
         "\"instance_path\":  {},\n    \"{}\":  \"{}\",",
         PROJECT_VERSION, result_format_version,
-        json_string(std::filesystem::absolute(instance_file).generic_string()),
+        json_string(std::filesystem::absolute(instance_file)
+                        .lexically_normal()
+                        .generic_string()),
         kind, name);
     print_json_property(stream, kind + "_parameters", parameters);
 }
@@ -334,6 +416,12 @@ progress_watch::progress_watch(const prepared_instance & prepared) {
                        initial = prepared.initial_score](const double score) {
         return format_gain(score * scale, initial);
     };
+    gecot::gain_text = gain;
+    gecot::change_text = [scale = prepared.score_scale,
+                          initial = prepared.initial_score](const double d) {
+        return initial > 0 ? format_percent(d * scale / initial * 100, true)
+                           : format_score(d * scale);
+    };
     // the max gain of the rounds only with a bound, the nodes only at -v
     gecot::log_table<spdlog::level::info, 20, 12, 12, 12> rounds(
         {"round", gecot::log_format::fixed(0)}, {"relaxation", gain},
@@ -347,62 +435,74 @@ progress_watch::progress_watch(const prepared_instance & prepared) {
                               base = prepared.base_score, gain, rounds, search,
                               looked = std::chrono::steady_clock::time_point{},
                               printed = std::chrono::steady_clock::time_point{},
-                              printed_values = std::string{}, started = false](
-                                 const gecot::progress & p) mutable {
+                              printed_values = std::string{}, started = false,
+                              last_round = gecot::progress{}](
+                                 const gecot::progress & report) mutable {
         using namespace std::chrono_literals;
-        if(p.end) {
+        const auto now = std::chrono::steady_clock::now();
+        const bool detailed = spdlog::should_log(spdlog::level::debug);
+        auto row = [&](const gecot::progress & p, const bool closing) {
+            // a model can value a solution below its score, as the Benders
+            // masters do at 0 first: below buying nothing, it says nothing
+            const auto score =
+                p.score && *p.score * scale >= base ? p.score : std::nullopt;
+            const auto share = !p.round && score && p.bound
+                                   ? guaranteed_gain_share(
+                                         *score * scale, *p.bound * scale, base)
+                                   : std::nullopt;
+            if(!std::exchange(started, true))
+                spdlog::info(
+                    "Ctrl-C stops the algorithm and keeps its best result so "
+                    "far");
+            // no row of a search that knows nothing yet, nor delay for its
+            // next
+            if(!p.round && !score && !p.bound) return;
+            // a row when a value changed, else one a minute; the round and
+            // the nodes always change
+            auto shown = [&gain](const std::optional<double> & v) {
+                return v ? gain(*v) : std::string("-");
+            };
+            std::string values =
+                p.round ? shown(p.relaxation) + '|' + shown(p.bound)
+                        : shown(score) + '|' + shown(p.bound) + '|' +
+                              std::format("{}", share.value_or(-1));
+            if(values == printed_values && (closing || now - printed < 60s))
+                return;
+            printed = now;
+            printed_values = std::move(values);
+            // the rows of a table close the other one, left open by an
+            // algorithm that did not report the end of its progress
+            if(p.round) {
+                search.end();
+                p.bound ? rounds.row(*p.round, p.relaxation, p.bound)
+                        : rounds.row(*p.round, p.relaxation);
+            } else {
+                rounds.end();
+                detailed ? search.row(score, p.bound, share, p.nodes)
+                         : search.row(score, p.bound, share);
+            }
+        };
+        if(report.end) {
+            // the state the step ended in, if its table shows another: a
+            // search sends it with the end, a loop of rounds as its last round
+            if(!printed_values.empty())
+                row(report.score || report.bound ? report : last_round, true);
             rounds.end();
             search.end();
+            printed_values.clear();
+            last_round = {};
             return;
         }
-        const auto now = std::chrono::steady_clock::now();
+        if(report.round) last_round = report;
         // a solver calls up to 100000 times a second
-        if(!p.round && now - looked < 500ms) return;
+        if(!report.round && now - looked < 500ms) return;
         looked = now;
-        const bool detailed = spdlog::should_log(spdlog::level::debug);
         // a row at most every 5 s, none in the first 2 s; at -v, every
-        // second or every round
-        if(detailed ? !p.round && now - printed < 1s
+        // second
+        if(detailed ? now - printed < 1s
                     : now - printed < 5s || elapsed_seconds() < 2)
             return;
-
-        // a model can value a solution below its score, as the Benders
-        // masters do at 0 first: below buying nothing, it says nothing
-        const auto score =
-            p.score && *p.score * scale >= base ? p.score : std::nullopt;
-        const auto share =
-            !p.round && score && p.bound
-                ? guaranteed_gain_share(*score * scale, *p.bound * scale, base)
-                : std::nullopt;
-        if(!std::exchange(started, true))
-            spdlog::info(
-                "Ctrl-C stops the algorithm and keeps its best result so "
-                "far");
-        // no row of a search that knows nothing yet, nor delay for its next
-        if(!p.round && !score && !p.bound) return;
-        // a row when a value changed, else one a minute; the round and
-        // the nodes always change
-        auto shown = [&gain](const std::optional<double> & v) {
-            return v ? gain(*v) : std::string("-");
-        };
-        std::string values = p.round
-                                 ? shown(p.relaxation) + '|' + shown(p.bound)
-                                 : shown(score) + '|' + shown(p.bound) + '|' +
-                                       std::format("{}", share.value_or(-1));
-        if(values == printed_values && now - printed < 60s) return;
-        printed = now;
-        printed_values = std::move(values);
-        // the rows of a table close the other one, left open by an
-        // algorithm that did not report the end of its progress
-        if(p.round) {
-            search.end();
-            p.bound ? rounds.row(*p.round, p.relaxation, p.bound)
-                    : rounds.row(*p.round, p.relaxation);
-        } else {
-            rounds.end();
-            detailed ? search.row(score, p.bound, share, p.nodes)
-                     : search.row(score, p.bound, share);
-        }
+        row(report, false);
     };
     gecot::stop_requested = false;
     _previous_handler = std::signal(SIGINT, request_stop);
@@ -412,4 +512,7 @@ progress_watch::~progress_watch() {
     std::signal(SIGINT, _previous_handler);
     gecot::stop_requested = false;
     gecot::report_progress = [](const gecot::progress &) {};
+    gecot::gain_text = gecot::change_text = [](const double score) {
+        return std::format("{:g}", score);
+    };
 }

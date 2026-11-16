@@ -17,6 +17,7 @@
 #include "gecot/helper.hpp"
 #include "gecot/solvers/heuristics_common.hpp"
 #include "gecot/utils/log_table.hpp"
+#include "gecot/utils/progress.hpp"
 
 namespace gecot {
 namespace solvers {
@@ -29,10 +30,19 @@ struct Greedy {
     bool only_dec = false;  // decremental, without the final purchases
     bool worst = false;     // worst choice in both phases
 
-    template <instance_c I>
+    // PURCHASES: the level of the table of the purchases, lower as a MIP start
+    template <spdlog::level::level_enum PURCHASES = spdlog::level::debug,
+              instance_c I>
     instance_solution_t<I> solve(const I & instance,
                                  const budget_t & budget) const {
         if(decremental) check_decremental(instance, "greedy");
+        // Ctrl-C between two steps once within the budget: the options bought
+        // so far. The report without values is what logs the line on Ctrl-C.
+        const auto stopped = [] {
+            if(stop_requested) return true;
+            report_progress({});
+            return false;
+        };
         auto solution = instance.create_option_map(false);
 
         // the options that fit alone: bought with --decremental, to buy
@@ -54,7 +64,6 @@ struct Greedy {
         auto options_ratios = instance.create_option_map(0.0);
         // divides the gains: the cost with a single dimension
         const auto costs = compute_heuristic_costs(instance, budget);
-        const std::size_t r0 = reference_dimension(budget);
         const auto options_sets = compute_options_conflict_sets(instance);
         const auto blocked = [&](const option_t & i) {
             return is_blocked(instance, options_sets, solution, i);
@@ -105,7 +114,8 @@ struct Greedy {
         const bool can_decrease =
             !worst && !has_non_decreasing_criterion(instance);
         while(!options.empty() &&
-              (purchased > budget.front() + feasibility_tol || can_decrease)) {
+              (purchased > budget.front() + feasibility_tol ||
+               (can_decrease && !stopped()))) {
             landscape.scores_without(solution, options, options_cases_pc_num);
             for(const option_t & i : options) {
                 options_ratios[i] =
@@ -165,9 +175,9 @@ struct Greedy {
                     std::ranges::remove_if(free_options, unavailable);
                 free_options.erase(first, last);
             }
-            log_table<spdlog::level::trace, 50, 40, 12, 11> added(
-                {"added option id"}, {"score gain", log_format::scientific(4)},
-                {"budget left", log_format::scientific(5)});
+            log_table<PURCHASES, 50, 40, 11, 12> added(
+                {"option bought"}, {"gain", change_text},
+                {"total gain", gain_text});
             // When nothing more fits, a bought option is swapped for another
             // of its conflict sets that fits and scores more, while such a
             // swap exists: buying a free option first must not lock out a
@@ -226,7 +236,7 @@ struct Greedy {
                     const double score = landscape.score();
                     added.row(instance.option_name(i) + " -> " +
                                   instance.option_name(j),
-                              score - previous_score, budget_left[r0]);
+                              score - previous_score, score);
                     previous_score = score;
                     free_options.clear();
                     for(auto && c : candidates)
@@ -237,7 +247,8 @@ struct Greedy {
             };
             // the option of largest gain per unit of cost (smallest with
             // --worst) is bought, as long as one fits
-            while(!free_options.empty() || (upgrades && upgrade())) {
+            while(!stopped() &&
+                  (!free_options.empty() || (upgrades && upgrade()))) {
                 landscape.scores_with(free_options, options_cases_pc_num);
                 for(const option_t & i : free_options) {
                     const double gain =
@@ -265,21 +276,17 @@ struct Greedy {
                 auto best_option_it = first_tied(free_options, best_it, lowers);
                 option_t best_option = *best_option_it;
                 // as the ratio times the cost, as before the cost dimensions
-                if(costs[best_option] == 0)
-                    previous_score += options_ratios[best_option];
-                else
-                    previous_score +=
-                        options_ratios[best_option] * costs[best_option];
+                const double gain =
+                    costs[best_option] == 0
+                        ? options_ratios[best_option]
+                        : options_ratios[best_option] * costs[best_option];
+                previous_score += gain;
                 for(std::size_t r = 0; r < budget.size(); ++r)
                     budget_left[r] -= instance.option_cost(best_option, r);
                 solution[best_option] = true;
                 landscape.buy(best_option);
-                added.row(
-                    instance.option_name(best_option),
-                    costs[best_option] == 0
-                        ? options_ratios[best_option]
-                        : options_ratios[best_option] * costs[best_option],
-                    budget_left[r0]);
+                added.row(instance.option_name(best_option), gain,
+                          previous_score);
 
                 free_options.erase(best_option_it);
                 const auto [first, last] =

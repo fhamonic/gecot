@@ -138,6 +138,8 @@ auto compute_constrained_strong_and_useless_arcs(
     if(decades_sweep && mus.size() > 1) mus.push_back(0.0);
     spdlog::trace("µ sequence: {:n:.3e}", mus);
 
+    // the counters of the µ table: they stay at 0 while it is off
+    const bool counted = spdlog::should_log(spdlog::level::debug);
     std::vector<std::atomic<std::size_t>> strong_counters(mus.size());
     std::vector<std::atomic<std::size_t>> useless_counters(mus.size());
     std::vector<std::pair<double, log_probability_map_t>>
@@ -228,7 +230,8 @@ auto compute_constrained_strong_and_useless_arcs(
                             if(never_target_map[w]) continue;
                             strong_arcs_map[w].push_back(uv);
                         }
-                        if(fiber_gain > 0) strong_counters[m] += fiber_gain;
+                        if(counted && fiber_gain > 0)
+                            strong_counters[m] += fiber_gain;
                     }
                     pb.tick();
                 }
@@ -285,7 +288,8 @@ auto compute_constrained_strong_and_useless_arcs(
                             if(never_target_map[w]) continue;
                             useless_arcs_map[w].push_back(uv);
                         }
-                        if(fiber_gain > 0) useless_counters[m] += fiber_gain;
+                        if(counted && fiber_gain > 0)
+                            useless_counters[m] += fiber_gain;
                     }
 
                     pb.tick();
@@ -293,7 +297,7 @@ auto compute_constrained_strong_and_useless_arcs(
             });
     }
     detail::sort_labels(graph, strong_arcs_map, useless_arcs_map);
-    if(spdlog::should_log(spdlog::level::debug)) {
+    if(counted) {
         for(auto m : std::views::iota(std::size_t(1), mus.size())) {
             strong_counters[m] += strong_counters[m - 1];
             useless_counters[m] += useless_counters[m - 1];
@@ -303,17 +307,23 @@ auto compute_constrained_strong_and_useless_arcs(
             {"strong fiber (avg. size)", log_format::fixed(3)},
             {"useless fiber (avg. size)", log_format::fixed(3)});
         const auto num_arcs = melon::num_arcs(graph);
+        std::size_t num_adding = 0;
         for(auto m : std::views::iota(std::size_t(0), mus.size())) {
             if(m > 0 &&
                strong_counters[m].load() == strong_counters[m - 1].load() &&
                useless_counters[m].load() == useless_counters[m - 1].load())
                 continue;
+            num_adding += m > 0;
             fibers.row(mus[m],
                        static_cast<double>(strong_counters[m]) /
                            static_cast<double>(num_arcs),
                        static_cast<double>(useless_counters[m]) /
                            static_cast<double>(num_arcs));
         }
+        fibers.end();
+        if(mus.size() > 1)
+            spdlog::debug("{} of the {} multipliers after the first add labels",
+                          num_adding, mus.size() - 1);
     }
 
     return std::make_pair(strong_arcs_map, useless_arcs_map);

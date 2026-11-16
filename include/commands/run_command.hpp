@@ -101,7 +101,8 @@ std::shared_ptr<Interface> parse_run_arguments(
                      "on stdout");
     app.add_flag("-q,--quiet", quiet, "Silence all logging except errors");
     app.add_option("--max-threads", max_threads,
-                   "Limits the number of threads used")
+                   "Limits the number of threads of GECOT's own computations, "
+                   "not those of the solver")
         ->check(CLI::Range(std::size_t{1},
                            std::numeric_limits<std::size_t>::max(),
                            "POSITIVE"));

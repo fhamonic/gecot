@@ -78,7 +78,7 @@ void check_bound(const prepared_instance & prepared,
         throw std::runtime_error(std::format(
             "the bound {} is below the score {} of buying only the options "
             "bought statically",
-            bound, base_score * score_scale));
+            format_score(bound), format_score(base_score * score_scale)));
 }
 
 bound_outcome evaluate(const prepared_instance & prepared,
@@ -191,6 +191,7 @@ int bound_command(const std::vector<std::string> & args) {
             write_json(file.get(), run, *method, prepared, outcome);
             spdlog::info("Bound written to {}",
                          std::filesystem::absolute(run.output_json_file.value())
+                             .lexically_normal()
                              .string());
         }
     } catch(const std::exception & e) {

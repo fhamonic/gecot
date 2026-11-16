@@ -318,8 +318,10 @@ struct multicut_benders : public mip_solver_base {
                                case_scores, formula);
             });
 
+        spdlog::info("Solving the optimization model");
         auto [has_solution, report] = _solve(model, sw);
         report.stats.emplace_back("lazy_constraints", num_cuts);
+        spdlog::debug("Cuts on the candidates of the search: {}", num_cuts);
         if(!has_solution) return {_fallback_solution(instance, budget), report};
         return {_bought_options(instance, model.get_solution(), x), report};
     }

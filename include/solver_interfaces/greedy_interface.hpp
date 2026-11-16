@@ -30,7 +30,9 @@ public:
 
     gecot::solve_result<Instance> solve(
         const Instance & instance, const gecot::budget_t & B) const override {
-        return {solver.solve(instance, B)};
+        // the flag read after the solve: a braced list runs in order
+        return {solver.solve(instance, B),
+                {gecot::stop_requested ? "interrupted" : "completed"}};
     };
 
     std::string description() const override {

@@ -9,6 +9,10 @@
 
 namespace gecot {
 
+// the relative gap between a solution and the bound at which the MIP solvers
+// stop: a bound within it of a score proves that score optimal
+inline constexpr double mip_gap = 1e-10;
+
 struct solve_report {
     std::string status = "completed";
     // best_bound and score_stats are in the solved instance's score unit,

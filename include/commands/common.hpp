@@ -28,7 +28,7 @@ void apply_logging(int verbosity, bool quiet);
 
 // at most 10 significant digits
 std::string format_score(double score);
-// two decimals, in scientific notation below 0.01 %
+// two decimals, none from 1000 % on, in scientific notation below 0.01 %
 std::string format_percent(double percent, bool sign);
 // "+11.28 %" over initial_score, the score itself if initial_score <= 0
 std::string format_gain(double score, double initial_score);
@@ -41,8 +41,9 @@ void check_finite_score(double score, std::string_view what);
 // ulps under the recomputed score. Further under, its tolerances failed.
 inline constexpr double bound_margin = 1e-6;
 // in %, rounded down: the share of the best possible gain, bound -
-// base_score, that score - base_score reaches; none if bound is not above
-// base_score, or is under score by more than bound_margin
+// base_score, that score - base_score reaches; 100 if bound is within
+// gecot::mip_gap above score; none if bound is not above base_score, or is
+// under score by more than bound_margin
 std::optional<double> guaranteed_gain_share(double score, double bound,
                                             double base_score);
 std::string format_duration(double seconds);

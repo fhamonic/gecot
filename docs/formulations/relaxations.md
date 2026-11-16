@@ -108,7 +108,7 @@ Its pricing is harder: for a target $t$, find the set of options that maximizes 
 
 !!! warning "`tree_lp` returns the relaxation, not a solution within the budget"
 
-    `tree_lp` is a tool to study the tree relaxation. The options it prints are all those that the relaxation buys, even fractionally, and they can cost more than the budget: GECOT then warns that the solution is over the budget. It reports no upper bound either: its pricing is a MILP solved up to the solver's tolerances, which can miss an improving column, so the value of its master, the `relaxation_value` of its report, is not a proven bound. Use `path_lp` for a bound and a solution, and the [exact algorithms](../usage/choosing.md) for a proof of optimality.
+    `tree_lp` is a tool to study the tree relaxation. The options it prints are all those that the relaxation buys, even fractionally, and they can cost more than the budget: GECOT then warns that the solution is over the budget. It reports no upper bound either: its pricing is a MILP solved up to the solver's tolerances, which can miss an improving column, so the value of its master, the `relaxation_value` of its report and the `Relaxation` line of its result, is not a proven bound. Use `path_lp` for a bound and a solution, and the [exact algorithms](../usage/choosing.md) for a proof of optimality.
 
 ## Parameters
 
@@ -122,6 +122,6 @@ Both take the [common parameters](../reference/parameters.md#common-to-the-milp-
 | `--evict-age n` | both | A column that has been in the master for more than $n$ rounds and is no longer attractive goes back to a pool (0: never) |
 | preprocessing parameters | `tree_lp` | The reduced graphs of its pricing, see [Preprocessing](../reference/parameters.md#preprocessing) |
 
-`--solver` can be any of the nine solvers for `path_lp`, and any but `glpk` for `tree_lp`. With `--time-limit` or Ctrl-C, both stop at the end of the current round, with the status `time limit reached` or `interrupted`.
+`--solver` can be any of the nine solvers for `path_lp`, and any but `glpk` for `tree_lp`. Ctrl-C and the time limit stop both in their pricing, with the status `interrupted` or `time limit reached`; `tree_lp` then solves its master once more, and `path_lp` with `--pricing enumerate` ends its round first. The time limit can also stop the master of `path_lp`, which it gives only the time left: that round then does not count.
 
-Their report gives `iterations`, the number of rounds, `relaxation_value`, the value of the master at the end, the size of the master (`variables`, `constraints`), `pool_columns` and `evicted_columns`; `path_lp` adds `pairs`, `searches` or `columns` depending on its pricing, and `best_bound`.
+Their report gives `iterations`, the number of rounds whose master was solved, `relaxation_value`, the value of the master at the end, the size of the master (`variables`, `constraints`), `pool_columns` and `evicted_columns`; `path_lp` adds `pairs`, `searches` or `columns` depending on its pricing, and `best_bound`.

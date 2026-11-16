@@ -26,7 +26,8 @@ $ gecot optimize flow_mip three-woods.json 4
 Status          optimal
 Initial score   18.4
 Solution score  28.76 (+56.30 %)
-Upper bound     28.76 (at least 100.0 % of the best possible gain)
+Upper bound     28.76 (+56.30 %)
+Guaranteed      at least 100.0 % of the best possible gain
 Cost            4 of 4
 Time            2 ms
 Options bought  2 of 3:

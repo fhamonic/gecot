@@ -108,7 +108,7 @@ $ gecot optimize flow_mip three-woods.json 4
 [   0.0s] Instance: /home/user/three-woods.json
 [   0.0s] Options count: 3
 [   0.0s] ------------+----------+----------+------------+---------+-----------
-[   0.0s]   species   | vertices | habitats | improvable |  arcs   | improvable
+[   0.0s]    case     | vertices | habitats | improvable |  arcs   | improvable
 [   0.0s]             |          |          |  vertices  |         |    arcs
 [   0.0s] ------------+----------+----------+------------+---------+-----------
 [   0.0s]    squirrel |        3 |        3 |          1 |       4 |          4
@@ -119,7 +119,8 @@ $ gecot optimize flow_mip three-woods.json 4
 Status          optimal
 Initial score   18.4
 Solution score  28.76 (+56.30 %)
-Upper bound     28.76 (at least 100.0 % of the best possible gain)
+Upper bound     28.76 (+56.30 %)
+Guaranteed      at least 100.0 % of the best possible gain
 Cost            4 of 4
 Time            2 ms
 Options bought  2 of 3:
@@ -144,7 +145,8 @@ $ gecot optimize flow_mip three-woods.json 3 -q
 Status          optimal
 Initial score   18.4
 Solution score  25.6 (+39.13 %)
-Upper bound     25.6 (at least 100.0 % of the best possible gain)
+Upper bound     25.6 (+39.13 %)
+Guaranteed      at least 100.0 % of the best possible gain
 Cost            3 of 3
 Time            2 ms
 Options bought  1 of 3:

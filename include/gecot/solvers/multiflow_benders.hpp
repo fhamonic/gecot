@@ -454,11 +454,8 @@ struct multiflow_benders : public mip_solver_base {
             for(const auto & source : block.sources)
                 num_source_arcs += source.arcs.size();
         }
-        if(no_stored_arcs)
-            spdlog::debug("{} targets, {} sources", blocks.size(), num_sources);
-        else
-            spdlog::debug("{} targets, {} sources, {} arcs over the sources",
-                          blocks.size(), num_sources, num_source_arcs);
+        spdlog::debug("Targets: {}, source-target pairs: {}, stored arcs: {}",
+                      blocks.size(), num_sources, num_source_arcs);
         return num_sources;
     }
 
@@ -501,15 +498,12 @@ struct multiflow_benders : public mip_solver_base {
         // f_t block by block, and the f^i_t: block by block, in the order of
         // the block's target quality gains
         std::vector<model_variable_t<M>> f, f_gains;
-        std::vector<preprocessing_row<>> preprocessing;
+        // with the vertices and the arcs of the graphs G_t, on average
+        std::vector<preprocessing_row<double, double>> preprocessing;
         for(auto && instance_case : instance.cases()) {
             const auto [strong_arcs_map, useless_arcs_map] =
                 _compute_strong_and_useless_arcs(instance, instance_case,
                                                  budget);
-            preprocessing.emplace_back(
-                instance_case.name(),
-                _average_size(instance_case, strong_arcs_map),
-                _average_size(instance_case, useless_arcs_map));
             spdlog::debug("Computing contractions of the '{}' graph",
                           instance_case.name());
 
@@ -519,6 +513,7 @@ struct multiflow_benders : public mip_solver_base {
             const auto z_row = model.add_constraint(z(k) <= 0);
             progress_bar<spdlog::level::info, 64> pb(
                 instance_case.graph().num_vertices());
+            graph_sizes sizes;
             for(const auto & original_t :
                 melon::vertices(instance_case.graph())) {
                 pb.tick();
@@ -548,10 +543,13 @@ struct multiflow_benders : public mip_solver_base {
                     model.add_constraint(f_ti <= f.back());
                     model.add_constraint(f_ti <= G_t.target_big_M(i) * x(i));
                 }
+                sizes.add(G_t.graph);
                 blocks.emplace_back(instance_case, original_t, std::move(G_t));
             }
+            preprocessing.push_back(_sizes_row(instance_case, strong_arcs_map,
+                                               useless_arcs_map, sizes));
         }
-        _log_preprocessing(preprocessing);
+        _log_graph_sizes(preprocessing);
         const std::size_t num_sources = _compute_sources(blocks);
 
         // multiflow_benders: the cut of the block b as a row. A lazy sum
@@ -576,6 +574,7 @@ struct multiflow_benders : public mip_solver_base {
                 model.add_constraint(cut_constraint(b, cuts[b]));
         }
 
+        spdlog::info("Solving the optimization model");
         // Cuts on the relaxation: the options are continuous for these
         // rounds, which take at most half of the time limit
         auto root_time_left = [&] {
@@ -595,7 +594,7 @@ struct multiflow_benders : public mip_solver_base {
                 break;
             ++root_rounds;
             root_value = model.get_solution_value();
-            report_progress({.relaxation = root_value, .round = root_rounds});
+            report_progress({.bound = root_value, .round = root_rounds});
             {
                 // readable until the model changes
                 const auto relaxation = model.get_solution();
@@ -628,7 +627,7 @@ struct multiflow_benders : public mip_solver_base {
         }
         for(auto && i : instance.options()) model.set_binary(x(i));
         report_progress({.end = true});
-        spdlog::debug("{} rounds and {} cuts on the relaxation", root_rounds,
+        spdlog::debug("Rounds on the relaxation: {}, cuts: {}", root_rounds,
                       root_cuts);
 
         // The search, steps 2 to 4: the flows of a candidate y, the cut at y
@@ -669,6 +668,7 @@ struct multiflow_benders : public mip_solver_base {
         report.stats.emplace_back("root_rounds", root_rounds);
         report.stats.emplace_back("root_cuts", root_cuts);
         report.stats.emplace_back("lazy_constraints", num_cuts);
+        spdlog::debug("Cuts on the candidates of the search: {}", num_cuts);
         // the relaxation with its cuts bounds the optimum too, better than
         // the solver's bound when the search is cut short
         if(root_value) {

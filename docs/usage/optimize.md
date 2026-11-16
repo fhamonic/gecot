@@ -44,7 +44,7 @@ $ gecot optimize --list-algorithms
 | `--no-merging` | for comparison: does not [merge](../formulations/preprocessing.md#the-instance-given-to-the-algorithms) the vertices linked by arcs of probability 1 |
 | `-v`, `--verbose` | logs the parameters and the details of the algorithm; `-vv` logs everything, with the solver's own log |
 | `-q`, `--quiet` | logs only the errors |
-| `--max-threads <n>` | limits the number of threads of GECOT's own computations |
+| `--max-threads <n>` | limits the number of threads of GECOT's own computations, not those of the solver |
 
 `--max-threads` bounds the parallel loops of GECOT: the evaluations of the heuristics, the preprocessing, the pricing and the separation of cuts. The MILP solver keeps its own setting for the search itself.
 
@@ -60,7 +60,7 @@ The parameters of each algorithm are listed on the [parameters page](../referenc
 $ gecot optimize flow_mip instance.json 100 --solver highs
 ```
 
-Not every solver offers every feature. When one is missing, GECOT logs a warning and goes on without it: a solver without a time limit ignores `--time-limit`, one without MIP start ignores `--mip-start`, and one that reports no dual bound gives a result without upper bound, as GLPK does.
+Not every solver offers every feature. When one is missing, GECOT logs a warning and goes on without it: a solver without a time limit ignores `--time-limit`, one without MIP start does not start from the solution of `--mip-start` or `--mip-start-algorithm`, and returns it only if it finds no solution, and one that reports no dual bound gives a result without upper bound, as GLPK does.
 
 ### Time limit
 
@@ -71,9 +71,9 @@ $ gecot optimize multicut_benders instance.json 100 --time-limit 600
 ```
 
 - The time counts from the start of the algorithm: the preprocessing, the construction of the model and the computation of a MIP start by `--mip-start-algorithm` are included. Reading the instance is not.
-- The column generations of `path_lp` and `tree_lp` stop at the end of their current round, so they can run a little over.
+- `tree_lp` stops its pricing when the time runs out and solves its master once more, so it can run a little over. `path_lp` gives its master only the time left: the limit can stop that master within a round, and the result is then that of the round before.
 - If the solver has found no solution when the time runs out, GECOT returns the MIP start if there is one, with a warning, and fails otherwise. It also fails if that MIP start exceeds a budget or buys two options of a conflict set. With a short limit on a large instance, give a MIP start.
-- The heuristics have no time limit.
+- The heuristics have no time limit. If the heuristic of `--mip-start-algorithm` takes the whole limit, a warning says so, and the algorithm returns its solution.
 
 Ctrl-C has the same effect as the time limit running out, at any moment: see [Results and logs](results.md#ctrl-c).
 
@@ -90,7 +90,7 @@ $ gecot optimize greedy instance.json 100 --decremental -o greedy.json
 $ gecot optimize flow_mip instance.json 100 --mip-start greedy.json
 ```
 
-The start also seeds the cuts of the Benders decompositions and the columns of the relaxations, and it is what `path_lp` returns if it finds nothing better.
+The start also seeds the cuts of the Benders decompositions and the columns of the relaxations, and it is what `path_lp` returns if it finds nothing better. With `--mip-start-algorithm`, the log gives what the start gains and, with a single cost, what it costs, as `MIP start: +22.05 %, cost 259.7424 of 260`: compared with the `Cost` of the result, it shows whether the algorithm changed the selection.
 
 ### Tolerance
 
@@ -102,17 +102,26 @@ The start also seeds the cuts of the Benders decompositions and the columns of t
 
 ## Removing options first
 
-`--reformulation path_lp` runs the path relaxation before the algorithm and removes the options that it proves to be in no solution better than the one it found. The algorithm then works on fewer options, from that solution.
+`--reformulation path_lp` runs the path relaxation before the algorithm and removes the options that it proves to be in no solution better than the one it found. The algorithm then works on fewer options, from that solution, which replaces its own `--mip-start-algorithm`; a `--mip-start` file given to the algorithm is kept.
 
 ```console
 $ gecot optimize flow_mip instance.json 8 --reformulation path_lp
-[   0.0s] Reformulating with path_lp
+[   0.0s] Reformulating with path_lp, without time limit
 [   0.0s] Computing the MIP start with greedy
-[   2.8s] The path relaxation leaves 15 of 27 options
-[   2.8s] Running algorithm 'flow_mip' on the options left
+[   0.1s] MIP start: +22.91 %, cost 7.8 of 8
+[   2.1s] Ctrl-C stops the algorithm and keeps its best result so far
+[   2.1s] -------------+--------------+-------------
+[   2.1s]    round     |  relaxation  |   max gain
+[   2.1s] -------------+--------------+-------------
+[   2.1s]            7 |     +23.26 % |     +24.59 %
+[   2.9s]           21 |     +23.26 % |     +23.26 %
+[   2.9s] -------------+--------------+-------------
+[   2.9s] The path relaxation finds +22.91 %, leaves 15 of 27 options
+[   2.9s] Running algorithm 'flow_mip' on the options left
+[   2.9s] MIP start: the path relaxation's solution
 ```
 
-It pays when the relaxation is tight and the algorithm slow on the whole instance; otherwise it only adds the time of the relaxation. When the relaxation proves its own solution optimal, the algorithm is not run at all. `--reformulation-params "time-limit=60 pricing=enumerate"` passes parameters to this `path_lp`, without their dashes and separated by spaces, so that a value cannot hold one; its MIP start is the solution of `greedy`, unless `mip-start-algorithm` names another algorithm or `mip-start=<file>` gives a solution, which replaces it. The report of the run prefixes the fields of the relaxation with `reformulation_` and adds `remaining_options`.
+It pays when the relaxation is tight and the algorithm slow on the whole instance; otherwise it only adds the time of the relaxation. When the relaxation proves its own solution optimal, the algorithm is not run at all, and the log says so, as it does after a Ctrl-C during the relaxation. `--time-limit` bounds the algorithm only: the relaxation has no time limit unless `--reformulation-params` gives it one, as `"time-limit=60"`. `--reformulation-params "time-limit=60 pricing=enumerate"` passes parameters to this `path_lp`, without their dashes and separated by spaces, so that a value cannot hold one; its MIP start is the solution of `greedy`, unless `mip-start-algorithm` names another algorithm or `mip-start=<file>` gives a solution, which replaces it. The report of the run prefixes the fields of the relaxation with `reformulation_` and adds `remaining_options`.
 
 ## Several budgets
 

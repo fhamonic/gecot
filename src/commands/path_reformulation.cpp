@@ -21,8 +21,8 @@ struct PathReformulationInterface : PathLpInterface {
     PathReformulationInterface() {
         app.get_option("--mip-start-algorithm")->default_val("greedy");
     }
-    // A start file replaces greedy's solution: left at its default, greedy
-    // would run and overwrite the start that the file gave.
+    // With a start file, its parameters read mip-start-algorithm none: greedy
+    // does not run, as with_mip_start keeps a start already set.
     void parse(std::vector<std::string> args) {
         PathLpInterface::parse(std::move(args));
         if(app.get_option("--mip-start")->count())
@@ -50,18 +50,26 @@ gecot::solve_result<Instance> solve_path_reformulated(
         return instance.eval_criterion(
             gecot::compute_solution_cases_pc_num(instance, X));
     };
-    spdlog::info("Reformulating with path_lp");
-    log_parameters(path_lp.parameters());
+    const auto parameters = path_lp.parameters();
+    const std::string & time_limit =
+        std::ranges::find(parameters, std::string("time-limit"),
+                          &std::pair<std::string, std::string>::first)
+            ->second;
+    spdlog::info("Reformulating with path_lp, {}",
+                 time_limit == "none" ? "without time limit"
+                                      : "time limit " + time_limit + " s");
+    log_parameters(parameters);
     auto [solution, report, option_bounds] = path_lp.relax(instance, budget);
     const double solution_score = score(solution);
     // an option is kept if a solution that buys it can beat this one by more
-    // than the optimality gap of the solvers
+    // than 1e-9 of its score, ten times gecot::mip_gap
     const double cutoff = solution_score + 1e-9 * std::abs(solution_score);
     auto keep = [&](const gecot::option_t o) {
         return option_bounds[o] > cutoff;
     };
     const auto num_kept = std::ranges::count_if(instance.options(), keep);
-    spdlog::info("The path relaxation leaves {} of {} options", num_kept,
+    spdlog::info("The path relaxation finds {}, leaves {} of {} options",
+                 gecot::gain_text(solution_score), num_kept,
                  instance.num_options());
     for(auto & [name, value] : report.stats) name = "reformulation_" + name;
     for(auto & [name, value] : report.score_stats)
@@ -70,19 +78,27 @@ gecot::solve_result<Instance> solve_path_reformulated(
     const double path_bound =
         report.best_bound.value_or(std::numeric_limits<double>::infinity());
     if(num_kept == 0 || path_bound <= cutoff) {
+        spdlog::info(
+            "{}: '{}' is not run",
+            num_kept == 0 ? "No option left" : "Its solution is optimal",
+            solver.name());
         report.status = "optimal";
         report.best_bound = std::min(path_bound, cutoff);
         return {std::move(solution), std::move(report)};
     }
-    if(gecot::stop_requested) return {std::move(solution), std::move(report)};
+    if(gecot::stop_requested) {
+        spdlog::info("Interrupted: '{}' is not run", solver.name());
+        return {std::move(solution), std::move(report)};
+    }
 
     const Instance restricted_instance =
         restrict_instance(instance, keep, merge);
     std::vector<std::string> start;
     for(auto && o : instance.options())
         if(solution[o]) start.push_back(instance.option_name(o));
-    solver.set_start(std::move(start));
     spdlog::info("Running algorithm '{}' on the options left", solver.name());
+    if(solver.set_start(std::move(start)))
+        spdlog::info("MIP start: the path relaxation's solution");
     const auto [restricted_solution, solver_report] =
         solver.solve(restricted_instance, budget);
     auto solver_solution = instance.create_option_map(false);

@@ -98,7 +98,7 @@ Two solvers work in pairs: `--solver cbc` solves its linear programs with CLP, a
 ```console
 $ gecot --version
 GECOT — Graph-based Ecological Connectivity Optimization Tool
-Version: 2.0 (built on Nov 12 2026)
+Version: 2.0
 ```
 
 Then follow [A first run](first-run.md): its example takes a few milliseconds and tells at once whether the solver is found.

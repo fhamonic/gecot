@@ -501,6 +501,7 @@ struct path_lp : public mip_solver_base {
         for(std::size_t r = 0; r < budget.size(); ++r)
             capacity.values.push_back(budget[r] + feasibility_tol);
         const auto [pairs, constants] = _pairs(instance, capacity, start);
+        spdlog::debug("Source-target pairs: {}", pairs.size());
         std::vector<option_reach> reaches;
         // per case, source s of a pair and vertex u, the probability of the
         // most reliable s-u path with every option: the share of its value
@@ -572,7 +573,9 @@ struct path_lp : public mip_solver_base {
 
         // The master's value and x at its last solve: the solvers give no
         // solution for a master changed since, or stopped by the time limit.
-        double master_value = 0;
+        // NaN, left out of the report, while no master is solved: 0 would
+        // read as a relaxation of -100 %
+        double master_value = std::numeric_limits<double>::quiet_NaN();
         auto x_values = instance.create_option_map(0.0);
         auto log_master = [&, option_name_max_length = std::ranges::max(
                                   std::ranges::views::transform(
@@ -649,7 +652,9 @@ struct path_lp : public mip_solver_base {
                                 : time_up()    ? "time limit reached"
                                                : "master not solved";
                 report_progress({.end = true});
-                spdlog::warn("Column generation stopped: {}", report.status);
+                spdlog::warn("Column generation stopped: {} in round {}",
+                             report.status, iterations);
+                --iterations;  // a round counts once its master is solved
                 break;
             }
             const auto dual_solution = model.get_dual_solution();
@@ -844,18 +849,19 @@ struct path_lp : public mip_solver_base {
                     option_bounds[i] =
                         std::min(option_bounds[i],
                                  bound + std::min(0.0, reduced_costs[i]));
-                report_progress({.bound = report.best_bound,
-                                 .relaxation = master_value,
-                                 .round = iterations});
-                if(relative_gap > 0 &&
-                   report.best_bound.value() - master_value <=
-                       relative_gap * master_value) {
-                    report_progress({.end = true});
-                    spdlog::debug(
-                        "Column generation stopped: relative gap reached");
-                    report.status = "relative gap reached";
-                    break;
-                }
+            }
+            // after a pricing cut short, with the bound of the rounds before
+            report_progress({.bound = report.best_bound,
+                             .relaxation = master_value,
+                             .round = iterations});
+            if(!cut_short && relative_gap > 0 &&
+               report.best_bound.value() - master_value <=
+                   relative_gap * master_value) {
+                report_progress({.end = true});
+                spdlog::debug(
+                    "Column generation stopped: relative gap reached");
+                report.status = "relative gap reached";
+                break;
             }
 
             // the improving columns enter the master, or the max_activations

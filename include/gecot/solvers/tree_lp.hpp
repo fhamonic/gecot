@@ -203,11 +203,12 @@ struct tree_lp : public mip_solver_base {
                                      [&](const case_id_t & k) { return z[k]; }},
             instance.criterion()));
 
-        auto log_master = [&, option_name_max_length = std::ranges::max(
-                                  std::ranges::views::transform(
-                                      instance.options(), [&](auto && i) {
-                                          return instance.option_name(i).size();
-                                      }))]() {
+        auto log_master = [&] {
+            if(!spdlog::should_log(spdlog::level::trace)) return;
+            const auto option_name_max_length = std::ranges::max(
+                instance.options() | std::views::transform([&](auto && i) {
+                    return instance.option_name(i).size();
+                }));
             const auto model_solution = model.get_solution();
             spdlog::trace("tree_lp relaxation has value: {}",
                           model.get_solution_value());
@@ -383,11 +384,15 @@ struct tree_lp : public mip_solver_base {
             if(stop_requested || time_up()) {
                 report.status =
                     stop_requested ? "interrupted" : "time limit reached";
-                report_progress({.end = true});
-                spdlog::warn("Column generation stopped: {}", report.status);
                 // Gurobi, CPLEX and COPT give no solution for a master
                 // changed since its last solve, HiGHS a zero value
-                if(num_activated) model.solve();
+                if(num_activated) {
+                    model.solve();
+                    report_progress({.relaxation = model.get_solution_value(),
+                                     .round = ++iterations});
+                }
+                report_progress({.end = true});
+                spdlog::warn("Column generation stopped: {}", report.status);
                 break;
             }
             // only once the master will be solved again, for the same reason

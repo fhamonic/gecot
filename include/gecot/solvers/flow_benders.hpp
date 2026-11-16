@@ -115,24 +115,12 @@ struct flow_benders : public mip_solver_base {
                                              G_t.target_big_M(i) * x(i));
                 }
             }
-            std::size_t num_vertices = 0, num_arcs = 0;
-            for(const auto & [f_t, G_t] : targets[k]) {
-                num_vertices += G_t.graph.num_vertices();
-                num_arcs += G_t.graph.num_arcs();
-            }
-            const auto num_graphs = static_cast<double>(
-                std::max<std::size_t>(targets[k].size(), 1));
-            preprocessing.emplace_back(
-                instance_case.name(),
-                _average_size(instance_case, strong_arcs_map),
-                _average_size(instance_case, useless_arcs_map),
-                static_cast<double>(num_vertices) / num_graphs,
-                static_cast<double>(num_arcs) / num_graphs);
+            graph_sizes sizes;
+            for(const auto & [f_t, G_t] : targets[k]) sizes.add(G_t.graph);
+            preprocessing.push_back(_sizes_row(instance_case, strong_arcs_map,
+                                               useless_arcs_map, sizes));
         }
-        _log_preprocessing(
-            preprocessing,
-            log_column<10>{"vertices per target", log_format::fixed(2)},
-            log_column<10>{"arcs per target", log_format::fixed(2)});
+        _log_graph_sizes(preprocessing);
 
         // The cut of a target: cut_{t,y}(x), with the potentials rho of y
         auto cut = [&](const contracted_graph_data<instance_case_t<I>> & G_t,
@@ -217,8 +205,10 @@ struct flow_benders : public mip_solver_base {
         if(const auto start = _add_mip_start(model, instance, x))
             seed_cuts(*start);
 
+        spdlog::info("Solving the optimization model");
         auto [has_solution, report] = _solve(model, sw);
         report.stats.emplace_back("lazy_constraints", num_cuts);
+        spdlog::debug("Cuts on the candidates of the search: {}", num_cuts);
         if(!has_solution) return {_fallback_solution(instance, budget), report};
         return {_bought_options(instance, model.get_solution(), x), report};
     }

@@ -62,12 +62,12 @@ struct flow_mip : public mip_solver_base {
         }
         void log(const std::string_view kind) const {
             spdlog::debug(
-                "flow_mip {} big-Ms: arcs {:.4g} of the knapsack ones ({} "
-                "of {} halved at least, {} not lowered), target gains {:.4g}",
+                "flow_mip {} big-Ms / knapsack's: arcs {:.4g}, targets {:.4g}",
                 kind, arc_knapsack_sum > 0 ? arc_sum / arc_knapsack_sum : 1.0,
-                num_arcs_halved, num_arcs, num_arcs_kept,
                 target_knapsack_sum > 0 ? target_sum / target_knapsack_sum
                                         : 1.0);
+            spdlog::debug("Arcs: {}, halved at least: {}, not lowered: {}",
+                          num_arcs, num_arcs_halved, num_arcs_kept);
         }
     };
 
@@ -110,7 +110,8 @@ struct flow_mip : public mip_solver_base {
         const std::optional<big_M_kind> computed_big_Ms =
             indicator_constraints ? std::nullopt : std::optional(big_Ms);
         lowered_big_M_statistics lowered_statistics;
-        std::vector<preprocessing_row<>> preprocessing;
+        // with the vertices and the arcs of the graphs G_t, on average
+        std::vector<preprocessing_row<double, double>> preprocessing;
         for(auto && instance_case : instance.cases()) {
             const case_id_t k = instance_case.id();
             const auto & original_graph = instance_case.graph();
@@ -122,10 +123,6 @@ struct flow_mip : public mip_solver_base {
             const auto [strong_arcs_map, useless_arcs_map] =
                 _compute_strong_and_useless_arcs(instance, instance_case,
                                                  budget);
-            preprocessing.emplace_back(
-                instance_case.name(),
-                _average_size(instance_case, strong_arcs_map),
-                _average_size(instance_case, useless_arcs_map));
             spdlog::debug("Computing contractions{} of the '{}' graph",
                           computed_big_Ms ? " and big-Ms" : "",
                           instance_case.name());
@@ -135,6 +132,7 @@ struct flow_mip : public mip_solver_base {
             const auto v =
                 model.add_variables(original_graph.num_vertices(),
                                     [](const vertex & t) { return t; });
+            graph_sizes sizes;
             for(const auto & original_t : melon::vertices(original_graph)) {
                 if(!_is_target(instance_case, original_t)) {
                     model.set_variable_upper_bound(v(original_t), 0);
@@ -148,6 +146,7 @@ struct flow_mip : public mip_solver_base {
                 const auto & graph = G_t.graph;
                 const auto & t = G_t.t;
                 lowered_statistics.add(G_t, vertex_options_map[original_t]);
+                sizes.add(graph);
 
                 // A linear program for the score: the flow f_t that reaches
                 // t. Target quality gains: for each gain f^i_t, equal to f_t
@@ -205,14 +204,17 @@ struct flow_mip : public mip_solver_base {
             // What flow_mip solves: the score of the case, at most the sum
             // of the v_t
             model.add_constraint(z(k) <= v);
+            preprocessing.push_back(_sizes_row(instance_case, strong_arcs_map,
+                                               useless_arcs_map, sizes));
         }
-        _log_preprocessing(preprocessing);
+        _log_graph_sizes(preprocessing);
         if(computed_big_Ms == big_M_kind::tight)
             lowered_statistics.log("tight");
         if(computed_big_Ms == big_M_kind::exact)
             lowered_statistics.log("exact");
         _add_mip_start(model, instance, x);
 
+        spdlog::info("Solving the optimization model");
         const auto [has_solution, report] = _solve(model, sw);
         if(!has_solution) return {_fallback_solution(instance, budget), report};
         if(!relax_integrality)

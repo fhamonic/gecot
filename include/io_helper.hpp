@@ -32,10 +32,11 @@ inline std::string csv_field(const std::string & text) {
 
 template <spdlog::level::level_enum LVL>
 void print_instance_size(auto && instance) {
+    if(!spdlog::should_log(LVL)) return;
     spdlog::log(LVL, "Options count: {}", instance.num_options());
     gecot::log_table<LVL, 0, 11, 8, 8, 10, 7, 10> sizes(
-        {"species"}, {"vertices"}, {"habitats"}, {"improvable vertices"},
-        {"arcs"}, {"improvable arcs"});
+        {"case"}, {"vertices"}, {"habitats"}, {"improvable vertices"}, {"arcs"},
+        {"improvable arcs"});
     for(const auto & instance_case : instance.cases()) {
         auto && graph = instance_case.graph();
         auto && vertex_options_map = instance_case.vertex_options_map();

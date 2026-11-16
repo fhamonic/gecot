@@ -33,7 +33,7 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 | `--no-merging` | for comparison: keeps apart the vertices that arcs of probability 1 link |
 | `-v`, `--verbose` | logs the details of the algorithm; `-vv` everything, with the solver's own log on the standard output |
 | `-q`, `--quiet` | logs only the errors |
-| `--max-threads <n>` | limits the number of threads of GECOT's own computations |
+| `--max-threads <n>` | limits the number of threads of GECOT's own computations, not those of the solver |
 | `-h`, `--help` | prints the help |
 
 ### `gecot bound`
@@ -68,7 +68,7 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 | `--solver <name>` | `gurobi` | the solver, used through mippp. `flow_mip` and `path_lp`: `gurobi`, `cplex`, `copt`, `xpress`, `mosek`, `highs`, `scip`, `cbc`, `glpk`. `tree_lp`: the same without `glpk`. Benders decompositions: `gurobi`, `cplex`, `copt` |
 | `-t`, `--feasibility-tolerance <value>` | `1e-07` | the tolerance for rounding errors: the solver's feasibility tolerance, and the relative error accepted on a candidate of a Benders decomposition |
 | `--mip-start <file>` | | a solution file (JSON, as written by `-o`) to start the solver from. Excludes `--mip-start-algorithm` |
-| `--mip-start-algorithm <name>` | `none` | the heuristic whose solution starts the solver, run in its incremental form: `none`, `static`, `greedy`. Its time counts in `--time-limit`. Excludes `--mip-start` |
+| `--mip-start-algorithm <name>` | `none` | the heuristic whose solution starts the solver, run in its incremental form: `none`, `static`, `greedy`. Its time counts in `--time-limit`. With `--reformulation path_lp`, the solution of the relaxation replaces it. Excludes `--mip-start` |
 | `--time-limit <seconds>` | | after this time, the best solution found is returned |
 | `--numeric-focus` | off | asks the solver for more care in its numerical computations, at some cost in time, on every model the algorithm solves: `NumericFocus` 1 for Gurobi, the numerical emphasis for CPLEX, `NUMERICALEMPHASIS` 1 for Xpress, and the numerical emphasis level 1 of MOSEK's MIP optimizer. COPT, HiGHS, CBC and GLPK have no such setting, and SCIP's numerics emphasis cannot be set through mippp: these warn |
 

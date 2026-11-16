@@ -18,24 +18,27 @@
 #include "instance.hpp"
 #include "io_helper.hpp"
 
-// the long name and the value of each option of app, its default if not
-// given, "none" without one
+// the value of option, its default if not given, "none" without one
+inline std::string option_value(const CLI::Option & option) {
+    std::string value;
+    if(option.get_expected_max() == 0)  // a flag
+        value = option.count() && option.as<bool>() ? "true" : "false";
+    else if(option.count())
+        value = option.results() | std::views::join_with(' ') |
+                std::ranges::to<std::string>();
+    else
+        value = option.get_default_str();
+    return value.empty() ? "none" : value;
+}
+
+// the long name and the option_value of each option of app
 inline std::vector<std::pair<std::string, std::string>> option_values(
     const CLI::App & app) {
     std::vector<std::pair<std::string, std::string>> values;
-    for(const CLI::Option * option : app.get_options()) {
-        if(option->get_lnames().empty()) continue;
-        std::string value;
-        if(option->get_expected_max() == 0)  // a flag
-            value = option->count() && option->as<bool>() ? "true" : "false";
-        else if(option->count())
-            value = option->results() | std::views::join_with(' ') |
-                    std::ranges::to<std::string>();
-        else
-            value = option->get_default_str();
-        values.emplace_back(option->get_lnames().front(),
-                            value.empty() ? "none" : value);
-    }
+    for(const CLI::Option * option : app.get_options())
+        if(!option->get_lnames().empty())
+            values.emplace_back(option->get_lnames().front(),
+                                option_value(*option));
     return values;
 }
 
@@ -125,8 +128,9 @@ public:
         return option_json_values(app);
     }
 
-    // the options of a solution that the algorithm may start from
-    virtual void set_start(std::vector<std::string>) {}
+    // the options of a solution that the algorithm may start from; false if
+    // it does not
+    virtual bool set_start(std::vector<std::string>) { return false; }
     virtual gecot::solve_result<Instance> solve(
         const Instance & instance, const gecot::budget_t & B) const = 0;
     virtual std::string description() const = 0;

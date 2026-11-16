@@ -7,8 +7,8 @@ For each case: the exit code, what was printed, the log, the files written
 and the model given to Gurobi, without what changes from one run to the next:
 - the times: the "Time" line of a summary, the "*_time_ms" fields, the
   seconds that begin each log line;
-- the table of the progress of a search, whose rows are sampled on the clock,
-  and the "Ctrl-C stops" line that comes with it;
+- the tables of the progress, of a search or of rounds, whose rows are
+  sampled on the clock, and the "Ctrl-C stops" line that comes with them;
 - the build date, the lines that name an output file, and the directory of
   the capture.
 A case that timed out on either side is reported as different: its end was
@@ -27,8 +27,9 @@ RULE = re.compile(r"^-+(\+-+)+$")
 BUILD_DATE = re.compile(r"built on [^)]*")
 DROPPED = re.compile(
     r'^\s*"\w+_time_ms":|^Time {2,}|^Ctrl-C stops|^(Solution|Bound) written to ')
-# the header of the table that a MIP search fills as time passes
-SEARCH_TABLE = re.compile(r"^\s*gain\s*\|\s*max gain\s*\|\s*guaranteed")
+# the headers of the tables that the progress fills as time passes
+PROGRESS_TABLE = re.compile(
+    r"^\s*(gain\s*\|\s*max gain\s*\|\s*guaranteed|round\s*\|\s*relaxation)")
 
 
 def normalized(path, capture, ignore):
@@ -38,7 +39,7 @@ def normalized(path, capture, ignore):
 
     def close():
         nonlocal rules
-        if not any(SEARCH_TABLE.search(row) for row in table):
+        if not any(PROGRESS_TABLE.search(row) for row in table):
             kept.extend(table)
         table.clear()
         rules = 0
@@ -53,7 +54,7 @@ def normalized(path, capture, ignore):
         # A table is a rule, its header, a rule, its rows and a rule. It is
         # closed there, and by any other line: two tables that follow each
         # other, or that only a dropped line separates, are not one table,
-        # which would be dropped whole if one of them is a search table.
+        # which would be dropped whole if one of them is a progress table.
         if rule or " | " in line:
             if not dropped:
                 table.append(line)

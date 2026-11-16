@@ -34,7 +34,8 @@ $ gecot optimize flow_mip three-woods-resources.json money=7,area=2,crossings=1
 Status          optimal
 Initial score   18.4
 Solution score  35.4 (+92.39 %)
-Upper bound     35.4 (at least 100.0 % of the best possible gain)
+Upper bound     35.4 (+92.39 %)
+Guaranteed      at least 100.0 % of the best possible gain
 Cost area       2 of 2
 Cost crossings  1 of 1
 Cost money      5 of 7

@@ -65,10 +65,6 @@ inline constexpr bool has_numeric_focus =
     std::same_as<M, mippp::mosek_milp>;
 
 struct mip_solver_base {
-    // the relative gap between a solution and the bound at which a MIP
-    // solver stops
-    static constexpr double mip_gap = 1e-10;
-
     // -t, in several roles: the feasibility tolerance of the solver; the
     // share of a flow by which a master may overestimate it before a cut;
     // the slack of the budget, for a MIP start, for the tight big-Ms, and in
@@ -245,12 +241,42 @@ struct mip_solver_base {
         const std::vector<preprocessing_row<V...>> & cases,
         log_column<WIDTHS>... columns) {
         log_table<spdlog::level::debug, 0, 12, 11, 12, WIDTHS...> table(
-            {"species"}, {"strong arcs per target", log_format::fixed(2)},
+            {"case"}, {"strong arcs per target", log_format::fixed(2)},
             {"useless arcs per target", log_format::fixed(2)},
             std::move(columns)...);
         for(const auto & values : cases)
             std::apply([&table](const auto &... v) { table.row(v...); },
                        values);
+    }
+
+    // the vertices and the arcs of the graphs G_t of a case
+    struct graph_sizes {
+        std::size_t num_graphs = 0, num_vertices = 0, num_arcs = 0;
+        void add(const auto & graph) {
+            ++num_graphs;
+            num_vertices += graph.num_vertices();
+            num_arcs += graph.num_arcs();
+        }
+    };
+    // the row of a case for _log_graph_sizes
+    template <case_c C>
+    preprocessing_row<double, double> _sizes_row(
+        const C & instance_case, const auto & strong_arcs_map,
+        const auto & useless_arcs_map, const graph_sizes & sizes) const {
+        const auto n =
+            static_cast<double>(std::max<std::size_t>(sizes.num_graphs, 1));
+        return {instance_case.name(),
+                _average_size(instance_case, strong_arcs_map),
+                _average_size(instance_case, useless_arcs_map),
+                static_cast<double>(sizes.num_vertices) / n,
+                static_cast<double>(sizes.num_arcs) / n};
+    }
+    // _log_preprocessing with the graphs G_t, on average
+    static void _log_graph_sizes(
+        const std::vector<preprocessing_row<double, double>> & cases) {
+        _log_preprocessing(
+            cases, log_column<10>{"vertices per target", log_format::fixed(2)},
+            log_column<10>{"arcs per target", log_format::fixed(2)});
     }
 
     // sw starts with solve(): the time limit also counts the preprocessing
@@ -278,10 +304,20 @@ struct mip_solver_base {
         }
         _warn_without_numeric_focus<M>("MIP");
         _set_numeric_focus(model);
+        // the solver's own log, on stdout, which shows the progress itself
+        const bool solver_log =
+            mippp::has_verbosity<M> && spdlog::should_log(spdlog::level::trace);
+        if constexpr(mippp::has_verbosity<M>) model.set_verbose(solver_log);
         if constexpr(mippp::has_progress_callback<M>)
-            model.set_progress_callback([](auto & handle) noexcept {
+            model.set_progress_callback([solver_log](auto & handle) noexcept {
                 if(stop_requested) {
                     handle.interrupt();
+                    return;
+                }
+                // a row would print among the lines of the solver's log: a
+                // progress without values logs only the line on Ctrl-C
+                if(solver_log) {
+                    report_progress({});
                     return;
                 }
                 // infinite until the solver has one
@@ -296,17 +332,10 @@ struct mip_solver_base {
                     p.nodes = handle.get_node_count();
                 report_progress(p);
             });
-        // the solver's own log, on stdout
-        if constexpr(mippp::has_verbosity<M>)
-            model.set_verbose(spdlog::should_log(spdlog::level::trace));
-        spdlog::info("Solving the optimization model");
-        spdlog::debug(
-            "The model has {} variables, {} constraints and {} "
-            "nonzeros",
-            model.num_variables(), model.num_constraints(),
-            model.num_nonzeros());
+        spdlog::debug("Model: {} variables, {} constraints, {} nonzeros",
+                      model.num_variables(), model.num_constraints(),
+                      model.num_nonzeros());
         model.solve();
-        report_progress({.end = true});
         const auto & s = model.get_status();
         const std::string_view reason = std::visit(
             []<typename S>(const S &) -> std::string_view {
@@ -341,22 +370,24 @@ struct mip_solver_base {
               std::chrono::duration_cast<std::chrono::milliseconds>(build_time)
                   .count()}}};
         if(!status::solution_available(s)) {
+            report_progress({.end = true});
             if(!mip_start)
                 throw std::runtime_error(std::format(
                     "the solver stopped without a solution: {}", reason));
-            spdlog::warn(
-                "Solver stopped without a solution: {}, returning "
-                "the MIP start",
-                reason);
+            spdlog::warn("Solver stopped: {}, MIP start kept", reason);
             return {false, report};
         }
         // as the solution, defined only after a stop or at the optimum
+        progress last{.score = model.get_solution_value(), .end = true};
         if constexpr(mippp::has_dual_bound<M>)
             if(const double bound = model.get_dual_bound();
                bound < model.infinity())
-                report.best_bound = bound;
-        if constexpr(mippp::has_node_count<M>)
-            report.stats.emplace_back("nodes", model.get_node_count());
+                report.best_bound = last.bound = bound;
+        if constexpr(mippp::has_node_count<M>) {
+            last.nodes = model.get_node_count();
+            report.stats.emplace_back("nodes", *last.nodes);
+        }
+        report_progress(last);
         spdlog::log(std::holds_alternative<status::optimal>(s)
                         ? spdlog::level::debug
                         : spdlog::level::warn,
@@ -457,10 +488,8 @@ struct mip_solver_base {
     template <typename M>
     void _warn_without_numeric_focus(const std::string_view models) const {
         if(numeric_focus && !has_numeric_focus<M>)
-            spdlog::warn(
-                "No numeric focus is set for the {} models of this solver: "
-                "--numeric-focus ignored for them",
-                models);
+            spdlog::warn("--numeric-focus ignored by this solver's {} models",
+                         models);
     }
 
     template <typename M>
@@ -485,7 +514,8 @@ struct mip_solver_base {
                 instance.options(),
                 [&](auto i) { return std::make_pair(x(i), start[i]); }));
         else
-            spdlog::warn("This solver has no MIP start: --mip-start ignored");
+            spdlog::warn(
+                "This solver has no MIP start: used if it finds no solution");
         return start;
     }
 

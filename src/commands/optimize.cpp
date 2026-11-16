@@ -3,7 +3,6 @@
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
-#include <format>
 #include <optional>
 #include <print>
 #include <ranges>
@@ -35,8 +34,9 @@ struct optimize_arguments {
     std::shared_ptr<const PathLpInterface> path_reformulation;
     bool no_merging = false;
     // the options of the command that change the instance of the algorithm,
-    // with their JSON values
+    // with their JSON values, and as text for the log
     std::vector<std::pair<std::string, std::string>> command_parameters;
+    std::vector<std::pair<std::string, std::string>> logged_parameters;
 };
 
 // the algorithm chosen, with its arguments parsed, or null if the command
@@ -89,9 +89,14 @@ std::shared_ptr<AbstractSolverInterface> parse_arguments(
         throw std::logic_error(
             "'--reformulation-params' requires '--reformulation path_lp'");
     for(const char * name :
-        {"--reformulation", "--reformulation-params", "--no-merging"})
-        arguments.command_parameters.emplace_back(
-            name + 2, option_json_value(*app.get_option(name)));
+        {"--reformulation", "--reformulation-params", "--no-merging"}) {
+        const CLI::Option & option = *app.get_option(name);
+        arguments.command_parameters.emplace_back(name + 2,
+                                                  option_json_value(option));
+        if(spdlog::should_log(spdlog::level::debug))
+            arguments.logged_parameters.emplace_back(name + 2,
+                                                     option_value(option));
+    }
     return solver;
 }
 
@@ -198,6 +203,7 @@ optimize_outcome evaluate(const prepared_instance & prepared,
     for(const auto & [key, value] : report.score_stats)
         report.stats.emplace_back(key, value * score_scale);
     const bool feasible = check_feasibility(prepared, cost, option_values);
+    const double margin = bound_margin * std::max(1.0, std::abs(score));
     std::optional<double> best_bound;
     if(report.best_bound) {
         const double bound = report.best_bound.value() * score_scale;
@@ -208,14 +214,23 @@ optimize_outcome evaluate(const prepared_instance & prepared,
         // own score.
         if(!feasible)
             best_bound = bound;
-        else if(bound >= score - bound_margin * std::max(1.0, std::abs(score)))
+        else if(bound >= score - margin)
             best_bound = std::max(bound, score);
         else
-            spdlog::warn(
-                "The bound {} of the algorithm is below the score {} of its "
-                "solution: no bound is shown, nor any share guaranteed",
-                bound, score);
+            spdlog::warn("Bound {} is below the score: not shown",
+                         format_score(bound));
     }
+    if(instance.num_options() > 0 &&
+       score - prepared.base_score <= bound_margin * std::abs(score) &&
+       (!best_bound || best_bound.value() > score + margin))
+        spdlog::warn(
+            "The algorithm found no solution better than buying nothing");
+    // a proved optimum, its bound the score up to the tolerances of the
+    // algorithm: the solver's gap, and the -t by which a Benders master can
+    // overvalue its solution. flow_mip --lp-relaxation is optimal too, with
+    // the bound of its relaxation above its selection.
+    const bool optimal = report.status == "optimal" && best_bound &&
+                         best_bound.value() <= score + margin;
     return {.status = std::move(report.status),
             .option_values = std::move(option_values),
             .score = score,
@@ -227,6 +242,9 @@ optimize_outcome evaluate(const prepared_instance & prepared,
                 feasible && best_bound
                     ? guaranteed_gain_share(score, best_bound.value(),
                                             prepared.base_score)
+                          .transform([optimal](const double share) {
+                              return optimal ? 100.0 : share;
+                          })
                     : std::nullopt,
             .stats = std::move(report.stats),
             .computation_time_ms = computation_time_ms};
@@ -240,16 +258,18 @@ void print_summary(const prepared_instance & prepared,
     std::println("Initial score   {}", format_score(prepared.initial_score));
     std::println("Solution score  {} ({})", format_score(outcome.score),
                  format_gain(outcome.score, prepared.initial_score));
+    for(const auto & [key, value] : outcome.stats)
+        if(key == "relaxation_value" && std::isfinite(value))
+            std::println("Relaxation      {} ({})", format_score(value),
+                         format_gain(value, prepared.initial_score));
     if(outcome.best_bound)
         std::println(
-            "Upper bound     {}{}", format_score(outcome.best_bound.value()),
-            outcome.guaranteed_share
-                .transform([](double share) {
-                    return std::format(
-                        " (at least {:.1f} % of the best possible gain)",
-                        share);
-                })
-                .value_or(""));
+            "Upper bound     {} ({})", format_score(outcome.best_bound.value()),
+            format_gain(outcome.best_bound.value(), prepared.initial_score));
+    if(outcome.guaranteed_share)
+        std::println(
+            "Guaranteed      at least {:.1f} % of the best possible gain",
+            outcome.guaranteed_share.value());
     for(std::size_t r = 0; r < budget.size(); ++r)
         if(budget.size() == 1)
             std::println("Cost            {:.10g} of {:.10g}", outcome.cost[r],
@@ -263,7 +283,7 @@ void print_summary(const prepared_instance & prepared,
         format_duration(static_cast<double>(outcome.computation_time_ms) /
                         1000.0));
     if(raw_instance.cases().size() > 1) {
-        std::println("Per species");
+        std::println("Per case");
         const std::size_t name_max_length = std::ranges::max(
             std::views::transform(raw_instance.cases(),
                                   [](auto && c) { return c.name().size(); }));
@@ -350,7 +370,9 @@ int optimize_command(const std::vector<std::string> & args) {
         program_state = "Checking output files";
         check_output_directories({output_json_file, output_csv_file});
         spdlog::info("GECOT {}, algorithm {}", PROJECT_VERSION, solver->name());
-        log_parameters(solver->parameters());
+        auto parameters = solver->parameters();
+        parameters.append_range(arguments.logged_parameters);
+        log_parameters(parameters);
         program_state = "Parsing instance";
         const prepared_instance prepared =
             prepare_instance(arguments.run.instance_file, arguments.run.budget,
@@ -385,16 +407,18 @@ int optimize_command(const std::vector<std::string> & args) {
             const auto file = open_output_file(
                 std::filesystem::absolute(output_json_file.value()));
             write_json(file.get(), arguments, *solver, prepared, outcome);
-            spdlog::info(
-                "Solution written to {}",
-                std::filesystem::absolute(output_json_file.value()).string());
+            spdlog::info("Solution written to {}",
+                         std::filesystem::absolute(output_json_file.value())
+                             .lexically_normal()
+                             .string());
         }
         if(output_csv_file) {
             const auto file = open_output_file(output_csv_file.value());
             write_csv(file.get(), prepared, outcome);
-            spdlog::info(
-                "Solution written to {}",
-                std::filesystem::absolute(output_csv_file.value()).string());
+            spdlog::info("Solution written to {}",
+                         std::filesystem::absolute(output_csv_file.value())
+                             .lexically_normal()
+                             .string());
         }
     } catch(const std::exception & e) {
         spdlog::error("{}: {}", program_state, e.what());

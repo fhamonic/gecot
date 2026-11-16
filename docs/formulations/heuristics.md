@@ -87,7 +87,7 @@ The swaps change one option at a time. An option in a conflict set with each of 
 
 ## Parameters
 
-The heuristics take `-t`, the tolerance used when comparing a cost with the budget ($10^{-7}$ by default, in every dimension), `--decremental` and, with it, `--only-dec`, both with a single cost and no conflict set; `greedy` also takes `--worst`. They always end with the status `completed`: Ctrl-C does not interrupt them.
+The heuristics take `-t`, the tolerance used when comparing a cost with the budget ($10^{-7}$ by default, in every dimension), `--decremental` and, with it, `--only-dec`, both with a single cost and no conflict set; `greedy` also takes `--worst`. `static` always ends with the status `completed`: Ctrl-C does not interrupt it. `greedy` stops at Ctrl-C after its current step, once its cost is within the budget (with `--decremental`, not before its removals reach the budget), with the status `interrupted` and the options bought so far.
 
 ## Reference
 

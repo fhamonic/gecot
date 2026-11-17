@@ -54,6 +54,9 @@ struct multiflow_benders : public mip_solver_base {
     // clamped to [0,1], and f_t as the solver returns it.
     double root_cut_tol = 1e-7;
     static constexpr double root_cut_abs_tol = 1e-7;
+    // The rounds also end once their bound is within root_cut_gap of their
+    // floor, relative to it, as path_lp's relative_gap; 0: never.
+    double root_cut_gap = 0;
 
     // The graph G_t of a target t, each improved copy an arc of its own, and
     // for each source the arcs that can carry its flow to t.
@@ -96,11 +99,14 @@ struct multiflow_benders : public mip_solver_base {
         struct cut {
             double value = 0, constant = 0;
             std::vector<double> coefficients;
+            bool settled = true;  // the flow of every source
         };
 
         case_id_t case_id;
         double target_quality;  // q_t
-        std::vector<std::pair<double, option_t>> target_quality_gains;
+        double flow_bound;      // M^t_t, the bound of f_t
+        // with the constant M^t_i of the target quality gain of i
+        std::vector<std::tuple<double, option_t, double>> target_quality_gains;
         graph_t graph;
         vertex t;
         vertex_map<double> source_quality_map;  // w_u
@@ -123,7 +129,9 @@ struct multiflow_benders : public mip_solver_base {
             for(const auto & [source_gain, target_gain, i] :
                 instance_case.vertex_options_map()[original_t])
                 if(target_gain > 0)
-                    target_quality_gains.emplace_back(target_gain, i);
+                    target_quality_gains.emplace_back(target_gain, i,
+                                                      G_t.target_big_M(i));
+            flow_bound = G_t.big_M_map.value()[G_t.t];
             const auto vertex_cmp = [](auto && u, auto && v) { return u < v; };
             t = static_cast<vertex>(std::ranges::count_if(
                 melon::vertices(G_t.graph),
@@ -277,10 +285,12 @@ struct multiflow_benders : public mip_solver_base {
         // augmenting paths: returns what reaches t, and leaves in search.rho
         // an optimal dual solution, ρ_u being the gain of the best path from
         // u to t in the last residual graph. If the search gives up, ρ is
-        // the fallback's and the value returned a bound, exact at a scenario.
-        double _largest_flow(const source & source_s, const double supply,
-                             const std::vector<double> & x_hat,
-                             flow_search & search) const {
+        // the fallback's and the value returned a bound, exact at a scenario:
+        // the second value returned is then false.
+        std::pair<double, bool> _largest_flow(const source & source_s,
+                                              const double supply,
+                                              const std::vector<double> & x_hat,
+                                              flow_search & search) const {
             auto & [capacities, flows, in_A_s, rho, potentials, status, next,
                     reached, heap] = search;
             const vertex s = source_s.s;
@@ -400,7 +410,7 @@ struct multiflow_benders : public mip_solver_base {
                 arrived = rho[s] * supply;
             }
             for(const arc a : source_s.arcs) in_A_s[a] = 0;
-            return arrived;
+            return {arrived, settled};
         }
 
         // The cut of the point x̂: for each source, its largest flow to t at
@@ -429,7 +439,10 @@ struct multiflow_benders : public mip_solver_base {
                 double supply = source_quality_map[s];
                 for(const auto & [source_gain, i] : source_options_map[s])
                     supply += source_gain * x_hat[i];
-                result.value += _largest_flow(source_s, supply, x_hat, search);
+                const auto [flow, settled] =
+                    _largest_flow(source_s, supply, x_hat, search);
+                result.value += flow;
+                result.settled = result.settled && settled;
                 result.constant += rho[s] * source_quality_map[s];
                 for(const auto & [source_gain, i] : source_options_map[s])
                     result.coefficients[i] += rho[s] * source_gain;
@@ -586,8 +599,30 @@ struct multiflow_benders : public mip_solver_base {
         };
         for(auto && i : instance.options()) model.set_continuous(x(i));
         std::size_t root_rounds = 0, root_cuts = 0;
-        std::optional<double> root_value;
+        // the relaxation with all the cuts lies between root_floor and
+        // root_value
+        std::optional<double> root_value, root_floor;
         std::vector<double> center, f_relaxed(blocks.size());
+        // The value of the point x̂ separated, with the flows of the cuts,
+        // in the relaxation with all the cuts: x̂ is within the budget, and
+        // no cut is under its flow. None if a flow did not settle: it is
+        // then a bound.
+        auto floor_at =
+            [&](const std::vector<double> & x_hat,
+                const std::vector<cut> & cuts) -> std::optional<double> {
+            auto case_scores = instance.create_case_map(0.0);
+            for(std::size_t b = 0; b < blocks.size(); ++b) {
+                if(!cuts[b].settled) return std::nullopt;
+                const double flow =
+                    std::min(cuts[b].value, blocks[b].flow_bound);
+                double score = blocks[b].target_quality * flow;
+                for(const auto & [target_gain, i, big_M] :
+                    blocks[b].target_quality_gains)
+                    score += target_gain * std::min(flow, big_M * x_hat[i]);
+                case_scores[blocks[b].case_id] += score;
+            }
+            return instance.eval_criterion(case_scores);
+        };
         for(bool in_out = !no_in_out; !no_root_cuts && !stop_requested &&
                                       !(time_limit && root_time_left() <= 0);) {
             if(time_limit)
@@ -598,7 +633,6 @@ struct multiflow_benders : public mip_solver_base {
                 break;
             ++root_rounds;
             root_value = model.get_solution_value();
-            report_progress({.bound = root_value, .round = root_rounds});
             {
                 // readable until the model changes
                 const auto relaxation = model.get_solution();
@@ -612,12 +646,21 @@ struct multiflow_benders : public mip_solver_base {
                 for(auto && i : instance.options())
                     center[i] = (center[i] + point[i]) / 2;
             }
-            const auto cuts = _separate(blocks, in_out ? center : point);
+            const auto & separated = in_out ? center : point;
+            const auto cuts = _separate(blocks, separated);
+            if(const auto floor = floor_at(separated, cuts))
+                root_floor = std::max(root_floor.value_or(*floor), *floor);
+            // the smallest --root-cut-tolerance at which no cut is added
+            double violation = 0;
             std::size_t num_added = 0;
             for(std::size_t b = 0; b < blocks.size(); ++b) {
                 double cut_at_optimum = cuts[b].constant;
                 for(auto && i : instance.options())
                     cut_at_optimum += cuts[b].coefficients[i] * point[i];
+                if(f_relaxed[b] > cut_at_optimum + root_cut_abs_tol)
+                    violation = std::max(
+                        violation,
+                        (f_relaxed[b] - root_cut_abs_tol) / cut_at_optimum - 1);
                 // not `<=` then skip: a NaN --root-cut-tolerance, which the
                 // CLI's range lets through, would add every cut forever
                 if(f_relaxed[b] >
@@ -626,7 +669,14 @@ struct multiflow_benders : public mip_solver_base {
                     ++num_added;
                 }
             }
+            report_progress({.bound = root_value,
+                             .relaxation = root_floor,
+                             .round = root_rounds,
+                             .violation = violation});
             root_cuts += num_added;
+            if(root_cut_gap > 0 && root_floor &&
+               *root_value - *root_floor <= root_cut_gap * *root_floor)
+                break;
             if(num_added) continue;
             if(!in_out) break;
             in_out = false;
@@ -647,7 +697,7 @@ struct multiflow_benders : public mip_solver_base {
             for(std::size_t b = 0; b < blocks.size(); ++b) {
                 const double flow = cuts[b].value;
                 double quality = blocks[b].target_quality;
-                for(const auto & [target_gain, i] :
+                for(const auto & [target_gain, i, big_M] :
                     blocks[b].target_quality_gains) {
                     candidate[*f_gain++] = y[i] * flow;
                     quality += y[i] * target_gain;

@@ -235,7 +235,8 @@ For `path_lp` and `tree_lp`, also when `path_lp` runs for [`--reformulation path
 
 ```text
 [   2.1s] -------------+--------------+-------------
-[   2.1s]    round     |  relaxation  |   max gain
+[   2.1s]    round     |  fractional  |   max gain
+[   2.1s]              |     gain     |
 [   2.1s] -------------+--------------+-------------
 [   2.1s]            7 |     +22.06 % |     +24.67 %
 ```
@@ -243,10 +244,11 @@ For `path_lp` and `tree_lp`, also when `path_lp` runs for [`--reformulation path
 | Column | Meaning |
 |---|---|
 | `round` | the number of the round |
-| `relaxation` | for `path_lp` and `tree_lp`, the gain of the master's value, which grows toward the value of the relaxation; `-` for `multiflow_benders` |
+| `fractional gain` | the gain of a plan that buys parts of options, which grows toward the value of the relaxation: for `path_lp` and `tree_lp`, that of their master; for `multiflow_benders`, the best so far of the points of its rounds, with all the cuts. No plan of whole options needs to reach it |
 | `max gain` | for `path_lp`, the gain of its Lagrangian bound; for `multiflow_benders`, the gain of its relaxation with the cuts so far, a bound that falls as cuts are added |
+| `violation` | for `multiflow_benders` only: the smallest [`--root-cut-tolerance`](../reference/parameters.md#multiflow_benders) with which the round adds no cut |
 
-`multiflow_benders` starts with such a table: its rounds are those of the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation) that it adds before its search. Its search can then start with a larger `max gain`, the solver's own bound until its search catches up: the result keeps the smaller. A row comes only once its round has its values: a long round, as a pricing of `path_lp` over many pairs, leaves the table silent meanwhile.
+`multiflow_benders` starts with such a table: its rounds are those of the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation) that it adds before its search. The value of its relaxation with all the cuts lies between its `fractional gain` and its `max gain`, which close in on it round after round: their gap is the most that more rounds can still take off the bound, and [`--root-cut-gap`](../reference/parameters.md#multiflow_benders) ends the rounds once it is small enough. On the bike instances of the benchmark, a run with a `--root-cut-tolerance` ended its rounds at the first round whose `violation` is under it, or up to five rounds later, with a `max gain` a little above that of this round; the `violation` can rise again in a later round, and the table can skip rounds. After the rounds, the search of `multiflow_benders` can start with a larger `max gain`, the solver's own bound until its search catches up: the result keeps the smaller. A row comes only once its round has its values: a long round, as a pricing of `path_lp` over many pairs, leaves the table silent meanwhile.
 
 ### Verbosity
 

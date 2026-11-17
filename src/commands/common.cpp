@@ -422,10 +422,11 @@ progress_watch::progress_watch(const prepared_instance & prepared) {
         return initial > 0 ? format_percent(d * scale / initial * 100, true)
                            : format_score(d * scale);
     };
-    // the max gain of the rounds only with a bound, the nodes only at -v
-    gecot::log_table<spdlog::level::info, 20, 12, 12, 12> rounds(
-        {"round", gecot::log_format::fixed(0)}, {"relaxation", gain},
-        {"max gain", gain});
+    // the max gain of the rounds only with a bound, their violation only
+    // with cuts, the nodes only at -v
+    gecot::log_table<spdlog::level::info, 20, 12, 12, 12, 12> rounds(
+        {"round", gecot::log_format::fixed(0)}, {"fractional gain", gain},
+        {"max gain", gain}, {"violation", gecot::log_format::scientific(1)});
     gecot::log_table<spdlog::level::info, 20, 12, 12, 12, 12> search(
         {"gain", gain}, {"max gain", gain},
         {"guaranteed",
@@ -463,7 +464,8 @@ progress_watch::progress_watch(const prepared_instance & prepared) {
                 return v ? gain(*v) : std::string("-");
             };
             std::string values =
-                p.round ? shown(p.relaxation) + '|' + shown(p.bound)
+                p.round ? shown(p.relaxation) + '|' + shown(p.bound) + '|' +
+                              std::format("{:.1e}", p.violation.value_or(-1))
                         : shown(score) + '|' + shown(p.bound) + '|' +
                               std::format("{}", share.value_or(-1));
             if(values == printed_values && (closing || now - printed < 60s))
@@ -474,8 +476,11 @@ progress_watch::progress_watch(const prepared_instance & prepared) {
             // algorithm that did not report the end of its progress
             if(p.round) {
                 search.end();
-                p.bound ? rounds.row(*p.round, p.relaxation, p.bound)
-                        : rounds.row(*p.round, p.relaxation);
+                if(p.violation)
+                    rounds.row(*p.round, p.relaxation, p.bound, p.violation);
+                else
+                    p.bound ? rounds.row(*p.round, p.relaxation, p.bound)
+                            : rounds.row(*p.round, p.relaxation);
             } else {
                 rounds.end();
                 detailed ? search.row(score, p.bound, share, p.nodes)

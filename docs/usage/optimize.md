@@ -111,7 +111,8 @@ $ gecot optimize flow_mip instance.json 8 --reformulation path_lp
 [   0.1s] MIP start: +22.91 %, cost 7.8 of 8
 [   2.1s] Ctrl-C stops the algorithm and keeps its best result so far
 [   2.1s] -------------+--------------+-------------
-[   2.1s]    round     |  relaxation  |   max gain
+[   2.1s]    round     |  fractional  |   max gain
+[   2.1s]              |     gain     |
 [   2.1s] -------------+--------------+-------------
 [   2.1s]            7 |     +23.26 % |     +24.59 %
 [   2.9s]           21 |     +23.26 % |     +23.26 %

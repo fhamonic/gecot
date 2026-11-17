@@ -29,7 +29,7 @@ DROPPED = re.compile(
     r'^\s*"\w+_time_ms":|^Time {2,}|^Ctrl-C stops|^(Solution|Bound) written to ')
 # the headers of the tables that the progress fills as time passes
 PROGRESS_TABLE = re.compile(
-    r"^\s*(gain\s*\|\s*max gain\s*\|\s*guaranteed|round\s*\|\s*relaxation)")
+    r"^\s*(gain\s*\|\s*max gain\s*\|\s*guaranteed|round\s*\|\s*(relaxation|fractional))")
 
 
 def normalized(path, capture, ignore):

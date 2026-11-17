@@ -27,6 +27,14 @@ public:
                                std::numeric_limits<double>::max(),
                                "AT LEAST 1e-07"))
             ->default_val(solver.root_cut_tol);
+        app.add_option("--root-cut-gap", solver.root_cut_gap,
+                       "Ends the cuts on the linear relaxation before the "
+                       "search once the max gain of their table is within "
+                       "this gap of its fractional gain, relative to the "
+                       "score of the fractional gain (0: never, the rounds "
+                       "then end by --root-cut-tolerance only)")
+            ->check(CLI::NonNegativeNumber)
+            ->default_val(solver.root_cut_gap);
         app.add_flag("--no-root-cuts", solver.no_root_cuts,
                      "For comparison: no cut on the linear relaxation before "
                      "the search");

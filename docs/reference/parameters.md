@@ -55,7 +55,7 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 | `flow_mip` | ✓ | ✓ | `--big-m`, `--lp-relaxation`, `--indicator-constraints` |
 | `multicut_benders` | ✓ | ✓ | `--groups`, `--grouping`, `--grouping-seed`, `--big-m`, `--no-lazy-constraints` |
 | `flow_benders` | ✓ | ✓ | `--big-m`, `--indicator-constraints`, `--no-lazy-constraints` |
-| `multiflow_benders` | ✓ | ✓ | `--big-m`, `--root-cut-tolerance`, `--no-root-cuts`, `--no-in-out`, `--no-stored-arcs`, `--no-lazy-constraints` |
+| `multiflow_benders` | ✓ | ✓ | `--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--no-root-cuts`, `--no-in-out`, `--no-stored-arcs`, `--no-lazy-constraints` |
 | `tree_lp` | ✓ | ✓ | `--evict-age` |
 | `path_lp` | ✓ | – | `--evict-age`, `--pricing`, `--max-activations`, `--relative-gap` |
 | `static` | – | – | `-t`, `--decremental`, `--only-dec` |
@@ -120,6 +120,7 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` and `tre
 |---|---|---|
 | `--big-m plain`, `knapsack_bnb`, `knapsack_dantzig`, `tight`, `exact` | `knapsack_bnb` | as for `flow_mip`, for $M^t_t$ only: the bound of $f_t$, and the constant of its [target quality gains](../formulations/benders.md#multiflow_benders-cuts-per-source), which `tight` and `exact` lower |
 | `--root-cut-tolerance <value>` | `1e-07` | the relative tolerance of the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation), $10^{-7}$ at least: a cut is added when the flow of the relaxation exceeds it by more than this share, and the rounds end when none does. A larger value ends them sooner, with a relaxation above its value with all the cuts by about this share at most, unless the criterion subtracts a constant |
+| `--root-cut-gap <g>` | `0` | also ends the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation) once the `max gain` of their table is within this gap of its `fractional gain`, relative to the score of the fractional gain, as `--relative-gap` does for `path_lp`. `0`: never, the rounds end by `--root-cut-tolerance` only |
 | `--no-root-cuts` | off | for comparison: no cut on the linear relaxation before the search |
 | `--no-in-out` | off | for comparison: separates each optimum of the relaxation, without the center that moves halfway to it |
 | `--no-stored-arcs` | off | keeps no [set $A_s$](../formulations/benders.md#separation) per source but rebuilds them at each separation: the same cuts, slower, in less memory |

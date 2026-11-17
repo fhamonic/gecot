@@ -18,6 +18,8 @@ struct progress {
     std::optional<double> relaxation = {};  // a relaxation's value, no bound
     std::optional<std::size_t> nodes = {};  // of the branch-and-bound
     std::optional<std::size_t> round = {};  // of a loop of rounds
+    // of the cuts of a round: the smallest tolerance at which it adds none
+    std::optional<double> violation = {};
     // The end of a step of the progress: sent before the algorithm logs
     // anything else, or these lines come before the rule that closes the
     // table of its progress. A search sends its last values with it; a loop

@@ -26,7 +26,7 @@
 #include "gecot/preprocessing/compute_contracted_graph.hpp"
 
 #include "gecot/solvers/column_generation.hpp"
-#include "gecot/solvers/mip_solver_base.hpp"
+#include "gecot/solvers/flow_preprocessing.hpp"
 #include "gecot/utils/progress.hpp"
 
 namespace gecot {
@@ -35,7 +35,7 @@ namespace solvers {
 // The tree relaxation of docs/formulations/relaxations.md, by column
 // generation. Its pricing can miss improving columns, so the value of its
 // master is not a bound.
-struct tree_lp : public mip_solver_base {
+struct tree_lp : public flow_preprocessing {
     using variable_t = mippp::model_variable<int, double>;
     using constraint_t = mippp::model_constraint<int>;
 
@@ -139,13 +139,6 @@ struct tree_lp : public mip_solver_base {
         check_plain_budget(instance, "tree_lp");
         _check_criterion(instance);
         spdlog::stopwatch sw;
-        auto time_up = [&] {
-            return time_limit && sw.elapsed().count() > time_limit.value();
-        };
-
-        // The master: x, the budget row, and for each case k, z_k with its
-        // contribution row, then the rows of its targets, whose pricing
-        // models are built along.
         LP model;
         if constexpr(has_feasibility_tolerance<LP>)
             model.set_feasibility_tolerance(feasibility_tol);
@@ -153,16 +146,10 @@ struct tree_lp : public mip_solver_base {
         _set_numeric_focus(model);
         _warn_without_numeric_focus<MILP>("pricing MIP");
         model.set_maximization();
-        const auto x = model.add_variables(
-            instance.options().size(), [](const option_t & i) { return i; });
-        model.add_constraint(xsum(instance.options(), [&](auto && i) {
-                                 return instance.option_cost(i) * x(i);
-                             }) <= budget);
-        std::vector<variable_t> z;
-        std::vector<constraint_t> contribution_rows;
+
+        // The pricing models: one per vertex of positive quality or quality
+        // gain as a target, case by case
         std::vector<pricing_model<I, MILP>> targets;
-        std::vector<constraint_t> uniqueness_rows;
-        std::vector<std::flat_map<option_t, constraint_t>> purchase_rows;
         std::vector<preprocessing_row<>> preprocessing;
         for(const auto & instance_case : instance.cases()) {
             const auto [strong_arcs_map, useless_arcs_map] =
@@ -172,23 +159,41 @@ struct tree_lp : public mip_solver_base {
                 instance_case.name(),
                 _average_size(instance_case, strong_arcs_map),
                 _average_size(instance_case, useless_arcs_map));
-            z.push_back(model.add_variable());
-            contribution_rows.push_back(model.add_constraint(z.back() <= 0));
-            // the vertices of positive quality or quality gain as a target
-            const auto first_target = std::ssize(targets);
             for(const auto & t :
                 std::views::filter(melon::vertices(instance_case.graph()),
                                    [&](const auto & t) {
                                        return _is_target(instance_case, t);
                                    })) {
-                uniqueness_rows.push_back(model.add_constraint(
-                    empty_linear_expression<variable_t, double> <= 1));
                 targets.emplace_back(instance, budget, instance_case,
                                      strong_arcs_map[t], useless_arcs_map[t], t,
-                                     !no_pruning);
+                                     pruning);
                 _set_numeric_focus(targets.back().model);
             }
-            for(const auto & p : std::views::drop(targets, first_target)) {
+        }
+        _log_preprocessing(preprocessing);
+
+        // The master: x, the budget row, and for each case k: z_k with its
+        // contribution row, the uniqueness row of each of its targets, then
+        // their purchase rows
+        const auto x = model.add_variables(
+            instance.options().size(), [](const option_t & i) { return i; });
+        model.add_constraint(xsum(instance.options(), [&](auto && i) {
+                                 return instance.option_cost(i) * x(i);
+                             }) <= budget);
+        std::vector<variable_t> z;
+        std::vector<constraint_t> contribution_rows, uniqueness_rows;
+        std::vector<std::flat_map<option_t, constraint_t>> purchase_rows;
+        for(const auto & instance_case : instance.cases()) {
+            z.push_back(model.add_variable());
+            contribution_rows.push_back(model.add_constraint(z.back() <= 0));
+            auto case_targets = std::views::filter(
+                targets, [k = instance_case.id()](const auto & p) {
+                    return p.case_id == k;
+                });
+            for([[maybe_unused]] const auto & p : case_targets)
+                uniqueness_rows.push_back(model.add_constraint(
+                    empty_linear_expression<variable_t, double> <= 1));
+            for(const auto & p : case_targets) {
                 auto & rows = purchase_rows.emplace_back();
                 for(const option_t i : p.X.keys())
                     rows.emplace(
@@ -197,36 +202,24 @@ struct tree_lp : public mip_solver_base {
                                x(i)));
             }
         }
-        _log_preprocessing(preprocessing);
         model.set_objective(std::visit(
             formula_variable_visitor{model,
                                      [&](const case_id_t & k) { return z[k]; }},
             instance.criterion()));
 
+        // a master changed since its last solve gives no solution to read
         auto log_master = [&] {
             if(!spdlog::should_log(spdlog::level::trace)) return;
-            const auto option_name_max_length = std::ranges::max(
-                instance.options() | std::views::transform([&](auto && i) {
-                    return instance.option_name(i).size();
-                }));
             const auto model_solution = model.get_solution();
-            spdlog::trace("tree_lp relaxation has value: {}",
-                          model.get_solution_value());
-            for(auto && option : instance.options()) {
-                const auto & option_name = instance.option_name(option);
-                spdlog::trace("    {:<{}} {}", option_name,
-                              option_name_max_length,
-                              model_solution[x(option)]);
-            }
+            solvers::log_master(
+                instance, "tree_lp", model.get_solution_value(),
+                [&](const option_t i) { return model_solution[x(i)]; });
         };
 
         // a tree y_tS, the key of the column manager: the index t of its
         // target and its options S, sorted; its value v_tS is the data
         using tree = std::pair<std::size_t, std::vector<option_t>>;
-        colgen::column_manager<
-            LP, tree, colgen::property_list<colgen::reduced_cost>,
-            colgen::property_list<colgen::reduced_cost, colgen::age>, double>
-            columns;
+        column_manager<LP, tree> columns;
         auto add_tree = [&](LP &, const auto & entry) {
             const auto & [t, S] = entry.seed;
             return model.add_column(std::views::concat(
@@ -274,11 +267,13 @@ struct tree_lp : public mip_solver_base {
         };
         add_start_trees(instance.create_option_map(false));
         if(mip_start) {
-            if(compute_solution_cost(instance, _mip_start_solution(instance)) >
-               budget + feasibility_tol)
-                spdlog::warn("MIP start exceeds the budget: ignored");
+            const auto start = _mip_start_solution(instance);
+            if(const auto defect =
+                   _start_defect(instance, start, budget_t{{budget}});
+               !defect.empty())
+                spdlog::warn("MIP start {}: ignored", defect);
             else
-                add_start_trees(_mip_start_solution(instance));
+                add_start_trees(start);
         }
 
         const auto unattractive = unattractive_columns<LP>(evict_age);
@@ -354,7 +349,7 @@ struct tree_lp : public mip_solver_base {
             tbb::concurrent_vector<std::pair<tree, double>> priced_trees;
             tbb::parallel_for(std::size_t{0}, targets.size(),
                               [&](const std::size_t t) {
-                                  if(stop_requested || time_up()) {
+                                  if(stop_requested || _time_up(sw)) {
                                       cut_short = true;
                                       return;
                                   }
@@ -372,8 +367,7 @@ struct tree_lp : public mip_solver_base {
             const std::size_t num_activated = columns.activate_columns(
                 model,
                 [&](const auto & entry) {
-                    return entry.state.template get<colgen::reduced_cost>() >
-                           margin(entry.seed.first);
+                    return reduced_cost_of(entry) > margin(entry.seed.first);
                 },
                 add_tree);
             if(!num_activated && !cut_short) {
@@ -381,7 +375,7 @@ struct tree_lp : public mip_solver_base {
                 spdlog::debug("Column generation stopped: converged");
                 break;
             }
-            if(stop_requested || time_up()) {
+            if(stop_requested || _time_up(sw)) {
                 report.status =
                     stop_requested ? "interrupted" : "time limit reached";
                 // Gurobi, CPLEX and COPT give no solution for a master

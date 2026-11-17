@@ -3,6 +3,7 @@
 
 #include <optional>
 #include <tuple>
+#include <utility>
 
 #include "melon/algorithm/breadth_first_search.hpp"
 #include "melon/container/mutable_digraph.hpp"
@@ -150,8 +151,10 @@ auto compute_contracted_generalized_flow_graph(const C & instance_case,
         arc_no_map[a] = arc_no++;
     }
 
-    return std::make_tuple(graph, source_quality_map, source_options_map,
-                           arc_no_map, probability_map, arc_option_map,
+    return std::make_tuple(std::move(graph), std::move(source_quality_map),
+                           std::move(source_options_map), std::move(arc_no_map),
+                           std::move(probability_map),
+                           std::move(arc_option_map),
                            original_to_new_vertex_map[original_t]);
 }
 

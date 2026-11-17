@@ -26,9 +26,11 @@ digits. What it does not tell:
 
 The matrix: the command line surface (help, lists, parameters, errors), each
 algorithm and bound with its main parameters on small instances, with a JSON
-result and the log at -v, and the printed summary on four instances. The
-instances with conflict sets or several costs are in it as a regression
-check; only the others have to stay bitwise identical.
+result and the log at -v, the printed summary on four instances, the
+relaxations and the removals of the heuristics at -vv on two, and the MIP
+starts that a run refuses. The instances with conflict sets or several costs
+are in it as a regression check; only the others have to stay bitwise
+identical.
 """
 import argparse, concurrent.futures, hashlib, json, os, platform, re
 import shutil, subprocess, sys, time
@@ -76,8 +78,19 @@ ALGORITHMS = HEURISTICS + [
     "flow_benders --indicator-constraints",
     "multiflow_benders", "multiflow_benders --no-root-cuts", "multiflow_benders --no-in-out",
     "multiflow_benders --no-stored-arcs",
-    "tree_lp", "path_lp", "path_lp --pricing enumerate", "path_lp --mip-start-algorithm greedy",
+    "multiflow_benders --root-cut-tolerance 1e-3", "multiflow_benders --root-cut-gap 1e-3",
+    # the search of the solvers without lazy constraints: on Gurobi, whose
+    # last model then holds the cuts as rows, and on the open-source default
+    "flow_benders --no-lazy-constraints", "multicut_benders --no-lazy-constraints",
+    "multiflow_benders --no-lazy-constraints", "multiflow_benders --solver highs",
+    "tree_lp", "tree_lp --evict-age 2", "tree_lp --mip-start-algorithm greedy",
+    "path_lp", "path_lp --pricing enumerate", "path_lp --mip-start-algorithm greedy",
+    "path_lp --evict-age 2", "path_lp --max-activations 5", "path_lp --relative-gap 0.01",
 ]
+# at -vv: the trace of the masters, the tables of the removals. Not the MIPs,
+# whose solver then prints its own log, with its times
+TRACED = ["tree_lp", "path_lp", "greedy --decremental", "static --decremental"]
+TRACED_ON = [("test", f"{T}/test/instance.json", "10"), ("aude", f"{T}/Aude/aude.json", "7")]
 CHEAP_BOUNDS = ["all_options", "qkp_planes", "qkp_planes --iterations 20", "split_lagrange"]
 BOUNDS = CHEAP_BOUNDS + ["flow_mip", "multicut_benders", "flow_benders", "multiflow_benders", "path_lp"]
 EXCLUDED = {
@@ -154,6 +167,18 @@ def surface_cases():
         cases.append((f"opt-{n:02d}-{slug(text)[:40]}", [o] + args))
     # a file name with a space, which split() cannot write
     cases.append(("opt-file-with-space", [o, "static", I, "10", "-o", "a b.json", "-q"]))
+    # A MIP start over the budget, and CONFLICT_START, which buys two options
+    # of a conflict set: flow_mip returns it when the solver finds nothing,
+    # the search without lazy constraints and the relaxations drop it.
+    X = f"{T}/conflicts/instance.json"
+    for algorithm, params in (("flow_mip", ["--time-limit", "0"]),
+                              ("flow_benders", ["--no-lazy-constraints"]),
+                              ("path_lp", ["--max-threads", "1"]),
+                              ("tree_lp", ["--max-threads", "1"])):
+        cases.append((f"start-over-budget-{algorithm}", [
+            o, algorithm, I, "1", "--mip-start", "START", *params, "-v"]))
+        cases.append((f"start-conflict-{algorithm}", [
+            o, algorithm, X, "money=7,area=9", "--mip-start", "CONFLICT_START", *params, "-v"]))
     return cases
 
 
@@ -176,6 +201,11 @@ def matrix_cases():
                 cases.append((f"{where}__bound_{slug(config)}", [
                     "bound", method, path, budget, *params, "-v", "--max-threads", "1",
                     "-o", "out.json"]))
+    for name, path, budget in TRACED_ON:
+        for config in TRACED:
+            algorithm, *params = config.split()
+            cases.append((f"{name}@{slug(budget)}__traced_{slug(config)}", [
+                "optimize", algorithm, path, budget, *params, "-vv", "--max-threads", "1"]))
     # the summaries printed without -o: with one case, with two, with several
     # costs, and on the one instance of the three that split_lagrange accepts
     for name, path, budget in (("test", f"{T}/test/instance.json", "10"),
@@ -272,7 +302,11 @@ def main():
     start = os.path.join(out, "start.json")
     subprocess.run([binary, "optimize", "flow_mip", f"{T}/test/instance.json", "10", "-q",
                     "-o", start], check=True)
-    cases = [(name, [start if a == "START" else a.replace("=START", f"={start}") for a in arguments])
+    conflict_start = os.path.join(out, "conflict_start.json")
+    json.dump({"solution": {"hedgerow": 0, "underpass": 1, "plantation": 1}},
+              open(conflict_start, "w"))
+    files = {"START": start, "CONFLICT_START": conflict_start}
+    cases = [(name, [files.get(a, a.replace("=START", f"={start}")) for a in arguments])
              for name, arguments in surface_cases() + matrix_cases()]
     cases = [c for c in cases if c[0] not in EXCLUDED]
     if args.only:

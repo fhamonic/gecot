@@ -4,7 +4,7 @@ Status, 2026-11-15: a record of measurements and of leads. The search of labels 
 
 ## What a separation does
 
-For a target t and a point x̂, `target_block::separate` builds one cut. For each source s of the block, `_largest_flow` computes the largest flow of s to t on its arcs A_s, where an improved copy a of the option i carries at most m_sa · x̂_i:
+For a target t and a point x̂, `target_block::separate` builds one cut (the block is `multiflow_target_block`, in `include/gecot/solvers/multiflow_target_block.hpp` since 2026-11-17). For each source s of the block, `_largest_flow` computes the largest flow of s to t on its arcs A_s, where an improved copy a of the option i carries at most m_sa · x̂_i:
 
 1. a search of labels from t gives ρ_u, the gain of the best path from u to t in the residual graph (`label`, Dijkstra's algorithm, on gains reduced by the labels of the search before from the second search of a source on);
 2. the path of s takes what its arcs allow (a *push*);
@@ -97,4 +97,4 @@ $ python3 benchmark/compare.py benchmark/results/before.csv benchmark/results/af
 
 Run alone on the machine: the suite varies by about 5 % from one run to the next. The reports of the runs (`benchmark/results/<label>/*.json`) hold `root_rounds`, `root_cuts`, `lazy_constraints` and `nodes`: a run that reaches optimality with the same cuts and nodes computed the same thing.
 
-To exercise the fallback, build once with `max_pushes = 0` in `target_block` (every source gives up after its first search), once with `max_pushes = 1` (every source that needs a second push gives up), and run the oracle on each: 268 of 268 runs must pass.
+To exercise the fallback end to end, build once with the alias `target_block` of `multiflow_benders` set to `multiflow_target_block<0>` (`max_pushes` is the template parameter of the block: every source gives up after its first search), once to `multiflow_target_block<1>` (every source that needs a second push gives up), and run the oracle on each: 268 of 268 runs must pass. Without a build, the unit test `multiflow_cuts_are_valid_and_tight` checks the cuts of the block at 0 and at 1 on three small instances: valid in every scenario, tight at a scenario.

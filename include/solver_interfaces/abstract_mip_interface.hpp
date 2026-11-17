@@ -1,14 +1,11 @@
 #pragma once
 
 #include <filesystem>
-#include <format>
 #include <fstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-#include <spdlog/spdlog.h>
-#include <spdlog/stopwatch.h>
 #include <CLI/CLI.hpp>
 #include <nlohmann/json.hpp>
 
@@ -24,9 +21,7 @@
 #include "mippp/solvers/xpress/all.hpp"
 
 #include "gecot/preprocessing/compute_big_M_map.hpp"
-#include "gecot/solvers/greedy.hpp"
-#include "gecot/solvers/mip_solver_base.hpp"
-#include "gecot/solvers/static.hpp"
+#include "gecot/solvers/benders_base.hpp"
 
 #include "solver_interfaces/abstract_solver_interface.hpp"
 
@@ -135,53 +130,31 @@ protected:
 
     // add_mip_options, for a Benders decomposition
     void add_benders_options(
-        gecot::solvers::mip_solver_base & solver,
+        gecot::solvers::benders_base & solver,
         const std::vector<std::string> & solvers = all_solvers) {
         add_mip_options(solver, solvers);
-        app.add_flag("--no-lazy-constraints", solver.no_lazy_constraints,
-                     "For comparison: solves the master again with the cuts "
-                     "of its solution until it receives none, as with the "
-                     "solvers that have no lazy constraints (all but gurobi, "
-                     "cplex and copt)");
+        app.add_flag_callback(
+            "--no-lazy-constraints",
+            [&solver] { solver.lazy_constraints = false; },
+            "For comparison: solves the master again with the cuts of its "
+            "solution until it receives none, as with the solvers that have "
+            "no lazy constraints (all but gurobi, cplex and copt)");
     }
 
     // solver with the solution of --mip-start-algorithm as its MIP start
     template <typename S>
     S with_mip_start(S solver, const Instance & instance,
                      const gecot::budget_t & B) const {
-        // or with that of set_start: --mip-start excludes the algorithm
-        if(mip_start_algorithm == "none" || solver.mip_start) return solver;
-        spdlog::info("Computing the MIP start with {}", mip_start_algorithm);
-        const spdlog::stopwatch sw;
-        const double tol = solver.feasibility_tol;
-        using namespace gecot::solvers;
-        const auto start =
-            mip_start_algorithm == "static"
-                ? Static{.feasibility_tol = tol}.solve(instance, B)
-                : Greedy{.feasibility_tol = tol}.solve<spdlog::level::trace>(
-                      instance, B);
-        solver.mip_start.emplace();
-        for(auto && o : instance.options())
-            if(start[o]) solver.mip_start->push_back(instance.option_name(o));
-        if(spdlog::should_log(spdlog::level::info))
-            spdlog::info(
-                "MIP start: {}{}",
-                gecot::gain_text(instance.eval_criterion(
-                    gecot::compute_solution_cases_pc_num(instance, start))),
-                B.size() == 1 ? std::format(", cost {:.10g} of {:.10g}",
-                                            gecot::compute_solution_cost(
-                                                instance, start, 0),
-                                            B[0])
-                              : std::string());
-        if(solver.time_limit) {
-            solver.time_limit =
-                std::max(0.0, *solver.time_limit - sw.elapsed().count());
-            if(*solver.time_limit == 0)
-                spdlog::warn(
-                    "No time is left for the algorithm after the MIP start");
-        }
+        compute_mip_start(solver, instance, B);
         return solver;
     }
+    // Gives solver the solution of --mip-start-algorithm as its MIP start,
+    // and takes the time of the heuristic off its time limit. In a source
+    // file of its own: the heuristics are compiled there once, not in the
+    // unit of each algorithm.
+    void compute_mip_start(gecot::solvers::mip_solver_base & solver,
+                           const Instance & instance,
+                           const gecot::budget_t & B) const;
 
     // f.template operator()<LP, MILP>() with the --solver mippp models
     template <typename F>
@@ -221,7 +194,8 @@ protected:
             "per vertex");
     }
 
-    void add_preprocessing_options(gecot::solvers::mip_solver_base & solver) {
+    void add_preprocessing_options(
+        gecot::solvers::flow_preprocessing & solver) {
         app.add_option("--resolution", solver.probability_resolution,
                        "Sets the resolution of the probabilities used by the "
                        "preprocessing algorithm")
@@ -261,10 +235,10 @@ protected:
         app.add_flag("--all-targets", solver.all_targets,
                      "For comparison: the vertices that can never be targets "
                      "are preprocessed and modelled as the others");
-        app.add_flag("--no-pruning", solver.no_pruning,
-                     "For comparison: keeps, in the graph of a target, the "
-                     "arcs that leave it and the vertices that no quality "
-                     "reaches");
+        app.add_flag_callback(
+            "--no-pruning", [&solver] { solver.pruning = false; },
+            "For comparison: keeps, in the graph of a target, the arcs that "
+            "leave it and the vertices that no quality reaches");
     }
 
 private:

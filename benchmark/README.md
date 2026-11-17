@@ -10,6 +10,7 @@ A fixed set of instances and budgets for comparing the algorithms of
 | `run.py` | runs one algorithm, with fixed parameters, over a suite |
 | `compare.py` | compares result files |
 | `best_known.csv` | best known score and bound of the runs made so far |
+| `defaults.md` | the defaults of the algorithms and the measurements that back them |
 | `generate/` | the scripts that built the instances |
 
 ## Running it

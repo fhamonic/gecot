@@ -86,6 +86,7 @@ add_executable(gecot src/gecot.cpp src/instance.cpp src/parse_instance.cpp
     src/commands/common.cpp src/commands/registry.cpp src/commands/optimize.cpp
     src/commands/path_reformulation.cpp
     src/commands/bound.cpp
+    src/solver_interfaces/abstract_mip_interface.cpp
     src/solver_interfaces/flow_mip_interface.cpp
     src/solver_interfaces/multicut_benders_interface.cpp
     src/solver_interfaces/flow_benders_interface.cpp

@@ -35,17 +35,19 @@ public:
                        "then end by --root-cut-tolerance only)")
             ->check(CLI::NonNegativeNumber)
             ->default_val(solver.root_cut_gap);
-        app.add_flag("--no-root-cuts", solver.no_root_cuts,
-                     "For comparison: no cut on the linear relaxation before "
-                     "the search");
-        app.add_flag("--no-in-out", solver.no_in_out,
-                     "For comparison: the cuts of each optimum of the "
-                     "relaxation, without the center that moves halfway to "
-                     "it");
-        app.add_flag("--no-stored-arcs", solver.no_stored_arcs,
-                     "Keeps no set A_s of arcs per source but rebuilds them at "
-                     "each separation: the same cuts, slower, in less memory "
-                     "when the sets add up to too much");
+        app.add_flag_callback(
+            "--no-root-cuts", [this] { solver.root_cuts = false; },
+            "For comparison: no cut on the linear relaxation before the "
+            "search");
+        app.add_flag_callback(
+            "--no-in-out", [this] { solver.in_out = false; },
+            "For comparison: the cuts of each optimum of the relaxation, "
+            "without the center that moves halfway to it");
+        app.add_flag_callback(
+            "--no-stored-arcs", [this] { solver.stored_arcs = false; },
+            "Keeps no set A_s of arcs per source but rebuilds them at each "
+            "separation: the same cuts, slower, in less memory when the "
+            "sets add up to too much");
     }
 
     gecot::solve_result<Instance> solve(

@@ -21,14 +21,14 @@
 #include "gecot/helper.hpp"
 #include "gecot/preprocessing/compute_contracted_graph.hpp"
 
-#include "gecot/solvers/mip_solver_base.hpp"
+#include "gecot/solvers/benders_base.hpp"
 
 namespace gecot {
 namespace solvers {
 
 // The decomposition of docs/formulations/benders.md with a cut per group of
 // targets. Each block of solve() builds what the section it names states.
-struct multicut_benders : public mip_solver_base {
+struct multicut_benders : public benders_base {
     // groups per case; 0: a group per target
     std::size_t num_groups = 2;
     // voronoi: the cells of a network Voronoi diagram, so that a group
@@ -37,8 +37,6 @@ struct multicut_benders : public mip_solver_base {
     enum class grouping { voronoi, consecutive, random };
     grouping groups = grouping::voronoi;
     std::size_t random_seed = 0;
-    // plain for comparison, tight experimental
-    big_M_kind big_Ms = big_M_kind::knapsack_bnb;
 
     // The targets of a case in the order of their groups, and the position
     // of the first target of each group, then their number. The kernels of
@@ -188,8 +186,8 @@ struct multicut_benders : public mip_solver_base {
                 for(const auto & t : target_vertices) {
                     targets[k].push_back(compute_contracted_graph_data(
                         instance, instance_case, budget, t, strong_arcs_map[t],
-                        useless_arcs_map[t], big_Ms, feasibility_tol,
-                        !no_pruning, _options_model<M>(instance, budget)));
+                        useless_arcs_map[t], big_Ms, feasibility_tol, pruning,
+                        _options_model<M>(instance, budget)));
                     pb.tick();
                 }
             }
@@ -213,47 +211,20 @@ struct multicut_benders : public mip_solver_base {
         }
         _log_preprocessing(preprocessing, log_column<22>{"targets per group"});
 
-        // multicut_benders: cut^v_{t,y}(x), with the potentials rho of y that
-        // count the target quality
+        // multicut_benders: cut^v_{t,y}(x), the cut of the target with the
+        // potentials rho of y that count the target quality, and the constant
+        // of each target quality gain that y does not buy
         auto cut = [&](const target_graph & G_t, const auto & y,
                        const auto & rho) {
-            return xsum(G_t.graph.vertices(),
-                        [&](auto && u) {
-                            return (G_t.source_quality_map[u] +
-                                    xsum(G_t.source_options_map[u],
-                                         [&](auto && gain) {
-                                             auto && [source_gain, i] = gain;
-                                             return source_gain * x(i);
-                                         })) *
-                                   rho[u];
-                        }) +
-                   xsum(G_t.graph.arcs(),
-                        [&](auto && a) {
-                            return xsum(
-                                std::views::iota(std::size_t{0},
-                                                 G_t.arc_options_map[a].size()),
-                                [&, a](const std::size_t n) {
-                                    auto && [improved_probability, i] =
-                                        G_t.arc_options_map[a][n];
-                                    const auto u = G_t.graph.arc_source(a);
-                                    const auto v = G_t.graph.arc_target(a);
-                                    const double sigma =
-                                        y[i] ? 0.0
-                                             : std::max(0.0,
-                                                        improved_probability *
-                                                                rho[v] -
-                                                            rho[u]);
-                                    return G_t.improvement_big_M(a, n) * sigma *
-                                           x(i);
-                                });
-                        }) +
-                   xsum(G_t.instance_case.get()
-                            .vertex_options_map()[G_t.original_t],
-                        [&](auto && gain) {
-                            auto && [source_gain, target_gain, i] = gain;
-                            return G_t.target_big_M(i) *
-                                   (y[i] ? 0.0 : target_gain) * x(i);
-                        });
+            return ordered_sum(
+                G_t.cut(x, y, rho),
+                xsum(G_t.instance_case.get()
+                         .vertex_options_map()[G_t.original_t],
+                     [&](auto && gain) {
+                         auto && [source_gain, target_gain, i] = gain;
+                         return G_t.target_big_M(i) *
+                                (y[i] ? 0.0 : target_gain) * x(i);
+                     }));
         };
         // visit(k, g, v_g, cut) for each group g of each case k, with
         // v_g the sum of the v_t(y) of its targets and its cut at y. The cut

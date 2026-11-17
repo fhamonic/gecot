@@ -13,9 +13,12 @@ This page is for whoever changes the code. It says where the mathematics is stat
 
 `include/gecot/solvers/flow_mip.hpp` is the reference.
 
-- The calls that build a model (`add_variables`, `add_constraints`, `add_column`, `add_lazy_constraint`) stay inline in `solve()`, in the order the solver receives them. No function builds rows, except the two helpers of the base that every MILP shares: `formula_variable_visitor`, for the rows of the linearized criterion, and `_add_budget_rows`, for the budget and conflict rows.
+- The calls that build a model (`add_variables`, `add_constraints`, `add_column`, `add_lazy_constraint`) stay inline in `solve()`, in the order the solver receives them. No other function builds rows, except these, and a new one needs the owner's word:
+  - the helpers that several models share: `formula_variable_visitor`, for the rows of the linearized criterion; `_add_budget_rows`, for the budget and conflict rows; `add_flow_rows`, for the conservation of the flow toward a target;
+  - the steps that add the cuts of a decomposition, each of which receives the row of a cut from a lambda written in `solve()`: `_benders_search`, and the rounds on the relaxation of `multiflow_benders`, `_root_rounds`;
+  - `contracted_graph_data::cut`, the expression of the cut of a target, which `flow_benders` and `multicut_benders` both state. mippp can put the right operand of a sum first: it sums with `ordered_sum`, which does not compile then, as `multicut_benders` does for its third term. A new helper that returns a sum does the same.
 - They form blocks. A block is preceded by one comment that names the section of the docs page it builds and says what it builds.
-- What is not the model is kept out of the way, in the base (`mip_solver_base.hpp`) or in a helper above `solve()`: the preprocessing table, the statistics, the MIP start, the readback of the solution.
+- What is not the model is kept out of the way, in the bases (`mip_solver_base.hpp` for every algorithm on a solver, `flow_preprocessing.hpp` for those that preprocess the graph of each target, `benders_base.hpp` for the search of the decompositions) or in a helper above `solve()`: the preprocessing table, the statistics, the MIP start, the readback of the solution.
 - A constant has a name next to the reason for its value. It is shared only where two sites must agree.
 
 ## Comments
@@ -58,7 +61,7 @@ The second one compares the algorithms and the bounds with a brute-force optimum
 | Change | Where |
 |---|---|
 | An algorithm | its header in `include/gecot/solvers`; an interface header in `include/solver_interfaces`, which overrides `bound_description()` if a run proves an upper bound: `gecot bound` then lists the algorithm as a method; for a MILP-based one, an interface `.cpp` in `src/solver_interfaces` and its line in `CMakeLists.txt`; `src/commands/registry.cpp`; its docs page, `docs/reference/parameters.md` and `docs/usage/choosing.md`; `test/brute_force/check.py` and the matrix of `test/parity/capture.py` |
-| A parameter | the member with its default, which is the only place that states it; the option in the interface, with `->default_val(member)`: CLI11 writes the default of an option into its member, so a literal there would replace the one of the struct for every run of the command and leave it to a caller of the library; a choice among names goes through `add_choice_option`, which reads its default from the member too; the docs tables |
+| A parameter | the member with its default, which is the only place that states it; the option in the interface, with `->default_val(member)`: CLI11 writes the default of an option into its member, so a literal there would replace the one of the struct for every run of the command and leave it to a caller of the library; a choice among names goes through `add_choice_option`, which reads its default from the member too; a flag that switches a step off (`--no-pruning`) sets a positive member (`pruning`) through `add_flag_callback`, so that the code reads no double negation; the docs tables |
 | A bound | its header in `include/gecot/bounds`, an interface header in `include/bound_interfaces`, `registry.cpp`; `docs/formulations/bounds.md`, `docs/usage/bound.md` and `docs/reference/parameters.md`; `test/bounds_test.cpp`, `check.py` and the lists `CHEAP_BOUNDS`, `BOUNDS` and `METHOD_NAMES` of `test/parity/capture.py` |
 
 ## Building and formatting

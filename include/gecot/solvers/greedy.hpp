@@ -43,19 +43,8 @@ struct Greedy {
             report_progress({});
             return false;
         };
-        auto solution = instance.create_option_map(false);
-
-        // the options that fit alone: bought with --decremental, to buy
-        // otherwise
-        std::vector<option_t> options, free_options;
-        for(const option_t & i : instance.options())
-            if(fits_alone(instance, i, budget, feasibility_tol))
-                (decremental ? options : free_options).emplace_back(i);
-        double purchased = 0.0;
-        for(const option_t & i : options) {
-            solution[i] = true;
-            purchased += instance.option_cost(i);
-        }
+        auto [solution, options, free_options, purchased] =
+            heuristic_start(instance, budget, feasibility_tol, decremental);
 
         heuristic_landscape landscape(instance);
         landscape.set(options);
@@ -78,17 +67,7 @@ struct Greedy {
         // the next were within 3e-15, tied, or 6e-9 apart at least; with
         // --worst, where the ratios near zero compete, real differences fall
         // inside the window and are ties too.
-        const auto tier = [&](const option_t & i) {
-            return free_option_tier(costs[i], options_ratios[i],
-                                    previous_score);
-        };
-        const auto key = [&](const option_t & i) {
-            return ratio_key(costs[i], options_ratios[i], previous_score);
-        };
-        const auto by_ratio = [&](auto && i1, auto && i2) {
-            const int t1 = tier(i1), t2 = tier(i2);
-            return t1 != t2 ? t1 < t2 : key(i1) < key(i2);
-        };
+        const option_ranking by_ratio{costs, options_ratios, previous_score};
         const auto weight = [&](const option_t & i) {
             return costs[i] == 0 ? 1.0 : 1 / costs[i];
         };
@@ -98,9 +77,9 @@ struct Greedy {
             auto first_it = best_it;
             for(auto it = candidates.begin(); it != candidates.end(); ++it)
                 if(*it < *first_it && !excluded(*it) &&
-                   tier(*it) == tier(*best_it) &&
+                   by_ratio.tier(*it) == by_ratio.tier(*best_it) &&
                    (costs[*it] == 0) == (costs[*best_it] == 0) &&
-                   std::abs(key(*it) - key(*best_it)) <=
+                   std::abs(by_ratio.key(*it) - by_ratio.key(*best_it)) <=
                        tie_window * std::abs(previous_score) *
                            (weight(*it) + weight(*best_it)))
                     first_it = it;
@@ -170,11 +149,7 @@ struct Greedy {
                         return true;
                 return blocked(i);
             };
-            {
-                const auto [first, last] =
-                    std::ranges::remove_if(free_options, unavailable);
-                free_options.erase(first, last);
-            }
+            std::erase_if(free_options, unavailable);
             log_table<PURCHASES, 50, 40, 11, 12> added(
                 {"option bought"}, {"gain", change_text},
                 {"total gain", gain_text});
@@ -289,9 +264,7 @@ struct Greedy {
                           previous_score);
 
                 free_options.erase(best_option_it);
-                const auto [first, last] =
-                    std::ranges::remove_if(free_options, unavailable);
-                free_options.erase(first, last);
+                std::erase_if(free_options, unavailable);
             }
         }
 

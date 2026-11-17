@@ -20,16 +20,14 @@
 #include "gecot/preprocessing/compute_big_M_map.hpp"
 #include "gecot/preprocessing/compute_contracted_graph.hpp"
 
-#include "gecot/solvers/mip_solver_base.hpp"
+#include "gecot/solvers/benders_base.hpp"
 
 namespace gecot {
 namespace solvers {
 
 // The decomposition of docs/formulations/benders.md with a cut per target.
 // Each block of solve() builds what the section it names states.
-struct flow_benders : public mip_solver_base {
-    // plain for comparison, tight experimental
-    big_M_kind big_Ms = big_M_kind::knapsack_bnb;
+struct flow_benders : public benders_base {
     // experimental: on the target quality gains only, the cuts keep their
     // big-Ms
     bool indicator_constraints = false;
@@ -100,7 +98,7 @@ struct flow_benders : public mip_solver_base {
                         instance, instance_case, budget, original_t,
                         strong_arcs_map[original_t],
                         useless_arcs_map[original_t], big_Ms, feasibility_tol,
-                        !no_pruning, _options_model<M>(instance, budget)));
+                        pruning, _options_model<M>(instance, budget)));
                 for(const auto & [source_gain, target_gain, i] :
                     vertex_options_map[original_t]) {
                     const auto f_ti = f_gains.emplace_back(model.add_column(
@@ -122,43 +120,13 @@ struct flow_benders : public mip_solver_base {
         }
         _log_graph_sizes(preprocessing);
 
-        // The cut of a target: cut_{t,y}(x), with the potentials rho of y
-        auto cut = [&](const contracted_graph_data<instance_case_t<I>> & G_t,
-                       const auto & y, const auto & rho) {
-            return xsum(G_t.graph.vertices(),
-                        [&](auto && u) {
-                            return (G_t.source_quality_map[u] +
-                                    xsum(G_t.source_options_map[u],
-                                         [&](auto && gain) {
-                                             auto && [source_gain, i] = gain;
-                                             return source_gain * x(i);
-                                         })) *
-                                   rho[u];
-                        }) +
-                   xsum(G_t.graph.arcs(), [&](auto && a) {
-                       return xsum(
-                           std::views::iota(std::size_t{0},
-                                            G_t.arc_options_map[a].size()),
-                           [&, a](std::size_t n) {
-                               auto && [improved_probability, i] =
-                                   G_t.arc_options_map[a][n];
-                               auto u = G_t.graph.arc_source(a);
-                               auto v = G_t.graph.arc_target(a);
-                               auto sigma =
-                                   y[i] ? 0.0
-                                        : std::max(0.0, improved_probability *
-                                                                rho[v] -
-                                                            rho[u]);
-                               return G_t.improvement_big_M(a, n) * x(i) *
-                                      sigma;
-                           });
-                   });
-        };
+        // The cut of a target: f_t <= cut_{t,y}(x), with the potentials rho of
+        // y
         auto seed_cuts = [&](const auto & y) {
             for(auto && instance_case : instance.cases())
                 for(const auto & [f_t, G_t] : targets[instance_case.id()]) {
                     const auto [flow, rho] = G_t.flow_and_potentials(y);
-                    model.add_constraint(f_t <= cut(G_t, y, rho));
+                    model.add_constraint(f_t <= G_t.cut(x, y, rho));
                 }
         };
         // The search, step 1: the cuts of the scenario that buys nothing
@@ -184,7 +152,7 @@ struct flow_benders : public mip_solver_base {
                     if(std::exchange(candidate[f_t], flow) - flow <=
                        feasibility_tol * flow)
                         continue;
-                    add(f_t <= cut(G_t, y, rho));
+                    add(f_t <= G_t.cut(x, y, rho));
                 }
             }
             return case_scores;

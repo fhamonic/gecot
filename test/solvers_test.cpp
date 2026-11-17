@@ -9,7 +9,11 @@
 #include <tbb/global_control.h>
 
 #include "gecot/indices/parallel_pc_num.hpp"
+#include "gecot/indices/pc_num.hpp"
+#include "gecot/preprocessing/compute_contracted_graph.hpp"
+#include "gecot/preprocessing/compute_strong_and_useless_arcs.hpp"
 #include "gecot/solvers/greedy.hpp"
+#include "gecot/solvers/multiflow_target_block.hpp"
 #include "gecot/solvers/static.hpp"
 
 #include "conflict_instances.hpp"
@@ -544,4 +548,119 @@ GTEST_TEST(solvers, incremental_heuristics_stay_feasible_and_maximal) {
     }
     EXPECT_GT(free_members, 0);
     EXPECT_GT(zero_budgets, 0);
+}
+
+namespace {
+// The cut that the block of each vertex of each case separates at each
+// scenario and at two fractional points is at least the flow that reaches
+// the vertex in every scenario. At a scenario its value is that flow and it
+// is tight; at a fractional point its value is at most the cut there, and
+// equal when the flow of every source settled. Returns how many of the cuts
+// went through the fallback of a source.
+template <std::size_t MaxPushes>
+std::size_t expect_valid_cuts(const std::string & path, const bool rebuild) {
+    const Instance instance = parse_instance(path);
+    const std::size_t n = instance.options().size();
+    const std::size_t num_scenarios = std::size_t{1} << n;
+    double all_costs = 0;
+    for(auto && i : instance.options()) all_costs += instance.option_cost(i);
+    const gecot::budget_t budget{{all_costs}};  // every scenario fits
+    auto point = [n](const std::size_t scenario) {
+        std::vector<double> y(n);
+        for(std::size_t i = 0; i < n; ++i)
+            y[i] = static_cast<double>(scenario >> i & 1);
+        return y;
+    };
+    std::vector<std::vector<double>> points;
+    for(std::size_t scenario = 0; scenario < num_scenarios; ++scenario)
+        points.push_back(point(scenario));
+    points.emplace_back(n, 0.5);
+    points.emplace_back(n);
+    for(std::size_t i = 0; i < n; ++i)
+        points.back()[i] =
+            static_cast<double>(i + 1) / static_cast<double>(n + 1);
+    std::size_t num_unsettled = 0;
+    for(const auto & instance_case : instance.cases()) {
+        const auto & graph = instance_case.graph();
+        const auto [strong_arcs_map, useless_arcs_map] =
+            gecot::compute_strong_and_useless_arcs(
+                instance_case, [](const gecot::option_t &) { return true; },
+                1e-8, true);
+        for(const auto & t : melon::vertices(graph)) {
+            // the flow that reaches t in each scenario, on the case's graph
+            std::vector<double> flows;
+            for(std::size_t scenario = 0; scenario < num_scenarios;
+                ++scenario) {
+                auto source_quality_map = instance_case.source_quality_map();
+                auto probability_map = instance_case.arc_probability_map();
+                for(const auto & u : melon::vertices(graph))
+                    for(const auto & [source_gain, target_gain, i] :
+                        instance_case.vertex_options_map()[u])
+                        if(scenario >> i & 1)
+                            source_quality_map[u] += source_gain;
+                for(const auto & a : melon::arcs(graph))
+                    for(const auto & [improved_probability, i] :
+                        instance_case.arc_options_map()[a])
+                        if(scenario >> i & 1)
+                            probability_map[a] = std::max(probability_map[a],
+                                                          improved_probability);
+                flows.push_back(gecot::pc_num_vertex_in_flow(
+                    graph, source_quality_map, probability_map, t));
+            }
+            gecot::solvers::multiflow_target_block<MaxPushes> block(
+                instance_case, t,
+                gecot::compute_contracted_flow_graph<false>(
+                    instance, instance_case, budget, t, strong_arcs_map[t],
+                    useless_arcs_map[t], gecot::big_M_kind::plain, 1e-7, true));
+            block.compute_sources(!rebuild);
+            for(std::size_t p = 0; p < points.size(); ++p) {
+                const auto cut = block.separate(points[p], rebuild);
+                num_unsettled += !cut.settled;
+                auto cut_at = [&](const std::vector<double> & x) {
+                    double value = cut.constant;
+                    for(std::size_t i = 0; i < n; ++i)
+                        value += cut.coefficients[i] * x[i];
+                    return value;
+                };
+                const double tol = 1e-9 * std::max(1.0, flows.back());
+                for(std::size_t scenario = 0; scenario < num_scenarios;
+                    ++scenario)
+                    EXPECT_GE(cut_at(point(scenario)), flows[scenario] - tol)
+                        << path << ": vertex " << t << ", point " << p
+                        << ", scenario " << scenario;
+                if(p < num_scenarios) {
+                    EXPECT_NEAR(cut.value, flows[p], tol)
+                        << path << ": vertex " << t << ", scenario " << p;
+                }
+                if(p < num_scenarios || cut.settled) {
+                    EXPECT_NEAR(cut_at(points[p]), cut.value, tol)
+                        << path << ": vertex " << t << ", point " << p;
+                } else {
+                    EXPECT_GE(cut_at(points[p]), cut.value - tol)
+                        << path << ": vertex " << t << ", point " << p;
+                }
+            }
+        }
+    }
+    return num_unsettled;
+}
+}  // namespace
+
+// MaxPushes 0: every source that has something to send gives up, and 1:
+// every source whose flow takes two paths, which only a fractional point
+// asks for. No run of the benchmark reaches this fallback.
+GTEST_TEST(solvers, multiflow_cuts_are_valid_and_tight) {
+    std::size_t gave_up_at_0 = 0, gave_up_at_1 = 0;
+    for(const std::string name : {"/test/instances/test/instance.json",
+                                  "/docs/examples/three-woods.json",
+                                  "/docs/examples/two-species.json"}) {
+        const std::string path = PROJECT_SOURCE_DIR + name;
+        for(const bool rebuild : {false, true}) {
+            EXPECT_EQ(expect_valid_cuts<100000>(path, rebuild), 0u) << path;
+            gave_up_at_0 += expect_valid_cuts<0>(path, rebuild);
+            gave_up_at_1 += expect_valid_cuts<1>(path, rebuild);
+        }
+    }
+    EXPECT_GT(gave_up_at_0, 0u);
+    EXPECT_GT(gave_up_at_1, 0u);
 }

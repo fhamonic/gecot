@@ -29,19 +29,8 @@ struct Static {
     instance_solution_t<I> solve(const I & instance,
                                  const budget_t & budget) const {
         if(decremental) check_decremental(instance, "static");
-        auto solution = instance.create_option_map(false);
-
-        // the options that fit alone: bought with --decremental, to buy
-        // otherwise
-        std::vector<option_t> options, free_options;
-        for(const option_t & i : instance.options())
-            if(fits_alone(instance, i, budget, feasibility_tol))
-                (decremental ? options : free_options).emplace_back(i);
-        double purchased = 0.0;
-        for(const option_t & i : options) {
-            solution[i] = true;
-            purchased += instance.option_cost(i);
-        }
+        auto [solution, options, free_options, purchased] =
+            heuristic_start(instance, budget, feasibility_tol, decremental);
 
         heuristic_landscape landscape(instance);
         auto options_cases_pc_num = instance.create_option_map(
@@ -122,17 +111,10 @@ struct Static {
                     decremental_score;
                 options_ratios[i] = costs[i] == 0 ? gain : gain / costs[i];
             }
-            const auto tier = [&](const option_t & i) {
-                return free_option_tier(costs[i], options_ratios[i],
-                                        decremental_score);
-            };
-            const auto key = [&](const option_t & i) {
-                return ratio_key(costs[i], options_ratios[i],
-                                 decremental_score);
-            };
+            const option_ranking by_ratio{costs, options_ratios,
+                                          decremental_score};
             std::ranges::sort(free_options, [&](auto && i1, auto && i2) {
-                const int t1 = tier(i1), t2 = tier(i2);
-                return t1 != t2 ? t1 > t2 : key(i1) > key(i2);
+                return by_ratio(i2, i1);
             });
 
             const auto options_sets = compute_options_conflict_sets(instance);

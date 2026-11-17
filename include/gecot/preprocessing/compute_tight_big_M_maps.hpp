@@ -13,6 +13,7 @@
 #include "melon/algorithm/dijkstra.hpp"
 #include "melon/algorithm/knapsack_bnb.hpp"
 #include "melon/graph.hpp"
+#include "melon/mapping.hpp"
 #include "melon/views/reverse.hpp"
 
 #include "gecot/concepts/instance.hpp"
@@ -21,21 +22,19 @@
 namespace gecot {
 
 // The tight big-Ms of a flow toward t, of docs/formulations/preprocessing.md
-// ("The tight constants"): one per arc a and option i improving it, bounding
-// the flow that leaves the tail of a on a improved by i, and one per option
-// of target_options, bounding the flow that reaches t when it is bought.
-// The graph gives each arc a base probability and the (improved probability,
-// option) pairs of its improvements; flow_mip's graph has an arc of base
-// probability 0 per improvement. The costs and the budget are those of the
-// cost dimension 0. Without WithArcs, the arcs get no big-M.
+// ("The tight constants"): one per improvement a, bounding the flow that
+// leaves its tail on it, and one per option of target_options, bounding the
+// flow that reaches t when it is bought. An improvement is an arc of its own:
+// option_map gives its option, and probability_map its probability with it.
+// The costs and the budget are those of the cost dimension 0. Without
+// WithArcs, the arcs get no big-M.
 template <bool WithArcs = true, instance_c I, typename GR, typename QM,
-          typename SOM, typename BPM, typename IM>
+          typename SOM, typename PM, typename OM>
 auto compute_tight_big_M_maps(const I & instance, const double budget,
                               const double tolerance, const GR & graph,
                               const QM & source_quality_map,
                               const SOM & source_options_map,
-                              const BPM & base_probability_map,
-                              const IM & improvements_map,
+                              const PM & probability_map, const OM & option_map,
                               const melon::vertex_t<GR> & t,
                               const auto & target_options) {
     using vertex_t = melon::vertex_t<GR>;
@@ -46,18 +45,18 @@ auto compute_tight_big_M_maps(const I & instance, const double budget,
                                        double>;
     const std::size_t num_options = std::ranges::size(instance.options());
 
-    // per option its improved arcs, and the share 1 / k_i of its cost that
-    // each pays
+    // per option its improvements within the budget, and the share 1 / k_i
+    // of its cost that each pays; the other improvements keep a probability
+    // of 0
     std::vector<std::vector<arc_t>> option_arcs_of(num_options);
     auto improved_probability_map = melon::create_arc_map<double>(graph, 0.0);
     for(auto && a : melon::arcs(graph)) {
-        improved_probability_map[a] = base_probability_map[a];
-        for(auto && [p, i] : improvements_map[a]) {
+        if(option_map[a].has_value()) {
+            const option_t i = option_map[a].value();
             if(instance.option_cost(i, 0) > budget) continue;
             option_arcs_of[i].push_back(a);
-            improved_probability_map[a] =
-                std::max(improved_probability_map[a], p);
         }
+        improved_probability_map[a] = probability_map[a];
     }
     std::vector<double> share(num_options, 0.0);
     for(std::size_t i = 0; i < num_options; ++i) {
@@ -82,8 +81,12 @@ auto compute_tight_big_M_maps(const I & instance, const double budget,
                                               improved_probability_map, t))
         improved_to_t[v] = p;
     auto base_to_t = melon::create_vertex_map<double>(graph, 0.0);
-    for(const auto & [v, p] : melon::dijkstra(reversed_traits{}, reversed_graph,
-                                              base_probability_map, t))
+    for(const auto & [v, p] : melon::dijkstra(
+            reversed_traits{}, reversed_graph,
+            melon::maps::function([&](const arc_t & a) {
+                return option_map[a].has_value() ? 0.0 : probability_map[a];
+            }),
+            t))
         base_to_t[v] = p;
 
     // The multipliers μ, times the budget; any μ >= 0 is valid. 0 first: its
@@ -99,18 +102,15 @@ auto compute_tight_big_M_maps(const I & instance, const double budget,
     };
     auto make_reach = [&](reach_scratch & sc) {
         auto tolled = melon::maps::function([&](const arc_t & e) {
-            if(sc.mu == 0.0) return improved_probability_map[e];
-            double p = base_probability_map[e];
-            for(auto && [improved_probability, i] : improvements_map[e]) {
-                if(instance.option_cost(i, 0) > budget) continue;
-                p = std::max(
-                    p, i == sc.free_option
-                           ? improved_probability
-                           : improved_probability *
-                                 std::exp(-sc.mu * instance.option_cost(i, 0) *
-                                          share[i]));
-            }
-            return p;
+            if(sc.mu == 0.0 || !option_map[e].has_value())
+                return improved_probability_map[e];
+            const option_t i = option_map[e].value();
+            if(instance.option_cost(i, 0) > budget) return 0.0;
+            return i == sc.free_option
+                       ? probability_map[e]
+                       : probability_map[e] *
+                             std::exp(-sc.mu * instance.option_cost(i, 0) *
+                                      share[i]);
         });
         return melon::dijkstra(reversed_traits{}, reversed_graph,
                                std::move(tolled));
@@ -186,14 +186,12 @@ auto compute_tight_big_M_maps(const I & instance, const double budget,
         return M;
     };
 
-    // per arc, the big-Ms of its improvements, in order
-    auto arc_big_M_map = melon::create_arc_map<std::vector<double>>(
-        graph, std::vector<double>{});
+    // the big-M of each improvement
+    auto arc_big_M_map = melon::create_arc_map<double>(graph, 0.0);
     std::vector<arc_t> improved_arcs;
     for(auto && a : melon::arcs(graph)) {
         if constexpr(!WithArcs) break;
-        arc_big_M_map[a].assign(std::ranges::size(improvements_map[a]), 0.0);
-        if(!arc_big_M_map[a].empty()) improved_arcs.push_back(a);
+        if(option_map[a].has_value()) improved_arcs.push_back(a);
     }
     tbb::parallel_for(
         tbb::blocked_range<std::size_t>(0, improved_arcs.size()),
@@ -203,20 +201,18 @@ auto compute_tight_big_M_maps(const I & instance, const double budget,
             std::vector<std::pair<vertex_t, double>> reach;
             for(std::size_t n = r.begin(); n != r.end(); ++n) {
                 const arc_t a = improved_arcs[n];
-                std::size_t rank = 0;
-                for(auto && [improved_probability, i] : improvements_map[a]) {
-                    const double through =
-                        improved_probability *
-                        improved_to_t[melon::arc_target(graph, a)];
-                    // keeps s within a relative 1e-9 of a tie
-                    budget_reach(
-                        algo, sc, melon::arc_source(graph, a), i,
-                        [&](const vertex_t & s, const double p) {
-                            return p * through >= base_to_t[s] * (1 - 1e-9);
-                        },
-                        reach);
-                    arc_big_M_map[a][rank++] = bound(reach, i);
-                }
+                const option_t i = option_map[a].value();
+                const double through =
+                    probability_map[a] *
+                    improved_to_t[melon::arc_target(graph, a)];
+                // keeps s within a relative 1e-9 of a tie
+                budget_reach(
+                    algo, sc, melon::arc_source(graph, a), i,
+                    [&](const vertex_t & s, const double p) {
+                        return p * through >= base_to_t[s] * (1 - 1e-9);
+                    },
+                    reach);
+                arc_big_M_map[a] = bound(reach, i);
             }
         });
 

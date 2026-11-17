@@ -3,7 +3,6 @@
 #include <cstddef>
 #include <optional>
 #include <stdexcept>
-#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -21,55 +20,18 @@
 #include "gecot/preprocessing/compute_big_M_map.hpp"
 #include "gecot/preprocessing/compute_contracted_graph.hpp"
 
-#include "gecot/solvers/mip_solver_base.hpp"
+#include "gecot/solvers/flow_preprocessing.hpp"
 
 namespace gecot {
 namespace solvers {
 
 // The flow formulation of docs/formulations/flow.md. Each block of solve()
 // builds the variables and the constraints of the section it names.
-struct flow_mip : public mip_solver_base {
-    // plain for comparison, tight experimental
-    big_M_kind big_Ms = big_M_kind::knapsack_bnb;
+struct flow_mip : public flow_preprocessing {
     // experimental: the options continuous, for the root relaxation's bound
     bool relax_integrality = false;
     // experimental: no big-M is then computed, and big_Ms is not read
     bool indicator_constraints = false;
-
-    // by how much the tight or exact big-Ms lower the knapsack ones
-    struct lowered_big_M_statistics {
-        double arc_sum = 0, arc_knapsack_sum = 0, target_sum = 0,
-               target_knapsack_sum = 0;
-        std::size_t num_arcs = 0, num_arcs_halved = 0, num_arcs_kept = 0;
-
-        void add(const contracted_flow_graph & G_t, const auto & target_gains) {
-            if(!G_t.lowered_big_Ms) return;
-            const auto & knapsack_big_M_map = G_t.big_M_map.value();
-            for(const auto & [source_gain, target_gain, i] : target_gains) {
-                target_sum += G_t.target_big_M(i);
-                target_knapsack_sum += knapsack_big_M_map[G_t.t];
-            }
-            for(auto && a : melon::arcs(G_t.graph)) {
-                if(!G_t.improvement_option_map[a].has_value()) continue;
-                const double knapsack_M =
-                    knapsack_big_M_map[melon::arc_source(G_t.graph, a)];
-                arc_sum += G_t.improvement_big_M(a);
-                arc_knapsack_sum += knapsack_M;
-                ++num_arcs;
-                num_arcs_halved += G_t.improvement_big_M(a) <= knapsack_M / 2;
-                num_arcs_kept += G_t.improvement_big_M(a) >= knapsack_M;
-            }
-        }
-        void log(const std::string_view kind) const {
-            spdlog::debug(
-                "flow_mip {} big-Ms / knapsack's: arcs {:.4g}, targets {:.4g}",
-                kind, arc_knapsack_sum > 0 ? arc_sum / arc_knapsack_sum : 1.0,
-                target_knapsack_sum > 0 ? target_sum / target_knapsack_sum
-                                        : 1.0);
-            spdlog::debug("Arcs: {}, halved at least: {}, not lowered: {}",
-                          num_arcs, num_arcs_halved, num_arcs_kept);
-        }
-    };
 
     template <typename M, instance_c I>
     solve_result<I> solve(const I & instance, const budget_t & budget) const {
@@ -141,7 +103,7 @@ struct flow_mip : public mip_solver_base {
                 const contracted_flow_graph G_t = compute_contracted_flow_graph(
                     instance, instance_case, budget, original_t,
                     strong_arcs_map[original_t], useless_arcs_map[original_t],
-                    computed_big_Ms, feasibility_tol, !no_pruning,
+                    computed_big_Ms, feasibility_tol, pruning,
                     _options_model<M>(instance, budget));
                 const auto & graph = G_t.graph;
                 const auto & t = G_t.t;

@@ -1,6 +1,6 @@
 # multiflow_benders: where the separation spends its time, and what could be tried
 
-Status, 2026-11-15: a record of measurements and of leads. The search of labels is Dijkstra's algorithm since the branch `multiflow-dijkstra`, which did what the first two leads of 2026-11-14 asked for: "Dijkstra on reduced gains" says what it changed. Since the branch `multiflow-no-source-arcs`, a pruned Dijkstra computes the sets A_s, and `--no-stored-arcs` rebuilds them at each separation: "A_s rebuilt at each separation". "What was measured" is the label-correcting search of commit da6b556. Nothing else here is implemented. The code is `include/gecot/solvers/multiflow_benders.hpp`; the algorithm is stated in `docs/formulations/benders.md`, "`multiflow_benders`: cuts per source".
+Status, 2026-11-17: a record of measurements and of leads. On the branch `multiflow-flow-study`, the pushes of a source are found by searches from the source and its labels by one search from t: "The flow search, 2026-11-17" says what was asked, counted, tried and kept, and the sections before it describe the search it replaces. The search of labels is Dijkstra's algorithm since the branch `multiflow-dijkstra`, which did what the first two leads of 2026-11-14 asked for: "Dijkstra on reduced gains" says what it changed. Since the branch `multiflow-no-source-arcs`, a pruned Dijkstra computes the sets A_s, and `--no-stored-arcs` rebuilds them at each separation: "A_s rebuilt at each separation". "What was measured" is the label-correcting search of commit da6b556. Nothing else here is implemented. The code is `include/gecot/solvers/multiflow_benders.hpp`; the algorithm is stated in `docs/formulations/benders.md`, "`multiflow_benders`: cuts per source".
 
 ## What a separation does
 
@@ -10,6 +10,8 @@ For a target t and a point x̂, `target_block::separate` builds one cut (the blo
 2. the path of s takes what its arcs allow (a *push*);
 3. the two steps repeat until the supply of s is sent or s no longer reaches t;
 4. the labels of the last search are an optimal dual solution, and give the part of s in the cut.
+
+Since 2026-11-17 step 1 is a search from s that stops at t, and the labels of step 4 come from one search from t at the end ("The flow search" below).
 
 The blocks are separated in parallel. The cut is separated on the linear relaxation before the search (the *rounds*), then at each candidate of the solver.
 
@@ -74,6 +76,92 @@ The measurements below were made before the flag, with builds that always rebuil
 - With the flag, the debug line of the sources no longer counts their arcs, which are not kept.
 - With the flag's build, the short suite at 30 s against main 7e2fd43. Without the flag, the 31 optimal runs are identical in rounds, cuts, lazy cuts, nodes, root values and scores (201.2 s against 201.4 s). With it, 30 of them are identical, and `urban-greening-large` at 8000 has the same cuts, nodes and score but ends its rounds on the clock at 15.2 s, one round short of the one that adds nothing; the 31 take 230.1 s (+14 %). The oracle on five configurations, two of them with the flag: 335 of 335 runs; on the four of `check.py` with `max_pushes` at 0 and at 1: 268 of 268 each. Hexagon at 151 over 100 s: 1.2 GB with the flag, two rounds by 56.4 s; without it, past 6 GB within seconds of the setup. The parity captures of main and of the branch are the same in their 837 common cases, models included, and each case with the flag matches the same case without it.
 
+## The flow search, 2026-11-17
+
+The owner asked for simpler and more efficient ways to compute `_largest_flow`, about half of the wall-clock time of a run, with two ideas: Dijkstra again with the filled arcs removed, nothing taken backward; and the flow of several sources at a time. Three sources of evidence: an instrumented build on four instances; prototypes behind a study switch, on the short suite at 30 s; and three agents that tried to refute each idea on small instances against an LP (Python, HiGHS and exact fractions; their scripts were not kept). The instrumented build and the prototypes are on the tag `archive/multiflow-flow-study-prototypes`, whose commit message says how to choose a variant.
+
+### What the search of 2026-11-15 does, counted
+
+Four runs at 30 s, at the fractional points of the rounds and at the scenarios of the candidates.
+
+| | `species-natural` at 6000 | `periurban-mixed` at 6000 | `bike-squirrel-town` at 300 | `bike-town` at 500 |
+|---|---|---|---|---|
+| arcs of A_s, of which improved copies | 411, 48 | 549, 136 | 372, 128 | 465, 157 |
+| searches per source, fractional points | 4.8 | 3.5 | 13.4 | 16.1 |
+| searches per source, scenarios | 1.61 | 1.39 | 1.09 | 1.11 |
+| vertices settled per search | 107 | 277 | 173 | 216 |
+| of which before s | 73 % | 82 % | 81 % | 82 % |
+| labels that change from a search to the next | 47 % | 36 % | 44 % | 42 % |
+| pushes that take an arc backward | 2.5 % | 4.5 % | 14.0 % | 17.5 % |
+| sources with such a push | 6.8 % | 11.4 % | 42.8 % | 54.2 % |
+| labels of a first search that differ from one search over every open arc, fractional points | 0.5 % | 3.4 % | 0.8 % | 0.5 % |
+| the same at scenarios | 11.8 % | 9.2 % | 3.8 % | 4.0 % |
+| separation CPU, fractional points and scenarios | 93.7 s, 7.3 s | 118.6 s, 43.5 s | 42.0 s, 2.8 s | 67.0 s, 1.8 s |
+
+- **"About three searches per source" understated the bike instances**: 13 to 16 there, 64 to 73 % of the sources at seven or more. Each push fills one copy, and their points hold many options at small values.
+- **A scenario does not always take one search.** When the source has its whole quality and its path is its best one to a bought copy, the push equals m_sa, the copy counts as full, and a second search runs: 9 to 61 % of the sources. Its labels are not the probabilities of connection, which `benders.md` said. Both sets of labels are optimal; those of the second search put a coefficient on the option of the copy, and are the stronger cut in 52 to 62 % of the pairs an agent compared, the weaker in 1 %.
+- **The time is at the fractional points**: 73 to 97 % of the separation CPU.
+
+### 1. No arc taken backward: valid, neither exact nor tight
+
+The idea: Dijkstra from t on the arcs that are not full, push, remove the copies the push filled, repeat; the labels of the last search give the cut.
+
+- **Valid.** The labels of a search from t on any set of arcs that holds every arc without option are a feasible dual solution, with σ on the copies as `separate` computes it. So the cut holds in every scenario.
+- **Not exact.** Smallest instance found: vertices s, a, b, t; arcs without option s→a 1/2, a→b 1, a→t 1/2, b→t 1/10, s→b 9/10; copies of one option on s→a and b→t, both of probability 1; a quality of 2 at s; x̂ = 1/2. The first push fills both copies: 5/4 reaches t, where the largest flow is 29/20. No order of pushes to saturation reaches it: the best one gives 13/9. On the four instances the flow is lower for 6 to 46 % of the sources, by 2 to 4 · 10⁻⁵ in total.
+- **Not tight, and that is what costs.** Even where the flow is the largest, the labels of the arcs that are not full are not an optimal dual solution: their value at x̂ is above the flow for 68 to 87 % of the sources, by 2.5 to 10 % in total. In the search of today an arc that carries flow, taken backward, holds the label of its head; without it that label drops and σ grows on the full copies. The arcs taken backward do two jobs, pushing back and holding labels, and the second one is needed far more often than the first.
+- **Not tight at a scenario either**, in the tie of the second bullet above (5 to 47 % of the sources): a cut that is not tight at a candidate may not cut its f_t off. The prototype therefore kept today's search at the scenarios.
+- **As many searches**: 0.91 to 0.98 of today's.
+- **Measured.** `species-natural` at 6000: a root bound 2.68 % above the optimum against 0.78 %, 544 nodes against 33, 12,210 lazy cuts against 726, 13.8 s against 12.5 s. `bike-town` at 500: a root bound 2.0 % above the optimum against 0.035 %, the 30 s limit with 7112 nodes against 477 nodes in 9.9 s.
+- **Testing its own gap does not save it.** The flow sent F and the value D of its labels at x̂ are free to read, and D = F proves both optimal. But D > F for most sources whose flow is the largest, so "this search, then today's where D > F" runs more searches than today's alone (23.2 against 12.4 per source in an agent's bike-like regime).
+- **What is kept of it**: the arcs are tried backward only at the vertices where a push of the source left or brought flow. On the search of 2026-11-15 that alone took 5 to 10 % off the separation CPU, with the same labels.
+
+### 2. What is kept: the pushes by searches from the source
+
+Dijkstra with arcs taken backward needs potentials p, with p_t = 1 and p_u ≥ g · p_v on every residual arc of gain g: the reduced gains g · p_v / p_u are then at most 1. The search of 2026-11-15 used as potentials the labels of its last search from t, which it ran in full after every push. Now:
+
+1. **One search from t over every arc open at x̂**, once per target and separation, gives the first potentials of every source: the first residual graph of a source is among these arcs.
+2. **Each push follows a search from s**, stopped when t is settled. With D_u the reduced gain of the best path from s to u, the potentials of the vertices settled, which have D_u ≥ D_t, become p_u · D_t / D_u. They stay feasible (the four cases of an arc between settled and other vertices), and are tight on the path, so the arcs that the push opens backward have a reduced gain of 1.
+3. **One search from t at the end** gives ρ on the last residual graph.
+
+- **The same cuts.** ρ is the gain of the best residual path to t once the flow is the largest. It is the least optimal dual solution: any optimal one is feasible on the residual graph of any largest flow, by complementary slackness, hence at least ρ everywhere. So ρ does not depend on which largest flow the pushes found, and is the ρ of the search before, up to rounding.
+- **Why it is faster.** A search from t settled 73 to 82 % of its vertices before s. A search from s on exact potentials settles the vertices that a path at least as good as the new best one could cross if their potentials still held: 33, 76, 84 and 99 per search on the four instances, where a search from t settles 107, 277, 173 and 216. The gain is smaller on the bike instances: an improved copy there is worth much more than its arc, so the path that replaces a filled one is far worse, and many vertices pass the test.
+- **The limit of pushes is simpler.** Past `max_pushes` the pushes stop and step 3 runs on the residual graph reached. Its ρ is feasible, the value returned is that of the cut at x̂, the flow sent plus ρ_s times the supply left, a bound on the flow; a scenario needs one push, so the flow of a candidate stays exact. The flows are no longer reset for a search without flow.
+- **Checked.**
+  - The unit tests: 77 of 77; `multiflow_cuts_are_valid_and_tight` now asks that the value of a cut be the cut at its point with the limit at 0 and at 1 too.
+  - The oracle: 2715 of 2715 runs; 268 of 268 with `multiflow_target_block<0>` and 268 of 268 with `multiflow_target_block<1>`.
+  - The parity capture against main: 7 of 1021 cases differ, all `multiflow_benders` on `aix30` at 8, by the hash of the model alone. In that model 33 of 8665 numbers differ, by 2.2 · 10⁻¹⁵ relative at most; scores, rounds, cuts, nodes and logs are the same in the 1021 cases.
+  - The short suite at 30 s, main bc1690b then the branch, one run of each: the same 31 runs solved, with the same scores. They take 207.1 s on main, and 172.0 s then 174.6 s in two runs of the branch, before and after the remarks of its review, whose 31 solved runs have the same rounds, cuts and nodes; what precedes the search, which holds the rounds, takes 89.2 s on main, 55.3 s and 56.5 s on the branch.
+  - 37 of the 42 runs have the same rounds, cuts and root value to the last bit. The 5 others stop their rounds on the clock and now do more of them: `bike-suburb` at 2000 goes from 10 rounds and a bound of 9,102,989 to 15 rounds and 9,063,286, `bike-squirrel-suburb` at 500 from 14 rounds to 19.
+  - 26 of the 31 runs solved have the same lazy cuts and nodes. In the 5 others the master after the rounds is main's up to rounding, and the search then takes another path: on `species-natural` at 6000, 1669 of its 342,920 numbers differ, by 9.3 · 10⁻¹⁵ relative at most, for 21 nodes and 704 lazy cuts against 33 and 726; on `periurban-mixed` at 12000, 134 of 623,863 by 2.0 · 10⁻¹⁵, for 17 nodes and 2036 lazy cuts against 11 and 1698.
+  - With the study build, which counts, on the same 31 runs: the separation CPU goes from 1060 s to 612 s at the fractional points and from 150 s to 128 s at the scenarios.
+  - Two readers of the new function, neither building nor running gecot. The first proved the four cases of the potentials on the code, and ran a port of its own with every step asserted (potentials feasible, path tight, ρ equal to the labels of Bellman and Ford on the last residual graph and to those of the search before, the value at the limits 0, 1 and 2, the state left to the next source): 48,553 sources in exact arithmetic and 115,875 in doubles, no failure, and five mutations of the port all caught. The second, a port tested against HiGHS, was cut off by a usage limit after 60,697 sources in doubles: the flow of the search before within 2.2 · 10⁻¹⁶ of the supply, and its labels but for 68 sources with an entry of x̂ around 10⁻¹³ or a copy full within the tolerance ("Found on the way"). Their remarks are in: the vertices to restore are listed once, the search from s stops at t without scanning its arcs, two comments.
+- **Not simpler.** `_largest_flow` is 173 lines where it was 125, with five more arrays in its scratch state. What is simpler is the limit of pushes.
+
+### 3. Several sources at a time
+
+Two readings.
+
+**The same cuts, with shared work.**
+
+- The search of step 1 above is shared by the sources of a target. Its labels serve as potentials, not as the dual solution: "Tried and dropped" records what the second use costs.
+- *The last labels repaired from that search* (prototype): a vertex whose path in the shared search is in the last residual graph of the source keeps its shared label, the others are searched among themselves. Exact. At the scenarios it relabels 10 to 48 vertices per source where a search settles 91 to 216, and takes 36 % off their separation CPU on the suite; at the fractional points it relabels 53 to 85 % of them and gains nothing. On the suite: 169.4 s against 175.1 s for the 31 runs solved, for about 60 lines and five more arrays. Left out.
+- *Labels repaired after each push*, in place of a search: exact with keys reduced by the labels before the push, wrong with the labels themselves. But 36 to 47 % of the labels change at each push, and each relabelled vertex has its arcs scanned twice: an agent counted 0.24 to 1.01 of the arcs of a full search. The searches from s reach the same vertices with less machinery.
+- *Flows in proportion*: two sources with the same A_s and constants in a constant ratio do not have proportional flows (refuted on 295 of 1452 pairs). They do when a source has one arc of A_s leaving it, without option nor copy, to another source, and neither has a quality gain: its part of the cut is then a multiple of the other's. The benchmark has no such source: 0 on the eleven instances counted.
+
+**One flow per group of sources.** This changes the relaxation; it is the aggregation the owner thought of for the memory of the sets A_s. With A_g the union of the A_s of a group and M_ga the sum of its m_sa on a copy:
+
+- valid: the flows of the sources add up to a flow of the group; and exact at a scenario, where the group sends each quality on its own best path;
+- the searches are divided by about the size k of the group, the stored arcs by up to k;
+- the root gap grows. On an agent's grids, the root gap of groups of the k nearest sources over the gap per source, for k = 2, 4, 8, 16 and one group: 1.00 to 1.47, 1.00 to 2.57, 1.01 to 4.38, 1.02 to 6.60, 1.02 to 14.5. Almost nothing is lost where every arc has a copy and the budget is loose; groups drawn at random lose 1.5 to 3 times more.
+
+Not prototyped in gecot: neither the nodes nor the time are measured, and the per-source relaxation is what makes `multiflow_benders` fast.
+
+### Found on the way
+
+- **The arc without option of a copy of A_s can be outside A_s**, since the test reads the probability of each arc: for 77 % of the copies of the sets on `species-natural` and `natural-crossing`, 1 to 7 % on the other landscapes, all of them on the cover instances. Putting it in does not change the largest flow at any point; it changes which optimal dual solution the labels are, towards cuts that charge a copy for its improvement. Prototype on the suite: the 31 runs in 169.2 s against 173.0 s, fewer cuts in the rounds (the separation CPU at fractional points goes from 612 s to 498 s), and nodes that move both ways (`species-natural` at 12000: 13 to 408; `rural-planting` at 260: 156 to 70). Not kept as it is.
+- **Entries of x̂ under 10⁻¹²** make a push that fills its copy without opening it backward, since a flow under `no_flow` times the supply counts as none. On tie-prone instances with such entries an agent got cuts that depend on the order of the heap among ties, all valid. The center of in-out halves old values at each round, which could produce such entries; whether the real points hold some was not counted.
+- **A candidate needs the labels of a block only if the master overvalues it**, and its flow is the quality of each source times its label in the shared search. The lazy cuts are 17 to 79 % of the separations at scenarios on the four instances: the flows of the others could be skipped. Not tried; the scenarios are 17 % of the separation CPU on the suite.
+
 ## Tried and dropped
 
 - **One Dijkstra per target, shared by the sources.** The labels of a search from t over every arc open at x̂ are a feasible dual solution for each source, and an optimal one for a source whose best path fills no arc. Those sources then need no search of their own. Valid, and the oracle passes, but: no faster on the suite (226 s against 220 s on the 31 runs), because at the points of the relaxation most sources fill an arc and search anyway; and the cuts are weaker, the shared labels being larger than a source's own away from its path (`species-natural` at 12000: 388 nodes against 14, 8858 lazy cuts against 770).
@@ -81,11 +169,12 @@ The measurements below were made before the flag, with builds that always rebuil
 
 ## Leads
 
-A change that moves the labels cannot be checked bit for bit: the check is the oracle (`test/brute_force/check.py` on the four configurations of `multiflow_benders`), the fallback forced (below), and the suite, comparing the cuts on the relaxation, the lazy cuts and the nodes, not only the time.
+A change that moves the labels cannot be checked bit for bit: the check is the oracle (`test/brute_force/check.py` on the four configurations of `multiflow_benders`), the limit of pushes forced (below), and the suite, comparing the cuts on the relaxation, the lazy cuts and the nodes, not only the time.
 
 1. **Keeping the part of a source from a round to the next.** The part of s depends on x̂ through the options of its quality gains and of the improved copies of A_s only. When none of them moved since the last separation, the part is the same. It needs the part of each source kept sparse (its ρ_s and its coefficients), which is memory in the order of the pairs of a source and an improved copy. Worth it in the late rounds, where few options move; useless at the candidates, which differ from one another.
 2. **Smaller A_s.** The test keeps an arc when the best path of s through it, with every option, is as reliable as its best path without any. A test within the budget (the best path through the arc with the options that the budget allows) would remove more, and shorten every search. It is the tight big-M of `docs/formulations/preprocessing.md` applied to the membership of A_s; the cut stays valid as long as the test is.
-3. **A cheaper search where the heap does not pay**, as on `species-natural`: the queue search for the first search of a source, which takes no arc backward, or a heap of another arity. Untested.
+3. **A cheaper search where the heap does not pay**, as on `species-natural`: a heap of another arity. Untested.
+4. **The leads of "Found on the way"** above: the flows of a candidate only for the blocks that the master overvalues; the arcs without option of the copies in A_s; the entries of x̂ under the tolerances.
 
 ## How to measure a change
 
@@ -97,4 +186,4 @@ $ python3 benchmark/compare.py benchmark/results/before.csv benchmark/results/af
 
 Run alone on the machine: the suite varies by about 5 % from one run to the next. The reports of the runs (`benchmark/results/<label>/*.json`) hold `root_rounds`, `root_cuts`, `lazy_constraints` and `nodes`: a run that reaches optimality with the same cuts and nodes computed the same thing.
 
-To exercise the fallback end to end, build once with the alias `target_block` of `multiflow_benders` set to `multiflow_target_block<0>` (`max_pushes` is the template parameter of the block: every source gives up after its first search), once to `multiflow_target_block<1>` (every source that needs a second push gives up), and run the oracle on each: 268 of 268 runs must pass. Without a build, the unit test `multiflow_cuts_are_valid_and_tight` checks the cuts of the block at 0 and at 1 on three small instances: valid in every scenario, tight at a scenario.
+To exercise the limit of pushes end to end, build once with the alias `target_block` of `multiflow_benders` set to `multiflow_target_block<0>` (`max_pushes` is the template parameter of the block: every source stops before its first push), once to `multiflow_target_block<1>` (every source that needs a second push stops after the first), and run the oracle on each: 268 of 268 runs must pass. Without a build, the unit test `multiflow_cuts_are_valid_and_tight` checks the cuts of the block at 0 and at 1 on three small instances: valid in every scenario, tight at a scenario.

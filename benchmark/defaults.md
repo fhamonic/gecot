@@ -58,7 +58,7 @@ A guard keeps a search valid or finite. A tunable is a choice that an experiment
 | `path_tie`, 1e-9 | `multiflow_target_block.hpp` | tunable | the reason in its comment; no run |
 | `mip_gap`, 1e-10 | `solve_result.hpp` | tunable | nothing |
 | `arc_full` 1e-11, `no_flow` 1e-12 | `multiflow_target_block.hpp` | guard | nothing |
-| `MaxPushes`, 100 000 | `multiflow_target_block.hpp` | guard | no search gave up in 8 million separations of a source (`misc/design/multiflow_benders_separation.md`); the fallback is tested at 0 and 1 |
+| `MaxPushes`, 100 000 | `multiflow_target_block.hpp` | guard | no search reached it in 8 million separations of a source (`misc/design/multiflow_benders_separation.md`); it is tested at 0 and 1 |
 | Gurobi's `OptimalityTol`, 1e-9 | `_set_search`, `mip_solver_base.hpp` | guard | one observation at the default 1e-6, in its comment |
 | `tie_window`, 1e-12 | `heuristics_common.hpp` | guard | 807 steps of the short suite, in the comment of `greedy.hpp` (3c8be7a) |
 | The grain 64 of the parallel sums | `parallel_pc_num.hpp`, `split_lagrange.hpp` | guard | it fixes the order of a sum: another value changes the last bits of every score |

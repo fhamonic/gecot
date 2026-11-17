@@ -553,10 +553,9 @@ GTEST_TEST(solvers, incremental_heuristics_stay_feasible_and_maximal) {
 namespace {
 // The cut that the block of each vertex of each case separates at each
 // scenario and at two fractional points is at least the flow that reaches
-// the vertex in every scenario. At a scenario its value is that flow and it
-// is tight; at a fractional point its value is at most the cut there, and
-// equal when the flow of every source settled. Returns how many of the cuts
-// went through the fallback of a source.
+// the vertex in every scenario, and its value is that of the cut at the
+// point separated. At a scenario that value is the flow. Returns how many of
+// the cuts stopped the flow of a source at the limit of its pushes.
 template <std::size_t MaxPushes>
 std::size_t expect_valid_cuts(const std::string & path, const bool rebuild) {
     const Instance instance = parse_instance(path);
@@ -632,13 +631,8 @@ std::size_t expect_valid_cuts(const std::string & path, const bool rebuild) {
                     EXPECT_NEAR(cut.value, flows[p], tol)
                         << path << ": vertex " << t << ", scenario " << p;
                 }
-                if(p < num_scenarios || cut.settled) {
-                    EXPECT_NEAR(cut_at(points[p]), cut.value, tol)
-                        << path << ": vertex " << t << ", point " << p;
-                } else {
-                    EXPECT_GE(cut_at(points[p]), cut.value - tol)
-                        << path << ": vertex " << t << ", point " << p;
-                }
+                EXPECT_NEAR(cut_at(points[p]), cut.value, tol)
+                    << path << ": vertex " << t << ", point " << p;
             }
         }
     }
@@ -646,9 +640,9 @@ std::size_t expect_valid_cuts(const std::string & path, const bool rebuild) {
 }
 }  // namespace
 
-// MaxPushes 0: every source that has something to send gives up, and 1:
-// every source whose flow takes two paths, which only a fractional point
-// asks for. No run of the benchmark reaches this fallback.
+// MaxPushes 0: every source that has something to send stops before its
+// first push, and 1: every source whose flow takes two paths, which only a
+// fractional point asks for. No run of the benchmark reaches that limit.
 GTEST_TEST(solvers, multiflow_cuts_are_valid_and_tight) {
     std::size_t gave_up_at_0 = 0, gave_up_at_1 = 0;
     for(const std::string name : {"/test/instances/test/instance.json",

@@ -1,6 +1,6 @@
 # multiflow_benders: where the separation spends its time, and what could be tried
 
-Status, 2026-11-17: a record of measurements and of leads. On the branch `multiflow-flow-study`, the pushes of a source are found by searches from the source and its labels by one search from t: "The flow search, 2026-11-17" says what was asked, counted, tried and kept, and the sections before it describe the search it replaces. The search of labels is Dijkstra's algorithm since the branch `multiflow-dijkstra`, which did what the first two leads of 2026-11-14 asked for: "Dijkstra on reduced gains" says what it changed. Since the branch `multiflow-no-source-arcs`, a pruned Dijkstra computes the sets A_s, and `--no-stored-arcs` rebuilds them at each separation: "A_s rebuilt at each separation". "What was measured" is the label-correcting search of commit da6b556. Nothing else here is implemented. The code is `include/gecot/solvers/multiflow_benders.hpp`; the algorithm is stated in `docs/formulations/benders.md`, "`multiflow_benders`: cuts per source".
+Status, 2026-11-18: a record of measurements and of leads. Since the branch `multiflow-flow-study`, the pushes of a source are found by searches from the source and its labels by one search from t: "The flow search, 2026-11-17" says what was asked, counted, tried and kept, and the sections before it describe the search it replaces. The search of labels is Dijkstra's algorithm since the branch `multiflow-dijkstra`, which did what the first two leads of 2026-11-14 asked for: "Dijkstra on reduced gains" says what it changed. Since the branch `multiflow-no-source-arcs`, a pruned Dijkstra computes the sets A_s, and `--no-stored-arcs` rebuilds them at each separation: "A_s rebuilt at each separation". Prefetches in the searches were tried and not kept: "Prefetching in the searches, 2026-11-18". On the branch `multiflow-branchless`, three tests of the searches that go either way are written without a branch: "Branches, 2026-11-18". "What was measured" is the label-correcting search of commit da6b556. Nothing else here is implemented. The code is `include/gecot/solvers/multiflow_benders.hpp`; the algorithm is stated in `docs/formulations/benders.md`, "`multiflow_benders`: cuts per source".
 
 ## What a separation does
 
@@ -162,10 +162,143 @@ Not prototyped in gecot: neither the nodes nor the time are measured, and the pe
 - **Entries of x̂ under 10⁻¹²** make a push that fills its copy without opening it backward, since a flow under `no_flow` times the supply counts as none. On tie-prone instances with such entries an agent got cuts that depend on the order of the heap among ties, all valid. The center of in-out halves old values at each round, which could produce such entries; whether the real points hold some was not counted.
 - **A candidate needs the labels of a block only if the master overvalues it**, and its flow is the quality of each source times its label in the shared search. The lazy cuts are 17 to 79 % of the separations at scenarios on the four instances: the flows of the others could be skipped. Not tried; the scenarios are 17 % of the separation CPU on the suite.
 
+## Prefetching in the searches, 2026-11-18
+
+The owner asked to try what melon's Dijkstra does: between `top()` and `pop()` of its heap, it prefetches the entries of the first arc that leaves the vertex it is about to settle (the target and the length), which gave him about 10 % elsewhere. He then asked for `status[u]`, the entry of the vertex popped, written right after `pop()`.
+
+**Not kept: no variant is faster on this machine**, on the suite or on the largest instance at hand. Each row is one variant alone, its prefetches between `top()` and `pop()`; a figure is the time with the variant against the time without, and "that search" is the time of the search alone.
+
+What was asked:
+
+| Search | What is prefetched | Suite: separation CPU | Suite: that search | Hexagon: separation CPU |
+|---|---|---|---|---|
+| from s | every arc map that the loop reads, at the first out-arc: melon's pattern | +1.0 % | +2.8 % | – |
+| last, from t | the ids of the in-arcs, and every arc map read, at the first: melon's pattern | +1.1 % | +2.6 % | – |
+| both | the two rows above together | +2.0 % | +2.0 % and +2.4 % | +0.3 % and +0.6 %, on two series |
+| of `_source_arcs` | the target and the probability of the first out-arc: melon's pattern | not in a separation | – | +0.3 %, the spread of the reference |
+| the three | `status` of the vertex popped | +0.2 % | +0.2 % and −0.1 %, inside the spread | +0.1 %, inside the spread |
+
+Variants around them, lighter or heavier, which were not asked:
+
+| Search | What is prefetched | Suite: separation CPU | Suite: that search | Hexagon: separation CPU |
+|---|---|---|---|---|
+| from s | `in_A_s` of the first out-arc | +0.8 % | +1.0 % | – |
+| last, from t | the ids of the in-arcs, and `in_A_s` of the first | +0.6 % | +1.3 % | – |
+| last, from t | the ids, and `in_A_s` of each in-arc | +3.0 % | +7.9 % | – |
+| both | every entry of the vertex popped: `status`, marks, potential, gain or label | +1.0 % | – | +0.6 % |
+| both | `status` of each neighbour | +5.6 % | – | +1.4 % |
+| both | `status` of each neighbour, its gain or label and its potential | +6.8 % | – | +2.1 % |
+| of `_source_arcs` | `status` of each neighbour | not in a separation | – | +2.5 % |
+
+How it was measured:
+
+- **One study build for several variants**, each behind a bit of a mask read from the environment, so that the code is laid out the same for each of them, and the reference is the same binary without a mask. It counts the thread CPU time of `separate` and the time of each search. There were three such builds: the arc maps; the vertex entries and `_source_arcs`; `status` of the vertex popped alone, with melon's pattern on both searches again. A row is compared with the reference of its build. No build without the counters was made, since nothing won.
+- **Suite:** the 31 runs of the short suite that main solves within 30 s, the variants interleaved, three passes on the first build and two on the others. Every pass did the same work: the same counts of sources (42.3 million), of searches and of settled vertices. A reference takes 717 to 722 s of separation CPU depending on the build, of which 394 s in the searches from s and 300 s in the last ones on the first; its passes are within 0.15 % of one another, and within 1 % for a search alone. The 31 runs take 171 to 174 s for the references and 171 to 176 s for the variants: a few percent of separation CPU hardly show there.
+- **Hexagon:** `hexagon_instances/1_1900_3800` at 151 with `--no-stored-arcs`, 50 s, two runs per variant: one round and two candidates, 6.2 million sources. A reference takes 1113 to 1120 s of separation CPU, of which 598 s in `_source_arcs`, 451 s in the last searches and 8 s in the searches from s; its two runs are within 0.3 % of each other. The first series of the row "both" is on the first build, at 100 s, where the two runs of the reference are 0.6 % apart: +0.3 % there is no difference.
+
+Why, as far as the sizes tell: there is little to fetch. The hardware counters of this machine cannot be read, so no miss was counted, and what follows is an inference.
+
+- **A block is small.** Its searches read about 37 bytes per arc and 50 per vertex. The graphs G_t of an instance of the suite hold 200 to 4,600 arcs on average, 12,400 at most, and those of hexagon 11,800: 10 to 280 KB for a block of the suite, 700 KB at most, and 640 KB on hexagon. A core here has 1 MB of L2 (Ryzen 7 7800X3D: 32 KB of L1, 1 MB of L2 per core, 96 MB of L3), which two threads share in these runs. The blocks of the suite stay in it; those of hexagon do not, and its result rests on the points below.
+- **A source loads its arcs before it searches:** it writes `in_A_s` and `flows` over A_s, two of the maps that its searches read there.
+- **`status` is a byte per vertex,** 4 KB for the largest graphs.
+- **The searches are short:** on average over a run of the suite, a search from s settles 3 to 98 vertices and the last search of a source 1 to 220; on hexagon, 1,500. The heap is small, and its `pop` leaves little time for a line to arrive.
+- **The time per settled vertex does not grow with the graph,** which agrees with the above without proving it, the searches of these instances differing in length too: in the last search, at the points of the relaxation, 81 ns on `species-natural` (650 arcs), 50 ns on `urban-greening-large` (4,600) and 49 ns on hexagon (11,800), with 16 threads on 8 cores.
+
+What it does not say:
+
+- **Another machine.** With 256 or 512 KB of L2 per core, the larger blocks are read from L3, and a prefetch has something to do. The study build is on the tag `archive/multiflow-prefetch-study`, with the masks listed at the top of `multiflow_target_block.hpp`; it prints its times at exit on the lines `PREFETCH`. From the root of the repository, with that build, for the reference, melon's pattern on each search and on both, and `status` of the vertex popped:
+
+  ```console
+  $ misc/study/prefetch_passes.sh here build/gecot "1 2 3" "0 2 8 10 1024"
+  $ python3 misc/study/prefetch_cmp.py here "1 2 3" "0 2 8 10 1024"
+  ```
+
+- **Graphs G_t far larger than these.**
+
+If a variant is kept one day: melon's helper is `melon::detail::prefetch_keys_and_values`, in a `detail` namespace, and it does nothing, without a word, for a map that has no `data()`. The study build asserts `melon::contiguous_mapping` on each map it passes.
+
+## Branches, 2026-11-18
+
+The owner asked whether some branches can be replaced by branchless instructions, with an example: `visited` and `changed` as arrays of `num_vertices + 1` behind a `unique_ptr`, with an end pointer, a range being filtered by `*end = v; end += accept(v);`.
+
+**Kept, on the branch `multiflow-branchless`: three of the five changes tried, the same results bit for bit, 3.3 % less separation CPU on the suite, 1.6 % less time, and about 20 % less memory at the peak with the sets kept.** A relaxation still ends in a branch that goes either way, and that one is the algorithm's.
+
+| Change | Whose | In the build of the variants, on the suite: separation CPU | On hexagon | Kept |
+|---|---|---|---|---|
+| The lists of vertices (`reached`, `visited`, `changed`, and `visited` of `_source_arcs`) are arrays with an end pointer; `changed` is filled by a store and a conditional increment | asked | −1.15 %, of which −0.57 % for the arrays without the conditional increment | −1.7 % | no: about 0.3 % of the time of a run, for raw arrays whose bounds only the sanitizer checks |
+| `_source_arcs` fills A_s and its improved copies the same way, in scratch arrays of `num_arcs + 1`, and the source gets them at their size | the owner's idiom, where a range is filtered | −1.1 % when added to the other changes, outside the searches; `compute_sources` −20 %; about 20 % less memory at the peak | −3.8 %, `_source_arcs` −6.1 % | yes |
+| No `in_A_s`: the capacities and the flows are 0 outside A_s, and the capacity of an arc without option is the largest double, not infinity. An arc is open, forward or backward, by one comparison | mine | −2.8 %; the finite capacity alone −0.56 % | −0.6 % | yes: one map less, and no case for infinity |
+| The potentials of the vertices a search went to are multiplied by 1 where the vertex is not settled, without a branch | mine | −0.74 % | – | no: a form that needs a comment to be read |
+| `separate` adds a term of 0 for an improved copy whose σ is not positive, without a branch | mine | −0.63 % when added to the change without `in_A_s` | – | yes |
+
+The owner ruled on that recommendation of mine ("Ok with your recommendation"). The figures of the table do not add: they sum to 6.4 %, and the first four changes together take 4.65 % less in the build of the variants. A row is its variant against the reference of that build, where a difference resolves to 0.1 %: two instantiations of the same code of the searches agree to 0.03 % in each search. Only the five together, then the three kept, were confirmed in builds of their own, below.
+
+The three kept, as built against main, both with the timers of the study:
+
+- **Suite**, the 31 runs that main solves within 30 s, three interleaved passes of each build, the same work in every pass: 710.1 s of separation CPU for main, 686.9 s for the change (−3.3 %), passes within 0.04 % of one another. The searches from s take 3.5 % less, `compute_sources` 20 % less (22.8 s to 18.2 s), and the last searches the same (+0.1 %). The 31 runs take 172.5 s and 169.7 s (−1.6 %). The five changes together had given −4.0 % of separation CPU and −1.3 % of time (−1.45 % without the timers).
+- **Hexagon** at 151 with `--no-stored-arcs`, 50 s, two runs of each build: per source at the candidates, 174.7 µs of separation CPU for main and 169.0 µs for the change (−3.3 %); `_source_arcs` goes from 95.2 µs to 89.9 µs per source (−5.6 %). The totals do not compare: the first round of the change ends before half the limit, and a second one runs, so the points of the relaxation are not the same either.
+- **Memory**, with the sets kept, one run of each binary: the peak goes from 705 MB to 559 MB on `species-natural` at 6000. With the five changes, from 1235 MB to 1009 MB on `urban-greening-large` at 8000 and from 906 MB to 747 MB on `periurban-mixed` at 12000; the memory is that of the sets, which the three kept hold. A set copied from the scratch arrays is a vector of its exact size, where one grown by `push_back` keeps its slack. With `--no-stored-arcs`, the same on hexagon (1230 MB).
+- **Checks:** the parity capture is the same as main's in its 1021 cases, models included; the 77 unit tests pass, and pass again under the address sanitizer, as do six runs of `multiflow_benders`, three of them with `--no-stored-arcs`. A scratch array holds one more than its list can: an arc enters A_s once, and the store of an arc that is not kept needs the slot after the last. The forms without a branch were read in the code of the binary. The oracle and the builds that force the limit of pushes were not run again: the results are those of main bit for bit, and the unit test of the limit at 0 and 1 passes, under the sanitizer too.
+
+### Where the branches go either way
+
+A counting build recorded, for each test of the three searches, how often it runs, how often it holds, and how often a 2-bit counter of its own would have guessed it wrong: an estimate of what a predictor misses, on the high side, since a real one also reads the history. On the 31 runs, for 10.9 billion settled vertices:
+
+| Test | Runs, billions | Holds | Misses of a 2-bit counter, billions |
+|---|---|---|---|
+| the vertex of a relaxation is settled | 28.0 | 36 % | 10.8 |
+| the arc has no option (`capacities[a] == infinity`) | 29.1 | 74 % | 7.6 |
+| the candidate is not better | 17.9 | 22 % | 4.5 |
+| an arc scanned backward carries flow | 10.9 | 34 % | 4.2 |
+| the arc is in A_s (`in_A_s[a]`), last search | 18.0 | 81 % | 3.0 |
+| the vertex is in the heap: promote or push | 13.9 | 15 % | 2.3 |
+| a copy has room | 7.5 | 37 % | 1.6 |
+| the vertex has no arc to scan backward | 10.8 | 69 % | 1.3 |
+| a vertex of `visited` is settled, in the update of the potentials | 6.3 | 83 % | 1.2 |
+| the arc is in A_s, search from s | 14.7 | 98 % | 0.3 |
+| the vertex is not yet in `changed` | 5.2 | 28 % | 0.26 |
+
+That is 37 billion estimated misses, 3.4 per settled vertex. The five changes tried remove the tests of the second and fifth rows and of the last three, the three kept those of the second and fifth rows; the test of a copy's room then runs on every arc of A_s, where it holds for the arcs without option. In `_source_arcs` the test of an arc of A_s is predictable (4 % of misses on the suite, 2.6 % on hexagon, where it holds for 64 % of the arcs: the arcs kept come in runs), and the test of an option on a kept arc is not (24 to 28 %).
+
+### Tried and not kept
+
+- **One branch for "settled or not better"**, the two tests that miss the most: +0.2 % of separation CPU on the suite, −0.15 % on hexagon (the last search −2.6 %, `_source_arcs` +2.1 %). Merged, the test still goes either way (it skips 54 % of the relaxations from s), and it reads the value of a vertex that is settled. A relaxation ends in work on the heap or in nothing: this branch stays.
+- **The owner's idiom on the arcs of a vertex**: the open arcs filtered into an array, then relaxed. On top of the change without `in_A_s`, +0.3 % of separation CPU: the loop over what was kept ends where the branch was.
+
+### What the measurements say besides
+
+- **A third of the separation is in the heap of melon.** A sampler under `gdb`, on three runs of the change (`periurban-mixed` at 12000, `bike-town` at 500, `urban-greening-large` at 8000): of the threads inside a separation, 59 to 63 % are in the code of `_largest_flow`, 33 to 36 % in the heap, `pop` alone 23 to 24 %. The branches of the heap were not counted.
+- **The builds differ by more than most variants.** The reference of the build that holds the variants takes 732 s of separation CPU, the three study builds of the prefetches 717 to 722 s, and main with the timers alone 709 s. So a variant was timed against the reference of its own build, and the change against main in two builds made for it.
+- **The compiler undoes some forms.** GCC 15.1 at `-O3` compiles `(a == 2) | (x <= y)` to the two jumps of `||`, and `x <= std::max(y, table[a])` to two jumps as well; the sum of the two tests gives one jump. `factors[test]` and `m * std::max(σ, 0.0)` come out without a jump. Each variant was read in the code generated (`objdump --disassemble=<symbol>`) before it was timed: the first form of "settled or not better" was the code of the reference.
+
+How it was measured: the counting build once on the suite and on hexagon; a build that holds the variants as instantiations of the searches, chosen per source by a mask read from the environment (`GECOT_BRANCHLESS`), two interleaved passes per variant on the suite, where the passes of the reference are within 0.1 % of one another, and two runs on hexagon; then the two builds above. The headers and the scripts are on the tag `archive/multiflow-branchless-study`.
+
+## The heap, 2026-11-18 (stopped)
+
+Tried after the branches, as their first lead: other heaps for the three searches of a block, each an instantiation of the searches chosen per source in one study build. The owner stopped the study before a variant was settled on; nothing of it is on the branch.
+
+| Heap | Suite: separation CPU, the 31 runs, two passes | Hexagon: per source at the candidates, two runs |
+|---|---|---|
+| melon's 4-ary heap (main) | 697 to 700 s | 170.5 to 170.8 µs |
+| melon's 2-ary heap | −1.7 % | +1.3 % |
+| melon's 8-ary heap | +0.9 % | – |
+| an array scanned for its largest key, entries as pairs | −10.2 % | +34 % |
+| the same, keys in an array of their own | −11.0 % (−12.1 % in a second build) | +34 % |
+| the scan while it holds at most K entries, then melon's 4-ary heap until it is empty, `push` not inlined | K = 16, 32, 64: −0.7, −5.2, −6.1 % (one pass) | +6, +5.7, +10 % |
+| the same, arrays of K, the small case inlined and the move out of line | not measured: its pass was stopped after 12 runs; on `bike-town` at 250 the same time as the scan | K = 16, 32, 64: +5.1, +4.1, +7.5 % |
+
+- **The scan wins where the heaps are small.** At a pop of the last search, a heap of the suite holds 9 to 30 entries on average, and the scan takes 15 to 20 % less where it holds 12 to 18, 1 to 7 % on `urban-greening-large` (about 20). On hexagon it holds 70 on average, 310 at most, and the scan loses a third.
+- **The hybrid first lost its gain to code, not to the switch**: GCC did not inline its `push`, which carried the move to the heap. With the small case inlined it matches the scan on `bike-town`; hexagon still pays 4 to 7.5 %, in the scan of the first entries of each search and in a call more for the large case.
+- **The heaps change only the order of ties.** On the 31 runs, the scores and the root rounds, cuts and values are those of main bit for bit for every heap, the vertices settled within 0.2 %; two runs change their tree (`species-natural` at 6000: 704 lazy cuts and 21 nodes, 1233 and 35 with the scan; `urban-greening-large` at 4000: 9 nodes, 5). A heap other than melon's 4-ary would need the oracle, not the parity capture.
+
+The study headers are on the tag `archive/multiflow-heap-study`, as for the branches.
+
 ## Tried and dropped
 
 - **One Dijkstra per target, shared by the sources.** The labels of a search from t over every arc open at x̂ are a feasible dual solution for each source, and an optimal one for a source whose best path fills no arc. Those sources then need no search of their own. Valid, and the oracle passes, but: no faster on the suite (226 s against 220 s on the 31 runs), because at the points of the relaxation most sources fill an arc and search anyway; and the cuts are weaker, the shared labels being larger than a source's own away from its path (`species-natural` at 12000: 388 nodes against 14, 8858 lazy cuts against 770).
 - **`bool` flags in place of `char` ones** in `flow_search`, against the aliasing of `char` writes: no measurable change.
+- **One branch for "settled or not better" in a relaxation, and the open arcs of a vertex filtered before they are relaxed:** no gain. "Branches, 2026-11-18".
+- **Prefetches between `top()` and `pop()` of the heaps,** of the arc maps and of the vertex entries: no difference to 6.8 % more separation CPU, never less. "Prefetching in the searches, 2026-11-18".
 
 ## Leads
 
@@ -173,8 +306,9 @@ A change that moves the labels cannot be checked bit for bit: the check is the o
 
 1. **Keeping the part of a source from a round to the next.** The part of s depends on x̂ through the options of its quality gains and of the improved copies of A_s only. When none of them moved since the last separation, the part is the same. It needs the part of each source kept sparse (its ρ_s and its coefficients), which is memory in the order of the pairs of a source and an improved copy. Worth it in the late rounds, where few options move; useless at the candidates, which differ from one another.
 2. **Smaller A_s.** The test keeps an arc when the best path of s through it, with every option, is as reliable as its best path without any. A test within the budget (the best path through the arc with the options that the budget allows) would remove more, and shorten every search. It is the tight big-M of `docs/formulations/preprocessing.md` applied to the membership of A_s; the cut stays valid as long as the test is.
-3. **A cheaper search where the heap does not pay**, as on `species-natural`: a heap of another arity. Untested.
-4. **The leads of "Found on the way"** above: the flows of a candidate only for the blocks that the master overvalues; the arcs without option of the copies in A_s; the entries of x̂ under the tolerances.
+3. **A cheaper heap.** It holds 33 to 36 % of the separation, `pop` alone 23 to 24 % ("Branches, 2026-11-18"). A scan of an array takes 11 % less separation CPU on the suite but a third more on hexagon; a hybrid that keeps the first and holds on the second was not reached ("The heap, 2026-11-18").
+4. **The scans backward.** Half of the vertices settled from s at the points of the relaxation scan their in-arcs for one that carries flow, and a third of those arcs do; with the scans of the last search, 5.5 billion of the 37 billion estimated misses. A count per vertex of its arcs with flow would skip the scans that find none. Untested.
+5. **The leads of "Found on the way"** above: the flows of a candidate only for the blocks that the master overvalues; the arcs without option of the copies in A_s; the entries of x̂ under the tolerances.
 
 ## How to measure a change
 

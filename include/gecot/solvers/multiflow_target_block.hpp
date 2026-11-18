@@ -4,8 +4,10 @@
 #include <cstddef>
 #include <functional>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <ranges>
+#include <span>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -38,7 +40,9 @@ struct multiflow_target_block {
     using vertex_map = melon::vertex_map_t<graph_t, V>;
     template <typename V>
     using arc_map = melon::arc_map_t<graph_t, V>;
-    static constexpr double infinity = std::numeric_limits<double>::infinity();
+    // The capacity of an arc without option. Finite, so that the test of
+    // an open arc needs no case: inf - flow > arc_full inf does not hold.
+    static constexpr double unbounded = std::numeric_limits<double>::max();
     // the relative slack of the test of A_s against the best path
     // without option
     static constexpr double path_tie = 1e-9;
@@ -144,11 +148,22 @@ struct multiflow_target_block {
         // 0 outside the heap, 1 in it, 2 settled
         vertex_map<char> status;
         std::vector<vertex> visited;
+        // A_s and its improved copies before the source gets them at their
+        // size: arrays of one more than they can hold, filled by
+        // `*end = x; end += keep;`, without a branch on a test that goes
+        // either way
+        std::unique_ptr<arc[]> arcs;
+        std::unique_ptr<std::pair<arc, double>[]> improved_copies;
         detail::pc_num_dijkstra_traits<graph_t, double>::heap heap;
 
         explicit source_search(const graph_t & graph)
             : best_from_s(melon::create_vertex_map<double>(graph, 0.0))
             , status(melon::create_vertex_map<char>(graph, 0))
+            , arcs(std::make_unique_for_overwrite<arc[]>(
+                  melon::num_arcs(graph) + 1))
+            , improved_copies(
+                  std::make_unique_for_overwrite<std::pair<arc, double>[]>(
+                      melon::num_arcs(graph) + 1))
             , heap(std::greater<double>{},
                    melon::create_vertex_map<std::size_t>(graph)) {}
     };
@@ -158,12 +173,11 @@ struct multiflow_target_block {
     // most reliable path of s is at least that reliable in every
     // scenario.
     void _source_arcs(source & source_s, source_search & search) const {
-        auto & [best_from_s, status, visited, heap] = search;
+        auto & [best_from_s, status, visited, arcs, improved_copies, heap] =
+            search;
         const vertex s = source_s.s;
         const double best_quality = _best_quality(s);
         const double threshold = base_to_t[s] * (1 - path_tie);
-        source_s.arcs.clear();
-        source_s.improved_copies.clear();
         for(const vertex v : visited) {
             best_from_s[v] = 0;
             status[v] = 0;
@@ -196,24 +210,30 @@ struct multiflow_target_block {
                 visited.push_back(v);
             }
         }
+        arc * arcs_end = arcs.get();
         for(const arc a : melon::arcs(graph)) {
-            const vertex u = melon::arc_source(graph, a);
-            const double through = best_from_s[u] * probability_map[a] *
+            const double through = best_from_s[melon::arc_source(graph, a)] *
+                                   probability_map[a] *
                                    best_to_t[melon::arc_target(graph, a)];
-            if(through <= 0 || through < threshold) continue;
-            source_s.arcs.push_back(a);
-            if(option_map[a])
-                source_s.improved_copies.emplace_back(
-                    a, best_quality * best_from_s[u]);
+            *arcs_end = a;
+            arcs_end += !((through <= 0) | (through < threshold));
         }
+        std::pair<arc, double> * copies_end = improved_copies.get();
+        for(const arc a : std::span(arcs.get(), arcs_end)) {
+            *copies_end = {
+                a, best_quality * best_from_s[melon::arc_source(graph, a)]};
+            copies_end += option_map[a].has_value();
+        }
+        source_s.arcs.assign(arcs.get(), arcs_end);
+        source_s.improved_copies.assign(improved_copies.get(), copies_end);
     }
 
     // What the searches of a separation reuse from a source to the next.
     struct flow_search {
-        // of an arc without option: infinity, whatever the source
+        // Both 0 outside A_s, which closes its arcs forward and backward;
+        // the capacity of an arc of A_s without option is unbounded.
         arc_map<double> capacities;
         arc_map<double> flows;
-        arc_map<char> in_A_s;
         // Feasible potentials of the residual graph of the source: 1 at t,
         // and p_u >= g p_v on each of its arcs, of gain g from u to v.
         // Between two sources, the labels of t over every arc open at x̂.
@@ -239,9 +259,8 @@ struct multiflow_target_block {
         detail::pc_num_dijkstra_traits<graph_t, double>::heap heap;
 
         flow_search(const graph_t & graph, const vertex_map<double> & open_to_t)
-            : capacities(melon::create_arc_map<double>(graph, infinity))
-            , flows(melon::create_arc_map<double>(graph))
-            , in_A_s(melon::create_arc_map<char>(graph, 0))
+            : capacities(melon::create_arc_map<double>(graph, 0.0))
+            , flows(melon::create_arc_map<double>(graph, 0.0))
             , potentials(open_to_t)
             , rho(melon::create_vertex_map<double>(graph, 0.0))
             , gain_from_s(melon::create_vertex_map<double>(graph, 0.0))
@@ -264,26 +283,19 @@ struct multiflow_target_block {
                                           const std::vector<double> & x_hat,
                                           const vertex_map<double> & open_to_t,
                                           flow_search & search) const {
-        auto & [capacities, flows, in_A_s, potentials, rho, gain_from_s,
-                last_arc, status, marks, reached, visited, changed, path,
-                heap] = search;
+        auto & [capacities, flows, potentials, rho, gain_from_s, last_arc,
+                status, marks, reached, visited, changed, path, heap] = search;
         const vertex s = source_s.s;
         for(const vertex v : reached) {
             rho[v] = 0;
             status[v] = 0;
         }
-        for(const arc a : source_s.arcs) {
-            in_A_s[a] = 1;
-            flows[a] = 0;
-        }
+        for(const arc a : source_s.arcs) capacities[a] = unbounded;
         for(const auto & [a, big_M] : source_s.improved_copies)
             capacities[a] = big_M * x_hat[option_map[a].value()];
         const double negligible = no_flow * supply;
-        // infinity first: inf - flow <= arc_full inf holds, and would fill
-        // the arcs without option
         const auto open = [&](const arc a) {
-            return capacities[a] == infinity ||
-                   capacities[a] - flows[a] > arc_full * capacities[a];
+            return capacities[a] - flows[a] > arc_full * capacities[a];
         };
         // The best residual path from s to t, in path: Dijkstra from s on
         // the gains reduced by the potentials, g p_v / p_u <= 1, stopped
@@ -323,14 +335,14 @@ struct multiflow_target_block {
                     visited.push_back(v);
                 };
                 for(const arc a : melon::out_arcs(graph, u))
-                    if(in_A_s[a] && open(a)) {
+                    if(open(a)) {
                         const vertex v = melon::arc_target(graph, a);
                         improve(v, scale * probability_map[a] * potentials[v],
                                 a, true);
                     }
                 if(!(marks[u] & flow_search::entered)) continue;
                 for(const arc a : melon::in_arcs(graph, u))
-                    if(in_A_s[a] && flows[a] > negligible) {
+                    if(flows[a] > negligible) {
                         const vertex w = melon::arc_source(graph, a);
                         improve(w, scale * potentials[w] / probability_map[a],
                                 a, false);
@@ -412,16 +424,19 @@ struct multiflow_target_block {
                 reached.push_back(u);
             };
             for(const arc a : melon::in_arcs(graph, v))
-                if(in_A_s[a] && open(a))
+                if(open(a))
                     improve(melon::arc_source(graph, a),
                             probability_map[a] * rho[v]);
             if(!(marks[v] & flow_search::left)) continue;
             for(const arc a : melon::out_arcs(graph, v))
-                if(in_A_s[a] && flows[a] > negligible)
+                if(flows[a] > negligible)
                     improve(melon::arc_target(graph, a),
                             rho[v] / probability_map[a]);
         }
-        for(const arc a : source_s.arcs) in_A_s[a] = 0;
+        for(const arc a : source_s.arcs) {
+            capacities[a] = 0;
+            flows[a] = 0;
+        }
         for(const vertex v : changed) {
             potentials[v] = open_to_t[v];
             marks[v] = 0;
@@ -459,12 +474,13 @@ struct multiflow_target_block {
             open_to_t[u] = probability;
         flow_search search(graph, open_to_t);
         const auto & rho = search.rho;
-        source_search from_s(graph);
+        std::optional<source_search> from_s;
+        if(rebuild) from_s.emplace(graph);
         source rebuilt{};
         for(const source & kept : sources) {
             if(rebuild) {
                 rebuilt.s = kept.s;
-                _source_arcs(rebuilt, from_s);
+                _source_arcs(rebuilt, *from_s);
             }
             const source & source_s = rebuild ? rebuilt : kept;
             const vertex s = source_s.s;
@@ -478,12 +494,13 @@ struct multiflow_target_block {
             result.constant += rho[s] * source_quality_map[s];
             for(const auto & [source_gain, i] : source_options_map[s])
                 result.coefficients[i] += rho[s] * source_gain;
+            // a term of 0 where σ is not positive, without a branch
             for(const auto & [a, big_M] : source_s.improved_copies) {
                 const double sigma =
                     probability_map[a] * rho[melon::arc_target(graph, a)] -
                     rho[melon::arc_source(graph, a)];
-                if(sigma > 0)
-                    result.coefficients[option_map[a].value()] += big_M * sigma;
+                result.coefficients[option_map[a].value()] +=
+                    big_M * std::max(sigma, 0.0);
             }
         }
         return result;

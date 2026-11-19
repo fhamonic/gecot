@@ -275,6 +275,41 @@ struct multiflow_target_block {
                 false};
     }
 
+    // The best gains to t over the arcs open at x̂
+    vertex_map<double> _open_to_t(const std::vector<double> & x_hat) const {
+        auto open_to_t = melon::create_vertex_map<double>(graph, 0.0);
+        for(const auto & [u, probability] : melon::dijkstra(
+                reversed_traits{}, melon::views::reverse(graph),
+                melon::maps::function([&](const arc & a) {
+                    return option_map[a] && !(x_hat[option_map[a].value()] > 0)
+                               ? 0.0
+                               : probability_map[a];
+                }),
+                t))
+            open_to_t[u] = probability;
+        return open_to_t;
+    }
+
+    // the quality of the source s at x̂
+    double _supply(const vertex s, const std::vector<double> & x_hat) const {
+        double supply = source_quality_map[s];
+        for(const auto & [source_gain, i] : source_options_map[s])
+            supply += source_gain * x_hat[i];
+        return supply;
+    }
+
+    // f_t(y) at a scenario y, the value of separate(y) without its cut: each
+    // source sends its quality along a best path to t, which lies in its
+    // A_s, so the labels of one search from t over the arcs open at y give
+    // every flow.
+    double flow_at(const std::vector<double> & y) const {
+        const auto open_to_t = _open_to_t(y);
+        double value = _supply(t, y);
+        for(const source & source_s : sources)
+            value += _supply(source_s.s, y) * open_to_t[source_s.s];
+        return value;
+    }
+
     // The cut of the point x̂: for each source, its largest flow to t at
     // x̂ and the dual solution that comes with it. At a scenario y one
     // path takes the whole supply, so value is f_t(y). rebuild: the
@@ -289,16 +324,7 @@ struct multiflow_target_block {
         // One search for all the sources: the labels of t over every arc
         // open at x̂ are feasible potentials for the first residual graph
         // of each source, whose arcs are among these.
-        auto open_to_t = melon::create_vertex_map<double>(graph, 0.0);
-        for(const auto & [u, probability] : melon::dijkstra(
-                reversed_traits{}, melon::views::reverse(graph),
-                melon::maps::function([&](const arc & a) {
-                    return option_map[a] && !(x_hat[option_map[a].value()] > 0)
-                               ? 0.0
-                               : probability_map[a];
-                }),
-                t))
-            open_to_t[u] = probability;
+        const auto open_to_t = _open_to_t(x_hat);
         flow_search search(graph, probability_map, open_to_t);
         const auto & algorithm = search.algorithm;
         std::optional<source_search> from_s;
@@ -311,11 +337,8 @@ struct multiflow_target_block {
             }
             const source & source_s = rebuild ? rebuilt : kept;
             const vertex s = source_s.s;
-            double supply = source_quality_map[s];
-            for(const auto & [source_gain, i] : source_options_map[s])
-                supply += source_gain * x_hat[i];
             const auto [flow, settled] =
-                _largest_flow(source_s, supply, x_hat, search);
+                _largest_flow(source_s, _supply(s, x_hat), x_hat, search);
             result.value += flow;
             result.settled = result.settled && settled;
             const double rho_s = algorithm.potential(s);

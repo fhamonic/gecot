@@ -84,6 +84,28 @@ struct multiflow_benders : public benders_base {
                           });
         return cuts;
     }
+    // the cuts of the blocks listed, in their order
+    std::vector<target_block::cut> _separate(
+        const std::vector<target_block> & blocks,
+        const std::vector<double> & x_hat,
+        const std::vector<std::size_t> & listed) const {
+        std::vector<target_block::cut> cuts(listed.size());
+        tbb::parallel_for(
+            std::size_t{0}, listed.size(), [&](const std::size_t k) {
+                cuts[k] = blocks[listed[k]].separate(x_hat, !stored_arcs);
+            });
+        return cuts;
+    }
+    // f_t at a scenario y for each block, without the cuts
+    static std::vector<double> _flows_at(
+        const std::vector<target_block> & blocks,
+        const std::vector<double> & y) {
+        std::vector<double> flows(blocks.size());
+        tbb::parallel_for(
+            std::size_t{0}, blocks.size(),
+            [&](const std::size_t b) { flows[b] = blocks[b].flow_at(y); });
+        return flows;
+    }
 
     // The value of the point x̂ separated, with the flows of the cuts, in the
     // relaxation with all the cuts: x̂ is within the budget, and no cut is
@@ -302,15 +324,17 @@ struct multiflow_benders : public benders_base {
             _root_rounds(model, sw, instance, x, f, blocks, cut_constraint);
 
         // The search, steps 2 to 4: the flows of a candidate y and the cut at
-        // y of each target whose f_t exceeds its flow
+        // y of each target whose f_t exceeds its flow. The flows need no
+        // cut, and the cuts are made for these targets only.
         auto cuts_at = [&](auto & candidate, const auto & bought, auto && add) {
             std::vector<double> y(instance.options().size());
             for(auto && i : instance.options()) y[i] = bought[i];
-            const auto cuts = _separate(blocks, y);
+            const auto flows = _flows_at(blocks, y);
+            std::vector<std::size_t> overvalued;
             auto case_scores = instance.create_case_map(0.0);
             auto f_gain = f_gains.begin();
             for(std::size_t b = 0; b < blocks.size(); ++b) {
-                const double flow = cuts[b].value;
+                const double flow = flows[b];
                 double quality = blocks[b].target_quality;
                 for(const auto & [target_gain, i, big_M] :
                     blocks[b].target_quality_gains) {
@@ -321,8 +345,11 @@ struct multiflow_benders : public benders_base {
                 if(std::exchange(candidate[f[b]], flow) - flow <=
                    feasibility_tol * flow)
                     continue;
-                add(cut_constraint(b, cuts[b]));
+                overvalued.push_back(b);
             }
+            const auto cuts = _separate(blocks, y, overvalued);
+            for(std::size_t k = 0; k < overvalued.size(); ++k)
+                add(cut_constraint(overvalued[k], cuts[k]));
             return case_scores;
         };
 

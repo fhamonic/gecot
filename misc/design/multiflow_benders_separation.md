@@ -160,7 +160,7 @@ Not prototyped in gecot: neither the nodes nor the time are measured, and the pe
 
 - **The arc without option of a copy of A_s can be outside A_s**, since the test reads the probability of each arc: for 77 % of the copies of the sets on `species-natural` and `natural-crossing`, 1 to 7 % on the other landscapes, all of them on the cover instances. Putting it in does not change the largest flow at any point; it changes which optimal dual solution the labels are, towards cuts that charge a copy for its improvement. Prototype on the suite: the 31 runs in 169.2 s against 173.0 s, fewer cuts in the rounds (the separation CPU at fractional points goes from 612 s to 498 s), and nodes that move both ways (`species-natural` at 12000: 13 to 408; `rural-planting` at 260: 156 to 70). Not kept as it is.
 - **Entries of x̂ under 10⁻¹²** make a push that fills its copy without opening it backward, since a flow under `no_flow` times the supply counts as none. On tie-prone instances with such entries an agent got cuts that depend on the order of the heap among ties, all valid. The center of in-out halves old values at each round, which could produce such entries; whether the real points hold some was not counted.
-- **A candidate needs the labels of a block only if the master overvalues it**, and its flow is the quality of each source times its label in the shared search. The lazy cuts are 17 to 79 % of the separations at scenarios on the four instances: the flows of the others could be skipped. Not tried; the scenarios are 17 % of the separation CPU on the suite.
+- **A candidate needs the labels of a block only if the master overvalues it**, and its flow is the quality of each source times its label in the shared search. The lazy cuts are 17 to 79 % of the separations at scenarios on the four instances: the flows of the others could be skipped. Done on 2026-11-19: "Plain Dijkstra at the candidates".
 
 ## Prefetching in the searches, 2026-11-18
 
@@ -414,6 +414,25 @@ The study headers, the blocks that dispatch the variants and the scripts are on 
 - **Moved into melon** 1.1.0, as `melon::onaga`, with the sparse reset and the flow lists as switches of its traits, on by default. The block uses it, and gecot's header and its tests are removed (the tests are melon's now). The parity capture is that of the binary built with gecot's header in its 1021 cases, models included, and the oracle passes 268 of 268.
 - **Checks:** 86 unit tests, of which four new ones for the onaga header (tied gains, potentials between augmentations, infinity against the largest capacity, the state a run leaves for the next search). Each new mechanism broken on purpose fails them: the residual test of the kept tree (the run hangs), the chains or the tree left over by `reset()` (a crash; a failure), the tree left over by `set_source()`, the gain of a kept vertex, either link of a chain, the open test in two terms, the clamp. The tests of the header pass under the address and undefined-behaviour sanitizers. The parity capture differs from the branch's in the 7 models of `multiflow_benders` on `aix30` at 8, as in the study, with the same outputs and scores. The oracle on the four configurations of `multiflow_benders`: 268 of 268, and 268 of 268 with `max_pushes` forced to 0 and to 1.
 
+## Plain Dijkstra at the candidates, 2026-11-19
+
+The owner asked why the separation at a candidate needs more than a Dijkstra, since no capacity limits the flow at an integral point. It does not for the flow: one best path takes the whole supply of a source and lies in its A_s, so one Dijkstra from t over the arcs open at y gives f_t(y) for every source of a target, and `separate()` already makes it for its start labels. It does for the dual: the cut reads ρ at both ends of every copy of A_s, off the path, where the optimal duals at y are not unique, and the per-source search from t over A_s gives the least one, which measured stronger than the labels of the shared search ("Tried and dropped"). Two changes were timed.
+
+- **No pushes at an integral point, the dual from the search from t without flow,** with the values first as below: not kept. A source that has its whole quality and reaches a copy along its best path fills the copy exactly, since m_sa is the most that can reach it. The pushes close that copy and the potentials of the residual graph charge its option; without them it stays open and the option's part goes into ρ_s. On the cover instances that cut is far weaker: `cover-40` at 12 goes from 9.5 s to the limit (1,209 lazy cuts to 10,323) and `faircover-40` at 12 from 3.8 s to the limit (109 to 1,048). The separation CPU at the candidates falls by 63 %, but the 31 runs take 204 s against 156 s, two of them unsolved, and 22 of them change their trees. The oracle passes.
+- **Kept: the values first, the cuts of the overvalued targets only.** `flow_at(y)` gives the value of a block from that one Dijkstra, and the callback makes the cut of a block, with the searches of its sources, only where the candidate's f_t exceeds it. The same results bit for bit: the parity capture is main's in its 1021 cases, models included, and every one of the 31 runs has the same nodes, cuts, rounds and score.
+
+As built against main, both with the timers of the study, three interleaved passes over the 31 runs:
+
+| | main | change |
+|---|---|---|
+| Separation CPU at the candidates | 112.0 s | 51.9 s (−53.6 %) |
+| Separation CPU, all | 545.7 s | 485.6 s (−11.0 %) |
+| Time of the runs | 155.0 s | 150.6 s (−2.9 %) |
+
+- **At the candidates,** 39,567 of the 87,188 separations of a block are still made: those of the targets that the master overvalues, and those of the MIP start.
+- **Hexagon** at 151 with `--no-stored-arcs`, 50 s, two runs of each: the same score, bound, nodes and cuts; half the targets need a cut at the candidates, so their separation CPU goes from 690 s to 347 s, and the run, which ends in the callback past its limit, ends at 68.3 s instead of 90.5 s.
+- **Checks:** 77 unit tests, and the oracle on the four configurations of `multiflow_benders`, 268 of 268, also with `max_pushes` forced to 0 and to 1.
+
 ## Tried and dropped
 
 - **One Dijkstra per target, shared by the sources.** The labels of a search from t over every arc open at x̂ are a feasible dual solution for each source, and an optimal one for a source whose best path fills no arc. Those sources then need no search of their own. Valid, and the oracle passes, but: no faster on the suite (226 s against 220 s on the 31 runs), because at the points of the relaxation most sources fill an arc and search anyway; and the cuts are weaker, the shared labels being larger than a source's own away from its path (`species-natural` at 12000: 388 nodes against 14, 8858 lazy cuts against 770).
@@ -430,7 +449,7 @@ A change that moves the labels cannot be checked bit for bit: the check is the o
 2. **Smaller A_s.** The test keeps an arc when the best path of s through it, with every option, is as reliable as its best path without any. A test within the budget (the best path through the arc with the options that the budget allows) would remove more, and shorten every search. It is the tight big-M of `docs/formulations/preprocessing.md` applied to the membership of A_s; the cut stays valid as long as the test is.
 3. **A cheaper heap.** It holds 33 to 36 % of the separation, `pop` alone 23 to 24 % ("Branches, 2026-11-18"). A scan of an array takes 11 % less separation CPU on the suite but a third more on hexagon; a hybrid that keeps the first and holds on the second was not reached ("The heap, 2026-11-18").
 4. **The scans backward.** Half of the vertices settled from s at the points of the relaxation scan their in-arcs for one that carries flow, and a third of those arcs do; with the scans of the last search, 5.5 billion of the 37 billion estimated misses. Measured in "Simplifications of gecot::onaga, 2026-11-19": per-vertex chains of the arcs that took flow, −4.9 % of separation CPU; the single arc that took flow kept per vertex, −4.3 % bit for bit.
-5. **The leads of "Found on the way"** above: the flows of a candidate only for the blocks that the master overvalues; the arcs without option of the copies in A_s; the entries of x̂ under the tolerances.
+5. **The leads of "Found on the way"** above: the arcs without option of the copies in A_s; the entries of x̂ under the tolerances.
 
 ## How to measure a change
 

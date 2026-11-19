@@ -33,14 +33,16 @@ GECOT is written in C++26 and built with [CMake](https://cmake.org) (3.25 or lat
     os=Linux
     ```
 
-2. One dependency is not on Conan Center: the solver interface [mippp](https://github.com/fhamonic/mippp). GECOT 2.0 needs its version 1.1.0 as it stands on the branch `feat/lp-algorithm`, until this branch is merged into mippp's `main`. Clone it and add it to your local Conan cache:
+2. Two dependencies are not on Conan Center in the versions GECOT needs. The solver interface [mippp](https://github.com/fhamonic/mippp): its version 1.1.0 as it stands on the branch `feat/lp-algorithm`, until this branch is merged into mippp's `main`. The graph library [melon](https://github.com/fhamonic/melon): its version 1.1.0, on its `main`, until it is released. Clone each and add it to your local Conan cache:
 
     ```console
     $ git clone -b feat/lp-algorithm https://github.com/fhamonic/mippp && cd mippp
     $ conan create . -pr=gcc15_c++26 -b=missing
+    $ cd .. && git clone https://github.com/fhamonic/melon && cd melon
+    $ conan create . -pr=gcc15_c++26 -b=missing
     ```
 
-    Conan fetches the other dependencies, the graph library [melon](https://github.com/fhamonic/melon) among them, when GECOT is built.
+    Conan fetches the other dependencies when GECOT is built.
 
 3. Build GECOT:
 

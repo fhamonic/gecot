@@ -36,6 +36,7 @@ nav = [
     { "The flow formulation" = "formulations/flow.md" },
     { "Preprocessing" = "formulations/preprocessing.md" },
     { "Benders decompositions" = "formulations/benders.md" },
+    { "multiflow_benders step by step" = "formulations/multiflow_benders.md" },
     { "Tree and path relaxations" = "formulations/relaxations.md" },
     { "Heuristics" = "formulations/heuristics.md" },
     { "Bounds" = "formulations/bounds.md" },

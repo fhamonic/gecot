@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -171,6 +172,46 @@ protected:
         if(solver_name == "cbc") return call<clp_lp, cbc_milp>(f);
         if(solver_name == "glpk") return call<glpk_lp, glpk_milp>(f);
         throw std::invalid_argument("unknown solver '" + solver_name + "'");
+    }
+
+    // The rounds of cuts on the relaxation of multiflow_benders, which
+    // multiflow_rounding solves too
+    void add_root_cut_options(auto & solver) {
+        app.add_option("--root-cut-tolerance", solver.root_cut_tol,
+                       "Relative tolerance of the cuts on the linear "
+                       "relaxation before the search: a cut is added when the "
+                       "relaxation's flow exceeds it by more than this share, "
+                       "and the rounds end when none does. A larger value "
+                       "ends them sooner, the relaxation then above its "
+                       "value with all the cuts by about this share at most, "
+                       "unless the criterion subtracts a constant")
+            ->check(CLI::Range(gecot::default_feasibility_tol,
+                               std::numeric_limits<double>::max(),
+                               "AT LEAST 1e-07"))
+            ->default_val(solver.root_cut_tol);
+        app.add_option("--root-cut-gap", solver.root_cut_gap,
+                       "Ends the cuts on the linear relaxation before the "
+                       "search once the max gain of their table is within "
+                       "this gap of its fractional gain, relative to the "
+                       "score of the fractional gain (0: never, the rounds "
+                       "then end by --root-cut-tolerance only)")
+            ->check(CLI::NonNegativeNumber)
+            ->default_val(solver.root_cut_gap);
+        app.add_option("--in-out-ratio", solver.in_out_ratio,
+                       "Step of the center of the cuts on the linear "
+                       "relaxation before the search: the share of the way "
+                       "to each new optimum of the relaxation that it moves, "
+                       "from the first optimum. 1 separates each optimum "
+                       "itself, without the center")
+            ->check(CLI::Range(0.0, 1.0))
+            ->default_val(solver.in_out_ratio);
+    }
+    void add_stored_arcs_option(auto & solver) {
+        app.add_flag_callback(
+            "--no-stored-arcs", [&solver] { solver.stored_arcs = false; },
+            "Keeps no set A_s of arcs per source but rebuilds them at each "
+            "separation: the same cuts, slower, in less memory when the "
+            "sets add up to too much");
     }
 
     void add_big_M_option(gecot::big_M_kind & big_Ms) {

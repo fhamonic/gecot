@@ -48,7 +48,7 @@ With [several costs](instance.md#several-costs), the `Cost` line is one line per
 
 | Status | Meaning |
 |---|---|
-| `optimal` | the solution is proved optimal (`flow_mip` and the Benders decompositions), up to the [tolerances](../formulations/flow.md#what-flow_mip-solves) |
+| `optimal` | the solution is proved optimal (`flow_mip`, the Benders decompositions, and `multiflow_rounding` when its best scenario reaches its bound), up to the [tolerances](../formulations/flow.md#what-flow_mip-solves) |
 | `converged` | the column generation of `path_lp` or `tree_lp` ended: the relaxation is solved |
 | `relative gap reached` | `path_lp` stopped at its `--relative-gap` |
 | `completed` | a heuristic or a bound method ran to its end |
@@ -162,7 +162,8 @@ The `algorithm_report` depends on the algorithm:
 | `nodes` | same, when the solver reports it | the nodes of the branch and bound, of all its solves when a Benders master is solved again |
 | `lazy_constraints` | the Benders decompositions | the cuts handed to the solver during the search, as lazy constraints or as constraints of a master solved again. One that the candidate violates by at most the solver's tolerance is counted too, although CPLEX and COPT are then not given it |
 | `master_solves` | the Benders decompositions [without lazy constraints](../formulations/benders.md#without-lazy-constraints) | the times the master was solved |
-| `sources`, `root_rounds`, `root_cuts`, `root_relaxation_value` | `multiflow_benders` | the source and target pairs, and the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation): the relaxations solved before the search, the cuts they added, and the value of the last one |
+| `sources`, `root_rounds`, `root_cuts`, `root_relaxation_value` | `multiflow_benders`, `multiflow_rounding` | the source and target pairs, and the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation): the relaxations solved before the search, the cuts they added, and the value of the last one |
+| `roundings`, `scenarios` | `multiflow_rounding` | the scenarios drawn from the optimum of the relaxation, and the distinct ones scored, in the [rounding](../formulations/benders.md#multiflow_rounding-the-relaxation-rounded) |
 | `iterations`, `relaxation_value`, `pool_columns`, `evicted_columns` | `path_lp`, `tree_lp` | the rounds of the column generation whose master was solved, and the value of the last master |
 | `pairs`, `searches` or `columns` | `path_lp` | the pairs priced, and the searches or the columns of its pricing |
 | `reformulation_...`, `remaining_options` | with `--reformulation path_lp` | the report of the path relaxation, and the options it left |
@@ -284,7 +285,7 @@ With [`--nb-mus`](../formulations/preprocessing.md#taking-the-budget-into-accoun
 
 ### Ctrl-C
 
-Ctrl-C stops the algorithm and keeps its best result so far, with the status `interrupted`; the result is printed or written as usual. A second Ctrl-C quits at once, without result.
+Ctrl-C stops the algorithm and keeps its best result so far, with the status `interrupted`; the result is printed or written as usual. A second Ctrl-C quits at once, without result. One that comes within 0.2 s of the first counts as the same: `timeout -s INT` sends the signal both to GECOT and to its process group. During the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation) of `multiflow_benders` and `multiflow_rounding`, a Ctrl-C ends the rounds only, at the end of the current one: the search, or the rounding, goes on from them, and the next Ctrl-C stops it, keeping its best result. One before the rounds stops the whole run.
 
 - A MILP solver notices the interruption when it next reports its progress to GECOT: within seconds with Gurobi once it has begun to report, up to some fifteen seconds with HiGHS on a large model, never with CBC, which reports none. Gurobi does not report during the first steps of its solve, such as the simplification of the model: on a model of two million variables, its first report came 20 s after the solve began.
 - The column generations of `path_lp` and `tree_lp` stop in their pricing, as at the time limit; `tree_lp` then solves its master once more, and `path_lp` with `--pricing enumerate` ends its round first.

@@ -3,7 +3,7 @@
 The algorithms of GECOT differ in what they promise. Start from what you need:
 
 - **the best selection, with a proof**: an exact algorithm;
-- **a good selection, with a measure of how good**: an exact algorithm under a time limit, or `path_lp`;
+- **a good selection, with a measure of how good**: an exact algorithm under a time limit, `multiflow_rounding` or `path_lp`;
 - **a selection, quickly, on any landscape**: a heuristic, to be [certified afterwards](bound.md#certifying-a-solution) if needed.
 
 ## At a glance
@@ -14,6 +14,7 @@ The algorithms of GECOT differ in what they promise. Start from what you need:
 | `multicut_benders` | an optimal solution, with its proof | as an alternative when `multiflow_benders` struggles |
 | `flow_benders` | an optimal solution, with its proof | mostly as a point of comparison |
 | `flow_mip` | an optimal solution, with its proof | with any other solver, or as the reference model |
+| `multiflow_rounding` | a solution and the upper bound of a relaxation | quickly, with a bound, when the search of `multiflow_benders` takes too long |
 | `path_lp` | a solution and the upper bound of a relaxation | when the exact algorithms do not end, or when a bound is enough |
 | `greedy` | a solution, without guarantee | for a quick solution, a MIP start, a very large landscape |
 | `static` | a solution, without guarantee | as the ranking method to compare with |
@@ -40,7 +41,7 @@ One instance does not make a benchmark, but it gives orders of magnitude. On the
 | `multicut_benders` | 438,893.1 | optimal | 1.4 s |
 | `multiflow_benders` | 438,893.1 | optimal | 1.2 s |
 
-`greedy` is within 1.3 % of the optimal gain here, in both directions, which only the exact algorithms can tell.
+`greedy` is within 1.3 % of the optimal gain here, in both directions, which only the exact algorithms can tell. `multiflow_rounding` returns the solution of `greedy` and `path_lp` too, with a guaranteed share of 98.1 %, in about half the time of `multiflow_benders` (0.23 s against 0.41 s, on another machine).
 
 ## Guidance
 
@@ -71,7 +72,7 @@ Instances with [conflict sets](instance.md#conflict-sets) or [several costs](ins
 
 | | Supported |
 |---|---|
-| `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders`, `path_lp` | yes |
+| `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders`, `multiflow_rounding`, `path_lp` | yes |
 | `static`, `greedy`, `greedy --worst` | yes, [with conflict rules](../formulations/heuristics.md#conflict-sets-and-several-costs) |
 | `static --decremental`, `greedy --decremental` | no |
 | `tree_lp` | no |
@@ -83,18 +84,18 @@ Instances with [conflict sets](instance.md#conflict-sets) or [several costs](ins
 
 ## What the solvers support
 
-Every solver can run `flow_mip` and `path_lp`, but not with the same features. GECOT warns when a parameter asks for a feature that the solver lacks.
+Every solver can run `flow_mip`, `multicut_benders` and `path_lp`, but not with the same features. GECOT warns when a parameter asks for a feature that the solver lacks. Only Gurobi, CPLEX and COPT give the Benders decompositions lazy constraints: with the others they [solve their master again](../formulations/benders.md#without-lazy-constraints).
 
 | Solver | Algorithms | `--mip-start` | Gap of $10^{-10}$ | Bound in the result | `--evict-age` | `--numeric-focus` |
 |---|---|:-:|:-:|:-:|:-:|:-:|
 | Gurobi | all | ✓ | ✓ | ✓ | ✓ | ✓ |
 | CPLEX | all | ✓ | ✓ | ✓ | ✓ | ✓ |
 | COPT | all | ✓ | ✓ | ✓ | – | – |
-| Xpress | `flow_mip`, `path_lp`, `tree_lp` | ✓ | ✓ | ✓ | – | ✓ |
-| MOSEK | `flow_mip`, `path_lp`, `tree_lp` | ✓ | – | ✓ | – | MIP only |
-| HiGHS | `flow_mip`, `path_lp`, `tree_lp` | ✓ | ✓ | ✓ | ✓ | – |
-| SCIP | `flow_mip`, `path_lp`, `tree_lp` | – | ✓ | ✓ | ✓ | – |
-| CBC | `flow_mip`, `path_lp`, `tree_lp` | ✓ | ✓ | ✓ | ✓ | – |
-| GLPK | `flow_mip`, `path_lp` | – | – | – | – | – |
+| Xpress | all | ✓ | ✓ | ✓ | – | ✓ |
+| MOSEK | all | ✓ | – | ✓ | – | MIP only |
+| HiGHS | all | ✓ | ✓ | ✓ | ✓ | – |
+| SCIP | all but `flow_benders`, `multiflow_benders`, `multiflow_rounding` | – | ✓ | ✓ | ✓ | – |
+| CBC | all | ✓ | ✓ | ✓ | ✓ | – |
+| GLPK | all but `tree_lp` | – | – | – | – | – |
 
 Every solver honours `--time-limit`. Without the optimality gap setting, a solver stops at its own default gap, and `optimal` then means optimal within this gap. Ctrl-C reaches a solver when it next reports its progress: within seconds with Gurobi, later with HiGHS, never with CBC.

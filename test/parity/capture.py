@@ -76,13 +76,17 @@ ALGORITHMS = HEURISTICS + [
     "flow_benders", "flow_benders --big-m knapsack_dantzig", "flow_benders --big-m tight",
     "flow_benders --big-m plain", "flow_benders --mip-start-algorithm static",
     "flow_benders --indicator-constraints",
-    "multiflow_benders", "multiflow_benders --no-root-cuts", "multiflow_benders --no-in-out",
+    "multiflow_benders", "multiflow_benders --no-root-cuts", "multiflow_benders --in-out-ratio 1",
     "multiflow_benders --no-stored-arcs",
     "multiflow_benders --root-cut-tolerance 1e-3", "multiflow_benders --root-cut-gap 1e-3",
+    "multiflow_benders --mip-start-algorithm greedy",
     # the search of the solvers without lazy constraints: on Gurobi, whose
     # last model then holds the cuts as rows, and on the open-source default
     "flow_benders --no-lazy-constraints", "multicut_benders --no-lazy-constraints",
     "multiflow_benders --no-lazy-constraints", "multiflow_benders --solver highs",
+    "multiflow_benders --mip-start-algorithm greedy --no-lazy-constraints",
+    "multiflow_rounding", "multiflow_rounding --roundings 50 --seed 1",
+    "multiflow_rounding --mip-start-algorithm greedy", "multiflow_rounding --solver highs",
     "tree_lp", "tree_lp --evict-age 2", "tree_lp --mip-start-algorithm greedy",
     "path_lp", "path_lp --pricing enumerate", "path_lp --mip-start-algorithm greedy",
     "path_lp --evict-age 2", "path_lp --max-activations 5", "path_lp --relative-gap 0.01",
@@ -92,7 +96,8 @@ ALGORITHMS = HEURISTICS + [
 TRACED = ["tree_lp", "path_lp", "greedy --decremental", "static --decremental"]
 TRACED_ON = [("test", f"{T}/test/instance.json", "10"), ("aude", f"{T}/Aude/aude.json", "7")]
 CHEAP_BOUNDS = ["all_options", "qkp_planes", "qkp_planes --iterations 20", "split_lagrange"]
-BOUNDS = CHEAP_BOUNDS + ["flow_mip", "multicut_benders", "flow_benders", "multiflow_benders", "path_lp"]
+BOUNDS = CHEAP_BOUNDS + ["flow_mip", "multicut_benders", "flow_benders", "multiflow_benders",
+                         "multiflow_rounding", "path_lp"]
 EXCLUDED = {
     # does not end in five minutes
     "dks30@6__multicut_benders_--big-m_plain",
@@ -100,9 +105,9 @@ EXCLUDED = {
     "aix30@8__flow_mip_--lp-relaxation",
 }
 ALGORITHM_NAMES = ["static", "greedy", "flow_mip", "multicut_benders", "flow_benders",
-                   "multiflow_benders", "tree_lp", "path_lp"]
+                   "multiflow_benders", "multiflow_rounding", "tree_lp", "path_lp"]
 METHOD_NAMES = ["all_options", "qkp_planes", "split_lagrange", "flow_mip", "multicut_benders",
-                "flow_benders", "multiflow_benders", "path_lp"]
+                "flow_benders", "multiflow_benders", "multiflow_rounding", "path_lp"]
 
 
 def slug(text):

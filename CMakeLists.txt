@@ -91,6 +91,7 @@ add_executable(gecot src/gecot.cpp src/instance.cpp src/parse_instance.cpp
     src/solver_interfaces/multicut_benders_interface.cpp
     src/solver_interfaces/flow_benders_interface.cpp
     src/solver_interfaces/multiflow_benders_interface.cpp
+    src/solver_interfaces/multiflow_rounding_interface.cpp
     src/solver_interfaces/tree_lp_interface.cpp
     src/solver_interfaces/path_lp_interface.cpp
     ${WINDRES_ICON_O})

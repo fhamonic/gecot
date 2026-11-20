@@ -205,6 +205,13 @@ protected:
                        "itself, without the center")
             ->check(CLI::Range(0.0, 1.0))
             ->default_val(solver.in_out_ratio);
+        app.add_option("--in-out-separation", solver.in_out_separation,
+                       "Point separated by the cuts on the linear relaxation "
+                       "before the search: the share of the way from the "
+                       "center to each new optimum of the relaxation, before "
+                       "the center moves (default: --in-out-ratio, the new "
+                       "center)")
+            ->check(CLI::Range(0.0, 1.0));
     }
     void add_stored_arcs_option(auto & solver) {
         app.add_flag_callback(

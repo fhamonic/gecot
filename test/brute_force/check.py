@@ -37,6 +37,7 @@ CONFIGS = [
     "flow_benders", "flow_benders --big-m knapsack_dantzig", "flow_benders --nb-mus 3",
     "flow_benders --indicator-constraints",
     "multiflow_benders", "multiflow_benders --no-root-cuts", "multiflow_benders --in-out-ratio 1",
+    "multiflow_benders --in-out-separation 0.9",
     "multiflow_benders --no-stored-arcs",
     "multiflow_benders --root-cut-tolerance 1e-3", "multiflow_benders --root-cut-gap 1e-3",
     "multiflow_benders --mip-start-algorithm greedy",

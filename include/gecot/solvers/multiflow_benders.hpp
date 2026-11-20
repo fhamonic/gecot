@@ -41,6 +41,10 @@ struct multiflow_benders : public benders_base {
     // center of the rounds moves, from the first optimum; 1: each optimum
     // separated itself, without the center
     double in_out_ratio = 0.5;
+    // the share of the way from the center to the new optimum at which the
+    // rounds separate, before the center moves; none: in_out_ratio, the
+    // new center
+    std::optional<double> in_out_separation;
     // off: the sets A_s are not kept but rebuilt at each separation: the
     // same cuts, slower, for instances whose sets do not fit in memory
     bool stored_arcs = true;
@@ -140,7 +144,8 @@ struct multiflow_benders : public benders_base {
     };
     // The rounds of cuts on the linear relaxation, for which the options x
     // are continuous: each solves the master, separates its optimum, or the
-    // center that moves in_out_ratio of the way to it, and adds as a row
+    // point in_out_separation of the way to it from the center, which then
+    // moves in_out_ratio of the way to it, and adds as a row
     // cut_constraint(block, cut) for each block whose f_t exceeds its cut.
     template <typename M, instance_c I, typename B>
     root_rounds _root_rounds(M & model, const spdlog::stopwatch & sw,
@@ -155,8 +160,10 @@ struct multiflow_benders : public benders_base {
         // the relaxation with all the cuts lies between root_floor and
         // root.value
         std::optional<double> root_floor;
-        std::vector<double> center(instance.options().size());
-        double in_out_coef = in_out_ratio;
+        std::vector<double> center(instance.options().size()),
+            separated(instance.options().size());
+        double center_coef = in_out_ratio;
+        double separation_coef = in_out_separation.value_or(in_out_ratio);
         while(root_cuts && !stop_requested && !_time_up(sw, root_time_share)) {
             _set_time_left(model, sw, root_time_share);
             model.solve();
@@ -171,14 +178,18 @@ struct multiflow_benders : public benders_base {
             root.optimum = std::ranges::to<std::vector>(
                 std::views::transform(instance.options(), optimum));
             if(root.rounds == 1) {
-                for(auto && i : instance.options()) center[i] = optimum(i);
-            } else {
                 for(auto && i : instance.options())
-                    center[i] = (1 - in_out_coef) * center[i] +
-                                in_out_coef * optimum(i);
+                    separated[i] = center[i] = optimum(i);
+            } else {
+                for(auto && i : instance.options()) {
+                    separated[i] = (1 - separation_coef) * center[i] +
+                                   separation_coef * optimum(i);
+                    center[i] = (1 - center_coef) * center[i] +
+                                center_coef * optimum(i);
+                }
             }
-            const auto cuts = _separate(blocks, center);
-            if(const auto floor = _floor_at(instance, blocks, center, cuts))
+            const auto cuts = _separate(blocks, separated);
+            if(const auto floor = _floor_at(instance, blocks, separated, cuts))
                 root_floor = std::max(root_floor.value_or(*floor), *floor);
             // the smallest --root-cut-tolerance at which no cut is added
             double violation = 0;
@@ -213,8 +224,8 @@ struct multiflow_benders : public benders_base {
                *root.value - *root_floor <= root_cut_gap * *root_floor)
                 break;
             if(num_added) continue;
-            if(in_out_coef == 1.0) break;
-            in_out_coef = 1.0;
+            if(center_coef == 1.0 && separation_coef == 1.0) break;
+            center_coef = separation_coef = 1.0;
         }
         for(auto && i : instance.options()) model.set_binary(x(i));
         report_progress({.end = true});

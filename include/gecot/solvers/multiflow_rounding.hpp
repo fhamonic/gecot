@@ -36,6 +36,11 @@ struct multiflow_rounding : public multiflow_benders {
     // draws, and the solution, do not depend on the number of threads.
     static constexpr std::size_t batch_size = 64;
 
+    // A longer step than multiflow_benders': the rounds are most of this
+    // run, and 0.9 shortened them by about 13 % on the benchmark for the
+    // same draws, in docs/formulations/benders.md
+    multiflow_rounding() { in_out_ratio = 0.9; }
+
     // The randomized rounding, after the rounds on the relaxation: the
     // scenarios drawn from x* and the MIP start, the best by the flows of
     // the blocks.

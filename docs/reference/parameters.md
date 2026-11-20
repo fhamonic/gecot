@@ -55,8 +55,8 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 | `flow_mip` | ✓ | ✓ | `--big-m`, `--lp-relaxation`, `--indicator-constraints` |
 | `multicut_benders` | ✓ | ✓ | `--groups`, `--grouping`, `--grouping-seed`, `--big-m`, `--no-lazy-constraints` |
 | `flow_benders` | ✓ | ✓ | `--big-m`, `--indicator-constraints`, `--no-lazy-constraints` |
-| `multiflow_benders` | ✓ | ✓ | `--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--no-root-cuts`, `--in-out-ratio`, `--no-stored-arcs`, `--no-lazy-constraints` |
-| `multiflow_rounding` | ✓ | ✓ | `--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--in-out-ratio`, `--no-stored-arcs`, `--roundings`, `--seed` |
+| `multiflow_benders` | ✓ | ✓ | `--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--no-root-cuts`, `--in-out-ratio`, `--in-out-separation`, `--no-stored-arcs`, `--no-lazy-constraints` |
+| `multiflow_rounding` | ✓ | ✓ | `--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--in-out-ratio`, `--in-out-separation`, `--no-stored-arcs`, `--roundings`, `--seed` |
 | `tree_lp` | ✓ | ✓ | `--evict-age` |
 | `path_lp` | ✓ | – | `--evict-age`, `--pricing`, `--max-activations`, `--relative-gap` |
 | `static` | – | – | `-t`, `--decremental`, `--only-dec` |
@@ -124,14 +124,16 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders`, `multif
 | `--root-cut-gap <g>` | `0` | also ends the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation) once the `max gain` of their table is within this gap of its `fractional gain`, relative to the score of the fractional gain, as `--relative-gap` does for `path_lp`. `0`: never, the rounds end by `--root-cut-tolerance` only |
 | `--no-root-cuts` | off | for comparison: no cut on the linear relaxation before the search |
 | `--in-out-ratio <r>` | `0.5` | the step of the center of the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation), in $[0, 1]$: the share of the way to each new optimum of the relaxation that it moves, from the first optimum. `1` separates each optimum itself, without the center |
+| `--in-out-separation <r>` | `--in-out-ratio` | the point that the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation) separate, in $[0, 1]$: the share of the way from the center to each new optimum, before the center moves. By default the new center; with `--in-out-ratio 1`, `1` separates each optimum itself |
 | `--no-stored-arcs` | off | keeps no [set $A_s$](../formulations/benders.md#separation) per source but rebuilds them at each separation: the same cuts, slower, in less memory |
 
 ### `multiflow_rounding`
 
-`--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--in-out-ratio` and `--no-stored-arcs` as for `multiflow_benders`, for the [same relaxation](../formulations/benders.md#multiflow_rounding-the-relaxation-rounded), plus:
+`--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--in-out-separation` and `--no-stored-arcs` as for `multiflow_benders`, for the [same relaxation](../formulations/benders.md#multiflow_rounding-the-relaxation-rounded), plus:
 
 | Parameter | Default | Meaning |
 |---|---|---|
+| `--in-out-ratio <r>` | `0.9` | as for `multiflow_benders`, with a longer step: the rounds are most of the run |
 | `--roundings <n>` | `1000` | the scenarios drawn from the optimum of the relaxation, the first by decreasing $x^*$. `0`: until `--time-limit`, which is then required |
 | `--seed <n>` | `0` | the seed of the draws |
 

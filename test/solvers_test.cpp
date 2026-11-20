@@ -16,6 +16,8 @@
 #include "gecot/solvers/multiflow_target_block.hpp"
 #include "gecot/solvers/static.hpp"
 
+#include "mippp/model_entities.hpp"
+
 #include "conflict_instances.hpp"
 #include "instance.hpp"
 #include "instance_builder.hpp"
@@ -606,11 +608,13 @@ std::size_t expect_valid_cuts(const std::string & path, const bool rebuild) {
                 flows.push_back(gecot::pc_num_vertex_in_flow(
                     graph, source_quality_map, probability_map, t));
             }
-            gecot::solvers::multiflow_target_block<MaxPushes> block(
-                instance_case, t,
-                gecot::compute_contracted_flow_graph<false>(
-                    instance, instance_case, budget, t, strong_arcs_map[t],
-                    useless_arcs_map[t], gecot::big_M_kind::plain, 1e-7, true));
+            gecot::solvers::multiflow_target_block<
+                mippp::model_variable<int, double>, MaxPushes>
+                block(instance_case, t,
+                      gecot::compute_contracted_flow_graph<false>(
+                          instance, instance_case, budget, t,
+                          strong_arcs_map[t], useless_arcs_map[t],
+                          gecot::big_M_kind::plain, 1e-7, true));
             block.compute_sources(!rebuild);
             for(std::size_t p = 0; p < points.size(); ++p) {
                 const auto cut = block.separate(points[p], rebuild);

@@ -76,6 +76,7 @@ The symbols of the [formulation pages](../formulations/problem.md), next to the 
 | $\theta_g$, $\mathcal{G}_k$ | value of the group of targets $g$, and the groups of the case $k$ | parameter `--groups` |
 | $A_s$, $m_{sa}$, $\rho^s$ | arcs, big-M constants and potentials of the source $s$ in `multiflow_benders` | field `sources` |
 | $\hat{x}$ | the point at which `multiflow_benders` separates a cut, fractional or not | |
+| $x^*$, $f^*_t$ | an optimum of the linear relaxation of the master, in the [rounds](../formulations/multiflow_benders.md#7-the-rounds-on-the-relaxation) of `multiflow_benders` | field `root_rounds` |
 | $p = (s,t)$ | a pair of vertices | field `pairs` |
 | $v_p(S)$, $v_t(S)$ | value of a pair, of a target, when the set $S$ is bought | |
 | $y_{pS}$, $y_{tS}$ | columns of the path and tree formulations | |

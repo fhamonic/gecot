@@ -55,7 +55,8 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 | `flow_mip` | ✓ | ✓ | `--big-m`, `--lp-relaxation`, `--indicator-constraints` |
 | `multicut_benders` | ✓ | ✓ | `--groups`, `--grouping`, `--grouping-seed`, `--big-m`, `--no-lazy-constraints` |
 | `flow_benders` | ✓ | ✓ | `--big-m`, `--indicator-constraints`, `--no-lazy-constraints` |
-| `multiflow_benders` | ✓ | ✓ | `--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--no-root-cuts`, `--no-in-out`, `--no-stored-arcs`, `--no-lazy-constraints` |
+| `multiflow_benders` | ✓ | ✓ | `--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--no-root-cuts`, `--in-out-ratio`, `--no-stored-arcs`, `--no-lazy-constraints` |
+| `multiflow_rounding` | ✓ | ✓ | `--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--in-out-ratio`, `--no-stored-arcs`, `--roundings`, `--seed` |
 | `tree_lp` | ✓ | ✓ | `--evict-age` |
 | `path_lp` | ✓ | – | `--evict-age`, `--pricing`, `--max-activations`, `--relative-gap` |
 | `static` | – | – | `-t`, `--decremental`, `--only-dec` |
@@ -65,7 +66,7 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `--solver <name>` | `gurobi` | the solver, used through mippp. `flow_mip` and `path_lp`: `gurobi`, `cplex`, `copt`, `xpress`, `mosek`, `highs`, `scip`, `cbc`, `glpk`. `tree_lp`: the same without `glpk`. `multicut_benders`: all of them; `flow_benders` and `multiflow_benders`: all but `scip`. Only `gurobi`, `cplex` and `copt` give the Benders decompositions [lazy constraints](../formulations/benders.md#without-lazy-constraints) |
+| `--solver <name>` | `gurobi` | the solver, used through mippp. `flow_mip` and `path_lp`: `gurobi`, `cplex`, `copt`, `xpress`, `mosek`, `highs`, `scip`, `cbc`, `glpk`. `tree_lp`: the same without `glpk`. `multicut_benders`: all of them; `flow_benders`, `multiflow_benders` and `multiflow_rounding`: all but `scip`. Only `gurobi`, `cplex` and `copt` give the Benders decompositions [lazy constraints](../formulations/benders.md#without-lazy-constraints) |
 | `-t`, `--feasibility-tolerance <value>` | `1e-07` | the tolerance for rounding errors: the solver's feasibility tolerance, and the relative error accepted on a candidate of a Benders decomposition |
 | `--mip-start <file>` | | a solution file (JSON, as written by `-o`) to start the solver from. Excludes `--mip-start-algorithm` |
 | `--mip-start-algorithm <name>` | `none` | the heuristic whose solution starts the solver, run in its incremental form: `none`, `static`, `greedy`. Its time counts in `--time-limit`. With `--reformulation path_lp`, the solution of the relaxation replaces it. Excludes `--mip-start` |
@@ -76,7 +77,7 @@ See [Optimizing](../usage/optimize.md#parameters-of-the-algorithms).
 
 ## Preprocessing
 
-For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` and `tree_lp`. See [Preprocessing](../formulations/preprocessing.md).
+For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders`, `multiflow_rounding` and `tree_lp`. See [Preprocessing](../formulations/preprocessing.md).
 
 | Parameter | Default | Meaning |
 |---|---|---|
@@ -122,8 +123,17 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` and `tre
 | `--root-cut-tolerance <value>` | `1e-07` | the relative tolerance of the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation), $10^{-7}$ at least: a cut is added when the flow of the relaxation exceeds it by more than this share, and the rounds end when none does. A larger value ends them sooner, with a relaxation above its value with all the cuts by about this share at most, unless the criterion subtracts a constant |
 | `--root-cut-gap <g>` | `0` | also ends the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation) once the `max gain` of their table is within this gap of its `fractional gain`, relative to the score of the fractional gain, as `--relative-gap` does for `path_lp`. `0`: never, the rounds end by `--root-cut-tolerance` only |
 | `--no-root-cuts` | off | for comparison: no cut on the linear relaxation before the search |
-| `--no-in-out` | off | for comparison: separates each optimum of the relaxation, without the center that moves halfway to it |
+| `--in-out-ratio <r>` | `0.5` | the step of the center of the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation), in $[0, 1]$: the share of the way to each new optimum of the relaxation that it moves, from the first optimum. `1` separates each optimum itself, without the center |
 | `--no-stored-arcs` | off | keeps no [set $A_s$](../formulations/benders.md#separation) per source but rebuilds them at each separation: the same cuts, slower, in less memory |
+
+### `multiflow_rounding`
+
+`--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--in-out-ratio` and `--no-stored-arcs` as for `multiflow_benders`, for the [same relaxation](../formulations/benders.md#multiflow_rounding-the-relaxation-rounded), plus:
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `--roundings <n>` | `1000` | the scenarios drawn from the optimum of the relaxation, the first by decreasing $x^*$. `0`: until `--time-limit`, which is then required |
+| `--seed <n>` | `0` | the seed of the draws |
 
 ### `path_lp`
 

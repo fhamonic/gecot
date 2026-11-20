@@ -35,7 +35,7 @@ One row per default of an algorithm: what it was compared with, on what, when, w
 |---|---|---|---|---|---|---|
 | `multicut_benders --grouping` | `voronoi` | `consecutive`, `random` with three seeds | 12 runs on Aix, Quebec and a bike crop, 60 s | 2026-11-10 | against every seed by 5 % or more, `voronoi` is better on 6 of the 12 and never worse; `consecutive` on 3 | c58f74b |
 | `multicut_benders --groups` | 2 | 1, and a group per target | Aix 40 × 40 and 70 × 70, 60 s, with consecutive groups | 2026-11-10 | with 2 groups, one, and a group per target: 1.9 s, 1.1 s and 33.1 s on Aix 40 × 40 at 8; gaps of 3.71 %, 4.69 % and 12.62 % on Aix 70 × 70 at 10 | edff7c0 |
-| `multiflow_benders --no-root-cuts`, `--no-in-out` | off: the rounds, in-out | each on | Aix 40 × 40 and 70 × 70 at 8, 60 s | 2026-11-12 | Aix 70 × 70: 4.2 s; 15.2 s without the center; the limit without the rounds | fb1f619 |
+| `multiflow_benders --no-root-cuts`, `--in-out-ratio` | off: the rounds; `0.5` | the flag on; `1`, without the center, and no other step | Aix 40 × 40 and 70 × 70 at 8, 60 s | 2026-11-12 | Aix 70 × 70: 4.2 s; 15.2 s without the center; the limit without the rounds | fb1f619 |
 | `--mip-start-algorithm` | `none` | `greedy` | Aix 70 × 70 at 10, 60 s, on `naive_benders`, removed since, and on `flow_mip` | 2026-11-10 | **against the default**: a gap of 2.38 % with the start against 4.75 %, and 0.95 % against 1.60 % | 57e13f3 |
 | The barrier of the master of `tree_lp`, taken when nothing is evicted | on, where the solver has it | the simplex | Aude at 8, biobj-Aude at 5, Quebec at 20, on Xpress and MOSEK | 2026-11-11 | fewer rounds: 41 to 17 and 46 to 18 on Aude | c68c0b9 |
 
@@ -54,7 +54,6 @@ A guard keeps a search valid or finite. A tunable is a choice that an experiment
 | The tolerance 1e-8 and the plain big-Ms of the pricing models | `tree_lp.hpp`, `pricing_model` | tunable | nothing. The tolerance does not follow `-t`, which the master does |
 | `root_cut_abs_tol`, 1e-7 | `multiflow_benders.hpp` | tunable | the reason in its comment; no run |
 | `root_time_share`, 0.5 | `multiflow_benders.hpp` | tunable | nothing; two design notes record runs that ended their rounds on it |
-| The step of in-out, 1/2 | `_root_rounds`, `multiflow_benders.hpp` | tunable | in-out on against off (fb1f619); the step never varied |
 | `path_tie`, 1e-9 | `multiflow_target_block.hpp` | tunable | the reason in its comment; no run |
 | `mip_gap`, 1e-10 | `solve_result.hpp` | tunable | nothing |
 | `arc_full` 1e-11, `negligible_flow` 1e-12 | `onaga_default_traits`, `melon/algorithm/onaga.hpp` (melon 1.1.0) | guard | nothing |

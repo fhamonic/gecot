@@ -103,6 +103,7 @@ The exact algorithms and the path relaxation prove a bound as they run, and `gec
 |---|---|
 | `flow_mip` | The dual bound of the branch and bound on the [flow formulation](flow.md) |
 | `multicut_benders`, `flow_benders`, `multiflow_benders` | The dual bound of the search on the master of the [decomposition](benders.md) |
+| `multiflow_rounding` | The value of the relaxation of `multiflow_benders` with its [cuts on the relaxation](benders.md#cuts-on-the-relaxation) |
 | `path_lp` | The [Lagrangian bound](relaxations.md#the-lagrangian-bound) of the path relaxation |
 
 They take the parameters of the algorithm, `--time-limit` among them. The first four are exact when the run ends with the status `optimal`: the bound is then the optimum, up to the tolerances. Stopped earlier, they return the bound proved so far, provided that the search found a solution; without one the method fails. The bound of `path_lp` is the value of a relaxation, above the optimum in general, but it is proved from the first complete round and is often tight: see the [example](../usage/bound.md).

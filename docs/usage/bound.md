@@ -17,6 +17,7 @@ The arguments are those of [`gecot optimize`](optimize.md), with a method in pla
 | `split_lagrange` | also limits the improvements of the arcs by the budget | options of a [simple shape](../formulations/bounds.md#split_lagrange) |
 | `path_lp` | the Lagrangian bound of the path relaxation | a linear solver |
 | `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` | the bound proved by the exact algorithm | a MILP solver; the optimum when the status is `optimal` |
+| `multiflow_rounding` | the relaxation of `multiflow_benders` with its [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation) | a solver other than SCIP, for linear programs only |
 
 The [bounds page](../formulations/bounds.md) explains what each one computes. Every method needs a criterion that is non-decreasing in the score of every case and refuses the others; see the [instance files](instance.md#criterion). Every method accepts [conflict sets](instance.md#conflict-sets) and [several costs](instance.md#several-costs).
 

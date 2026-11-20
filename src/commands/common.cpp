@@ -69,9 +69,28 @@ public:
 
 static_assert(std::atomic<bool>::is_always_lock_free,
               "stop_requested is set in a signal handler");
+// the steady_clock time of the Ctrl-C that set stop_requested
+static std::atomic<std::chrono::steady_clock::rep> stop_time = 0;
+static_assert(decltype(stop_time)::is_always_lock_free,
+              "stop_time is set in a signal handler");
+// A Ctrl-C sets stop_requested; one while it is set ends gecot, but not one
+// within 0.2 s of the Ctrl-C that set it: that is the same, sent again, as
+// GNU timeout sends it to gecot and then to its process group, which would
+// end gecot without its result. An algorithm that takes a Ctrl-C clears
+// stop_requested, as multiflow_benders does at the end of its rounds on the
+// relaxation: the next one is a first one again. steady_clock reads
+// clock_gettime on Linux, which POSIX lists as async-signal-safe.
 extern "C" void request_stop(int) {
-    gecot::stop_requested = true;
-    std::signal(SIGINT, SIG_DFL);  // a second Ctrl-C ends gecot
+    using namespace std::chrono;
+    const auto now = steady_clock::now().time_since_epoch().count();
+    if(!gecot::stop_requested.exchange(true)) {
+        stop_time = now;
+        return;
+    }
+    if(now - stop_time < duration_cast<steady_clock::duration>(200ms).count())
+        return;
+    std::signal(SIGINT, SIG_DFL);
+    std::raise(SIGINT);
 }
 
 // The criterion on one line, its cases by their names and its numbers to 3

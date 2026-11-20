@@ -30,9 +30,9 @@ namespace solvers {
 // The subproblem of multiflow_benders for a target t (benders.md): its graph
 // G_t, each improved copy an arc of its own, for each source the arcs that
 // can carry its flow to t, and the cut of a point.
-// MaxPushes is a parameter for the tests, which stop the flow of a source
-// with 0 and 1.
-template <std::size_t MaxPushes = 100000>
+// Variable is that of the master, for f_t and the f^i_t. MaxPushes is a
+// parameter for the tests, which stop the flow of a source with 0 and 1.
+template <typename Variable, std::size_t MaxPushes = 100000>
 struct multiflow_target_block {
     using graph_t = melon::static_digraph;
     using vertex = melon::vertex_t<graph_t>;
@@ -74,8 +74,12 @@ struct multiflow_target_block {
     case_id_t case_id;
     double target_quality;  // q_t
     double flow_bound;      // M^t_t, the bound of f_t
-    // with the constant M^t_i of the target quality gain of i
-    std::vector<std::tuple<double, option_t, double>> target_quality_gains;
+    // f_t, and the f^i_t of target_quality_gains: the block leaves them
+    // unset, the master sets them
+    Variable f_t{};
+    // with the constant M^t_i of the target quality gain of i, and f^i_t
+    std::vector<std::tuple<double, option_t, double, Variable>>
+        target_quality_gains;
     graph_t graph;
     vertex t;
     vertex_map<double> source_quality_map;  // w_u
@@ -98,8 +102,8 @@ struct multiflow_target_block {
         for(const auto & [source_gain, target_gain, i] :
             instance_case.vertex_options_map()[original_t])
             if(target_gain > 0)
-                target_quality_gains.emplace_back(target_gain, i,
-                                                  G_t.target_big_M(i));
+                target_quality_gains.emplace_back(
+                    target_gain, i, G_t.target_big_M(i), Variable{});
         flow_bound = G_t.big_M_map.value()[G_t.t];
         std::tie(t, graph, source_quality_map, source_options_map,
                  probability_map, option_map) = static_flow_graph(G_t);
@@ -253,7 +257,7 @@ struct multiflow_target_block {
     // flow, and the second value returned is false.
     std::pair<double, bool> _largest_flow(const source & source_s,
                                           const double supply,
-                                          const std::vector<double> & x_hat,
+                                          const auto & x_hat,
                                           flow_search & search) const {
         auto & [capacities, algorithm] = search;
         const vertex s = source_s.s;
@@ -275,20 +279,8 @@ struct multiflow_target_block {
                 false};
     }
 
-    // The cut of the point x̂: for each source, its largest flow to t at
-    // x̂ and the dual solution that comes with it. At a scenario y one
-    // path takes the whole supply, so value is f_t(y). rebuild: the
-    // sources have no A_s kept.
-    cut separate(const std::vector<double> & x_hat, const bool rebuild) const {
-        cut result{source_quality_map[t], source_quality_map[t],
-                   std::vector<double>(x_hat.size(), 0.0)};
-        for(const auto & [source_gain, i] : source_options_map[t]) {
-            result.coefficients[i] += source_gain;
-            result.value += source_gain * x_hat[i];
-        }
-        // One search for all the sources: the labels of t over every arc
-        // open at x̂ are feasible potentials for the first residual graph
-        // of each source, whose arcs are among these.
+    // The best gains to t over the arcs open at x̂
+    vertex_map<double> _open_to_t(const auto & x_hat) const {
         auto open_to_t = melon::create_vertex_map<double>(graph, 0.0);
         for(const auto & [u, probability] : melon::dijkstra(
                 reversed_traits{}, melon::views::reverse(graph),
@@ -299,6 +291,46 @@ struct multiflow_target_block {
                 }),
                 t))
             open_to_t[u] = probability;
+        return open_to_t;
+    }
+
+    // the quality of the source s at x̂
+    double _supply(const vertex s, const auto & x_hat) const {
+        double supply = source_quality_map[s];
+        for(const auto & [source_gain, i] : source_options_map[s])
+            supply += source_gain * x_hat[i];
+        return supply;
+    }
+
+    // f_t(y) at a scenario y, the value of separate(y) without its cut: each
+    // source sends its quality along a best path to t, which lies in its
+    // A_s, so the labels of one search from t over the arcs open at y give
+    // every flow.
+    double flow_at(const melon::mapping<option_t> auto & y) const {
+        const auto open_to_t = _open_to_t(y);
+        double value = _supply(t, y);
+        for(const source & source_s : sources)
+            value += _supply(source_s.s, y) * open_to_t[source_s.s];
+        return value;
+    }
+
+    // The cut of the point x̂: for each source, its largest flow to t at
+    // x̂ and the dual solution that comes with it. At a scenario y one
+    // path takes the whole supply, so value is f_t(y). rebuild: the
+    // sources have no A_s kept. x̂ has a value in [0, 1] for each option,
+    // x_hat.size() of them.
+    cut separate(const melon::mapping<option_t> auto & x_hat,
+                 const bool rebuild) const {
+        cut result{source_quality_map[t], source_quality_map[t],
+                   std::vector<double>(x_hat.size(), 0.0)};
+        for(const auto & [source_gain, i] : source_options_map[t]) {
+            result.coefficients[i] += source_gain;
+            result.value += source_gain * x_hat[i];
+        }
+        // One search for all the sources: the labels of t over every arc
+        // open at x̂ are feasible potentials for the first residual graph
+        // of each source, whose arcs are among these.
+        const auto open_to_t = _open_to_t(x_hat);
         flow_search search(graph, probability_map, open_to_t);
         const auto & algorithm = search.algorithm;
         std::optional<source_search> from_s;
@@ -311,11 +343,8 @@ struct multiflow_target_block {
             }
             const source & source_s = rebuild ? rebuilt : kept;
             const vertex s = source_s.s;
-            double supply = source_quality_map[s];
-            for(const auto & [source_gain, i] : source_options_map[s])
-                supply += source_gain * x_hat[i];
             const auto [flow, settled] =
-                _largest_flow(source_s, supply, x_hat, search);
+                _largest_flow(source_s, _supply(s, x_hat), x_hat, search);
             result.value += flow;
             result.settled = result.settled && settled;
             const double rho_s = algorithm.potential(s);

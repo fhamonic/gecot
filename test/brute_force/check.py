@@ -36,13 +36,17 @@ CONFIGS = [
     "multicut_benders", "multicut_benders --big-m tight", "multicut_benders --groups 0",
     "flow_benders", "flow_benders --big-m knapsack_dantzig", "flow_benders --nb-mus 3",
     "flow_benders --indicator-constraints",
-    "multiflow_benders", "multiflow_benders --no-root-cuts", "multiflow_benders --no-in-out",
+    "multiflow_benders", "multiflow_benders --no-root-cuts", "multiflow_benders --in-out-ratio 1",
     "multiflow_benders --no-stored-arcs",
     "multiflow_benders --root-cut-tolerance 1e-3", "multiflow_benders --root-cut-gap 1e-3",
+    "multiflow_benders --mip-start-algorithm greedy",
+    "multiflow_benders --mip-start-algorithm greedy --no-lazy-constraints",
     "flow_benders --no-lazy-constraints", "multicut_benders --no-lazy-constraints",
     "multiflow_benders --no-lazy-constraints", "multiflow_benders --solver highs",
     "flow_mip --big-m exact", "multicut_benders --big-m exact", "flow_benders --big-m exact",
     "multiflow_benders --big-m exact",
+    "multiflow_rounding", "multiflow_rounding --roundings 10 --seed 3",
+    "multiflow_rounding --mip-start-algorithm greedy", "multiflow_rounding --solver highs",
     "path_lp", "path_lp --pricing enumerate", "flow_mip --reformulation path_lp",
     "multicut_benders --reformulation path_lp --reformulation-params pricing=enumerate",
     "static", "greedy", "greedy --worst",
@@ -54,7 +58,8 @@ CONFIGS = [
 def relaxed(config):
     """Not exact: the relaxations, the heuristics and the bounds."""
     words = config.split()
-    return words[0] in ("static", "greedy", "path_lp", "bound") or "--lp-relaxation" in words
+    return (words[0] in ("static", "greedy", "path_lp", "multiflow_rounding", "bound")
+            or "--lp-relaxation" in words)
 
 
 def write_instances(out):

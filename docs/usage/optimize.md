@@ -27,6 +27,7 @@ $ gecot optimize --list-algorithms
 | `multicut_benders` | [Benders decomposition](../formulations/benders.md#multicut_benders-cuts-on-groups-of-targets) with a cut per group of targets | optimal |
 | `flow_benders` | [Benders decomposition](../formulations/benders.md#flow_benders-cuts-on-the-flows) with a cut per target flow | optimal |
 | `multiflow_benders` | [Benders decomposition](../formulations/benders.md#multiflow_benders-cuts-per-source) with cuts per source and target | optimal |
+| `multiflow_rounding` | the relaxation of `multiflow_benders`, then a [randomized rounding](../formulations/benders.md#multiflow_rounding-the-relaxation-rounded) of its optimum | a solution and an upper bound |
 | `path_lp` | the [path relaxation](../formulations/relaxations.md), by column generation | a solution and an upper bound |
 | `tree_lp` | the [tree relaxation](../formulations/relaxations.md#the-tree-formulation), by column generation | none: can exceed the budget |
 | `static`, `greedy` | the [heuristics](../formulations/heuristics.md), incremental or, with a single cost and no conflict set, with `--decremental` | none |
@@ -50,7 +51,7 @@ $ gecot optimize --list-algorithms
 
 ## Parameters of the algorithms
 
-The parameters of each algorithm are listed on the [parameters page](../reference/parameters.md). The ones below are common to all the algorithms that use a solver: `flow_mip`, the three Benders decompositions, `path_lp` and `tree_lp`.
+The parameters of each algorithm are listed on the [parameters page](../reference/parameters.md). The ones below are common to all the algorithms that use a solver: `flow_mip`, the three Benders decompositions, `multiflow_rounding`, `path_lp` and `tree_lp`.
 
 ### Solver
 

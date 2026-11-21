@@ -151,7 +151,7 @@ $$
 l = \left\lfloor \frac{-\ln \max\{\pi, \varepsilon\}}{\ln(1 + \varepsilon)} \right\rfloor\,.
 $$
 
-A probability below $\varepsilon$ is thus treated as $\varepsilon$, and two paths are told apart only if their probabilities differ by a factor of about $1 + h \cdot \varepsilon$, for paths of $h$ arcs. Integer lengths make the comparisons of the labelling exact, at the price of this resolution: an arc can be labelled against a path that beats it by less. The optimum that the algorithms prove is therefore exact *up to the resolution*. This matters only when the gains at stake are of that order, for instance a budget that only buys options that are negligible at the scale of the landscape: then compare with `--preprocessing none`, which uses no label.
+A probability below $\varepsilon$ is thus treated as $\varepsilon$, and two paths are told apart only if their probabilities differ by a factor of about $1 + h \cdot \varepsilon$, for paths of $h$ arcs. Integer lengths make the comparisons of the labelling exact, at the price of this resolution: an arc can be labelled against a path that beats it by less. The optimum that the algorithms prove is therefore exact *up to the resolution*. This matters only when the gains at stake are of that order, for instance a budget that only buys options that are negligible at the scale of the landscape: then compare with `--no-strong-arcs --no-useless-arcs`, which uses no label.
 
 The resolution must lie strictly between 0 and 1, and GECOT also refuses one so small that the lengths of a path could overflow their 64-bit integers: from about $5 \cdot 10^{-12}$ down on a graph of a million vertices, $5 \cdot 10^{-14}$ on one of ten thousand. Between these limits any value is accepted, however coarse: keep it well below the probabilities of the instance, which the labels otherwise no longer tell apart.
 
@@ -208,11 +208,11 @@ $$
 
 For a scenario $x$ of cost at most $\beta$ and a simple path $Q$, the options that $x$ buys pay at most $\mu \cdot \beta$ along $Q$, so $l^x(Q) \ge \lambda^\mu(Q) - \mu \cdot \beta$. The colouring algorithm run with the lower lengths $\lambda^\mu$, the paths through $(u,v)$ being handicapped by $\mu \cdot \beta$, therefore yields labels that are valid within the budget. Each multiplier gives its own labels, and they accumulate: $\mu = 0$ gives the labels of the previous sections, and larger multipliers add to them. With [several costs](problem.md#several-costs-and-conflict-sets), $c_i$ and $\beta$ are the costs and the budget of the first cost dimension, in the [order of their names](../usage/instance.md#several-costs); ignoring the other dimensions and the conflict sets only weakens the labels.
 
-`--nb-mus N` turns this on, with $N + 1$ positive multipliers in geometric progression up to the largest useful one, after $\mu = 0$. It is experimental, and off by default ($N = 0$):
+`--mu-steps N` turns this on, with $N + 1$ positive multipliers in geometric progression up to the largest useful one, after $\mu = 0$. It is experimental, and off by default ($N = 0$):
 
 - it helps only when the budget is small in absolute terms, so that few options fit together; where it finds nothing it only adds preprocessing time, since each multiplier costs one more pass;
-- `--nb-mus 20` suits graphs where a pass takes well under half a second, `--nb-mus 9` larger ones; compare with `--nb-mus 0` on your instance before relying on it;
-- `--mus-sweep decades`, the default, spreads the multipliers over at most the three decades below the largest useful one and tests $\mu = 0$ once more at the end; `--mus-sweep full` starts from the inverse of the largest cost per arc.
+- `--mu-steps 20` suits graphs where a pass takes well under half a second, `--mu-steps 9` larger ones; compare with `--mu-steps 0` on your instance before relying on it;
+- `--mu-sweep decades`, the default, spreads the multipliers over at most the three decades below the largest useful one and tests $\mu = 0$ once more at the end; `--mu-sweep full` starts from the inverse of the largest cost per arc.
 
 ## Big-M constants
 
@@ -279,13 +279,13 @@ The constant $M^t_t$ of the target quality gain of $i$ is bounded in the same wa
 |---|---|---|
 | Merging the vertices linked with probability 1 | `--no-merging` | `gecot optimize`, every algorithm |
 | Skipping the vertices that are never targets | `--all-targets` | `flow_mip`, the three Benders decompositions, `tree_lp` |
-| Removing the useless arcs | `--preprocessing strong` or `none` | same |
-| Contracting the strong arcs | `--preprocessing useless` or `none` | same |
+| Removing the useless arcs | `--no-useless-arcs` | same |
+| Contracting the strong arcs | `--no-strong-arcs` | same |
 | Pruning | `--no-pruning` | same |
-| Budget-aware labels | off unless `--nb-mus N` | same |
+| Budget-aware labels | off unless `--mu-steps N` | same |
 | Big-M constants within the budget | `--big-m plain` | `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders` |
 
-`--preprocessing` takes `all` (the default), `strong` (only the contraction), `useless` (only the removal) or `none`. Both kinds of labels are computed together, so `strong` and `useless` measure the size of the model and the time to solve it, not the time to label.
+Both kinds of labels are computed together unless both switches are given, so `--no-strong-arcs` or `--no-useless-arcs` alone measures the size of the model and the time to solve it, not the time to label.
 
 As an order of magnitude, here is `flow_mip` on a 30 × 30 raster landscape of the repository (`test/instances/Aix/instance_30x30`, 2,700 vertices, 5,280 arcs, 18 options) at budget 8, with Gurobi on an 8-core desktop computer, one run each. Every run returns the same optimum.
 
@@ -294,9 +294,9 @@ As an order of magnitude, here is `flow_mip` on a 30 × 30 raster landscape of t
 | default | 22,817 | 11,116 | 1.0 s |
 | `--big-m plain` | 22,817 | 11,116 | 0.9 s |
 | `--no-pruning` | 29,839 | 14,003 | 0.9 s |
-| `--preprocessing strong` | 43,209 | 13,469 | 1.8 s |
-| `--preprocessing useless` | 55,564 | 39,149 | 1.3 s |
-| `--preprocessing none` | 179,471 | 86,124 | 6.3 s |
+| `--no-useless-arcs` | 43,209 | 13,469 | 1.8 s |
+| `--no-strong-arcs` | 55,564 | 39,149 | 1.3 s |
+| `--no-strong-arcs --no-useless-arcs` | 179,471 | 86,124 | 6.3 s |
 | `--no-merging` | 481,084 | 182,938 | 4.6 s |
 | `--all-targets` | 814,021 | 422,885 | 5.2 s |
 

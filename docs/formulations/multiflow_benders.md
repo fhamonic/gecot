@@ -83,7 +83,7 @@ In the example nothing is removed, bought or merged. The qualities are multiplie
 
 ## 2. The labels of the arcs
 
-For each case, the colouring algorithm of [Preprocessing](preprocessing.md#strong-and-useless-arcs) finds, for each target $t$, the $t$-strong arcs $S(t)$ and the $t$-useless arcs $W(t)$. It makes two runs of an adapted Dijkstra's algorithm per arc, in parallel. `--preprocessing` chooses what the labels are used for, `--resolution` sets the precision of their comparisons, and `--nb-mus` and `--mus-sweep` add the labels that hold within the budget only. The log shows `Preprocessing the 'squirrel' graph`.
+For each case, the colouring algorithm of [Preprocessing](preprocessing.md#strong-and-useless-arcs) finds, for each target $t$, the $t$-strong arcs $S(t)$ and the $t$-useless arcs $W(t)$. It makes two runs of an adapted Dijkstra's algorithm per arc, in parallel. `--no-strong-arcs` and `--no-useless-arcs` switch off what the labels are used for, `--resolution` sets the precision of their comparisons, and `--mu-steps` and `--mu-sweep` add the labels that hold within the budget only. The log shows `Preprocessing the 'squirrel' graph`.
 
 In the example, for the target `wood_c`:
 

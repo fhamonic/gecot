@@ -12,13 +12,13 @@ public:
     MulticutBendersInterface() : AbstractMipInterface("multicut_benders") {
         add_benders_options(solver);
         add_preprocessing_options(solver);
-        app.add_option("--groups", solver.num_groups,
-                       "Groups of targets per graph, each with its own cuts "
-                       "(1: a single cut per graph; 0: a group per target)")
+        app.add_option("--target-groups", solver.num_groups,
+                       "Groups of targets per case, each with its own cuts "
+                       "(1: a single cut per case; 0: a group per target)")
             ->default_val(solver.num_groups);
         using grouping = gecot::solvers::multicut_benders::grouping;
         add_choice_option<grouping>(
-            app, "--grouping", solver.groups,
+            app, "--target-grouping", solver.groups,
             {{"voronoi", grouping::voronoi},
              {"consecutive", grouping::consecutive},
              {"random", grouping::random}},
@@ -27,8 +27,8 @@ public:
             "targets of value far from each other; consecutive: groups of "
             "consecutive targets; random: groups of targets drawn at "
             "random, as a control");
-        app.add_option("--grouping-seed", solver.random_seed,
-                       "Seed of --grouping random")
+        app.add_option("--target-grouping-seed", solver.random_seed,
+                       "Seed of --target-grouping random")
             ->default_val(solver.random_seed);
         add_big_M_option(solver.big_Ms);
     }
@@ -38,7 +38,7 @@ public:
 
     std::string description() const override {
         return "Benders decomposition with a cut per group of targets, "
-               "from a single cut per graph to a cut per target";
+               "from a single cut per case to a cut per target";
     }
     std::optional<std::string> bound_description() const override {
         return "Dual bound of the multicut Benders master; needs an incumbent.";

@@ -662,3 +662,189 @@ GTEST_TEST(solvers, multiflow_cuts_are_valid_and_tight) {
     EXPECT_GT(gave_up_at_0, 0u);
     EXPECT_GT(gave_up_at_1, 0u);
 }
+
+// make_groups splits the sources not affine into ⌈n / size⌉ groups, none
+// empty, each source in one group or affine, each group within the sum of
+// the bounds of its sources; and the parts of the groups with the fixed part
+// add up to the cut, at the point separated and at another; the fixed part
+// is the target's own quality with the flows of the affine sources, those of
+// their parts in the cut. Voronoi puts together sources close in G_t: twice
+// as many pairs of a group as random are adjacent or share a neighbor other
+// than t. Aude is a river network; Quebec, under a budget of 1000, has
+// sources with no improved copy, some of quality gains; on cover-40 every
+// way has probability 1, the arcs of a way to a kernel then decide its cell,
+// and no voronoi cell takes half the sources of the target.
+GTEST_TEST(solvers, multiflow_source_groups_partition_the_sources) {
+    using block_t =
+        gecot::solvers::multiflow_target_block<mippp::model_variable<int, double>>;
+    using grouping = gecot::solvers::source_grouping;
+    // the paths that the test must cover
+    std::size_t num_voronoi = 0, num_shared = 0, num_with_affine = 0;
+    struct tested {
+        std::string name;
+        double budget;  // 0: every option
+        bool balanced;  // voronoi cells under half the sources
+    };
+    for(const tested & tested_instance :
+        {tested{"/test/instances/Aude/aude.json", 0, false},
+         tested{"/test/instances/Quebec_438_RASY/instance.json", 1000, false},
+         tested{"/benchmark/instances/cover-40/instance.json", 0, true}}) {
+        const std::string path = PROJECT_SOURCE_DIR + tested_instance.name;
+        const Instance instance = parse_instance(path);
+        const std::size_t n = instance.options().size();
+        double all_costs = 0;
+        for(auto && i : instance.options()) all_costs += instance.option_cost(i);
+        const gecot::budget_t budget{
+            {tested_instance.budget > 0 ? tested_instance.budget : all_costs}};
+        std::vector<double> x_hat(n), other(n);
+        for(std::size_t i = 0; i < n; ++i) {
+            x_hat[i] = static_cast<double>(i + 1) / static_cast<double>(n + 1);
+            other[i] = static_cast<double>(i % 2);
+        }
+        // of each grouping, the pairs of a group close in G_t
+        std::array<std::size_t, 3> close_pairs{};
+        for(const auto & instance_case : instance.cases()) {
+            const auto & graph = instance_case.graph();
+            const auto [strong_arcs_map, useless_arcs_map] =
+                gecot::compute_strong_and_useless_arcs(
+                    instance_case,
+                    [](const gecot::option_t &) { return true; }, 1e-8, true);
+            for(const auto & t : melon::vertices(graph)) {
+                block_t block(instance_case, t,
+                              gecot::compute_contracted_flow_graph<false>(
+                                  instance, instance_case, budget, t,
+                                  strong_arcs_map[t], useless_arcs_map[t],
+                                  gecot::big_M_kind::plain, 1e-7, true));
+                block.compute_sources(true);
+                std::size_t num_affine = 0;
+                for(const auto & source : block.sources)
+                    num_affine += source.improved_copies.empty();
+                const std::size_t num_grouped =
+                    block.sources.size() - num_affine;
+                const auto cut = block.separate(x_hat, false, true);
+                // each source with its neighbors other than t, sorted
+                std::vector<std::vector<std::size_t>> around(
+                    block.sources.size());
+                for(std::size_t k = 0; k < block.sources.size(); ++k) {
+                    const auto s = block.sources[k].s;
+                    around[k].push_back(s);
+                    for(const auto a : melon::out_arcs(block.graph, s))
+                        around[k].push_back(melon::arc_target(block.graph, a));
+                    for(const auto a : melon::in_arcs(block.graph, s))
+                        around[k].push_back(melon::arc_source(block.graph, a));
+                    std::erase(around[k], block.t);
+                    std::ranges::sort(around[k]);
+                }
+                auto close = [&](const std::size_t k1, const std::size_t k2) {
+                    std::vector<std::size_t> both;
+                    std::ranges::set_intersection(around[k1], around[k2],
+                                                  std::back_inserter(both));
+                    return !both.empty();
+                };
+                for(const grouping method :
+                    {grouping::voronoi, grouping::consecutive,
+                     grouping::random})
+                    for(const std::size_t size :
+                        std::initializer_list<std::size_t>{1, 2, 3, 5, 16}) {
+                        std::mt19937_64 rng{size};
+                        block.make_groups(size, method, true, rng);
+                        const std::size_t expected_groups =
+                            (num_grouped + size - 1) / size;
+                        if(expected_groups <= 1) {
+                            EXPECT_TRUE(block.groups.empty());
+                            EXPECT_TRUE(block.affine_sources.empty());
+                            continue;
+                        }
+                        num_voronoi += method == grouping::voronoi &&
+                                       expected_groups < num_grouped;
+                        num_with_affine += num_affine > 0;
+                        ASSERT_EQ(block.groups.size(), expected_groups);
+                        EXPECT_EQ(block.affine_sources.size(), num_affine);
+                        std::vector<int> seen(block.sources.size(), 0);
+                        for(const std::size_t k : block.affine_sources) {
+                            EXPECT_TRUE(
+                                block.sources[k].improved_copies.empty());
+                            ++seen[k];
+                        }
+                        std::size_t largest = 0;
+                        for(const auto & group : block.groups) {
+                            EXPECT_FALSE(group.members.empty());
+                            for(std::size_t m1 = 0; m1 < group.members.size();
+                                ++m1)
+                                for(std::size_t m2 = m1 + 1;
+                                    m2 < group.members.size(); ++m2)
+                                    close_pairs[static_cast<std::size_t>(
+                                        method)] += close(group.members[m1],
+                                                          group.members[m2]);
+                            num_shared += group.members.size() > 1;
+                            largest = std::max(largest, group.members.size());
+                            double bound = 0;
+                            for(const std::size_t k : group.members) {
+                                ++seen[k];
+                                bound +=
+                                    block.source_flow_bound(block.sources[k]);
+                            }
+                            EXPECT_NEAR(group.bound, bound,
+                                        1e-12 * std::max(1.0, bound));
+                        }
+                        for(const int count : seen) EXPECT_EQ(count, 1);
+                        if(method != grouping::voronoi) {
+                            EXPECT_LE(largest, size);
+                        }
+                        if(tested_instance.balanced &&
+                           method == grouping::voronoi) {
+                            EXPECT_LT(2 * largest, num_grouped)
+                                << path << ": size " << size;
+                        }
+                        const auto [constant, terms] = block.fixed_part();
+                        // the target's own quality and the parts of the
+                        // affine sources, option by option
+                        double expected_constant =
+                            block.source_quality_map[block.t];
+                        std::vector<double> expected(n, 0.0), fixed(n, 0.0);
+                        for(const auto & [source_gain, i] :
+                            block.source_options_map[block.t])
+                            expected[i] += source_gain;
+                        for(const std::size_t k : block.affine_sources) {
+                            expected_constant += cut.sources[k].constant;
+                            for(const auto & [i, coefficient] :
+                                cut.sources[k].coefficients)
+                                expected[i] += coefficient;
+                        }
+                        for(const auto & [i, coefficient] : terms)
+                            fixed[i] += coefficient;
+                        EXPECT_NEAR(constant, expected_constant,
+                                    1e-9 * std::abs(expected_constant) + 1e-12);
+                        for(std::size_t i = 0; i < n; ++i)
+                            EXPECT_NEAR(fixed[i], expected[i],
+                                        1e-9 * std::abs(expected[i]) + 1e-12)
+                                << path << ": vertex " << t << ", option "
+                                << i;
+                        for(const auto & y : {x_hat, other}) {
+                            auto at = [&](const gecot::option_t i) {
+                                return y[i];
+                            };
+                            double sum = constant;
+                            for(const auto & [i, coefficient] : terms)
+                                sum += coefficient * y[i];
+                            for(std::size_t g = 0; g < block.groups.size();
+                                ++g)
+                                sum += block.group_part(g, cut).at(at);
+                            double cut_at = cut.constant;
+                            for(std::size_t i = 0; i < n; ++i)
+                                cut_at += cut.coefficients[i] * y[i];
+                            EXPECT_NEAR(sum, cut_at,
+                                        1e-9 * std::max(1.0, cut_at))
+                                << path << ": vertex " << t;
+                        }
+                    }
+            }
+        }
+        EXPECT_GT(close_pairs[static_cast<std::size_t>(grouping::voronoi)],
+                  2 * close_pairs[static_cast<std::size_t>(grouping::random)])
+            << path;
+    }
+    EXPECT_GT(num_voronoi, 0u);
+    EXPECT_GT(num_shared, 0u);
+    EXPECT_GT(num_with_affine, 0u);
+}

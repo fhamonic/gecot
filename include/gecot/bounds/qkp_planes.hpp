@@ -333,7 +333,7 @@ struct qkp_planes {
                 weighted_target = target.value() - form->constant;
             else
                 spdlog::warn(
-                    "qkp_planes: --target ignored, the criterion is not "
+                    "qkp_planes: --aim-score ignored, the criterion is not "
                     "linear");
         }
         const double b = bound_criterion(

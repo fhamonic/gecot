@@ -6,6 +6,8 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <queue>
+#include <random>
 #include <ranges>
 #include <span>
 #include <tuple>
@@ -26,6 +28,12 @@
 
 namespace gecot {
 namespace solvers {
+
+// How multiflow_target_block::make_groups splits the sources of a target:
+// voronoi, the cells of a network Voronoi diagram on G_t around sources of
+// flow far from each other; consecutive, by vertex of G_t; random, drawn at
+// random, as a control
+enum class source_grouping { voronoi, consecutive, random };
 
 // The subproblem of multiflow_benders for a target t (benders.md): its graph
 // G_t, each improved copy an arc of its own, for each source the arcs that
@@ -61,6 +69,23 @@ struct multiflow_target_block {
         std::vector<arc> arcs;
         std::vector<std::pair<arc, double>> improved_copies;
     };
+    // The part of a source in a cut: f_st <= constant + Σ coefficients in
+    // every scenario, by option, sorted, without duplicate or 0. value is
+    // the flow of the source at the point separated, or the bound of its
+    // part there when its flow did not settle. Of a group: the sum of the
+    // parts of its sources.
+    struct source_cut {
+        std::size_t source;  // in sources, or in groups
+        double value = 0, constant = 0;
+        std::vector<std::pair<option_t, double>> coefficients{};
+
+        double at(auto && x) const {
+            double result = constant;
+            for(const auto & [i, coefficient] : coefficients)
+                result += coefficient * x(i);
+            return result;
+        }
+    };
     // f_t <= constant + Σ_i coefficients[i] x_i in every scenario; value
     // is the flow that reaches t at the point separated. When the flow
     // of a source did not settle, it is the value of the cut at that
@@ -69,7 +94,217 @@ struct multiflow_target_block {
         double value = 0, constant = 0;
         std::vector<double> coefficients;
         bool settled = true;  // the flow of every source
+        // asked by per_source: the part of each source, whose sum with the
+        // target's own quality is the cut
+        std::vector<source_cut> sources{};
     };
+
+    // sorted by option, the duplicates summed, without 0
+    static void _merge(std::vector<std::pair<option_t, double>> & terms) {
+        std::ranges::sort(terms, {}, &std::pair<option_t, double>::first);
+        auto out = terms.begin();
+        for(auto it = terms.begin(); it != terms.end();) {
+            const option_t i = it->first;
+            double sum = 0;
+            for(; it != terms.end() && it->first == i; ++it) sum += it->second;
+            if(sum != 0) *out++ = {i, sum};
+        }
+        terms.erase(out, terms.end());
+    }
+
+    // w̄_s Π̄(s, t): the flow of the source in every scenario and at every
+    // point is at most its best quality on its best path
+    double source_flow_bound(const source & source_s) const {
+        return _best_quality(source_s.s) * best_to_t[source_s.s];
+    }
+
+    // The variables of the master for the sources, when make_groups made two
+    // groups or more; without, the cuts bound f_t. A source whose A_s has no
+    // improved copy has the flow Π(s, t) w^x_s at every point, affine, which
+    // fixed_part() writes exactly; the others are split into groups, each
+    // with a variable f_tg within the sum of the bounds of its sources, that
+    // receives the sum of their parts.
+    struct source_group {
+        Variable f{};
+        std::vector<std::size_t> members;  // in sources
+        double bound = 0;
+    };
+    std::vector<source_group> groups;
+    std::vector<std::size_t> affine_sources;  // in sources
+
+    // Splits the n sources not affine into ⌈n / group_size⌉ groups, by
+    // grouping, rng for random; group_size 0: a single group. fold_affine:
+    // the affine sources in no group, which needs their A_s. A single group
+    // leaves no group and no affine source: the cuts on f_t are then as
+    // tight.
+    void make_groups(const std::size_t group_size,
+                     const source_grouping grouping, const bool fold_affine,
+                     std::mt19937_64 & rng) {
+        groups.clear();
+        affine_sources.clear();
+        if(group_size == 0) return;
+        std::vector<std::size_t> grouped;
+        for(std::size_t k = 0; k < sources.size(); ++k)
+            (fold_affine && sources[k].improved_copies.empty()
+                 ? affine_sources
+                 : grouped)
+                .push_back(k);
+        const std::size_t n = grouped.size();
+        const std::size_t g_count = (n + group_size - 1) / group_size;
+        if(g_count <= 1) {
+            affine_sources.clear();
+            return;
+        }
+        std::vector<std::size_t> cells(n);
+        // a group per source needs no cell
+        if(grouping == source_grouping::voronoi && g_count < n)
+            cells = _voronoi_cells(grouped, g_count);
+        else {
+            if(grouping == source_grouping::random)
+                std::ranges::shuffle(grouped, rng);
+            for(std::size_t j = 0; j < n; ++j) cells[j] = j * g_count / n;
+        }
+        groups.assign(g_count, source_group{});
+        for(std::size_t j = 0; j < n; ++j) {
+            source_group & group = groups[cells[j]];
+            group.members.push_back(grouped[j]);
+            group.bound += source_flow_bound(sources[grouped[j]]);
+        }
+    }
+
+    // The cell of each source of grouped, by its index there, among g_count
+    // kernels on G_t without t, its arcs in both directions at their best
+    // probability: the way of a vertex to a kernel is the most reliable, P,
+    // then of fewest arcs, which decide between the ways of probability 1.
+    // The kernels are the source of largest bound w̄_s Π̄(s, t), then each
+    // time the one of largest w̄_s Π̄(s, t) (1 - P), then of most arcs to
+    // its kernel, as multicut_benders picks its kernels. A source falls in
+    // the cell of the kernel of its best way, ahead of the kernels after it:
+    // the cells gather sources close in G_t, by ways that can go against the
+    // arcs, which only approximates sources whose flows to t share arcs and
+    // options. Without t, whose arcs link every source to every other. A
+    // source that reaches no kernel falls in the smallest cell. Each kernel takes its cell by a
+    // search from it through the vertices whose way it betters, the only
+    // ones whose cell changes.
+    std::vector<std::size_t> _voronoi_cells(
+        const std::vector<std::size_t> & grouped,
+        const std::size_t g_count) const {
+        const std::size_t n = grouped.size();
+        constexpr std::size_t far = std::numeric_limits<std::size_t>::max();
+        // the way of each vertex to its kernel, P and its arcs, and its
+        // cell, g_count without
+        auto to_kernel = melon::create_vertex_map<double>(graph, 0.0);
+        auto hops = melon::create_vertex_map<std::size_t>(graph, far);
+        auto cell = melon::create_vertex_map<std::size_t>(graph, g_count);
+        std::vector<double> bounds(n);
+        std::vector<char> is_kernel(n, false);
+        auto key = [&](const std::size_t j) {
+            const vertex s = sources[grouped[j]].s;
+            return std::make_pair(bounds[j] * (1 - to_kernel[s]), hops[s]);
+        };
+        // the sources by their key when pushed: keys only decrease, so the
+        // first entry popped at the key of its source has the largest
+        std::priority_queue<
+            std::pair<std::pair<double, std::size_t>, std::size_t>>
+            candidates;
+        for(std::size_t j = 0; j < n; ++j) {
+            bounds[j] = source_flow_bound(sources[grouped[j]]);
+            candidates.emplace(key(j), j);
+        }
+        // the best way first: P, then far minus its arcs
+        std::priority_queue<std::tuple<double, std::size_t, vertex>> heap;
+        auto reach = [&](const vertex v, const double probability,
+                         const std::size_t arcs, const std::size_t c) {
+            if(v == t || probability < to_kernel[v] ||
+               (probability == to_kernel[v] && arcs >= hops[v]))
+                return;
+            to_kernel[v] = probability;
+            hops[v] = arcs;
+            cell[v] = c;
+            heap.emplace(probability, far - arcs, v);
+        };
+        for(std::size_t c = 0; c < g_count; ++c) {
+            // g_count <= n: a source not a kernel remains in candidates
+            std::size_t kernel = 0;
+            for(;;) {
+                const auto [pushed_key, j] = candidates.top();
+                candidates.pop();
+                if(is_kernel[j]) continue;
+                if(const auto current = key(j); current < pushed_key) {
+                    candidates.emplace(current, j);
+                    continue;
+                }
+                kernel = j;
+                break;
+            }
+            is_kernel[kernel] = true;
+            // its own cell, even at a way of probability 1 to a kernel
+            const vertex k = sources[grouped[kernel]].s;
+            to_kernel[k] = 1;
+            hops[k] = 0;
+            cell[k] = c;
+            heap.emplace(1.0, far, k);
+            while(!heap.empty()) {
+                const auto [probability, far_arcs, u] = heap.top();
+                heap.pop();
+                const std::size_t arcs = far - far_arcs;
+                // bettered since
+                if(probability != to_kernel[u] || arcs != hops[u]) continue;
+                for(const arc a : melon::out_arcs(graph, u))
+                    reach(melon::arc_target(graph, a),
+                          probability * probability_map[a], arcs + 1, c);
+                for(const arc a : melon::in_arcs(graph, u))
+                    reach(melon::arc_source(graph, a),
+                          probability * probability_map[a], arcs + 1, c);
+            }
+        }
+        std::vector<std::size_t> cells(n), sizes(g_count, 0);
+        for(std::size_t j = 0; j < n; ++j) {
+            cells[j] = cell[sources[grouped[j]].s];
+            if(cells[j] < g_count) ++sizes[cells[j]];
+        }
+        for(std::size_t j = 0; j < n; ++j)
+            if(cells[j] == g_count) {
+                cells[j] = static_cast<std::size_t>(
+                    std::ranges::min_element(sizes) - sizes.begin());
+                ++sizes[cells[j]];
+            }
+        return cells;
+    }
+
+    // The fixed part of f_t: the target's own quality, w_t + Σ_i w^i_t x_i,
+    // and the flow Π(s, t) w^x_s of each affine source, its constant and its
+    // terms, merged
+    std::pair<double, std::vector<std::pair<option_t, double>>> fixed_part()
+        const {
+        double constant = source_quality_map[t];
+        std::vector<std::pair<option_t, double>> terms;
+        for(const auto & [source_gain, i] : source_options_map[t])
+            terms.emplace_back(i, source_gain);
+        for(const std::size_t k : affine_sources) {
+            const vertex s = sources[k].s;
+            constant += base_to_t[s] * source_quality_map[s];
+            for(const auto & [source_gain, i] : source_options_map[s])
+                terms.emplace_back(i, base_to_t[s] * source_gain);
+        }
+        _merge(terms);
+        return {constant, std::move(terms)};
+    }
+
+    // the part of the group g in the cut c, separated per_source
+    source_cut group_part(const std::size_t g, const cut & c) const {
+        source_cut part{g};
+        for(const std::size_t k : groups[g].members) {
+            const source_cut & source_part = c.sources[k];
+            part.value += source_part.value;
+            part.constant += source_part.constant;
+            part.coefficients.insert(part.coefficients.end(),
+                                     source_part.coefficients.begin(),
+                                     source_part.coefficients.end());
+        }
+        _merge(part.coefficients);
+        return part;
+    }
 
     case_id_t case_id;
     double target_quality;  // q_t
@@ -306,21 +541,31 @@ struct multiflow_target_block {
     // source sends its quality along a best path to t, which lies in its
     // A_s, so the labels of one search from t over the arcs open at y give
     // every flow.
-    double flow_at(const melon::mapping<option_t> auto & y) const {
+    // on_source(k, flow) receives the flow of each source k of sources.
+    double flow_at(const melon::mapping<option_t> auto & y,
+                   auto && on_source) const {
         const auto open_to_t = _open_to_t(y);
         double value = _supply(t, y);
-        for(const source & source_s : sources)
-            value += _supply(source_s.s, y) * open_to_t[source_s.s];
+        for(std::size_t k = 0; k < sources.size(); ++k) {
+            const double flow =
+                _supply(sources[k].s, y) * open_to_t[sources[k].s];
+            on_source(k, flow);
+            value += flow;
+        }
         return value;
+    }
+    double flow_at(const melon::mapping<option_t> auto & y) const {
+        return flow_at(y, [](std::size_t, double) {});
     }
 
     // The cut of the point x̂: for each source, its largest flow to t at
     // x̂ and the dual solution that comes with it. At a scenario y one
     // path takes the whole supply, so value is f_t(y). rebuild: the
     // sources have no A_s kept. x̂ has a value in [0, 1] for each option,
-    // x_hat.size() of them.
+    // x_hat.size() of them. per_source: the cut also gives the part of each
+    // source.
     cut separate(const melon::mapping<option_t> auto & x_hat,
-                 const bool rebuild) const {
+                 const bool rebuild, const bool per_source = false) const {
         cut result{source_quality_map[t], source_quality_map[t],
                    std::vector<double>(x_hat.size(), 0.0)};
         for(const auto & [source_gain, i] : source_options_map[t]) {
@@ -336,7 +581,9 @@ struct multiflow_target_block {
         std::optional<source_search> from_s;
         if(rebuild) from_s.emplace(graph);
         source rebuilt{};
-        for(const source & kept : sources) {
+        if(per_source) result.sources.reserve(sources.size());
+        for(std::size_t k = 0; k < sources.size(); ++k) {
+            const source & kept = sources[k];
             if(rebuild) {
                 rebuilt.s = kept.s;
                 _source_arcs(rebuilt, *from_s);
@@ -360,6 +607,22 @@ struct multiflow_target_block {
                 result.coefficients[option_map[a].value()] +=
                     big_M * std::max(sigma, 0.0);
             }
+            if(!per_source) continue;
+            // the same terms, for this source alone
+            source_cut & part = result.sources.emplace_back(
+                k, flow, rho_s * source_quality_map[s]);
+            for(const auto & [source_gain, i] : source_options_map[s])
+                part.coefficients.emplace_back(i, rho_s * source_gain);
+            for(const auto & [a, big_M] : source_s.improved_copies) {
+                const double sigma =
+                    probability_map[a] *
+                        algorithm.potential(melon::arc_target(graph, a)) -
+                    algorithm.potential(melon::arc_source(graph, a));
+                if(sigma > 0)
+                    part.coefficients.emplace_back(option_map[a].value(),
+                                                   big_M * sigma);
+            }
+            _merge(part.coefficients);
         }
         return result;
     }

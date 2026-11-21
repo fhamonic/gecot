@@ -15,13 +15,15 @@ public:
         add_big_M_option(solver.big_Ms);
         add_root_cut_options(solver);
         add_stored_arcs_option(solver);
+        add_source_group_options(solver);
         app.add_option("--roundings", solver.roundings,
                        "Scenarios drawn from the optimum of the relaxation, "
                        "the first by decreasing x (0: until --time-limit, "
                        "which is then required)")
             ->default_val(solver.roundings);
-        app.add_option("--seed", solver.random_seed, "Seed of the draws")
-            ->default_val(solver.random_seed);
+        app.add_option("--rounding-seed", solver.rounding_seed,
+                       "Seed of the draws")
+            ->default_val(solver.rounding_seed);
     }
 
     gecot::solve_result<Instance> solve(

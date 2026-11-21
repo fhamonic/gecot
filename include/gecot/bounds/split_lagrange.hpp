@@ -569,7 +569,7 @@ public:
             spdlog::info(
                 "split_lagrange: one bound per case, the criterion is not "
                 "linear");
-            if(target) spdlog::info("split_lagrange: --target ignored");
+            if(target) spdlog::info("split_lagrange: --aim-score ignored");
         }
         std::size_t total_iterations = 0;
         bool timed_out = false;

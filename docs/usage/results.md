@@ -84,9 +84,10 @@ $ gecot optimize flow_mip three-woods.json 7 -o solution.json
         "time-limit":            null,
         "numeric-focus":         false,
         "resolution":            1e-08,
-        "nb-mus":                0,
-        "mus-sweep":             "decades",
-        "preprocessing":         "all",
+        "mu-steps":              0,
+        "mu-sweep":              "decades",
+        "no-strong-arcs":        false,
+        "no-useless-arcs":       false,
         "all-targets":           false,
         "no-pruning":            false,
         "big-m":                 "knapsack_bnb",
@@ -163,6 +164,7 @@ The `algorithm_report` depends on the algorithm:
 | `lazy_constraints` | the Benders decompositions | the cuts handed to the solver during the search, as lazy constraints or as constraints of a master solved again. One that the candidate violates by at most the solver's tolerance is counted too, although CPLEX and COPT are then not given it |
 | `master_solves` | the Benders decompositions [without lazy constraints](../formulations/benders.md#without-lazy-constraints) | the times the master was solved |
 | `sources`, `root_rounds`, `root_cuts`, `root_relaxation_value` | `multiflow_benders`, `multiflow_rounding` | the source and target pairs, and the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation): the relaxations solved before the search, the cuts they added, and the value of the last one |
+| `source_groups`, `affine_sources` | `multiflow_benders`, `multiflow_rounding`, with `--source-group-size` | the flow variables of the [groups of sources](../formulations/benders.md#groups-of-sources), and the sources written exactly in the row of $f_t$ |
 | `roundings`, `scenarios` | `multiflow_rounding` | the scenarios drawn from the optimum of the relaxation, and the distinct ones scored, in the [rounding](../formulations/benders.md#multiflow_rounding-the-relaxation-rounded) |
 | `iterations`, `relaxation_value`, `pool_columns`, `evicted_columns` | `path_lp`, `tree_lp` | the rounds of the column generation whose master was solved, and the value of the last master |
 | `pairs`, `searches` or `columns` | `path_lp` | the pairs priced, and the searches or the columns of its pricing |
@@ -188,7 +190,7 @@ option_id,value
 Each line of the log starts with the seconds elapsed since `gecot` started. On a terminal, the levels have their colours: warnings in yellow, errors in red. A terminal also shows a progress bar while the graph of each case is preprocessed and, for the Benders decompositions, while the graphs of its targets are built; at `-v`, also at each step of a heuristic. A bar is erased before the next line of the log, is never written to a file or a pipe, and `-q` hides it.
 
 ```console
-$ gecot optimize multicut_benders instance.json 8 --preprocessing none --time-limit 25
+$ gecot optimize multicut_benders instance.json 8 --no-strong-arcs --no-useless-arcs --time-limit 25
 [   0.0s] GECOT 2.0, algorithm multicut_benders
 [   0.0s] Instance: /home/user/instances/Aix/instance_40x40/instance.json
 [   0.0s] Options count: 27
@@ -277,11 +279,11 @@ With `-v` again, the algorithms that [preprocess](../formulations/preprocessing.
 
 | Column | Meaning |
 |---|---|
-| `strong arcs per target`, `useless arcs per target` | the arcs that the graph of a target loses, contracted or removed, on average over the targets of the case; 0 for a kind that `--preprocessing` switches off |
+| `strong arcs per target`, `useless arcs per target` | the arcs that the graph of a target loses, contracted or removed, on average over the targets of the case; 0 for a kind that `--no-strong-arcs` or `--no-useless-arcs` switches off |
 | `vertices per target`, `arcs per target` | for `flow_mip`, `flow_benders` and `multiflow_benders`, the size of the graph of a target once preprocessed, on average |
 | `targets per group` | for `multicut_benders`, the number of targets of each group of the case |
 
-With [`--nb-mus`](../formulations/preprocessing.md#taking-the-budget-into-account), the budget-aware preprocessing of each graph logs a table before this one: a row for µ = 0 and one for each multiplier that adds labels. A line then says how many add some, as `0 of the 11 multipliers after the first add labels`: with 0, the budget-aware labelling found nothing more than µ = 0.
+With [`--mu-steps`](../formulations/preprocessing.md#taking-the-budget-into-account), the budget-aware preprocessing of each graph logs a table before this one: a row for µ = 0 and one for each multiplier that adds labels. A line then says how many add some, as `0 of the 11 multipliers after the first add labels`: with 0, the budget-aware labelling found nothing more than µ = 0.
 
 ### Ctrl-C
 

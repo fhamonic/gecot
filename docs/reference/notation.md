@@ -54,13 +54,13 @@ The symbols of the [formulation pages](../formulations/problem.md), next to the 
 | Symbol | Meaning | In GECOT |
 |---|---|---|
 | $\mathbb{S}(t)$, $\mathbb{W}(t)$ | the $t$-strong and the $t$-useless arcs | |
-| $S(t)$, $W(t)$ | the subsets that GECOT computes, with continuous scenarios | parameter `--preprocessing` |
+| $S(t)$, $W(t)$ | the subsets that GECOT computes, with continuous scenarios | parameters `--no-strong-arcs`, `--no-useless-arcs` |
 | $[\,l^-_a, l^+_a\,]$ | interval of the length $-\log \pi$ of the arc $a$ | |
 | $l^x_a$, $d^x(s,t)$ | length of an arc and distance in the scenario $x$ | |
 | $F^x(u,v)$, $F(u,v)$ | fiber of the arc $(u,v)$ in the scenario $x$, and in every scenario | |
 | $\varepsilon$ | resolution of the integer lengths | parameter `--resolution` |
 | $G_t$ | reduced graph of the target $t$ | |
-| $\mu$, $\lambda^\mu_a$ | Lagrange multiplier of the budget-aware labelling and of the tight constants, and the lengths it penalizes | parameters `--nb-mus`, `--mus-sweep` |
+| $\mu$, $\lambda^\mu_a$ | Lagrange multiplier of the budget-aware labelling and of the tight constants, and the lengths it penalizes | parameters `--mu-steps`, `--mu-sweep` |
 | $k_j$, $\Pi^\mu(s,u)$ | bound on the arcs of the option $j$ on a simple path, and probability of connection under the tolls of the [tight constants](../formulations/preprocessing.md#the-tight-constants) | `--big-m tight` |
 | $A_i$ | the arcs that the option $i$ improves | |
 
@@ -73,7 +73,7 @@ The symbols of the [formulation pages](../formulations/problem.md), next to the 
 | $y$, $Y_t$, $Y_g$ | reference scenario of a cut, and the scenarios at which the target $t$, the group $g$, received one so far | |
 | $\operatorname{cut}_{t,y}(x)$ | cut of the target $t$ at $y$, a linear function of $x$ | field `lazy_constraints` |
 | $v_t(x)$ | value of the target $t$, $q^x_t \cdot f_t(x)$; also the variable that `flow_mip` gives it | |
-| $\theta_g$, $\mathcal{G}_k$ | value of the group of targets $g$, and the groups of the case $k$ | parameter `--groups` |
+| $\theta_g$, $\mathcal{G}_k$ | value of the group of targets $g$, and the groups of the case $k$ | parameter `--target-groups` |
 | $A_s$, $m_{sa}$, $\rho^s$ | arcs, big-M constants and potentials of the source $s$ in `multiflow_benders` | field `sources` |
 | $\hat{x}$ | the point at which `multiflow_benders` separates a cut, fractional or not | |
 | $x^*$, $f^*_t$ | an optimum of the linear relaxation of the master, in the [rounds](../formulations/multiflow_benders.md#7-the-rounds-on-the-relaxation) of `multiflow_benders` | field `root_rounds` |

@@ -1,9 +1,12 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <functional>
+#include <limits>
 #include <optional>
+#include <random>
 #include <ranges>
 #include <utility>
 #include <variant>
@@ -65,6 +68,29 @@ struct multiflow_benders : public benders_base {
     // the rounds take at most this share of --time-limit, which leaves the
     // search the other half
     static constexpr double root_time_share = 0.5;
+    // Experimental: the n_t sources of each target not affine in ⌈n_t /
+    // source_group_size⌉ groups, by grouping; 0: no group. A target of two
+    // groups or more has a variable f_tg per group, within the sum of their
+    // w̄_s Π̄(s, t), which receives the sum of their parts in each cut, and
+    // the row f_t <= w^x_t + Σ_g f_tg, which bounds f_t in place of the cuts:
+    // each group keeps the least of its own parts, where f_t kept the least
+    // of their sums. A cut on f_t still comes with them when they leave the
+    // point over it. With stored_arcs, the sources whose A_s has no improved
+    // copy have an affine flow, written exactly in that row, in no group. At
+    // convergence the relaxation is the same: over a finite set of cuts, the
+    // groups combine the parts of different cuts, which f_t alone cannot.
+    std::size_t source_group_size = 0;
+    source_grouping grouping = source_grouping::voronoi;
+    // of random, with the index of the target
+    std::size_t grouping_seed = 0;
+    // In a target with groups, the part of a group is added when the point's
+    // f_tg exceeds it by the tolerance of the test of f_t, relative, and by
+    // source_cut_abs_tol or --feasibility-tolerance, the larger, or when it
+    // is under the group's envelope at the point, its bound and its parts so
+    // far, by that relative tolerance and source_cut_abs_tol shared by the
+    // groups of the target. The cut on f_t is added too when no part cuts the
+    // point off, or when the parts leave f_t over the tolerances.
+    static constexpr double source_cut_abs_tol = 1e-7;
 
     // the sources of every block; returns their number
     template <typename B>
@@ -91,29 +117,50 @@ struct multiflow_benders : public benders_base {
         std::vector<typename B::cut> cuts(blocks.size());
         tbb::parallel_for(std::size_t{0}, blocks.size(),
                           [&](const std::size_t b) {
-                              cuts[b] = blocks[b].separate(x_hat, !stored_arcs);
+                              cuts[b] = blocks[b].separate(
+                                  x_hat, !stored_arcs,
+                                  !blocks[b].groups.empty());
                           });
         return cuts;
     }
+    // of a block at a candidate: the f_t of the candidate, its cut if it is
+    // overvalued, and the flow of each of its groups at the scenario
+    template <typename B>
+    struct overvalued_block {
+        double f_t = 0;
+        std::optional<typename B::cut> cut;
+        std::vector<double> group_flows;
+    };
     // The search, steps 2 and 3: the cut at the scenario y of each block
     // whose f_t in candidate exceeds f_t(y), which it writes there, its own
     // variable from its thread. Not inline in solve(): there, the loop is
-    // compiled again for each backend and each add of _benders_search.
+    // compiled again for each backend and each add of _benders_search. The
+    // f_tg are left to the caller.
     template <typename B>
-    std::vector<std::optional<typename B::cut>> _overvalued_cuts(
+    std::vector<overvalued_block<B>> _overvalued_cuts(
         const std::vector<B> & blocks, const melon::mapping<option_t> auto & y,
         auto & candidate) const {
-        std::vector<std::optional<typename B::cut>> cuts(blocks.size());
+        std::vector<overvalued_block<B>> result(blocks.size());
         tbb::parallel_for(
             std::size_t{0}, blocks.size(), [&](const std::size_t b) {
                 const B & block = blocks[b];
-                const double flow = block.flow_at(y);
-                if(std::exchange(candidate[block.f_t], flow) - flow <=
-                   feasibility_tol * flow)
-                    return;
-                cuts[b] = block.separate(y, !stored_arcs);
+                auto & [f_t, cut, group_flows] = result[b];
+                const bool grouped = !block.groups.empty();
+                std::vector<double> flows;
+                if(grouped) flows.resize(block.sources.size());
+                const double flow =
+                    block.flow_at(y, [&](const std::size_t k, const double f) {
+                        if(grouped) flows[k] = f;
+                    });
+                group_flows.assign(block.groups.size(), 0.0);
+                for(std::size_t g = 0; g < block.groups.size(); ++g)
+                    for(const std::size_t k : block.groups[g].members)
+                        group_flows[g] += flows[k];
+                f_t = std::exchange(candidate[block.f_t], flow);
+                if(f_t - flow <= feasibility_tol * flow) return;
+                cut = block.separate(y, !stored_arcs, grouped);
             });
-        return cuts;
+        return result;
     }
 
     // The value of the point x̂ separated, with the flows of the cuts, in the
@@ -149,13 +196,13 @@ struct multiflow_benders : public benders_base {
     // The rounds of cuts on the linear relaxation, for which the options x
     // are continuous: each solves the master, separates its optimum, or the
     // point in_out_separation of the way to it from the center, which then
-    // moves in_out_ratio of the way to it, and adds as a row
-    // cut_constraint(block, cut) for each block whose f_t exceeds its cut.
+    // moves in_out_ratio of the way to it, and adds as rows
+    // add_cut(block, cut, ...) for each block whose f_t exceeds its cut.
     template <typename M, instance_c I, typename B>
     root_rounds _root_rounds(M & model, const spdlog::stopwatch & sw,
                              const I & instance, const auto & x,
                              const std::vector<B> & blocks,
-                             auto && cut_constraint) const {
+                             auto && add_cut) const {
         namespace status = mippp::status;
         root_rounds root;
         // a Ctrl-C before the rounds stops the whole run
@@ -196,7 +243,7 @@ struct multiflow_benders : public benders_base {
             if(lift > 0)
                 for(auto && i : instance.options())
                     separated[i] = std::max(separated[i], lift);
-            const auto cuts = _separate(blocks, separated);
+            auto cuts = _separate(blocks, separated);
             // A lifted point can be over the budget: its value can exceed the
             // relaxation's, and --root-cut-gap would then end the rounds early
             if(lift == 0)
@@ -206,7 +253,7 @@ struct multiflow_benders : public benders_base {
             // the smallest --root-cut-tolerance at which no cut is added
             double violation = 0;
             std::size_t num_added = 0;
-            for(const auto & [block, cut] : std::views::zip(blocks, cuts)) {
+            for(auto && [block, cut] : std::views::zip(blocks, cuts)) {
                 const double f_at_optimum = relaxation[block.f_t];
                 const double cut_at_optimum = std::ranges::fold_left(
                     std::views::transform(instance.options(),
@@ -222,10 +269,15 @@ struct multiflow_benders : public benders_base {
                 // not `<=` then skip: a NaN --root-cut-tolerance, which the
                 // CLI's range lets through, would add every cut forever
                 if(f_at_optimum >
-                   cut_at_optimum * (1 + root_cut_tol) + root_cut_abs_tol) {
-                    model.add_constraint(cut_constraint(block, cut));
-                    ++num_added;
-                }
+                   cut_at_optimum * (1 + root_cut_tol) + root_cut_abs_tol)
+                    num_added += add_cut(
+                        block, cut, optimum,
+                        [&](const auto & v) { return relaxation[v]; },
+                        root_cut_tol, f_at_optimum,
+                        [&](auto && row) {
+                            model.add_constraint(
+                                std::forward<decltype(row)>(row));
+                        });
             }
             report_progress({.bound = root.value,
                              .relaxation = root_floor,
@@ -260,7 +312,7 @@ struct multiflow_benders : public benders_base {
 
     // Builds the master and its blocks, adds the cuts of the MIP start and
     // runs the rounds on the relaxation, then returns the solution that
-    // search(model, sw, x, z, formula, blocks, cut_constraint, root) finds
+    // search(model, sw, x, z, formula, blocks, add_cut, root) finds
     // and its report, which receives the statistics of the blocks and of the
     // rounds. multiflow_rounding shares all but the search.
     template <mippp::has_column_generation M, instance_c I>
@@ -342,33 +394,149 @@ struct multiflow_benders : public benders_base {
         _log_graph_sizes(preprocessing);
         const std::size_t num_sources = _compute_sources(blocks);
 
-        // multiflow_benders: the cut of a block as a row. A lazy sum that
-        // reads the cut: only valid while the cut lives.
-        auto cut_constraint = [&](const target_block & block, const cut & c) {
-            return block.f_t <=
-                   c.constant + xsum(std::views::filter(
-                                         instance.options(),
-                                         [&c](const option_t i) {
-                                             return c.coefficients[i] != 0;
-                                         }),
-                                     [&](const option_t i) {
-                                         return c.coefficients[i] * x(i);
-                                     });
+        // the groups of each block, their f_tg, and the row
+        // f_t <= w^x_t + Σ_g f_tg that they fill
+        std::size_t num_group_flows = 0, num_affine = 0, largest_group = 0;
+        if(source_group_size > 0) {
+            tbb::parallel_for(
+                std::size_t{0}, blocks.size(), [&](const std::size_t b) {
+                    // seed_seq keeps 32 bits of each value
+                    std::seed_seq seed{grouping_seed & 0xffffffff,
+                                       grouping_seed >> 32, b};
+                    std::mt19937_64 rng(seed);
+                    blocks[b].make_groups(source_group_size, grouping,
+                                          stored_arcs, rng);
+                });
+            for(target_block & block : blocks) {
+                if(block.groups.empty()) continue;
+                const auto [fixed_constant, fixed_terms] = block.fixed_part();
+                const auto link_row = model.add_constraint(
+                    block.f_t <= fixed_constant +
+                                     xsum(fixed_terms, [&](const auto & term) {
+                                         return term.second * x(term.first);
+                                     }));
+                for(auto & group : block.groups) {
+                    group.f = model.add_column({std::make_pair(link_row, -1.0)},
+                                               {.upper_bound = group.bound});
+                    largest_group =
+                        std::max(largest_group, group.members.size());
+                }
+                num_group_flows += block.groups.size();
+                num_affine += block.affine_sources.size();
+            }
+            spdlog::debug(
+                "Source groups: {} variables, the largest of {} sources, {} "
+                "affine sources",
+                num_group_flows, largest_group, num_affine);
+        }
+        // the parts of each group of each block added so far, its envelope
+        std::vector<std::vector<std::vector<typename target_block::source_cut>>>
+            group_parts(blocks.size());
+        for(std::size_t b = 0; b < blocks.size(); ++b)
+            group_parts[b].resize(blocks[b].groups.size());
+        // multiflow_benders: the cut c of a block as rows, each through add:
+        // the row of f_t, or with groups those of the parts of the groups
+        // that the point, its f_tg read by value_of, exceeds by tol,
+        // or that are under the group's envelope there by tol, and the row of
+        // f_t when the point, f_value its f_t, exceeds the cut by tol and no
+        // part cuts it off, or the master with these parts still allows f_t
+        // over the cut there: a candidate of the search may break rows
+        // already added, which must then cut it off again. Returns their
+        // number. Lazy sums that read the cut: only valid while the cut lives.
+        auto add_cut = [&](const target_block & block, cut & c, auto && point,
+                           auto && value_of, const double tol,
+                           const double f_value,
+                           auto && add) -> std::size_t {
+            auto f_t_row = [&] {
+                return block.f_t <=
+                       c.constant + xsum(std::views::filter(
+                                             instance.options(),
+                                             [&c](const option_t i) {
+                                                 return c.coefficients[i] != 0;
+                                             }),
+                                         [&](const option_t i) {
+                                             return c.coefficients[i] * x(i);
+                                         });
+            };
+            if(block.groups.empty()) {
+                add(f_t_row());
+                return 1;
+            }
+            auto & parts =
+                group_parts[static_cast<std::size_t>(&block - blocks.data())];
+            const double abs_tol =
+                source_cut_abs_tol /
+                static_cast<double>(std::max<std::size_t>(1, parts.size()));
+            std::size_t num_rows = 0;
+            bool cut_off = false;  // by a part
+            // what the master allows f_t at point over the cut: Σ of the
+            // envelopes of the groups not cut over their parts
+            double slack = 0;
+            for(std::size_t g = 0; g < parts.size(); ++g) {
+                auto part = block.group_part(g, c);
+                const double at = part.at(point);
+                const double over = value_of(block.groups[g].f) - at;
+                double envelope = block.groups[g].bound;
+                for(const auto & old : parts[g])
+                    envelope = std::min(envelope, old.at(point));
+                // the envelope shares the absolute tolerance among the
+                // groups; a part cuts the point off only by all of it and
+                // by the solver's tolerance, within which the solver could
+                // keep the point
+                const double part_tol = tol * std::abs(at) + abs_tol;
+                const double cut_off_tol =
+                    tol * std::abs(at) +
+                    std::max(source_cut_abs_tol, feasibility_tol);
+                if(over > cut_off_tol || at < envelope - part_tol) {
+                    add(block.groups[g].f <=
+                        part.constant +
+                            xsum(part.coefficients, [&](const auto & term) {
+                                return term.second * x(term.first);
+                            }));
+                    ++num_rows;
+                    cut_off = cut_off || over > cut_off_tol;
+                    parts[g].push_back(std::move(part));
+                } else
+                    slack += envelope - at;
+            }
+            double cut_at = c.constant;
+            for(auto && i : instance.options())
+                cut_at += c.coefficients[i] * point(i);
+            const double cut_tol = cut_at * (1 + tol) + source_cut_abs_tol;
+            if(f_value > cut_tol && (!cut_off || cut_at + slack > cut_tol)) {
+                add(f_t_row());
+                ++num_rows;
+            }
+            return num_rows;
         };
         // The search, step 1: the cuts of the MIP start
-        if(const auto start = _add_mip_start(model, instance, x))
-            for(const auto & [block, c] :
-                std::views::zip(blocks, _separate(blocks, *start)))
-                model.add_constraint(cut_constraint(block, c));
+        if(const auto start = _add_mip_start(model, instance, x)) {
+            auto start_cuts = _separate(blocks, *start);
+            for(auto && [block, c] : std::views::zip(blocks, start_cuts))
+                add_cut(
+                    block, c,
+                    [&](const option_t i) { return (*start)[i] ? 1.0 : 0.0; },
+                    [](const auto &) {
+                        return -std::numeric_limits<double>::infinity();
+                    },
+                    0.0, -std::numeric_limits<double>::infinity(),
+                    [&](auto && row) {
+                        model.add_constraint(std::forward<decltype(row)>(row));
+                    });
+        }
 
         spdlog::info("Solving the optimization model");
         // Cuts on the relaxation, before the search
         const root_rounds root =
-            _root_rounds(model, sw, instance, x, blocks, cut_constraint);
+            _root_rounds(model, sw, instance, x, blocks, add_cut);
 
         auto [solution, report] =
-            search(model, sw, x, z, formula, blocks, cut_constraint, root);
+            search(model, sw, x, z, formula, blocks, add_cut, root);
         report.stats.emplace_back("sources", num_sources);
+        if(source_group_size > 0) {
+            report.stats.emplace_back("source_groups", num_group_flows);
+            report.stats.emplace_back("affine_sources", num_affine);
+        }
         report.stats.emplace_back("root_rounds", root.rounds);
         report.stats.emplace_back("root_cuts", root.cuts);
         // the relaxation with its cuts bounds the optimum too, better than
@@ -389,17 +557,17 @@ struct multiflow_benders : public benders_base {
             instance, budget,
             [&](auto & model, const auto & sw, const auto & x, const auto & z,
                 const auto & formula, const auto & blocks,
-                const auto & cut_constraint, const root_rounds &) {
+                const auto & add_cut, const root_rounds &) {
                 // The search, steps 2 to 4: the flows of a candidate y and the
                 // cut at y of each target whose f_t exceeds its flow. The flows
                 // need no cut, and the cuts are made for these targets only.
                 auto cuts_at = [&](auto & candidate, const auto & y,
                                    auto && add) {
-                    const auto overvalued =
-                        _overvalued_cuts(blocks, y, candidate);
+                    auto overvalued = _overvalued_cuts(blocks, y, candidate);
                     auto case_scores = instance.create_case_map(0.0);
-                    for(const auto & [block, block_cut] :
+                    for(auto && [block, over] :
                         std::views::zip(blocks, overvalued)) {
+                        auto & [f_value, block_cut, group_flows] = over;
                         // f_t(y), which _overvalued_cuts left in candidate
                         const double flow = candidate[block.f_t];
                         double quality = block.target_quality;
@@ -409,7 +577,17 @@ struct multiflow_benders : public benders_base {
                             quality += y[i] * target_gain;
                         }
                         case_scores[block.case_id] += quality * flow;
-                        if(block_cut) add(cut_constraint(block, *block_cut));
+                        if(block_cut)
+                            add_cut(
+                                block, *block_cut,
+                                [&](const option_t i) {
+                                    return y[i] ? 1.0 : 0.0;
+                                },
+                                [&](const auto & v) { return candidate[v]; },
+                                feasibility_tol, f_value, add);
+                        // the f_tg at y
+                        for(std::size_t g = 0; g < group_flows.size(); ++g)
+                            candidate[block.groups[g].f] = group_flows[g];
                     }
                     return case_scores;
                 };

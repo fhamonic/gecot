@@ -19,6 +19,7 @@ public:
             "For comparison: no cut on the linear relaxation before the "
             "search");
         add_stored_arcs_option(solver);
+        add_source_group_options(solver);
     }
 
     gecot::solve_result<Instance> solve(

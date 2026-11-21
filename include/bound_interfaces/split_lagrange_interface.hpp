@@ -10,7 +10,7 @@
 class SplitLagrangeInterface : public AbstractBoundInterface {
 private:
     gecot::split_lagrange method;
-    std::optional<double> target;  // raw score
+    std::optional<double> aim_score;  // raw score
 
 public:
     SplitLagrangeInterface() : AbstractBoundInterface("split_lagrange") {
@@ -23,10 +23,10 @@ public:
                        "the best bound of the complete steps is returned; for "
                        "each case a non-linear criterion reads")
             ->check(CLI::NonNegativeNumber);
-        add_target_option(target,
-                          "Score the steps aim at, the best known solution's "
-                          "for instance (default: the score of the first "
-                          "knapsack solution's whole options)");
+        add_aim_score_option(aim_score,
+                             "Score the steps aim at, the best known "
+                             "solution's for instance (default: the score of "
+                             "the first knapsack solution's whole options)");
         using theta_start = gecot::qkp_planes::theta_start;
         add_choice_option<theta_start>(
             app, "--theta", method.vertex_side.start,
@@ -45,7 +45,7 @@ public:
                                 const gecot::budget_t & B,
                                 const bound_context & context) const override {
         gecot::split_lagrange m = method;
-        if(target) m.target = target.value() / context.score_scale;
+        if(aim_score) m.target = aim_score.value() / context.score_scale;
         return m.bound(instance, B);
     }
 

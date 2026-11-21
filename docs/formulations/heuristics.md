@@ -32,7 +32,7 @@ There are two heuristics, `static` and `greedy`, and each works in two direction
 
 **`greedy --decremental`** starts from the scenario that buys every option and repeats: compute the loss $\Delta^-_i(x)$ of each option bought, and remove the one whose loss is the smallest, until the cost fits the budget. It then spends what is left of the budget as `greedy` does, among the options removed. This is the principle of the Zonation algorithm.
 
-With `--decremental`, `--only-dec` skips these final purchases.
+With `--decremental`, `--no-add-back` skips these final purchases.
 
 The incremental steps, these final purchases included, buy as long as an option fits, even one that gains nothing, but not one that would lower the score. Only a [criterion that decreases](../usage/instance.md#which-formulas-the-algorithms-accept) in the score of a case allows such an option, and for such a criterion the decremental steps go on once the cost fits, as long as a removal raises the score. `greedy --worst` keeps no such rule.
 
@@ -87,7 +87,7 @@ The swaps change one option at a time. An option in a conflict set with each of 
 
 ## Parameters
 
-The heuristics take `-t`, the tolerance used when comparing a cost with the budget ($10^{-7}$ by default, in every dimension), `--decremental` and, with it, `--only-dec`, both with a single cost and no conflict set; `greedy` also takes `--worst`. `static` always ends with the status `completed`: Ctrl-C does not interrupt it. `greedy` stops at Ctrl-C after its current step, once its cost is within the budget (with `--decremental`, not before its removals reach the budget), with the status `interrupted` and the options bought so far.
+The heuristics take `-t`, the tolerance used when comparing a cost with the budget ($10^{-7}$ by default, in every dimension), `--decremental` and, with it, `--no-add-back`, both with a single cost and no conflict set; `greedy` also takes `--worst`. `static` always ends with the status `completed`: Ctrl-C does not interrupt it. `greedy` stops at Ctrl-C after its current step, once its cost is within the budget (with `--decremental`, not before its removals reach the budget), with the status `interrupted` and the options bought so far.
 
 ## Reference
 

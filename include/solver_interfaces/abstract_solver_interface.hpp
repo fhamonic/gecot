@@ -44,7 +44,7 @@ inline std::vector<std::pair<std::string, std::string>> option_values(
 
 // The value of option, its default if not given, as a JSON value: a boolean
 // for a flag, a number for a numeric option, null without a value, else a
-// string. The type is the option's, not the text's: '--preprocessing none'
+// string. The type is the option's, not the text's: '--big-m plain'
 // is a string and a MIP start file named 7 too.
 inline std::string option_json_value(const CLI::Option & option) {
     const std::string type = option.get_type_name();

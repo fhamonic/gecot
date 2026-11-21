@@ -99,7 +99,7 @@ The start also seeds the cuts of the Benders decompositions and the columns of t
 
 ### Preprocessing
 
-`flow_mip`, the Benders decompositions and `tree_lp` share the parameters of the [preprocessing](../formulations/preprocessing.md): `--resolution`, `--nb-mus`, `--mus-sweep`, and the switches that disable its steps. The defaults are the right choice in practice; the switches are there to measure what each step brings.
+`flow_mip`, the Benders decompositions and `tree_lp` share the parameters of the [preprocessing](../formulations/preprocessing.md): `--resolution`, `--mu-steps`, `--mu-sweep`, and the switches that disable its steps. The defaults are the right choice in practice; the switches are there to measure what each step brings.
 
 ## Removing options first
 

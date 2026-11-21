@@ -65,7 +65,7 @@ Three things set it apart from ranking the actions one by one:
 
 !!! info "Version"
 
-    This documentation describes GECOT 2.0, the version of the `main` branch of the repository. The command of the 1.0 release was `gecot_optimize <algorithm> ...`: it is now `gecot optimize <algorithm> ...`, its algorithm `prep_mip` is `flow_mip`, and its `mip` is `flow_mip --preprocessing none`.
+    This documentation describes GECOT 2.0, the version of the `main` branch of the repository. The command of the 1.0 release was `gecot_optimize <algorithm> ...`: it is now `gecot optimize <algorithm> ...`, its algorithm `prep_mip` is `flow_mip`, whose big-Ms are now within the budget (`--big-m plain` gives those of 1.0), and its `mip` is `flow_mip --no-strong-arcs --no-useless-arcs --all-targets --no-pruning --big-m plain`.
 
 ## Citation
 

@@ -53,14 +53,14 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 | Algorithm | Common | Preprocessing | Own parameters |
 |---|:-:|:-:|---|
 | `flow_mip` | ✓ | ✓ | `--big-m`, `--lp-relaxation`, `--indicator-constraints` |
-| `multicut_benders` | ✓ | ✓ | `--groups`, `--grouping`, `--grouping-seed`, `--big-m`, `--no-lazy-constraints` |
+| `multicut_benders` | ✓ | ✓ | `--target-groups`, `--target-grouping`, `--target-grouping-seed`, `--big-m`, `--no-lazy-constraints` |
 | `flow_benders` | ✓ | ✓ | `--big-m`, `--indicator-constraints`, `--no-lazy-constraints` |
-| `multiflow_benders` | ✓ | ✓ | `--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--no-root-cuts`, `--in-out-ratio`, `--in-out-separation`, `--in-out-lift`, `--no-stored-arcs`, `--no-lazy-constraints` |
-| `multiflow_rounding` | ✓ | ✓ | `--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--in-out-ratio`, `--in-out-separation`, `--in-out-lift`, `--no-stored-arcs`, `--roundings`, `--seed` |
+| `multiflow_benders` | ✓ | ✓ | `--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--no-root-cuts`, `--in-out-ratio`, `--in-out-separation`, `--in-out-lift`, `--no-stored-arcs`, `--source-group-size`, `--source-grouping`, `--source-grouping-seed`, `--no-lazy-constraints` |
+| `multiflow_rounding` | ✓ | ✓ | `--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--in-out-ratio`, `--in-out-separation`, `--in-out-lift`, `--no-stored-arcs`, `--source-group-size`, `--source-grouping`, `--source-grouping-seed`, `--roundings`, `--rounding-seed` |
 | `tree_lp` | ✓ | ✓ | `--evict-age` |
 | `path_lp` | ✓ | – | `--evict-age`, `--pricing`, `--max-activations`, `--relative-gap` |
-| `static` | – | – | `-t`, `--decremental`, `--only-dec` |
-| `greedy` | – | – | `-t`, `--decremental`, `--only-dec`, `--worst` |
+| `static` | – | – | `-t`, `--decremental`, `--no-add-back` |
+| `greedy` | – | – | `-t`, `--decremental`, `--no-add-back`, `--worst` |
 
 ## Common to the MILP-based algorithms
 
@@ -82,9 +82,10 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders`, `multif
 | Parameter | Default | Meaning |
 |---|---|---|
 | `--resolution <value>` | `1e-08` | the [resolution](../formulations/preprocessing.md#resolution) of the probabilities in the labelling of the strong and useless arcs. Strictly between 0 and 1, and not so small that the integer lengths of a path overflow: other values are refused |
-| `--nb-mus <n>` | `0` | the number of geometric steps between the Lagrange multipliers of the [budget-aware labelling](../formulations/preprocessing.md#taking-the-budget-into-account), which tests $n + 1$ positive multipliers after 0. `0`: no budget-aware labelling. Experimental: 20, or 9 on large instances. With [several costs](../usage/instance.md#several-costs), it reads only the first dimension, in the [order of their names](../usage/instance.md#several-costs): valid, but looser |
-| `--mus-sweep decades`, `full` | `decades` | the range of the positive multipliers, up to the largest useful one. `decades`: at most the 3 decades below it, and 0 again at the end. `full`: from the inverse of the largest option cost per arc. Needs `--nb-mus` above 0. Experimental |
-| `--preprocessing all`, `strong`, `useless`, `none` | `all` | for comparison, what the labels are used for. `strong`: only the contraction of the strong arcs. `useless`: only the removal of the useless arcs. `none`: neither; `--resolution`, `--nb-mus` and `--mus-sweep` then have no effect |
+| `--mu-steps <n>` | `0` | the number of geometric steps between the Lagrange multipliers of the [budget-aware labelling](../formulations/preprocessing.md#taking-the-budget-into-account), which tests $n + 1$ positive multipliers after 0. `0`: no budget-aware labelling. Experimental: 20, or 9 on large instances. `--nb-mus`, its name in GECOT 1.0, is accepted too. With [several costs](../usage/instance.md#several-costs), it reads only the first dimension, in the [order of their names](../usage/instance.md#several-costs): valid, but looser |
+| `--mu-sweep decades`, `full` | `decades` | the range of the positive multipliers, up to the largest useful one. `decades`: at most the 3 decades below it, and 0 again at the end. `full`: from the inverse of the largest option cost per arc. Needs `--mu-steps` above 0. Experimental |
+| `--no-strong-arcs` | off | for comparison: the strong arcs are not contracted |
+| `--no-useless-arcs` | off | for comparison: the useless arcs are not removed. With `--no-strong-arcs`, no arc is labelled: `--resolution`, `--mu-steps` and `--mu-sweep` then have no effect |
 | `--all-targets` | off | for comparison: the vertices that can never be targets get a flow like the others |
 | `--no-pruning` | off | for comparison: keeps, in the graph of a target, the arcs that leave it and the vertices that no quality reaches |
 
@@ -102,9 +103,9 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders`, `multif
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `--groups <n>` | `2` | the groups of targets per case, each with its own cuts. `1`: a single cut per case. `0`: a group per target |
-| `--grouping voronoi`, `consecutive`, `random` | `voronoi` | how the targets are grouped. `voronoi`: the cells of a network Voronoi diagram around targets of value far from each other. `consecutive`: runs of consecutive targets. `random`: at random, as a control |
-| `--grouping-seed <n>` | `0` | the seed of `--grouping random` |
+| `--target-groups <n>` | `2` | the groups of targets per case, each with its own cuts. `1`: a single cut per case. `0`: a group per target |
+| `--target-grouping voronoi`, `consecutive`, `random` | `voronoi` | how the targets are grouped. `voronoi`: the cells of a network Voronoi diagram around targets of value far from each other. `consecutive`: runs of consecutive targets. `random`: at random, as a control |
+| `--target-grouping-seed <n>` | `0` | the seed of `--target-grouping random` |
 | `--big-m plain`, `knapsack_bnb`, `knapsack_dantzig`, `tight`, `exact` | `knapsack_bnb` | as for `flow_mip` |
 | `--no-lazy-constraints` | off | for comparison: the master [solved again](../formulations/benders.md#without-lazy-constraints) with the cuts of its solution, as with the solvers without lazy constraints. The same for `flow_benders` and `multiflow_benders` |
 
@@ -127,16 +128,19 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders`, `multif
 | `--in-out-separation <r>` | `--in-out-ratio` | the point that the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation) separate, in $[0, 1]$: the share of the way from the center to each new optimum, before the center moves. By default the new center; with `--in-out-ratio 1`, `1` separates each optimum itself |
 | `--in-out-lift <δ>` | `1e-07` | raises each option of the point that the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation) separate to at least δ, in $[0, 1]$, until a round adds no cut; the optimum itself is separated from then on. The lifted rounds have no `fractional gain`: `--root-cut-gap` then acts on the last ones only, usually one, and changed nothing on the bike instances. `0`: never |
 | `--no-stored-arcs` | off | keeps no [set $A_s$](../formulations/benders.md#separation) per source but rebuilds them at each separation: the same cuts, slower, in less memory |
+| `--source-group-size <n>` | `0` | experimental: the $n_t$ sources of each target in $\lceil n_t / n \rceil$ [groups](../formulations/benders.md#groups-of-sources), each with a variable that receives their parts of the cuts. `0`: no group, the cuts on $f_t$. `1`: a variable per source. A target left with one group keeps the cuts on $f_t$; in the others, but with `--no-stored-arcs`, the sources whose $A_s$ holds no improved copy are written exactly, in no group |
+| `--source-grouping voronoi`, `consecutive`, `random` | `voronoi` | how the sources of a target are grouped. `voronoi`: the cells of a network Voronoi diagram of the graph of the target around sources of value far from each other. `consecutive`: runs of consecutive sources. `random`: at random, as a control |
+| `--source-grouping-seed <n>` | `0` | the seed of `--source-grouping random` |
 
 ### `multiflow_rounding`
 
-`--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--in-out-ratio`, `--in-out-separation` and `--no-stored-arcs` as for `multiflow_benders`, for the [same relaxation](../formulations/benders.md#multiflow_rounding-the-relaxation-rounded), plus:
+`--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--in-out-ratio`, `--in-out-separation`, `--no-stored-arcs`, `--source-group-size`, `--source-grouping` and `--source-grouping-seed` as for `multiflow_benders`, for the [same relaxation](../formulations/benders.md#multiflow_rounding-the-relaxation-rounded), plus:
 
 | Parameter | Default | Meaning |
 |---|---|---|
 | `--in-out-lift <δ>` | `0` | as for `multiflow_benders`, off: the rounds are most of the run, and the lift pays in a search |
 | `--roundings <n>` | `1000` | the scenarios drawn from the optimum of the relaxation, the first by decreasing $x^*$. `0`: until `--time-limit`, which is then required |
-| `--seed <n>` | `0` | the seed of the draws |
+| `--rounding-seed <n>` | `0` | the seed of the draws |
 
 ### `path_lp`
 
@@ -159,7 +163,7 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders`, `multif
 |---|---|---|
 | `-t`, `--feasibility-tolerance <value>` | `1e-07` | the slack allowed when a cost is compared with the budget |
 | `--decremental` | off | starts from every option bought and removes options until the cost fits the budget, then buys back those that fit in the budget left. With a single cost and no conflict set only |
-| `--only-dec` | off | with `--decremental`: skips these final purchases |
+| `--no-add-back` | off | with `--decremental`: skips these final purchases. `--only-dec`, its name in GECOT 1.0, is accepted too |
 | `--worst` | off | `greedy`, for comparison: the opposite choice at each step, which spends the budget while gaining as little as possible |
 
 ## Parameters of the bound methods
@@ -172,7 +176,7 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders`, `multif
 |---|---|---|
 | `--theta best`, `half`, `target`, `source` | `best` | the split of the quadratic terms between the two options of a pair: half each, all to the one with the target gain, all to the one with the source gain, or the best of the three |
 | `--iterations <n>` | `0` | subgradient steps on the split after it |
-| `--target <score>` | 0.9 times the bound | the score that the subgradient steps aim at, that of a known solution for instance |
+| `--aim-score <score>` | 0.9 times the bound | the score that the subgradient steps aim at, that of a known solution for instance |
 
 ### `split_lagrange`
 
@@ -180,7 +184,7 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders`, `multif
 |---|---|---|
 | `--iterations <n>` | `30` | subgradient steps on the prices, each a pricing of every pair of habitats |
 | `--time-limit <seconds>` | | setup included; the best bound of the complete steps is returned |
-| `--target <score>` | the score of a first knapsack solution | the score that the steps aim at, that of the best known solution for instance |
+| `--aim-score <score>` | the score of a first knapsack solution | the score that the steps aim at, that of the best known solution for instance |
 | `--theta best`, `half`, `target`, `source` | `best` | the split of the quadratic terms of the quality gains, as for `qkp_planes` |
 
 ## Environment variables

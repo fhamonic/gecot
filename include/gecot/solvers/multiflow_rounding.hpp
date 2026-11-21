@@ -30,7 +30,7 @@ namespace solvers {
 struct multiflow_rounding : public multiflow_benders {
     // the scenarios drawn; 0: until --time-limit, which is then required
     std::size_t roundings = 1000;
-    std::size_t random_seed = 0;
+    std::size_t rounding_seed = 0;
     // The scenarios are scored by batches of this many draws, in parallel,
     // and the stops are tested between batches: a constant, so that the
     // draws, and the solution, do not depend on the number of threads.
@@ -95,7 +95,7 @@ struct multiflow_rounding : public multiflow_benders {
                 instance.options(), [&y](const option_t i) { return y[i]; }));
         };
 
-        std::mt19937_64 rng{random_seed};
+        std::mt19937_64 rng{rounding_seed};
         std::uniform_real_distribution<double> uniform;
         std::unordered_set<std::vector<bool>> seen;
         std::vector<instance_solution_t<I>> batch;

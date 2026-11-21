@@ -60,7 +60,7 @@ The result is at least as good as the heuristic's and comes with a guaranteed sh
 
 **The landscape is too large for any model.** Use `greedy`. Its cost grows with the number of options squared times the cost of evaluating the score, and it needs no solver and little memory. A [bound](bound.md) such as `qkp_planes` then costs nothing, although it is loose when the budget is small.
 
-**The budget is very small.** Few options fit together, which the budget-aware preprocessing exploits: try [`--nb-mus 20`](../formulations/preprocessing.md#taking-the-budget-into-account) with `flow_mip` or a Benders decomposition, and compare.
+**The budget is very small.** Few options fit together, which the budget-aware preprocessing exploits: try [`--mu-steps 20`](../formulations/preprocessing.md#taking-the-budget-into-account) with `flow_mip` or a Benders decomposition, and compare.
 
 **Several species with a minimum criterion.** Prefer an exact algorithm. A heuristic ranks the options by the gain of the criterion, and with a minimum only the options that help the worst-off case have any: its choices among the others are arbitrary.
 

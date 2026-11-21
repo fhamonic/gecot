@@ -5,6 +5,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include <CLI/CLI.hpp>
@@ -221,6 +222,35 @@ protected:
             ->check(CLI::Range(0.0, 1.0))
             ->default_val(solver.in_out_lift);
     }
+    void add_source_group_options(auto & solver) {
+        app.add_option(
+               "--source-group-size", solver.source_group_size,
+               "Experimental: the n sources of each target in ceil(n / this) "
+               "groups, each with a flow variable that receives their part of "
+               "each cut, f_t then bounded by their sum: the same relaxation "
+               "once converged, and a master that combines the parts of "
+               "different cuts, with a variable per group (0: no group, the "
+               "cuts on f_t; 1: a variable per source). A target left with "
+               "one group keeps the cuts on f_t, and, but with "
+               "--no-stored-arcs, a source with no improvable arc on its best "
+               "paths is written exactly, in no group")
+            ->default_val(solver.source_group_size);
+        // dependent: the interfaces without multiflow do not see the enum
+        using grouping = std::remove_cvref_t<decltype(solver.grouping)>;
+        add_choice_option<grouping>(
+            app, "--source-grouping", solver.grouping,
+            {{"voronoi", grouping::voronoi},
+             {"consecutive", grouping::consecutive},
+             {"random", grouping::random}},
+            [&solver](const grouping groups) { solver.grouping = groups; },
+            "With --source-group-size, voronoi: the cells of a network "
+            "Voronoi diagram of the target's graph around sources of flow far "
+            "from each other; consecutive: groups of consecutive sources; "
+            "random: groups of sources drawn at random, as a control");
+        app.add_option("--source-grouping-seed", solver.grouping_seed,
+                       "Seed of --source-grouping random")
+            ->default_val(solver.grouping_seed);
+    }
     void add_stored_arcs_option(auto & solver) {
         app.add_flag_callback(
             "--no-stored-arcs", [&solver] { solver.stored_arcs = false; },
@@ -256,7 +286,8 @@ protected:
                        "Sets the resolution of the probabilities used by the "
                        "preprocessing algorithm")
             ->default_val(solver.probability_resolution);
-        app.add_option("--nb-mus", solver.num_mus,
+        // --nb-mus: its name in GECOT 1.0
+        app.add_option("--mu-steps,--nb-mus", solver.num_mus,
                        "Sets the number of geometric steps between the "
                        "lagrangian multipliers of the constrained "
                        "preprocessing, which tests N + 1 positive ones after 0 "
@@ -265,29 +296,23 @@ protected:
             ->check(CLI::NonNegativeNumber)
             ->default_val(solver.num_mus);
         add_choice_option<bool>(
-            app, "--mus-sweep", solver.decades_sweep,
+            app, "--mu-sweep", solver.decades_sweep,
             {{"decades", true}, {"full", false}},
             [&solver](const bool decades) { solver.decades_sweep = decades; },
             "Range of the positive multipliers, up to the largest useful "
             "one: decades spans at most the 3 decades below it and tests 0 "
             "again last, full starts from the inverse of the largest option "
-            "cost per arc (needs --nb-mus > 0; experimental)");
-        // contract_strong_arcs, remove_useless_arcs
-        add_choice_option<std::pair<bool, bool>>(
-            app, "--preprocessing",
-            {solver.contract_strong_arcs, solver.remove_useless_arcs},
-            {{"all", {true, true}},
-             {"strong", {true, false}},
-             {"useless", {false, true}},
-             {"none", {false, false}}},
-            [&solver](const std::pair<bool, bool> & uses) {
-                solver.contract_strong_arcs = uses.first;
-                solver.remove_useless_arcs = uses.second;
-            },
-            "For comparison, what the strong and useless arcs are used "
-            "for: all; strong, only the contraction of the strong arcs; "
-            "useless, only the removal of the useless arcs; none, where "
-            "--resolution, --nb-mus and --mus-sweep have no effect");
+            "cost per arc (needs --mu-steps > 0; experimental)");
+        app.add_flag_callback(
+            "--no-strong-arcs",
+            [&solver] { solver.contract_strong_arcs = false; },
+            "For comparison: the strong arcs are not contracted");
+        app.add_flag_callback(
+            "--no-useless-arcs",
+            [&solver] { solver.remove_useless_arcs = false; },
+            "For comparison: the useless arcs are not removed; with "
+            "--no-strong-arcs, no arc is labelled, and --resolution, "
+            "--mu-steps and --mu-sweep have no effect");
         app.add_flag("--all-targets", solver.all_targets,
                      "For comparison: the vertices that can never be targets "
                      "are preprocessed and modelled as the others");

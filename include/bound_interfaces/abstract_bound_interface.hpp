@@ -22,9 +22,9 @@ protected:
     CLI::App app;
 
     // a raw score: an infinite one would make the steps NaN
-    void add_target_option(std::optional<double> & target,
-                           const std::string & description) {
-        app.add_option("--target", target, description)
+    void add_aim_score_option(std::optional<double> & aim_score,
+                              const std::string & description) {
+        app.add_option("--aim-score", aim_score, description)
             ->check(CLI::Validator(
                 [](std::string & s) -> std::string {
                     try {

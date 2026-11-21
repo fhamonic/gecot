@@ -19,9 +19,11 @@ public:
             "From the improved landscape, iteratively remove the option with "
             "the worst gain/cost ratio until the budget is met (Zonation "
             "Algorithm), then add back the options that fit");
-        app.add_flag("--only-dec", solver.only_dec,
-                     "Do not perform the final incremental steps that ensure "
-                     "that the entire budget is used")
+        // --only-dec: its name in GECOT 1.0
+        app.add_flag("--no-add-back,--only-dec", solver.only_dec,
+                     "Do not add back, after the removals, the options that "
+                     "still fit: the final purchases that spend the rest of "
+                     "the budget")
             ->needs(decremental);
         app.add_flag("--worst", solver.worst,
                      "For comparison: the opposite choice at each step, to "

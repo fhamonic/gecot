@@ -10,7 +10,7 @@
 class QkpPlanesInterface : public AbstractBoundInterface {
 private:
     gecot::qkp_planes method;
-    std::optional<double> target;  // raw score
+    std::optional<double> aim_score;  // raw score
 
 public:
     QkpPlanesInterface() : AbstractBoundInterface("qkp_planes") {
@@ -28,17 +28,17 @@ public:
         app.add_option("--iterations", method.iterations,
                        "Subgradient steps on the split after it")
             ->default_val(method.iterations);
-        add_target_option(target,
-                          "Score the subgradient steps aim at, a known "
-                          "solution's for instance (default: 0.9 times the "
-                          "bound)");
+        add_aim_score_option(aim_score,
+                             "Score the subgradient steps aim at, a known "
+                             "solution's for instance (default: 0.9 times the "
+                             "bound)");
     }
 
     gecot::bound_report compute(const Instance & instance,
                                 const gecot::budget_t & B,
                                 const bound_context & context) const override {
         gecot::qkp_planes m = method;
-        if(target) m.target = target.value() / context.score_scale;
+        if(aim_score) m.target = aim_score.value() / context.score_scale;
         return m.bound(instance, B);
     }
 

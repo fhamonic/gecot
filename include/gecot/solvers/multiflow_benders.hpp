@@ -40,11 +40,15 @@ struct multiflow_benders : public benders_base {
     // the share of the way to each new optimum of the relaxation that the
     // center of the rounds moves, from the first optimum; 1: each optimum
     // separated itself, without the center
-    double in_out_ratio = 0.5;
+    double in_out_ratio = 0.9;
     // the share of the way from the center to the new optimum at which the
     // rounds separate, before the center moves; none: in_out_ratio, the
     // new center
     std::optional<double> in_out_separation;
+    // The rounds separate the point with every option raised to at least
+    // in_out_lift, the "2ε trick" of Fischetti, Ljubić and Sinnl (2017), until
+    // they add no cut, and the point itself from then on; 0: never.
+    double in_out_lift = 1e-7;
     // off: the sets A_s are not kept but rebuilt at each separation: the
     // same cuts, slower, for instances whose sets do not fit in memory
     bool stored_arcs = true;
@@ -164,6 +168,7 @@ struct multiflow_benders : public benders_base {
             separated(instance.options().size());
         double center_coef = in_out_ratio;
         double separation_coef = in_out_separation.value_or(in_out_ratio);
+        double lift = in_out_lift;
         while(root_cuts && !stop_requested && !_time_up(sw, root_time_share)) {
             _set_time_left(model, sw, root_time_share);
             model.solve();
@@ -188,9 +193,16 @@ struct multiflow_benders : public benders_base {
                                 center_coef * optimum(i);
                 }
             }
+            if(lift > 0)
+                for(auto && i : instance.options())
+                    separated[i] = std::max(separated[i], lift);
             const auto cuts = _separate(blocks, separated);
-            if(const auto floor = _floor_at(instance, blocks, separated, cuts))
-                root_floor = std::max(root_floor.value_or(*floor), *floor);
+            // A lifted point can be over the budget: its value can exceed the
+            // relaxation's, and --root-cut-gap would then end the rounds early
+            if(lift == 0)
+                if(const auto floor =
+                       _floor_at(instance, blocks, separated, cuts))
+                    root_floor = std::max(root_floor.value_or(*floor), *floor);
             // the smallest --root-cut-tolerance at which no cut is added
             double violation = 0;
             std::size_t num_added = 0;
@@ -224,8 +236,12 @@ struct multiflow_benders : public benders_base {
                *root.value - *root_floor <= root_cut_gap * *root_floor)
                 break;
             if(num_added) continue;
-            if(center_coef == 1.0 && separation_coef == 1.0) break;
+            // Not on a lifted round: a lifted cut exceeds the flow at x* by
+            // up to its coefficients times the lift, and the rounds that add
+            // none would end with the bound above the relaxation's value
+            if(center_coef == 1.0 && separation_coef == 1.0 && lift == 0) break;
             center_coef = separation_coef = 1.0;
+            lift = 0;
         }
         for(auto && i : instance.options()) model.set_binary(x(i));
         report_progress({.end = true});

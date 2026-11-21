@@ -41,7 +41,7 @@ One instance does not make a benchmark, but it gives orders of magnitude. On the
 | `multicut_benders` | 438,893.1 | optimal | 1.4 s |
 | `multiflow_benders` | 438,893.1 | optimal | 1.2 s |
 
-`greedy` is within 1.3 % of the optimal gain here, in both directions, which only the exact algorithms can tell. `multiflow_rounding` returns the solution of `greedy` and `path_lp` too, with a guaranteed share of 98.1 %, in about half the time of `multiflow_benders` (0.23 s against 0.41 s, on another machine).
+`greedy` is within 1.3 % of the optimal gain here, in both directions, which only the exact algorithms can tell. `multiflow_rounding` returns the solution of `greedy` and `path_lp` too, with a guaranteed share of 98.1 %, in about two thirds of the time of `multiflow_benders` (0.18 s against 0.28 s, on another machine).
 
 ## Guidance
 

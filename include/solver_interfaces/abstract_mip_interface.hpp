@@ -212,6 +212,14 @@ protected:
                        "the center moves (default: --in-out-ratio, the new "
                        "center)")
             ->check(CLI::Range(0.0, 1.0));
+        app.add_option("--in-out-lift", solver.in_out_lift,
+                       "Lift of the cuts on the linear relaxation before the "
+                       "search: each option of the point they separate is "
+                       "raised to at least this value, until they add no cut; "
+                       "the optimum itself is separated from then on (0: "
+                       "never)")
+            ->check(CLI::Range(0.0, 1.0))
+            ->default_val(solver.in_out_lift);
     }
     void add_stored_arcs_option(auto & solver) {
         app.add_flag_callback(

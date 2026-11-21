@@ -50,7 +50,7 @@ $ gecot optimize multiflow_benders three-woods.json 4 -v
 [   0.0s]    round     |  fractional  |   max gain   |  violation
 [   0.0s]              |     gain     |              |
 [   0.0s] -------------+--------------+--------------+-------------
-[   0.0s]            1 |     +33.70 % |    +130.65 % |      8.1e-01
+[   0.0s]            1 |            - |    +130.65 % |      8.1e-01
 [   0.0s]            4 |     +80.49 % |     +80.49 % |      0.0e+00
 [   0.0s] -------------+--------------+--------------+-------------
 [   0.0s] Rounds on the relaxation: 4, cuts: 4
@@ -251,14 +251,14 @@ Before the search, the master is solved as a linear program, with $x \in [0, 1]^
 
 1. **Solves the relaxation.** The rounds stop if it ends without an optimum, on Ctrl-C, which then leaves the search to run until the next one, or once half of `--time-limit` has passed, which leaves the other half to the search. The value of the relaxation is the `max gain` of the table.
 2. **Reads the optimum**: the options $x^*$, brought back into $[0, 1]$, and the flows $f^*_t$.
-3. **Moves the center** toward $x^*$, by `--in-out-ratio` of the way, half by default. In the first round the center is $x^*$ itself.
-4. **Separates every block** at the center, or with `--in-out-separation` at the point that share of the way from the old center to $x^*$. Once that point has stopped adding cuts, both steps become 1: the point separated is $x^*$ from then on. `--in-out-ratio 1` separates $x^*$ from the start.
-5. **Scores the point separated** with its flows. The criterion is evaluated with each $f_t$ held under $M^t_t$ and each target quality gain under its constant times $\hat{x}_i$. The best value so far is the `fractional gain`: the relaxation with all the cuts reaches at least that much. A round in which some flow stopped after 100,000 pushes gives no value.
+3. **Moves the center** toward $x^*$, by `--in-out-ratio` of the way, 0.9 of it by default. In the first round the center is $x^*$ itself.
+4. **Separates every block** at the center, or with `--in-out-separation` at the point that share of the way from the old center to $x^*$. With `--in-out-lift δ`, $10^{-7}$ by default, each option of that point is raised to at least $\delta$. Once that point has stopped adding cuts, both steps become 1 and the lift ends: the point separated is $x^*$ from then on. `--in-out-ratio 1` separates $x^*$ from the start.
+5. **Scores the point separated** with its flows. The criterion is evaluated with each $f_t$ held under $M^t_t$ and each target quality gain under its constant times $\hat{x}_i$. The best value so far is the `fractional gain`: the relaxation with all the cuts reaches at least that much. A round in which some flow stopped after 100,000 pushes gives no value, nor does a lifted point, which can be over the budget.
 6. **Adds the cuts that the optimum violates.** A cut separated away from $x^*$ is tested at $x^*$. It is added when $f^*_t > \text{cut}(x^*) \cdot (1 + \tau) + 10^{-7}$, where $\tau$ is `--root-cut-tolerance` ($10^{-7}$ by default). The `violation` of the table is the smallest $\tau$ at which this round would add no cut.
 7. **Decides what comes next:**
     - with `--root-cut-gap g`, the rounds stop once the value of the relaxation exceeds the best value of the points separated by at most $g$ times the latter: the scores behind `max gain` and `fractional gain`;
     - a round that adds a cut is followed by another;
-    - a round of the center that adds none hands over to the optimum;
+    - a round of the center, or of a lifted point, that adds none hands over to the optimum;
     - a round of the optimum that adds none ends the rounds.
 
 The options become binary again, and the cuts stay in the master as rows for the search. The value of the last relaxation is reported as `root_relaxation_value`. `--no-root-cuts` skips these rounds. The log ends them with `Rounds on the relaxation: 4, cuts: 4`. The table has a row at most every second: this run took 4 ms, so it shows its first round and its last.

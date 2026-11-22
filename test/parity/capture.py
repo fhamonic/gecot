@@ -94,6 +94,7 @@ ALGORITHMS = HEURISTICS + [
     "path_lp", "path_lp --pricing enumerate", "path_lp --mip-start-algorithm greedy",
     "path_lp --evict-age 2", "path_lp --max-activations 5", "path_lp --relative-gap 0.01",
     "multiflow_benders --source-group-size 2", "multiflow_rounding --source-group-size 2",
+    "multiflow_benders --root-cut-purge 3", "multiflow_rounding --root-cut-purge 0",
 ]
 # at -vv: the trace of the masters, the tables of the removals. Not the MIPs,
 # whose solver then prints its own log, with its times
@@ -170,6 +171,8 @@ def surface_cases():
         "flow_mip I 10 --indicator-constraints --solver highs -q",
         "flow_mip I 10 --indicator-constraints --lp-relaxation -q",
         "flow_benders I 10 --indicator-constraints --solver copt -q",
+        # a solver that keeps its rows: a warning only when the option is given
+        "multiflow_rounding I 10 --solver cbc", "multiflow_rounding I 10 --solver cbc --root-cut-purge 10",
     ]
     for n, text in enumerate(numbered):
         args = [I if w == "I" else w.replace("=I", f"={I}") for w in text.split()]

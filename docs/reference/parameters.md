@@ -55,8 +55,8 @@ gecot bound <method> <instance> <budget> [<parameters> ...]
 | `flow_mip` | ✓ | ✓ | `--big-m`, `--lp-relaxation`, `--indicator-constraints` |
 | `multicut_benders` | ✓ | ✓ | `--target-groups`, `--target-grouping`, `--target-grouping-seed`, `--big-m`, `--no-lazy-constraints` |
 | `flow_benders` | ✓ | ✓ | `--big-m`, `--indicator-constraints`, `--no-lazy-constraints` |
-| `multiflow_benders` | ✓ | ✓ | `--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--no-root-cuts`, `--in-out-ratio`, `--in-out-separation`, `--in-out-lift`, `--no-stored-arcs`, `--source-group-size`, `--source-grouping`, `--source-grouping-seed`, `--no-lazy-constraints` |
-| `multiflow_rounding` | ✓ | ✓ | `--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--in-out-ratio`, `--in-out-separation`, `--in-out-lift`, `--no-stored-arcs`, `--source-group-size`, `--source-grouping`, `--source-grouping-seed`, `--roundings`, `--rounding-seed` |
+| `multiflow_benders` | ✓ | ✓ | `--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--root-cut-purge`, `--no-root-cuts`, `--in-out-ratio`, `--in-out-separation`, `--in-out-lift`, `--no-stored-arcs`, `--source-group-size`, `--source-grouping`, `--source-grouping-seed`, `--no-lazy-constraints` |
+| `multiflow_rounding` | ✓ | ✓ | `--big-m`, `--root-cut-tolerance`, `--root-cut-gap`, `--root-cut-purge`, `--in-out-ratio`, `--in-out-separation`, `--in-out-lift`, `--no-stored-arcs`, `--source-group-size`, `--source-grouping`, `--source-grouping-seed`, `--roundings`, `--rounding-seed` |
 | `tree_lp` | ✓ | ✓ | `--evict-age` |
 | `path_lp` | ✓ | – | `--evict-age`, `--pricing`, `--max-activations`, `--relative-gap` |
 | `static` | – | – | `-t`, `--decremental`, `--no-add-back` |
@@ -123,6 +123,7 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders`, `multif
 | `--big-m plain`, `knapsack_bnb`, `knapsack_dantzig`, `tight`, `exact` | `knapsack_bnb` | as for `flow_mip`, for $M^t_t$ only: the bound of $f_t$, and the constant of its [target quality gains](../formulations/benders.md#multiflow_benders-cuts-per-source), which `tight` and `exact` lower |
 | `--root-cut-tolerance <value>` | `1e-07` | the relative tolerance of the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation), $10^{-7}$ at least: a cut is added when the flow of the relaxation exceeds it by more than this share, and the rounds end when none does. A larger value ends them sooner, with a relaxation above its value with all the cuts by about this share at most, unless the criterion subtracts a constant |
 | `--root-cut-gap <g>` | `0` | also ends the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation) once the `max gain` of their table is within this gap of its `fractional gain`, relative to the score of the fractional gain, as `--relative-gap` does for `path_lp`. `0`: never, the rounds end by `--root-cut-tolerance` only. With a lift, `--in-out-lift` above 0 as by default, only the last rounds have a fractional gain, usually one: pass `--in-out-lift 0` with it |
+| `--root-cut-purge <k>` | `0` | [removes](../formulations/benders.md#slack-cuts-removed) from the relaxation the row of each [cut on the relaxation](../formulations/benders.md#cuts-on-the-relaxation) slack, by `--root-cut-tolerance`, at $k$ optima in a row, with `gurobi`, `cplex` and `highs`: rounds that converge end at the same value within `--root-cut-tolerance`, usually with fewer rows, rounds cut short can end higher, and the search has only the rows left. A small value adds removed cuts back. `0`: never |
 | `--no-root-cuts` | off | for comparison: no cut on the linear relaxation before the search |
 | `--in-out-ratio <r>` | `0.9` | the step of the center of the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation), in $[0, 1]$: the share of the way to each new optimum of the relaxation that it moves, from the first optimum. `1` separates each optimum itself, without the center |
 | `--in-out-separation <r>` | `--in-out-ratio` | the point that the [cuts on the relaxation](../formulations/benders.md#cuts-on-the-relaxation) separate, in $[0, 1]$: the share of the way from the center to each new optimum, before the center moves. By default the new center; with `--in-out-ratio 1`, `1` separates each optimum itself |
@@ -139,6 +140,7 @@ For `flow_mip`, `multicut_benders`, `flow_benders`, `multiflow_benders`, `multif
 | Parameter | Default | Meaning |
 |---|---|---|
 | `--in-out-lift <δ>` | `0` | as for `multiflow_benders`, off: the rounds are most of the run, and the lift pays in a search |
+| `--root-cut-purge <k>` | `10` | as for `multiflow_benders`, on: the run reads only the optimum and the value of the relaxation, and the rows of its cuts grow with the rounds. Other solvers keep every row, with a warning when the option is given and a line at `-v` otherwise |
 | `--roundings <n>` | `1000` | the scenarios drawn from the optimum of the relaxation, the first by decreasing $x^*$. `0`: until `--time-limit`, which is then required |
 | `--rounding-seed <n>` | `0` | the seed of the draws |
 

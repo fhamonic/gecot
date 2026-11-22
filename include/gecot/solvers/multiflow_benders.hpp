@@ -65,6 +65,22 @@ struct multiflow_benders : public benders_base {
     // The rounds also end once their bound is within root_cut_gap of their
     // floor, relative to it, as path_lp's relative_gap; 0: never.
     double root_cut_gap = 0;
+    // The row of a cut that the rounds add leaves the relaxation once it is
+    // slack at root_cut_purge optima in a row, by root_cut_tol of its terms
+    // there and by root_cut_abs_tol, on a solver that can remove rows; 0:
+    // never. Its slack is then basic: the basis of the optimum stays one,
+    // and the value does not change. A removed cut can come back, so rows
+    // leave only at a value below that of the last removal: the rounds still
+    // end, and once they converge, at the same value within root_cut_tol,
+    // since the separation of x* then finds no cut, removed ones included.
+    // Rounds cut short can end higher. A small value adds cuts back: see
+    // benchmark/defaults.md. The search of multiflow_benders has only the
+    // rows left.
+    std::size_t root_cut_purge = 0;
+    // set by the interface when --root-cut-purge is given: a solver that
+    // cannot remove rows then warns, where for the default of
+    // multiflow_rounding it logs at -v only
+    bool root_cut_purge_given = false;
     // the rounds take at most this share of --time-limit, which leaves the
     // search the other half
     static constexpr double root_time_share = 0.5;
@@ -187,7 +203,12 @@ struct multiflow_benders : public benders_base {
     // of the rounds on the relaxation: their number, that of their cuts, and
     // the value of the last relaxation solved, none if no round ended
     struct root_rounds {
-        std::size_t rounds = 0, cuts = 0;
+        // cuts: the rows added, a cut added again counted again; purged:
+        // those removed since, by --root-cut-purge
+        std::size_t rounds = 0, cuts = 0, purged = 0;
+        // whether the rounds may remove slack rows: --root-cut-purge above
+        // 0, rounds that run, and a solver that removes rows
+        bool purging = false;
         std::optional<double> value;
         // x* of that relaxation, within [0, 1]: what multiflow_rounding
         // rounds
@@ -197,7 +218,10 @@ struct multiflow_benders : public benders_base {
     // are continuous: each solves the master, separates its optimum, or the
     // point in_out_separation of the way to it from the center, which then
     // moves in_out_ratio of the way to it, and adds as rows
-    // add_cut(block, cut, ...) for each block whose f_t exceeds its cut.
+    // add_cut(block, cut, ...) for each block whose f_t exceeds its cut,
+    // with root_cut_purge the rows slack at root_cut_purge optima in a row
+    // removed. add_cut hands each row to add(row), or add(row, on_removed)
+    // with what to call if the rounds remove it.
     template <typename M, instance_c I, typename B>
     root_rounds _root_rounds(M & model, const spdlog::stopwatch & sw,
                              const I & instance, const auto & x,
@@ -205,6 +229,34 @@ struct multiflow_benders : public benders_base {
                              auto && add_cut) const {
         namespace status = mippp::status;
         root_rounds root;
+        // The rows of the cuts added below, while they stay in the master,
+        // with what reads their slack at the next optima: their terms by
+        // value, since add_cut hands lazy sums that live with its cut.
+        struct cut_row {
+            mippp::model_constraint_t<M> constraint;
+            std::vector<std::pair<mippp::model_variable_t<M>, double>> terms;
+            double rhs;
+            mippp::constraint_sense sense;
+            std::function<void()> on_removed;  // none: nothing to tell
+            std::size_t slack_optima = 0;
+        };
+        std::vector<cut_row> cut_rows;
+        // where the terms of a row are read before they are copied, at their
+        // size, into its cut_row
+        std::vector<std::pair<mippp::model_variable_t<M>, double>> read_terms;
+        root.purging =
+            root_cuts && root_cut_purge > 0 && mippp::has_remove_constraint<M>;
+        // a warning only when asked for: multiflow_rounding purges by default
+        if(root_cuts && root_cut_purge > 0 && !mippp::has_remove_constraint<M>)
+            spdlog::log(
+                root_cut_purge_given ? spdlog::level::warn
+                                     : spdlog::level::debug,
+                "This solver cannot remove rows: --root-cut-purge ignored");
+        // the value at the last removal: rows leave only at a value below it
+        std::optional<double> value_at_purge;
+        // a round after one that added no row solves the same relaxation,
+        // less rows whose slacks were basic: the same optimum, not another
+        bool rows_added = true;
         // a Ctrl-C before the rounds stops the whole run
         const bool stopped_before = stop_requested;
         for(auto && i : instance.options()) model.set_continuous(x(i));
@@ -229,6 +281,52 @@ struct multiflow_benders : public benders_base {
             };
             root.optimum = std::ranges::to<std::vector>(
                 std::views::transform(instance.options(), optimum));
+            // The rows slack at root_cut_purge optima in a row leave the
+            // master, which relaxation, a copy, outlives. A removed cut can
+            // come back: they leave only at a value below that of the last
+            // removal by the tolerances, which happens finitely often, and
+            // from the last removal on the rows only grow, as without it.
+            if constexpr(mippp::has_remove_constraint<M>) {
+                if(root.purging && rows_added)
+                    for(cut_row & row : cut_rows) {
+                        double activity = 0, scale = std::abs(row.rhs);
+                        for(const auto & [v, coef] : row.terms) {
+                            const double term = coef * relaxation[v];
+                            activity += term;
+                            scale += std::abs(term);
+                        }
+                        double slack = 0;  // an equality is never slack
+                        if(row.sense == mippp::constraint_sense::less_equal)
+                            slack = row.rhs - activity;
+                        else if(row.sense ==
+                                mippp::constraint_sense::greater_equal)
+                            slack = activity - row.rhs;
+                        row.slack_optima =
+                            slack > root_cut_tol * scale + root_cut_abs_tol
+                                ? row.slack_optima + 1
+                                : 0;
+                    }
+                if(root.purging &&
+                   (!value_at_purge ||
+                    *root.value < *value_at_purge -
+                                      root_cut_tol * std::abs(*value_at_purge) -
+                                      root_cut_abs_tol)) {
+                    std::vector<mippp::model_constraint_t<M>> removed;
+                    for(cut_row & row : cut_rows)
+                        if(row.slack_optima >= root_cut_purge) {
+                            removed.push_back(row.constraint);
+                            if(row.on_removed) row.on_removed();
+                        }
+                    if(!removed.empty()) {
+                        std::erase_if(cut_rows, [this](const cut_row & row) {
+                            return row.slack_optima >= root_cut_purge;
+                        });
+                        model.remove_constraints(removed);
+                        root.purged += removed.size();
+                        value_at_purge = root.value;
+                    }
+                }
+            }
             if(root.rounds == 1) {
                 for(auto && i : instance.options())
                     separated[i] = center[i] = optimum(i);
@@ -274,11 +372,27 @@ struct multiflow_benders : public benders_base {
                         block, cut, optimum,
                         [&](const auto & v) { return relaxation[v]; },
                         root_cut_tol, f_at_optimum,
-                        [&](auto && row) {
-                            model.add_constraint(
-                                std::forward<decltype(row)>(row));
+                        [&](auto && row, auto &&... on_removed) {
+                            if(!root.purging) {
+                                model.add_constraint(
+                                    std::forward<decltype(row)>(row));
+                                return;
+                            }
+                            read_terms.clear();
+                            for(auto && [v, coef] : row.linear_terms())
+                                read_terms.emplace_back(v, coef);
+                            const double rhs = row.rhs();
+                            const mippp::constraint_sense sense = row.sense();
+                            cut_rows.push_back(
+                                {model.add_constraint(
+                                     std::forward<decltype(row)>(row)),
+                                 {read_terms.begin(), read_terms.end()},
+                                 rhs,
+                                 sense,
+                                 std::function<void()>(on_removed...)});
                         });
             }
+            rows_added = num_added > 0;
             report_progress({.bound = root.value,
                              .relaxation = root_floor,
                              .round = root.rounds,
@@ -299,6 +413,9 @@ struct multiflow_benders : public benders_base {
         report_progress({.end = true});
         spdlog::debug("Rounds on the relaxation: {}, cuts: {}", root.rounds,
                       root.cuts);
+        if(root.purging)
+            spdlog::debug("Rows of these cuts removed: {}, left: {}",
+                          root.purged, cut_rows.size());
         // A Ctrl-C during the rounds ends them only: what follows them goes
         // on, and the next Ctrl-C stops it
         if(stop_requested && !stopped_before) {
@@ -429,9 +546,14 @@ struct multiflow_benders : public benders_base {
                 "affine sources",
                 num_group_flows, largest_group, num_affine);
         }
-        // the parts of each group of each block added so far, its envelope
-        std::vector<std::vector<std::vector<typename target_block::source_cut>>>
-            group_parts(blocks.size());
+        // the parts of each group of each block added so far, live while
+        // their rows are in the master: its envelope
+        struct group_part {
+            typename target_block::source_cut part;
+            bool live = true;
+        };
+        std::vector<std::vector<std::vector<group_part>>> group_parts(
+            blocks.size());
         for(std::size_t b = 0; b < blocks.size(); ++b)
             group_parts[b].resize(blocks[b].groups.size());
         // multiflow_benders: the cut c of a block as rows, each through add:
@@ -443,6 +565,8 @@ struct multiflow_benders : public benders_base {
         // over the cut there: a candidate of the search may break rows
         // already added, which must then cut it off again. Returns their
         // number. Lazy sums that read the cut: only valid while the cut lives.
+        // A part goes through add(row, on_removed): the rounds that remove
+        // its row call on_removed, and the envelope leaves the part out.
         auto add_cut = [&](const target_block & block, cut & c, auto && point,
                            auto && value_of, const double tol,
                            const double f_value,
@@ -478,7 +602,8 @@ struct multiflow_benders : public benders_base {
                 const double over = value_of(block.groups[g].f) - at;
                 double envelope = block.groups[g].bound;
                 for(const auto & old : parts[g])
-                    envelope = std::min(envelope, old.at(point));
+                    if(old.live)
+                        envelope = std::min(envelope, old.part.at(point));
                 // the envelope shares the absolute tolerance among the
                 // groups; a part cuts the point off only by all of it and
                 // by the solver's tolerance, within which the solver could
@@ -489,13 +614,17 @@ struct multiflow_benders : public benders_base {
                     std::max(source_cut_abs_tol, feasibility_tol);
                 if(over > cut_off_tol || at < envelope - part_tol) {
                     add(block.groups[g].f <=
-                        part.constant +
-                            xsum(part.coefficients, [&](const auto & term) {
-                                return term.second * x(term.first);
-                            }));
+                            part.constant +
+                                xsum(part.coefficients,
+                                     [&](const auto & term) {
+                                         return term.second * x(term.first);
+                                     }),
+                        [parts = &parts, g, k = parts[g].size()] {
+                            (*parts)[g][k].live = false;
+                        });
                     ++num_rows;
                     cut_off = cut_off || over > cut_off_tol;
-                    parts[g].push_back(std::move(part));
+                    parts[g].push_back({std::move(part)});
                 } else
                     slack += envelope - at;
             }
@@ -520,7 +649,7 @@ struct multiflow_benders : public benders_base {
                         return -std::numeric_limits<double>::infinity();
                     },
                     0.0, -std::numeric_limits<double>::infinity(),
-                    [&](auto && row) {
+                    [&](auto && row, auto &&...) {
                         model.add_constraint(std::forward<decltype(row)>(row));
                     });
         }
@@ -529,6 +658,12 @@ struct multiflow_benders : public benders_base {
         // Cuts on the relaxation, before the search
         const root_rounds root =
             _root_rounds(model, sw, instance, x, blocks, add_cut);
+        // the parts whose rows the rounds removed, out of the envelopes for
+        // good: the hooks that marked them died with the rounds
+        for(auto & block_parts : group_parts)
+            for(auto & parts : block_parts)
+                std::erase_if(parts,
+                              [](const group_part & p) { return !p.live; });
 
         auto [solution, report] =
             search(model, sw, x, z, formula, blocks, add_cut, root);
@@ -539,6 +674,8 @@ struct multiflow_benders : public benders_base {
         }
         report.stats.emplace_back("root_rounds", root.rounds);
         report.stats.emplace_back("root_cuts", root.cuts);
+        if(root.purging)
+            report.stats.emplace_back("root_cuts_purged", root.purged);
         // the relaxation with its cuts bounds the optimum too, better than
         // the solver's bound when the search is cut short
         if(root.value) {

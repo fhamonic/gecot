@@ -39,6 +39,12 @@ static_assert(!mippp::has_column_generation<mippp::scip_milp>);
 // the same for the two backends that the help of --indicator-constraints names
 static_assert(mippp::has_indicator_constraints<mippp::gurobi_milp>);
 static_assert(mippp::has_indicator_constraints<mippp::cplex_milp>);
+// and for the three that the help of --root-cut-purge names, and one that
+// keeps its rows, with which the parity matrix runs the warning
+static_assert(mippp::has_remove_constraint<mippp::gurobi_milp>);
+static_assert(mippp::has_remove_constraint<mippp::cplex_milp>);
+static_assert(mippp::has_remove_constraint<mippp::highs_milp>);
+static_assert(!mippp::has_remove_constraint<mippp::cbc_milp>);
 
 class AbstractMipInterface : public AbstractSolverInterface {
 public:
@@ -175,6 +181,11 @@ protected:
         throw std::invalid_argument("unknown solver '" + solver_name + "'");
     }
 
+    // whether --root-cut-purge was given, for the warning of a solver that
+    // cannot remove rows: the solve sets it on its copy of the solver
+    bool root_cut_purge_given() const {
+        return app.count("--root-cut-purge") > 0;
+    }
     // The rounds of cuts on the relaxation of multiflow_benders, which
     // multiflow_rounding solves too
     void add_root_cut_options(auto & solver) {
@@ -198,6 +209,16 @@ protected:
                        "then end by --root-cut-tolerance only)")
             ->check(CLI::NonNegativeNumber)
             ->default_val(solver.root_cut_gap);
+        app.add_option("--root-cut-purge", solver.root_cut_purge,
+                       "Removes from the linear relaxation before the search "
+                       "the row of each cut slack, by --root-cut-tolerance, "
+                       "at this many of its optima in a row, with gurobi, "
+                       "cplex and highs: rounds that converge end at the same "
+                       "value within --root-cut-tolerance, usually with fewer "
+                       "rows, rounds cut short can end higher, and "
+                       "multiflow_benders searches with the rows left. A small "
+                       "value adds removed cuts back (0: never)")
+            ->default_val(solver.root_cut_purge);
         app.add_option("--in-out-ratio", solver.in_out_ratio,
                        "Step of the center of the cuts on the linear "
                        "relaxation before the search: the share of the way "

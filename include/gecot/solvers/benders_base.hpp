@@ -51,7 +51,9 @@ struct benders_base : public flow_preprocessing {
     // cuts(candidate, y, add) writes in candidate, a point of the master,
     // its other variables at the scenario y (f_t and f^i_t, or theta_g),
     // calls add with the cut at y of each block that candidate overvalues,
-    // and returns the scores of the cases at y. With lazy constraints, in a
+    // and returns the scores of the cases at y. add ignores what may follow
+    // the cut: the hook of a row that the rounds of multiflow_benders may
+    // remove, which the search never does. With lazy constraints, in a
     // callback of the solver; without, the master solved again with the cuts
     // of its solution as rows, until it receives none. No solution if the
     // solver found none: the caller then returns _fallback_solution.
@@ -80,7 +82,8 @@ struct benders_base : public flow_preprocessing {
                 auto candidate = handle.get_solution();
                 const auto y = _bought_options(instance, candidate, x);
                 const std::size_t num_cuts_before = num_cuts;
-                const auto case_scores = cuts(candidate, y, [&](auto && cut) {
+                const auto case_scores = cuts(candidate, y, [&](auto && cut,
+                                                                auto &&...) {
                     ++num_cuts;
                     handle.add_lazy_constraint(
                         std::forward<decltype(cut)>(cut));
@@ -137,7 +140,7 @@ struct benders_base : public flow_preprocessing {
                _start_defect(instance, start, budget).empty()) {
                 best_score =
                     score_of(std::vector<double>(model.num_variables()), start,
-                             [](auto &&) {});
+                             [](auto &&, auto &&...) {});
                 best = std::move(start);
             }
         // the times the masters proposed each scenario. The second time,
@@ -176,7 +179,7 @@ struct benders_base : public flow_preprocessing {
                                   std::numeric_limits<double>::infinity());
             const std::size_t num_cuts_before = num_cuts;
             const double score =
-                score_of(std::move(values), y, [&](auto && cut) {
+                score_of(std::move(values), y, [&](auto && cut, auto &&...) {
                     ++num_cuts;
                     model.add_constraint(std::forward<decltype(cut)>(cut));
                 });

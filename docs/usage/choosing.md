@@ -86,16 +86,16 @@ Instances with [conflict sets](instance.md#conflict-sets) or [several costs](ins
 
 Every solver can run `flow_mip`, `multicut_benders` and `path_lp`, but not with the same features. GECOT warns when a parameter asks for a feature that the solver lacks. Only Gurobi, CPLEX and COPT give the Benders decompositions lazy constraints: with the others they [solve their master again](../formulations/benders.md#without-lazy-constraints).
 
-| Solver | Algorithms | `--mip-start` | Gap of $10^{-10}$ | Bound in the result | `--evict-age` | `--numeric-focus` |
-|---|---|:-:|:-:|:-:|:-:|:-:|
-| Gurobi | all | ✓ | ✓ | ✓ | ✓ | ✓ |
-| CPLEX | all | ✓ | ✓ | ✓ | ✓ | ✓ |
-| COPT | all | ✓ | ✓ | ✓ | – | – |
-| Xpress | all | ✓ | ✓ | ✓ | – | ✓ |
-| MOSEK | all | ✓ | – | ✓ | – | MIP only |
-| HiGHS | all | ✓ | ✓ | ✓ | ✓ | – |
-| SCIP | all but `flow_benders`, `multiflow_benders`, `multiflow_rounding` | – | ✓ | ✓ | ✓ | – |
-| CBC | all | ✓ | ✓ | ✓ | ✓ | – |
-| GLPK | all but `tree_lp` | – | – | – | – | – |
+| Solver | Algorithms | `--mip-start` | Gap of $10^{-10}$ | Bound in the result | `--evict-age` | `--root-cut-purge` | `--numeric-focus` |
+|---|---|:-:|:-:|:-:|:-:|:-:|:-:|
+| Gurobi | all | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| CPLEX | all | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| COPT | all | ✓ | ✓ | ✓ | – | – | – |
+| Xpress | all | ✓ | ✓ | ✓ | – | – | ✓ |
+| MOSEK | all | ✓ | – | ✓ | – | – | MIP only |
+| HiGHS | all | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| SCIP | all but `flow_benders`, `multiflow_benders`, `multiflow_rounding` | – | ✓ | ✓ | ✓ | – | – |
+| CBC | all | ✓ | ✓ | ✓ | ✓ | – | – |
+| GLPK | all but `tree_lp` | – | – | – | – | – | – |
 
 Every solver honours `--time-limit`. Without the optimality gap setting, a solver stops at its own default gap, and `optimal` then means optimal within this gap. Ctrl-C reaches a solver when it next reports its progress: within seconds with Gurobi, later with HiGHS, never with CBC.

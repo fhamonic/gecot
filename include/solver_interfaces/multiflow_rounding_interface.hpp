@@ -34,7 +34,8 @@ public:
                "randomized rounding of its optimum";
     }
     std::optional<std::string> bound_description() const override {
-        return "Value of the relaxation of multiflow_benders with the cuts of "
-               "its rounds.";
+        return "Value of the relaxation of multiflow_benders with the cuts its "
+               "rounds kept: once they converge, its value with all of them, "
+               "within the cut tolerance.";
     }
 };

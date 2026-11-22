@@ -250,7 +250,7 @@ With `--mip-start` or `--mip-start-algorithm static` or `greedy`, the solution i
 Before the search, the master is solved as a linear program, with $x \in [0, 1]^\Phi$, and cuts are added round after round ([Cuts on the relaxation](benders.md#cuts-on-the-relaxation)). Each round:
 
 1. **Solves the relaxation.** The rounds stop if it ends without an optimum, on Ctrl-C, which then leaves the search to run until the next one, or once half of `--time-limit` has passed, which leaves the other half to the search. The value of the relaxation is the `max gain` of the table.
-2. **Reads the optimum**: the options $x^*$, brought back into $[0, 1]$, and the flows $f^*_t$.
+2. **Reads the optimum**: the options $x^*$, brought back into $[0, 1]$, and the flows $f^*_t$. With `--root-cut-purge k`, the rows of the cuts slack at it and at the $k - 1$ optima before leave the relaxation, at a value below that of the last removal ([Slack cuts removed](benders.md#slack-cuts-removed)); `multiflow_rounding` does so with $k = 10$ by default.
 3. **Moves the center** toward $x^*$, by `--in-out-ratio` of the way, 0.9 of it by default. In the first round the center is $x^*$ itself.
 4. **Separates every block** at the center, or with `--in-out-separation` at the point that share of the way from the old center to $x^*$. With `--in-out-lift δ`, $10^{-7}$ by default, each option of that point is raised to at least $\delta$. Once that point has stopped adding cuts, both steps become 1 and the lift ends: the point separated is $x^*$ from then on. `--in-out-ratio 1` separates $x^*$ from the start.
 5. **Scores the point separated** with its flows. The criterion is evaluated with each $f_t$ held under $M^t_t$ and each target quality gain under its constant times $\hat{x}_i$. The best value so far is the `fractional gain`: the relaxation with all the cuts reaches at least that much. A round in which some flow stopped after 100,000 pushes gives no value, nor does a lifted point, which can be over the budget.
@@ -261,7 +261,7 @@ Before the search, the master is solved as a linear program, with $x \in [0, 1]^
     - a round of the center, or of a lifted point, that adds none hands over to the optimum;
     - a round of the optimum that adds none ends the rounds.
 
-The options become binary again, and the cuts stay in the master as rows for the search. The value of the last relaxation is reported as `root_relaxation_value`. `--no-root-cuts` skips these rounds. The log ends them with `Rounds on the relaxation: 4, cuts: 4`. The table has a row at most every second: this run took 4 ms, so it shows its first round and its last.
+The options become binary again, and the cuts stay in the master as rows for the search, with `--root-cut-purge` those that item 2 left. The value of the last relaxation is reported as `root_relaxation_value`. `--no-root-cuts` skips these rounds. The log ends them with `Rounds on the relaxation: 4, cuts: 4`. The table has a row at most every second: this run took 4 ms, so it shows its first round and its last.
 
 In the example, the first relaxation has no cut. Each flow takes its bound, $f_a = 5.96$, $f_b = 6.2$ and $f_c = 6.04$, and the plantation is bought for the target quality gain of wood B. The relaxation is worth $2 \times 5.96 + 6.2 + 6.2 + 3 \times 6.04 = 42.44$, which is $+130.65\,\%$ over the initial score of 18.4: the `max gain` of the first row. Four rounds bring it to $+80.49\,\%$, against the optimum's $+56.30\,\%$. The search closes the rest.
 
@@ -312,6 +312,6 @@ A copy is filled exactly whenever a source has its whole quality $\overline{w}_s
 - **The report** adds to the size of the model and to `model_build_time_ms`:
     - `lazy_constraints`, the cuts of step 8, and `nodes`;
     - `sources`, the pairs of step 5;
-    - `root_rounds` and `root_cuts`, from step 7.
+    - `root_rounds` and `root_cuts`, from step 7, and with `--root-cut-purge` `root_cuts_purged`, from its item 2.
 
 If the solver stops before any solution, the result is the MIP start when there is one, and an error otherwise.

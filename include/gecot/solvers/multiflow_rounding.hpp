@@ -39,7 +39,15 @@ struct multiflow_rounding : public multiflow_benders {
     // Without the lift of multiflow_benders: its cuts pay in a search, which
     // this run has not, and it made the rounds 31 % longer on the benchmark
     // for solutions as good, in docs/formulations/benders.md
-    multiflow_rounding() { in_out_lift = 0; }
+    // With the purge of slack cuts: this run reads x*, the bound and the
+    // number of rows only, and the rows grow with the rounds. 10: at 3 and 5
+    // the rounds add more removed cuts back, and the suite ran 10 % slower at
+    // 3 than at 10; above 10 the master keeps more rows, and the long rounds
+    // of a hexagon grid were 9 % slower at 20, in benchmark/defaults.md
+    multiflow_rounding() {
+        in_out_lift = 0;
+        root_cut_purge = 10;
+    }
 
     // The randomized rounding, after the rounds on the relaxation: the
     // scenarios drawn from x* and the MIP start, the best by the flows of
